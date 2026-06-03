@@ -25,7 +25,6 @@ grok calculator {
   }
 
   // Recursive descent parser/evaluator
-  // Evaluates simple arithmetic expressions
   func eval_simple(a: f64, op: string, b: f64) -> f64 {
     if op == "+" {
       return a + b
@@ -48,28 +47,30 @@ grok calculator {
     ops: [string]
 
     func push_value(mut self, v: f64) {
-      self.values = append(self.values, v)
+      self.values.push(v)
     }
 
     func push_op(mut self, op: string) {
-      self.ops = append(self.ops, op)
+      self.ops.push(op)
     }
 
     func pop_value(mut self) -> f64? {
-      if len(self.values) == 0 {
+      if self.values.len() == 0 {
         return nil
       }
-      let v = self.values[len(self.values) - 1]
-      self.values = self.values[:len(self.values) - 1]
+      let idx = self.values.len() - 1
+      let v = self.values[idx]
+      self.values = self.values[:idx]
       return v
     }
 
     func pop_op(mut self) -> string? {
-      if len(self.ops) == 0 {
+      if self.ops.len() == 0 {
         return nil
       }
-      let op = self.ops[len(self.ops) - 1]
-      self.ops = self.ops[:len(self.ops) - 1]
+      let idx = self.ops.len() - 1
+      let op = self.ops[idx]
+      self.ops = self.ops[:idx]
       return op
     }
 
@@ -89,7 +90,7 @@ grok calculator {
     }
 
     func result(self) -> f64? {
-      if len(self.values) == 0 {
+      if self.values.len() == 0 {
         return nil
       }
       return self.values[0]
