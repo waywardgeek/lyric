@@ -445,6 +445,8 @@ func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 		return c.checkMapLit(expr)
 	case ast.ExprStructLit:
 		return c.checkStructLit(expr)
+	case ast.ExprMatch:
+		return c.checkMatchExpr(expr)
 	default:
 		return TypeUnknown
 	}
@@ -654,6 +656,36 @@ func (c *Checker) checkMapLit(expr *ast.Expr) *Type {
 		}
 	}
 	return MapType(keyType, valType)
+}
+
+func (c *Checker) checkMatchExpr(expr *ast.Expr) *Type {
+	m := expr.Data.(*ast.MatchStmt)
+	c.checkExpr(&m.Value)
+	// Infer type from last expression of first arm
+	var resultType *Type
+	for _, arm := range m.Arms {
+		c.pushScope()
+		c.bindPattern(&arm.Pattern, c.inferExpr(&m.Value))
+		for i := range arm.Body.Stmts {
+			c.checkStmt(&arm.Body.Stmts[i])
+		}
+		// Use last stmt if it's an expr stmt
+		if len(arm.Body.Stmts) > 0 {
+			last := &arm.Body.Stmts[len(arm.Body.Stmts)-1]
+			if last.Kind == ast.StmtExpr {
+				es := last.Data.(*ast.ExprStmt)
+				t := c.inferExpr(&es.Expr)
+				if resultType == nil {
+					resultType = t
+				}
+			}
+		}
+		c.popScope()
+	}
+	if resultType == nil {
+		return TypeUnknown
+	}
+	return resultType
 }
 
 // --- Statement checking ---

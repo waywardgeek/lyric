@@ -282,10 +282,14 @@ func (p *Parser) parsePrimaryExpr() (*ast.Expr, error) {
 			Kind: ast.ExprNil,
 			Span: tok.Span,
 		}, nil
-	case TIdent:
+	case TIdent, TSelf:
 		p.next()
+		name := tok.Text
+		if tok.Kind == TSelf {
+			name = "self"
+		}
 		// Check for map literal: map[K]V{...}
-		if tok.Text == "map" && p.peek().Kind == TLBracket {
+		if name == "map" && p.peek().Kind == TLBracket {
 			return p.parseMapLit(tok)
 		}
 		// Check for struct literal: TypeName{Field: value, ...}
@@ -295,7 +299,7 @@ func (p *Parser) parsePrimaryExpr() (*ast.Expr, error) {
 		}
 		return &ast.Expr{
 			Kind: ast.ExprIdent,
-			Data: &ast.IdentExpr{Name: tok.Text},
+			Data: &ast.IdentExpr{Name: name},
 			Span: tok.Span,
 		}, nil
 	case TLParen:

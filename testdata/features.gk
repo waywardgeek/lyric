@@ -59,5 +59,11 @@ grok features {
         let a = Vec2{X: 1.0, Y: 2.0}
         let b = Vec2{X: 3.0, Y: 4.0}
         let _ = Dot(a, b)
+
+        // Test typed list/map literals
+        let nums = [1, 2, 3]
+        let _ = SumList(nums)
+        let scores = map[string]i32{"alice": 100, "bob": 95}
+        let _ = scores
     }
 }

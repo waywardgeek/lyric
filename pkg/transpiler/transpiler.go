@@ -11,9 +11,11 @@ import (
 
 // Transpiler converts Grok AST to Go source.
 type Transpiler struct {
-	buf    strings.Builder
-	indent int
-	pkg    string // Go package name
+	buf               strings.Builder
+	indent            int
+	pkg               string // Go package name
+	currentReturnType string // Go return type of current function
+	selfName          string // receiver name to replace "self" with
 }
 
 // New creates a transpiler targeting the given Go package name.
@@ -280,6 +282,9 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 			}
 		}
 		t.writef("(%s *%s) ", recvName, receiver)
+		t.selfName = recvName
+	} else {
+		t.selfName = ""
 	}
 
 	// Special-case: Main -> main for Go entry point
@@ -315,7 +320,14 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 	if fn.Body != nil {
 		t.writef(" {\n")
 		t.indent++
+		prevReturn := t.currentReturnType
+		if fn.ReturnType != nil {
+			t.currentReturnType = t.goType(fn.ReturnType)
+		} else {
+			t.currentReturnType = ""
+		}
 		t.transpileStmts(fn.Body.Stmts)
+		t.currentReturnType = prevReturn
 		t.indent--
 		t.writeIndent()
 		t.writef("}\n")
@@ -415,6 +427,19 @@ func (t *Transpiler) transpileReturn(stmt *ast.Stmt) {
 	t.writeIndent()
 	if ret.Value != nil {
 		t.writef("return ")
+		// Insert cast if return value type differs from function return type
+		if t.currentReturnType != "" {
+			if rt, ok := ret.Value.ResolvedType.(*checker.Type); ok {
+				exprGoType := checkerTypeToGo(rt)
+				if exprGoType != "" && exprGoType != t.currentReturnType {
+					t.writef("%s(", t.currentReturnType)
+					t.transpileExpr(ret.Value)
+					t.writef(")")
+					t.writef("\n")
+					return
+				}
+			}
+		}
 		t.transpileExpr(ret.Value)
 		t.writef("\n")
 	} else {
@@ -524,7 +549,11 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.writef("nil")
 	case ast.ExprIdent:
 		id := expr.Data.(*ast.IdentExpr)
-		t.writef("%s", id.Name)
+		name := id.Name
+		if name == "self" && t.selfName != "" {
+			name = t.selfName
+		}
+		t.writef("%s", name)
 	case ast.ExprUnary:
 		u := expr.Data.(*ast.UnaryExpr)
 		switch u.Op {
@@ -570,8 +599,12 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.writef("]")
 	case ast.ExprListLit:
 		lit := expr.Data.(*ast.ListLitExpr)
-		// Without type context we emit []any{...}
-		t.writef("[]any{")
+		// Use resolved type from checker if available
+		typeStr := "[]any"
+		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyList {
+			typeStr = checkerTypeToGo(rt)
+		}
+		t.writef("%s{", typeStr)
 		for i := range lit.Elems {
 			if i > 0 {
 				t.writef(", ")
@@ -591,7 +624,11 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		}
 	case ast.ExprMapLit:
 		lit := expr.Data.(*ast.MapLitExpr)
-		t.writef("map[any]any{")
+		typeStr := "map[any]any"
+		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyMap {
+			typeStr = checkerTypeToGo(rt)
+		}
+		t.writef("%s{", typeStr)
 		for i, e := range lit.Entries {
 			if i > 0 {
 				t.writef(", ")
@@ -639,7 +676,13 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 	case ast.ExprMatch:
 		// Match-as-expression in Go via IIFE: func() T { switch v { case ... } }()
 		m := expr.Data.(*ast.MatchStmt)
-		t.writef("func() any {\n")
+		retType := "any"
+		if rt, ok := expr.ResolvedType.(*checker.Type); ok {
+			if gt := checkerTypeToGo(rt); gt != "" {
+				retType = gt
+			}
+		}
+		t.writef("func() %s {\n", retType)
 		t.indent++
 		t.writeIndent()
 		t.writef("switch _m := ")
@@ -673,12 +716,29 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			}
 			t.indent--
 		}
-		t.writeIndent()
-		t.writef("default:\n")
-		t.indent++
-		t.writeIndent()
-		t.writef("return nil\n")
-		t.indent--
+		// Add fallback default only if no wildcard arm exists
+		hasDefault := false
+		for _, arm := range m.Arms {
+			if arm.Pattern.Kind == ast.PatWildcard {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			t.writeIndent()
+			t.writef("default:\n")
+			t.indent++
+			t.writeIndent()
+			// Use typed zero value for non-any return types
+			if retType != "any" {
+				t.writef("var _zero %s\n", retType)
+				t.writeIndent()
+				t.writef("return _zero\n")
+			} else {
+				t.writef("return nil\n")
+			}
+			t.indent--
+		}
 		t.writeIndent()
 		t.writef("}\n")
 		t.indent--
@@ -734,6 +794,25 @@ func checkerTypeToGo(ct *checker.Type) string {
 		return "bool"
 	case checker.TyString:
 		return "string"
+	case checker.TyList:
+		if ct.Elem != nil {
+			return "[]" + checkerTypeToGo(ct.Elem)
+		}
+		return "[]any"
+	case checker.TyMap:
+		kt, vt := "any", "any"
+		if ct.Key != nil {
+			kt = checkerTypeToGo(ct.Key)
+		}
+		if ct.Val != nil {
+			vt = checkerTypeToGo(ct.Val)
+		}
+		return "map[" + kt + "]" + vt
+	case checker.TyOptional:
+		if ct.Elem != nil {
+			return "*" + checkerTypeToGo(ct.Elem)
+		}
+		return "*any"
 	default:
 		return ""
 	}
