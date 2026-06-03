@@ -55,7 +55,24 @@ grok advanced {
         return f(a, b)
     }
 
+    // Function that matches on enum variants
+    func Area(s: Shape) -> f64 {
+        return match s {
+            Circle(r) => { 3.14159 * r * r }
+            Rectangle(w, h) => { w * h }
+            Empty => { 0.0 }
+        }
+    }
+
     func Main() {
+        // Enum variant constructors
+        let c = Circle(5.0)
+        let r = Rectangle(3.0, 4.0)
+        let e = Empty
+        let _ = Area(c)
+        let _ = Area(r)
+        let _ = Area(e)
+
         // Class usage
         let mut ctr = Counter{Count: 0}
         ctr.Increment()

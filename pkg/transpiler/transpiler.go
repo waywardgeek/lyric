@@ -9,6 +9,12 @@ import (
 	"github.com/waywardgeek/grok/pkg/checker"
 )
 
+// variantCtorInfo holds info needed to transpile an enum variant constructor call.
+type variantCtorInfo struct {
+	enumName   string   // e.g., "Shape"
+	fieldNames []string // e.g., ["radius"] or ["width", "height"]; positional if empty name
+}
+
 // Transpiler converts Grok AST to Go source.
 type Transpiler struct {
 	buf               strings.Builder
@@ -19,11 +25,13 @@ type Transpiler struct {
 	classes           map[string]bool   // tracks which types are classes (pointer receiver methods)
 	topFuncs          map[string]bool   // tracks top-level function names
 	autoImports       map[string]bool   // auto-detected import requirements (e.g., "fmt" for Sprintf)
+	variantCtors      map[string]*variantCtorInfo // variant name → constructor info
+	unitVariants      map[string]string           // variant name → enum name (for unit variants)
 }
 
 // New creates a transpiler targeting the given Go package name.
 func New(pkg string) *Transpiler {
-	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool)}
+	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string)}
 }
 
 func (t *Transpiler) needsImport(pkg string) {
@@ -341,6 +349,7 @@ func (t *Transpiler) transpileEnum(e *ast.EnumDecl) {
 	// Variant structs
 	for _, v := range e.Variants {
 		vName := fmt.Sprintf("%s%s", name, exportName(v.Name))
+		var fieldNames []string
 		if len(v.Fields) == 0 {
 			t.writef("\ntype %s struct{}\n", vName)
 		} else {
@@ -352,12 +361,23 @@ func (t *Transpiler) transpileEnum(e *ast.EnumDecl) {
 				if fieldName == "" {
 					fieldName = fmt.Sprintf("V%d", i)
 				}
+				fieldNames = append(fieldNames, fieldName)
 				t.writef("%s %s\n", exportName(fieldName), t.goType(&f.Type))
 			}
 			t.indent--
 			t.writef("}\n")
 		}
 		t.writef("\nfunc (%s) is%s() {}\n", vName, name)
+
+		// Register variant constructor info for call transpilation
+		if len(v.Fields) > 0 {
+			t.variantCtors[v.Name] = &variantCtorInfo{
+				enumName:   e.Name,
+				fieldNames: fieldNames,
+			}
+		} else {
+			t.unitVariants[v.Name] = e.Name
+		}
 	}
 }
 
@@ -600,14 +620,36 @@ func (t *Transpiler) transpileWhile(stmt *ast.Stmt) {
 
 func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	matchStmt := stmt.Data.(*ast.MatchStmt)
+	isEnumMatch := t.isEnumMatch(&matchStmt.Value)
 	t.writeIndent()
-	t.writef("switch ")
-	t.transpileExpr(&matchStmt.Value)
-	t.writef(" {\n")
+	if isEnumMatch {
+		t.writef("switch _m := ")
+		t.transpileExpr(&matchStmt.Value)
+		t.writef(".(type) {\n")
+	} else {
+		t.writef("switch ")
+		t.transpileExpr(&matchStmt.Value)
+		t.writef(" {\n")
+	}
 	for _, arm := range matchStmt.Arms {
 		t.writeIndent()
 		if arm.Pattern.Kind == ast.PatWildcard {
 			t.writef("default:\n")
+		} else if arm.Pattern.Kind == ast.PatVariant && isEnumMatch {
+			vp := arm.Pattern.Data.(*ast.VariantPattern)
+			t.writef("case %s:\n", t.variantGoType(vp.Name))
+			t.indent++
+			t.emitVariantBindings(vp)
+			t.transpileStmts(arm.Body.Stmts)
+			t.indent--
+			continue
+		} else if arm.Pattern.Kind == ast.PatIdent && isEnumMatch {
+			id := arm.Pattern.Data.(*ast.IdentPattern)
+			if goType := t.variantGoType(id.Name); goType != exportName(id.Name) {
+				t.writef("case %s:\n", goType)
+			} else {
+				t.writef("case %s:\n", id.Name)
+			}
 		} else {
 			t.writef("case ")
 			t.transpilePattern(&arm.Pattern)
@@ -619,6 +661,48 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	}
 	t.writeIndent()
 	t.writef("}\n")
+}
+
+// isEnumMatch checks if the match value expression has an enum resolved type.
+func (t *Transpiler) isEnumMatch(expr *ast.Expr) bool {
+	if rt, ok := expr.ResolvedType.(*checker.Type); ok {
+		return rt.Kind == checker.TyEnum
+	}
+	return false
+}
+
+// variantGoType returns the Go type name for a variant (e.g., "ShapeCircle").
+func (t *Transpiler) variantGoType(variantName string) string {
+	if vci, ok := t.variantCtors[variantName]; ok {
+		return exportName(vci.enumName) + exportName(variantName)
+	}
+	if enumName, ok := t.unitVariants[variantName]; ok {
+		return exportName(enumName) + exportName(variantName)
+	}
+	return exportName(variantName)
+}
+
+// emitVariantBindings emits field extraction from a type-switch matched variant.
+func (t *Transpiler) emitVariantBindings(vp *ast.VariantPattern) {
+	vci, ok := t.variantCtors[vp.Name]
+	if !ok || len(vp.Bindings) == 0 {
+		return
+	}
+	for i, binding := range vp.Bindings {
+		if binding.Kind != ast.PatIdent {
+			continue
+		}
+		id := binding.Data.(*ast.IdentPattern)
+		if id.Name == "_" {
+			continue
+		}
+		fieldName := fmt.Sprintf("V%d", i)
+		if i < len(vci.fieldNames) {
+			fieldName = vci.fieldNames[i]
+		}
+		t.writeIndent()
+		t.writef("%s := _m.%s\n", id.Name, exportName(fieldName))
+	}
 }
 
 // --- Expressions ---
@@ -697,6 +781,9 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		name := id.Name
 		if name == "self" && t.selfName != "" {
 			name = t.selfName
+		} else if enumName, ok := t.unitVariants[name]; ok {
+			// Unit enum variant: emit as struct literal
+			name = fmt.Sprintf("%s%s{}", exportName(enumName), exportName(name))
 		}
 		t.writef("%s", name)
 	case ast.ExprUnary:
@@ -712,6 +799,28 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.transpileBinary(expr)
 	case ast.ExprCall:
 		call := expr.Data.(*ast.CallExpr)
+		// Check if this is an enum variant constructor
+		if call.Func.Kind == ast.ExprIdent {
+			id := call.Func.Data.(*ast.IdentExpr)
+			if vci, ok := t.variantCtors[id.Name]; ok {
+				// Emit as struct literal: EnumVariant{Field: val, ...}
+				goName := fmt.Sprintf("%s%s", exportName(vci.enumName), exportName(id.Name))
+				t.writef("%s{", goName)
+				for i := range call.Args {
+					if i > 0 {
+						t.writef(", ")
+					}
+					fieldName := fmt.Sprintf("V%d", i)
+					if i < len(vci.fieldNames) {
+						fieldName = vci.fieldNames[i]
+					}
+					t.writef("%s: ", exportName(fieldName))
+					t.transpileExpr(&call.Args[i])
+				}
+				t.writef("}")
+				break
+			}
+		}
 		// Handle builtins and top-level function names
 		if call.Func.Kind == ast.ExprIdent {
 			id := call.Func.Data.(*ast.IdentExpr)
@@ -870,22 +979,42 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				retType = gt
 			}
 		}
+		isEnumMatch := t.isEnumMatch(&m.Value)
 		t.writef("func() %s {\n", retType)
 		t.indent++
 		t.writeIndent()
-		t.writef("switch _m := ")
-		t.transpileExpr(&m.Value)
-		t.writef("; _m {\n")
+		if isEnumMatch {
+			t.writef("switch _m := ")
+			t.transpileExpr(&m.Value)
+			t.writef(".(type) {\n")
+		} else {
+			t.writef("switch _m := ")
+			t.transpileExpr(&m.Value)
+			t.writef("; _m {\n")
+		}
 		for _, arm := range m.Arms {
 			t.writeIndent()
 			if arm.Pattern.Kind == ast.PatWildcard {
 				t.writef("default:\n")
+			} else if arm.Pattern.Kind == ast.PatVariant && isEnumMatch {
+				vp := arm.Pattern.Data.(*ast.VariantPattern)
+				t.writef("case %s:\n", t.variantGoType(vp.Name))
+				t.indent++
+				t.emitVariantBindings(vp)
+			} else if arm.Pattern.Kind == ast.PatIdent && isEnumMatch {
+				id := arm.Pattern.Data.(*ast.IdentPattern)
+				if goType := t.variantGoType(id.Name); goType != exportName(id.Name) {
+					t.writef("case %s:\n", goType)
+				} else {
+					t.writef("case %s:\n", id.Name)
+				}
+				t.indent++
 			} else {
 				t.writef("case ")
 				t.transpilePattern(&arm.Pattern)
 				t.writef(":\n")
+				t.indent++
 			}
-			t.indent++
 			// Last statement in arm body is the result — emit as return
 			if len(arm.Body.Stmts) > 0 {
 				for i := 0; i < len(arm.Body.Stmts)-1; i++ {

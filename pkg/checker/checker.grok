@@ -14,6 +14,11 @@ grok Checker {
        After registration, checkImplements verifies each class satisfies its declared
        interfaces (method signature matching).
 
+       Enums: registerEnum stores variant field info in TypeInfo.Variants and defines
+       variant names in the global scope — unit variants as enum-typed values,
+       field variants as TyFunc constructors (fields → enum type). This enables
+       both variant construction (Circle(5.0)) and typed pattern binding in match.
+
     2. Checking Phase: walks function bodies (statements and expressions),
        performing type inference and validation. Each expression returns its
        inferred *Type; each statement is checked for type consistency.
@@ -147,10 +152,18 @@ grok Checker {
 
   // ---- Type registry ----
 
+  struct VariantInfo {
+    why: "Holds field information for a single enum variant."
+    EnumName: string
+    Fields:   [TypeField]
+  }
+
   struct TypeInfo {
-    Type:    Type?
-    Fields:  map[string]Type?
-    Methods: map[string]Type?
+    Type:     Type?
+    Fields:   map[string]Type?
+    Methods:  map[string]Type?
+    Variants: map[string]VariantInfo?
+      why: "Enum variants: variant name → field info. Enables typed variant construction and pattern binding."
   }
 
   class Registry() {

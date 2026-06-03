@@ -51,6 +51,11 @@ grok Transpiler {
 
     Enums: tagged union pattern — interface with private marker method, variant
     structs implementing it. Unnamed variant fields get positional names (V0, V1).
+    During transpilation, variant constructor info is registered in variantCtors
+    (field variants) and unitVariants (unit variants), enabling:
+    - Constructor calls: Circle(5.0) → ShapeCircle{Radius: 5.0}
+    - Unit variant refs: Empty → ShapeEmpty{}
+    - Match type switches: switch _m := s.(type) { case ShapeCircle: r := _m.Radius ... }
 
     Functions: regular Go funcs. Self params skipped from parameter list.
     Type parameters emit Go 1.18+ constraint syntax (default: any).
@@ -66,7 +71,10 @@ grok Transpiler {
     - If/ElseIf/Else: direct Go if/else chain
     - For: `for _, var := range collection` (always discards index)
     - While: `for condition { ... }`
-    - Match: `switch value { case pattern: ... }`; wildcard → default:
+    - Match: when match value has enum ResolvedType, emits Go type switch
+      (`switch _m := val.(type)`) with variant-typed cases and field extraction
+      (`r := _m.Radius`). For non-enum matches, emits regular `switch value { ... }`.
+      Wildcard → default:. Unit variants in match arms detected via PatIdent.
     - Cascade: `defer func() { ... }()`
     - Break/Continue: direct Go keywords
     - Block: bare `{ ... }` block
@@ -125,6 +133,10 @@ grok Transpiler {
       why: "Tracks which type names are classes (vs structs). Class struct literals emit with & prefix for pointer receiver compatibility."
     topFuncs:          map[string]bool
       why: "Tracks top-level function names. Call expressions export these names but leave local variables as-is."
+    variantCtors:      map[string]any
+      why: "Maps variant name → {enumName, fieldNames}. Enables variant constructor calls to emit struct literals."
+    unitVariants:      map[string]string
+      why: "Maps unit variant name → enum name. Enables identifier refs to emit ShapeEmpty{} instead of Empty."
 
     func Transpile(mut self, file: File?) -> string
       why: "Primary entry point. Emits package declaration then all blocks."

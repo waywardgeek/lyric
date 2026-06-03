@@ -834,3 +834,48 @@ func TestCastPlatformInt(t *testing.T) {
 	expectNoErrors(t, c)
 }
 
+
+func TestEnumVariantConstructor(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  enum Color {
+    Red
+    Green
+    RGB(r: i32, g: i32, b: i32)
+  }
+  func f() {
+    let a = Red
+    let b = RGB(255, 128, 0)
+    let _ = a
+    let _ = b
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestEnumVariantConstructorWrongArgs(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  enum Color {
+    RGB(r: i32, g: i32, b: i32)
+  }
+  func f() {
+    let _ = RGB(255, 128)
+  }
+}`)
+	expectErrors(t, c, 1)
+}
+
+func TestEnumVariantPatternTyped(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  enum Shape {
+    Circle(radius: f64)
+    Empty
+  }
+  func f(s: Shape) -> f64 {
+    return match s {
+      Circle(r) => { r * r }
+      Empty => { 0.0 }
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+}

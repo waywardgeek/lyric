@@ -5,7 +5,25 @@ import (
 	"testing"
 
 	"github.com/waywardgeek/grok/pkg/ast"
+	"github.com/waywardgeek/grok/pkg/checker"
+	"github.com/waywardgeek/grok/pkg/parser"
 )
+
+// transpileWithChecker parses, type-checks, and transpiles Grok source.
+func transpileWithChecker(t *testing.T, src string) string {
+	t.Helper()
+	file, err := parser.ParseString(src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	c := checker.New()
+	c.CheckFile(file)
+	if errs := c.Errors(); len(errs) > 0 {
+		t.Fatalf("checker errors: %v", errs)
+	}
+	tr := New("main")
+	return tr.Transpile(file)
+}
 
 func TestTranspileStruct(t *testing.T) {
 	file := &ast.File{
@@ -445,4 +463,54 @@ func TestTranspileInterfaceComposition(t *testing.T) {
 	assertContains(t, got, "Reader")
 	assertContains(t, got, "Writer")
 	assertContains(t, got, "Close()")
+}
+
+func TestTranspileEnumVariantConstructor(t *testing.T) {
+	src := `grok test {
+  enum Shape {
+    Circle(radius: f64)
+    Empty
+  }
+  func main() {
+    let c = Circle(5.0)
+    let e = Empty
+    let _ = c
+    let _ = e
+  }
+}`
+	output := transpileWithChecker(t, src)
+	if !strings.Contains(output, "ShapeCircle{Radius: 5.0}") {
+		t.Errorf("expected variant constructor struct literal, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ShapeEmpty{}") {
+		t.Errorf("expected unit variant struct literal, got:\n%s", output)
+	}
+}
+
+func TestTranspileEnumMatchTypeSwitch(t *testing.T) {
+	src := `grok test {
+  enum Shape {
+    Circle(radius: f64)
+    Empty
+  }
+  func Area(s: Shape) -> f64 {
+    return match s {
+      Circle(r) => { r }
+      Empty => { 0.0 }
+    }
+  }
+}`
+	output := transpileWithChecker(t, src)
+	if !strings.Contains(output, ".(type)") {
+		t.Errorf("expected type switch, got:\n%s", output)
+	}
+	if !strings.Contains(output, "case ShapeCircle:") {
+		t.Errorf("expected ShapeCircle case, got:\n%s", output)
+	}
+	if !strings.Contains(output, "r := _m.Radius") {
+		t.Errorf("expected field binding, got:\n%s", output)
+	}
+	if !strings.Contains(output, "case ShapeEmpty:") {
+		t.Errorf("expected ShapeEmpty case, got:\n%s", output)
+	}
 }

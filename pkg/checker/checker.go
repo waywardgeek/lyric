@@ -240,11 +240,18 @@ func (s *Scope) Lookup(name string) *Type {
 
 // --- Type Registry ---
 
+// VariantInfo holds field information for an enum variant.
+type VariantInfo struct {
+	EnumName string
+	Fields   []TypeField // variant fields (named or positional)
+}
+
 // TypeInfo holds registered type information.
 type TypeInfo struct {
-	Type    *Type
-	Fields  map[string]*Type // struct/class fields
-	Methods map[string]*Type // method signatures (as TyFunc)
+	Type     *Type
+	Fields   map[string]*Type    // struct/class fields
+	Methods  map[string]*Type    // method signatures (as TyFunc)
+	Variants map[string]*VariantInfo // enum variants (variant name → info)
 }
 
 // Registry holds all known types in the program.
@@ -972,9 +979,23 @@ func (c *Checker) bindPattern(pat *ast.Pattern, matchType *Type) {
 		}
 	case ast.PatVariant:
 		vp := pat.Data.(*ast.VariantPattern)
-		// Bind sub-patterns as unknown (enum variant field types not tracked yet)
+		// Look up variant field types from the enum's registry entry
+		var fieldTypes []TypeField
+		if matchType.Kind == TyEnum {
+			if enumInfo := c.registry.Lookup(matchType.Name); enumInfo != nil {
+				if vi, ok := enumInfo.Variants[vp.Name]; ok {
+					fieldTypes = vi.Fields
+				}
+			}
+		}
 		for i := range vp.Bindings {
-			c.bindPattern(&vp.Bindings[i], TypeUnknown)
+			var bindType *Type
+			if i < len(fieldTypes) {
+				bindType = fieldTypes[i].Type
+			} else {
+				bindType = TypeUnknown
+			}
+			c.bindPattern(&vp.Bindings[i], bindType)
 		}
 	case ast.PatTuple:
 		tp := pat.Data.(*ast.TuplePattern)
@@ -1081,8 +1102,34 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 }
 
 func (c *Checker) registerEnum(e *ast.EnumDecl) {
+	enumType := &Type{Kind: TyEnum, Name: e.Name}
 	info := &TypeInfo{
-		Type: &Type{Kind: TyEnum, Name: e.Name},
+		Type:     enumType,
+		Variants: make(map[string]*VariantInfo),
+	}
+	for _, v := range e.Variants {
+		vi := &VariantInfo{EnumName: e.Name}
+		var paramTypes []*Type
+		for _, f := range v.Fields {
+			ft := c.resolveTypeExpr(&f.Type)
+			vi.Fields = append(vi.Fields, TypeField{Name: f.Name, Type: ft})
+			paramTypes = append(paramTypes, ft)
+		}
+		info.Variants[v.Name] = vi
+
+		// Register variant as a constructor function (or value for unit variants)
+		if len(v.Fields) == 0 {
+			// Unit variant: just a value of the enum type
+			c.scope.Define(v.Name, enumType)
+		} else {
+			// Constructor: function from fields → enum type
+			c.scope.Define(v.Name, &Type{
+				Kind:   TyFunc,
+				Name:   v.Name,
+				Params: paramTypes,
+				Return: enumType,
+			})
+		}
 	}
 	c.registry.Register(e.Name, info)
 }
