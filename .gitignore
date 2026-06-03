@@ -13,3 +13,9 @@ grok-verify
 .DS_Store
 Thumbs.db
 grok-compile
+
+# Generated Go output from .gk compilation
+*.go
+!**/*_test.go
+!cmd/**/*.go
+!pkg/**/*.go
