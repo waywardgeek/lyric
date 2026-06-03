@@ -986,6 +986,18 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.writef("[")
 		t.transpileExpr(&idx.Index)
 		t.writef("]")
+	case ast.ExprSlice:
+		sl := expr.Data.(*ast.SliceExpr)
+		t.transpileExpr(&sl.Receiver)
+		t.writef("[")
+		if sl.Low != nil {
+			t.transpileExpr(sl.Low)
+		}
+		t.writef(":")
+		if sl.High != nil {
+			t.transpileExpr(sl.High)
+		}
+		t.writef("]")
 	case ast.ExprListLit:
 		lit := expr.Data.(*ast.ListLitExpr)
 		// Use resolved type from checker if available

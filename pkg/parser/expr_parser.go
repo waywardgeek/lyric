@@ -247,18 +247,62 @@ func (p *Parser) parsePostfixExpr() (*ast.Expr, error) {
 			}
 		case TLBracket:
 			p.next()
-			index, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			end, err := p.expect(TRBracket)
-			if err != nil {
-				return nil, err
-			}
-			expr = &ast.Expr{
-				Kind: ast.ExprIndex,
-				Data: &ast.IndexExpr{Receiver: *expr, Index: *index},
-				Span: ast.Span{Start: expr.Span.Start, End: end.Span.End},
+			// Check for slice with no low bound: [:high] or [:]
+			if p.peek().Kind == TColon {
+				p.next() // consume ':'
+				var high *ast.Expr
+				if p.peek().Kind != TRBracket {
+					h, err := p.parseExpr()
+					if err != nil {
+						return nil, err
+					}
+					high = h
+				}
+				end, err := p.expect(TRBracket)
+				if err != nil {
+					return nil, err
+				}
+				expr = &ast.Expr{
+					Kind: ast.ExprSlice,
+					Data: &ast.SliceExpr{Receiver: *expr, Low: nil, High: high},
+					Span: ast.Span{Start: expr.Span.Start, End: end.Span.End},
+				}
+			} else {
+				index, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+				// Check for slice: [low:high] or [low:]
+				if p.peek().Kind == TColon {
+					p.next() // consume ':'
+					var high *ast.Expr
+					if p.peek().Kind != TRBracket {
+						h, err := p.parseExpr()
+						if err != nil {
+							return nil, err
+						}
+						high = h
+					}
+					end, err := p.expect(TRBracket)
+					if err != nil {
+						return nil, err
+					}
+					expr = &ast.Expr{
+						Kind: ast.ExprSlice,
+						Data: &ast.SliceExpr{Receiver: *expr, Low: index, High: high},
+						Span: ast.Span{Start: expr.Span.Start, End: end.Span.End},
+					}
+				} else {
+					end, err := p.expect(TRBracket)
+					if err != nil {
+						return nil, err
+					}
+					expr = &ast.Expr{
+						Kind: ast.ExprIndex,
+						Data: &ast.IndexExpr{Receiver: *expr, Index: *index},
+						Span: ast.Span{Start: expr.Span.Start, End: end.Span.End},
+					}
+				}
 			}
 		case TBang:
 			// Postfix ! — unwrap optional, panic if nil

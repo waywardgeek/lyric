@@ -27,6 +27,7 @@ const (
 	ExprStructLit                 // Point{X: 3.0, Y: 4.0}
 	ExprCast                      // <i64>x — type cast
 	ExprUnwrap                    // x! — unwrap optional, panic if nil
+	ExprSlice                     // xs[start:end] — slice expression
 )
 
 // Expr is any expression node.
@@ -85,6 +86,12 @@ type FieldAccessExpr struct {
 type IndexExpr struct {
 	Receiver Expr
 	Index    Expr
+}
+
+type SliceExpr struct {
+	Receiver Expr
+	Low      *Expr // nil = from start
+	High     *Expr // nil = to end
 }
 
 type UnaryOp int

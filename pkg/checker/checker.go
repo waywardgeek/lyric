@@ -624,6 +624,8 @@ func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 		return c.checkFieldAccess(expr)
 	case ast.ExprIndex:
 		return c.checkIndex(expr)
+	case ast.ExprSlice:
+		return c.checkSlice(expr)
 	case ast.ExprListLit:
 		return c.checkListLit(expr)
 	case ast.ExprTupleLit:
@@ -869,6 +871,31 @@ func (c *Checker) checkIndex(expr *ast.Expr) *Type {
 			c.error(expr.Span, "string index must be integer, got %s", indexType)
 		}
 		return TypeString // single char as string
+	}
+	return TypeUnknown
+}
+
+func (c *Checker) checkSlice(expr *ast.Expr) *Type {
+	sl := expr.Data.(*ast.SliceExpr)
+	recvType := c.checkExpr(&sl.Receiver)
+	if sl.Low != nil {
+		lowType := c.checkExpr(sl.Low)
+		if !lowType.IsInteger() && lowType.Kind != TyUnknown {
+			c.error(expr.Span, "slice low bound must be integer, got %s", lowType)
+		}
+	}
+	if sl.High != nil {
+		highType := c.checkExpr(sl.High)
+		if !highType.IsInteger() && highType.Kind != TyUnknown {
+			c.error(expr.Span, "slice high bound must be integer, got %s", highType)
+		}
+	}
+	// Slicing a list returns a list, slicing a string returns a string
+	switch recvType.Kind {
+	case TyList:
+		return recvType
+	case TyString:
+		return TypeString
 	}
 	return TypeUnknown
 }
@@ -1345,11 +1372,16 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 	for _, p := range cls.CtorParams {
 		ctorParams = append(ctorParams, c.resolveTypeExpr(&p.Type))
 	}
+	var typeParamNames []string
+	for _, tp := range cls.TypeParams {
+		typeParamNames = append(typeParamNames, tp.Name)
+	}
 	c.scope.Define(cls.Name, &Type{
-		Kind:   TyFunc,
-		Name:   cls.Name,
-		Params: ctorParams,
-		Return: info.Type,
+		Kind:           TyFunc,
+		Name:           cls.Name,
+		Params:         ctorParams,
+		Return:         info.Type,
+		TypeParamNames: typeParamNames,
 	})
 }
 
