@@ -706,8 +706,9 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 			c.error(expr.Span, "mismatched numeric types: %s and %s", left, right)
 			return TypeError
 		}
-		// String concatenation
-		if b.Op == ast.OpAdd && left.Equal(TypeString) && right.Equal(TypeString) {
+		// String concatenation (allow unknown on either side if the other is string)
+		if b.Op == ast.OpAdd && (left.Equal(TypeString) && (right.Equal(TypeString) || right.Kind == TyUnknown) ||
+			right.Equal(TypeString) && left.Kind == TyUnknown) {
 			return TypeString
 		}
 		c.error(expr.Span, "cannot apply %v to %s and %s", b.Op, left, right)
