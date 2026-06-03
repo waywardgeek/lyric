@@ -490,7 +490,10 @@ func (c *Checker) assignableTo(from, to *Type) bool {
 	if from.Kind == to.Kind {
 		switch from.Kind {
 		case TyList:
-			if from.Elem != nil && to.Elem != nil {
+			if from.Elem == nil || from.Elem.Kind == TyUnknown {
+				return true // empty list [] is assignable to any typed list
+			}
+			if to.Elem != nil {
 				return c.assignableTo(from.Elem, to.Elem)
 			}
 		case TyMap:
