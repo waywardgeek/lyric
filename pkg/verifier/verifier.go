@@ -797,6 +797,17 @@ func verifyFuncSignature(context string, grokFunc grokast.FuncDecl, goFunc *goFu
 		if !typesMatch(grokReturnStr, goFunc.Returns[0]) {
 			result.add(Error, grokFile, goFile, fmt.Sprintf("%s: return type mismatch: .grok=%s, Go=%s", context, grokReturnStr, goFunc.Returns[0]))
 		}
+	} else if grokReturnCount > 1 && grokFunc.ReturnType != nil && grokFunc.ReturnType.Kind == grokast.TypeTuple {
+		// Element-wise comparison for tuple returns
+		tt := grokFunc.ReturnType.Data.(grokast.TupleType)
+		for i, field := range tt.Fields {
+			if i < len(goFunc.Returns) {
+				grokElemStr := grokTypeToGoString(field.Type)
+				if !typesMatch(grokElemStr, goFunc.Returns[i]) {
+					result.add(Error, grokFile, goFile, fmt.Sprintf("%s: return #%d type mismatch: .grok=%s, Go=%s", context, i+1, grokElemStr, goFunc.Returns[i]))
+				}
+			}
+		}
 	}
 }
 

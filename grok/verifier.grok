@@ -68,7 +68,7 @@ grok Verifier {
 
   // ---- Public API ----
 
-  func verify(grok_path: string, base_dir: string) -> (Result, error)
+  func verify(grok_path: string, base_dir: string) -> (Result?, error)
     why: "Entry point. Parses .grok, finds source files, compares structurally."
 
   // ---- Naming helpers ----
