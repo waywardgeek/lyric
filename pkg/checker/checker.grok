@@ -40,9 +40,11 @@ grok Checker {
     integer type), `let s = "hello"` infers string. When an explicit type annotation
     is present, the initializer type is checked against it.
 
-    Integer literals default to i32, float literals to f64. The checker doesn't yet
-    perform numeric coercion — `let x: i64 = 42` would technically fail because
-    the literal infers i32. This is a known limitation.
+    Integer literals default to i32, float literals to f64. Numeric widening is
+    supported: i32 widens to i64, f32 to f64, etc. Same-sign integers and floats
+    widen to larger bit widths. No cross-kind coercion (int→float requires explicit
+    cast). No narrowing (i64→i32 is an error). Widening applies in assignments,
+    returns, function arguments, binary arithmetic, and comparisons.
 
     For-loop element inference: `for x in collection` infers x's type from the
     collection's Elem type (list → element, map → key).
@@ -70,18 +72,16 @@ grok Checker {
     - Assign: check target is defined and mutable, check value type matches
     - Return: check value type matches enclosing function's declared return type
     - If/ElseIf: check condition is bool, check body blocks
-    - For: resolve collection element type, bind loop var, check body
-    - While: check condition is bool, check body
-    - Match: check match value, check each arm body
+    - For: resolve collection element type, bind loop var, increment loopDepth, check body
+    - While: check condition is bool, increment loopDepth, check body
+    - Match: check match value, bind pattern variables into arm scopes, check each arm body
+    - Break/Continue: error if loopDepth == 0
     - Block: push scope, check stmts, pop scope
     - Cascade/Expr: check inner expression(s)
   """
 
   doc "Known Limitations": """
     - Generic type instantiation: TypeVar exists but no constraint solving
-    - Pattern variable binding: match arm patterns don't bind variables in scope
-    - Numeric coercion: i32 literal doesn't auto-widen to i64
-    - Loop depth tracking: break/continue validity not checked
     - No error recovery: first error stops checking that branch
   """
 
@@ -161,6 +161,8 @@ grok Checker {
     errors:        [error]
     currentReturn: Type?
       why: "Expected return type of the function currently being checked. Nil for void/unit functions."
+    loopDepth: int
+      why: "Tracks nesting depth inside loops for break/continue validation."
 
     func CheckFile(mut self, file: File?)
       why: "Primary entry point. Registers all types, then checks all function bodies."

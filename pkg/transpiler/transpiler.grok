@@ -1,131 +1,114 @@
-// transpiler.grok — the Grok Go transpiler's own understanding
+// transpiler.grok — Grok AST to Go source code generator
 
 grok Transpiler {
-  why: "Backend code generator. Transforms a Grok AST into idiomatic Go source code. Final stage of the .gk compilation pipeline: source text → parser → checker → transpiler → .go file."
+  why: "Final stage of the compilation pipeline. Takes a type-checked AST and emits idiomatic Go source code. Sits after the checker; consumes the same AST structures the parser produces."
 
   doc "Architecture": """
-    The transpiler performs a single recursive walk of the AST, emitting Go source
-    into a strings.Builder. No intermediate representation — AST nodes map directly
-    to Go syntax constructs. This keeps the implementation simple (~740 LOC) at the
-    cost of some output quality (no goimports, no line-length wrapping).
+    Single-pass tree walk over the AST, writing Go text into a strings.Builder.
+    The transpiler maintains an indentation level for formatted output.
 
-    Key design: the transpiler is stateless except for indentation level and output
-    buffer. No type information from the checker is used — all type mapping is done
-    from AST TypeExpr nodes via goType(). This means the transpiler can run without
-    the checker, though the output may have type issues (e.g., []any for untyped
-    list literals).
+    Pipeline: parser → checker → transpiler → Go source → go build
+
+    The transpiler does NOT read type information from the checker — it works
+    purely from AST structure and type annotations (TypeExpr nodes). This means
+    some type-dependent decisions (like typed list literals) aren't yet possible.
   """
 
   doc "Type Mapping": """
-    goType() recursively converts Grok TypeExpr → Go type string:
+    Grok types map to Go types via goType() and grokPrimitiveToGo():
 
-      Named types: grokPrimitiveToGo() maps all primitive names:
-        i8-i256   → int8-int64 (i128/i256 downcast — needs big.Int)
-        u8-u256   → uint8-uint64
-        f32-f128  → float32-float64 (f128 lossy)
-        bool/string/any/int/uint/float → direct Go equivalents
+    Primitives: i8→int8, i16→int16, i32→int32, i64→int64, u8→uint8, etc.
+    f32→float32, f64→float64. i128/i256/u128/u256 downcast to int64/uint64
+    (needs big.Int integration for correctness).
 
-      Composite types:
-        T?          → *T         (optional = pointer)
-        [T]         → []T        (sequence = slice)
-        map[K]V     → map[K]V    (direct)
-        (T, U)      → (T, U)     (tuple = multi-return for function returns)
-        T -> U      → func(T) U
-        channel<T>  → chan T
-        lock        → sync.Mutex
-        unit        → ""          (void — omitted from signatures)
+    Composites:
+    - T? → *T (optional as pointer)
+    - [T] → []T (sequence as slice)
+    - map[K]V → map[K]V (direct)
+    - (A, B) → multiple return values or struct (context-dependent)
+    - func(A) -> B → func(A) B
+    - chan T → chan T
+    - lock → sync.Mutex
 
-      Generics: Type[A, B] → Type[A, B] (Go 1.18+ syntax). Constraint-less
-      type params default to `any`.
+    Named types pass through as-is (user-defined). Generic types emit Go 1.18+
+    type parameter syntax: Type[A, B].
   """
 
-  doc "Declaration Mapping": """
-    Structs: direct mapping. Fields exported via exportName (capitalize first letter).
+  doc "Declaration Transpilation": """
+    Structs: struct fields with exportName() capitalization.
 
-    Classes: split into Go struct (ctor params + fields) + NewX constructor function
-    (returns pointer) + pointer-receiver methods. Self param stripped from method
-    signatures; receiver name defaults to "r" unless named in Grok source.
+    Classes: emit struct (ctor params + fields), NewX() constructor returning
+    pointer, and pointer-receiver methods. The receiver name defaults to "r"
+    unless a self parameter provides a name.
 
-    Enums: tagged union pattern — Go interface with private marker method (isX()),
-    plus one struct per variant implementing the interface. Variants with fields get
-    real struct fields; empty variants get struct{}. This is idiomatic Go for sum
-    types and enables type-switch matching.
+    Enums: tagged union pattern — interface with private marker method, variant
+    structs implementing it. Unnamed variant fields get positional names (V0, V1).
 
-    Functions: direct mapping. Export all names. Params emitted positionally.
+    Functions: regular Go funcs. Self params skipped from parameter list.
+    Type parameters emit Go 1.18+ constraint syntax (default: any).
   """
 
-  doc "Statement Mapping": """
-    VarDecl → `:=` (inferred) or `var T` (explicit type) or `_ =` (blank identifier).
-    Blank identifier special-cased because Go rejects `_ :=`.
-
-    Assign → `target = value` (compound assignment desugared in parser, not here).
-
-    If/ElseIf/Else → direct Go if/else if/else chain.
-
-    For → `for _, var := range collection` (always discards index — future: expose it).
-
-    While → `for condition { ... }` (Go's only loop).
-
-    Match → `switch value { case pattern: body }` (wildcard pattern → default).
-
-    Cascade → `defer func() { body }()` (Grok's deferred cleanup = Go's defer).
-
-    Break/Continue → direct.
-
-    Block → `{ ... }` with scope isolation via indentation.
+  doc "Statement Transpilation": """
+    - VarDecl: `:=` for inferred, `var T =` for annotated, `_ =` for blank
+    - Assign: direct assignment (compound operators desugared in parser)
+    - Return: `return` with optional value
+    - If/ElseIf/Else: direct Go if/else chain
+    - For: `for _, var := range collection` (always discards index)
+    - While: `for condition { ... }`
+    - Match: `switch value { case pattern: ... }`
+    - Cascade: `defer func() { ... }()`
+    - Break/Continue: direct Go keywords
+    - Block: bare `{ ... }` block
   """
 
-  doc "Expression Mapping": """
-    Literals: int/float/bool/nil → direct. String → %q (Go-escaped).
+  doc "Expression Transpilation": """
+    All expression nodes map to Go equivalents. Notable cases:
 
-    Binary/unary operators: direct Go equivalents for all 18 binary ops and 2 unary ops.
+    - List literals: emit `[]any{...}` (no type context yet)
+    - Map literals: emit `map[any]any{...}` (no type context yet)
+    - Tuple literals: emit comma-separated (works for multi-return)
+    - Struct literals: `TypeName{Field: val}` with exportName
+    - Lambdas: `func(params) retType { body }`
+    - Match-as-expression: placeholder `nil` (Go switch is statement-only)
 
-    Call → `func(args)`. Method call → `receiver.Method(args)`.
-    Field access → `receiver.Field`. Index → `receiver[index]`.
-
-    List literals → `[]any{...}` (no type context from checker — a known limitation).
-    Map literals → `map[any]any{...}` (same limitation).
-    Tuple literals → comma-separated values (works for multi-return).
-
-    Lambda → `func(params) RetType { body }`.
-
-    Match-as-expression → placeholder `nil` with comment (Go switch is statement-only;
-    needs IIFE wrapper or temp variable to support expression context).
+    Binary operators map directly. Precedence is encoded in the AST structure
+    (parser handles it), so no parenthesization logic needed here.
   """
 
   doc "Known Limitations": """
-    - Struct literal syntax: not yet supported in parser (Point{X: 3.0})
-    - Untyped collection literals: []any / map[any]any without checker integration
-    - Match-as-expression: emits placeholder — needs IIFE or temp-var pattern
-    - i128/i256: downcast to int64 (needs math/big integration)
-    - For-loop index: always discarded with `_`
-    - No goimports/gofmt: output compiles but isn't formatted
-    - No unused variable detection: Go will reject unused `let` bindings
-    - exportName is naive: doesn't handle acronyms (id → Id not ID)
+    - List/map literals emit []any / map[any]any without type context
+    - Match-as-expression not implementable in Go (would need IIFE)
+    - i128/i256 silently downcast to int64 (data loss)
+    - No import management — user must add imports manually
+    - Tuple types emit as multi-value but tuple literals emit as comma-separated
+    - For loops always discard the index variable
   """
 
-  // ---- Core ----
+  // ---- Core transpiler ----
 
-  class Transpiler(Pkg: string) {
-    why: "Stateful writer. Tracks indentation depth and accumulates output into a string builder."
+  class Transpiler() {
+    why: "Stateful code generator. Accumulates output in a string builder."
+    buf:    any  // strings.Builder — no Grok equivalent, accepted error
+    indent: int
+    pkg:    string
+      why: "Go package name for the output file header."
 
     func Transpile(mut self, file: File?) -> string
-      why: "Primary entry point. Emits package declaration + all blocks."
+      why: "Primary entry point. Emits package declaration then all blocks."
   }
+
+  // ---- Helpers ----
 
   func New(pkg: string) -> Transpiler?
     why: "Creates a transpiler targeting the given Go package name."
 
-  // ---- Helpers ----
-
   func exportName(name: string) -> string
-    why: "Capitalizes first letter for Go export. Naive — doesn't handle acronyms."
+    why: "Capitalizes first letter for Go export convention."
 
   func grokPrimitiveToGo(name: string) -> string
-    why: "Maps Grok primitive type names to Go equivalents. Unknown names pass through as user-defined types."
+    why: "Maps Grok primitive type names to Go equivalents."
 
   func binaryOpString(op: BinaryOp) -> string
-    why: "Maps Grok BinaryOp enum to Go operator string."
 
   source: ["transpiler.go"]
 }
