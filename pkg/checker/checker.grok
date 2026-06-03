@@ -45,8 +45,10 @@ grok Checker {
     Type equality is structural via Equal(): two types match if Kind, Bits, Name,
     and recursive sub-types all match. assignableTo() extends Equal() with interface
     subtyping: a class/struct satisfies an interface if it has all required methods
-    with matching signatures (structural subtyping). IsNumeric() and IsInteger()
-    helpers simplify arithmetic checking.
+    with matching signatures (structural subtyping). Also handles: numeric widening,
+    recursive composite type matching (list/map/optional/tuple element types), and
+    nil (TyUnknown) assignability to optional and interface types.
+    IsNumeric() and IsInteger() helpers simplify arithmetic checking.
   """
 
   doc "Type Inference": """
@@ -62,6 +64,19 @@ grok Checker {
 
     For-loop element inference: `for x in collection` infers x's type from the
     collection's Elem type (list → element, map → key).
+  """
+
+  doc "Error Handling": """
+    Error handling uses Go-style (T, error) tuple returns. `error` is registered
+    as a built-in interface type. Functions return tuples: `func f() -> (i32, error)`.
+    resolveTypeExpr handles TypeTuple by resolving each field type recursively.
+
+    Tuple destructuring: `let (val, err) = f()` — checkVarDecl detects Names field,
+    checks value type is TyTuple with matching arity, and defines each name with
+    the corresponding field type.
+
+    nil (ExprNil → TyUnknown) is assignable to optional and interface types via
+    assignableTo, enabling `return (value, nil)` for no-error returns.
   """
 
   doc "Expression Checking": """

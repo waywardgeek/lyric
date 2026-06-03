@@ -80,7 +80,9 @@ grok Parser {
 
   doc "Statement Parsing": """
     parseStmt() dispatches on the current token:
-    - let/let mut → parseVarDecl (type annotation and/or initializer)
+    - let/let mut → parseVarDecl (type annotation and/or initializer).
+      Supports tuple destructuring: `let (a, b) = expr` detects leading `(`
+      and parses comma-separated names into VarDeclStmt.Names.
     - return → parseReturn (optional value)
     - if → parseIf (with else if / else chains)
     - for → parseFor (for var in collection)

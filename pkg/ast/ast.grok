@@ -268,8 +268,9 @@ grok AST {
   }
 
   struct VarDeclStmt {
-    why: "let or let mut. Type and Value are both optional (but at least one must be present)."
+    why: "let or let mut. Type and Value are both optional (but at least one must be present). Names is used for tuple destructuring: let (a, b) = expr."
     Name:  string
+    Names: [string]
     IsMut: bool
     Type:  TypeExpr?
     Value: Expr?

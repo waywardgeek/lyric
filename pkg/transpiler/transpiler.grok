@@ -112,9 +112,20 @@ grok Transpiler {
 
   doc "Known Limitations": """
     - i128/i256 silently downcast to int64 (data loss)
-    - Tuple types emit as multi-value but tuple literals emit as comma-separated
     - For loops always discard the index variable
     - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)
+  """
+
+  doc "Error Handling & Tuple Returns": """
+    (T, error) tuple return types map directly to Go multi-return. Tuple return
+    types emit as `(T, error)` in function signatures (via goType for TypeTuple).
+    Tuple literal returns emit comma-separated values: `return val, nil`.
+    Return cast logic is skipped for tuple literals to avoid wrapping.
+
+    Tuple destructuring: `let (a, b) = f()` → `a, b := F()` via VarDeclStmt.Names.
+
+    checkerTypeToGo handles TyTuple (emits `(T, U)`), TyInterface (emits name
+    or `interface{}`), TyClass/TyStruct (emits name).
   """
 
   // ---- Variant info ----
