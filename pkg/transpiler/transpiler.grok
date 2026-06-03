@@ -108,6 +108,10 @@ grok Transpiler {
       Return type is inferred from checker's ResolvedType on the match expr.
       Wildcard arms emit `default:`; fallback default uses typed zero value.
     - self: emits receiver name (e.g., `r`) when inside a method body
+    - Built-in methods on string/list/map: intercepted via transpileBuiltinMethod.
+      String methods → strings.* stdlib calls (auto-imports "strings").
+      List methods → len/append/slices.* calls (auto-imports "slices").
+      Map methods → len or IIFE patterns for contains_key/keys/values.
     - Binary ops with differing numeric types: inserts explicit Go cast using
       ResolvedType annotations from checker
     - Cast expressions (<Type>expr): emit Go type conversion `TargetType(expr)`.

@@ -185,6 +185,22 @@ grok Checker {
     These are treated as TyFunc with nil Params (variadic/special).
   """
 
+  doc "Built-in Methods": """
+    checkMethodCall dispatches to checkBuiltinMethod for string, list, and map
+    receiver types. Methods are resolved before falling through to TypeUnknown.
+
+    String methods: len, contains, has_prefix, has_suffix, to_upper, to_lower,
+    trim, trim_left, trim_right, replace, split, index_of, repeat.
+
+    List methods: len, push, pop, contains, reverse, join.
+
+    Map methods: len, contains_key, keys, values.
+
+    The transpiler maps these to Go stdlib calls (strings.Contains, slices.Contains,
+    etc.) with automatic import insertion. Methods that don't map to Go methods
+    (e.g., map.contains_key) use IIFE patterns.
+  """
+
   // ---- Type system ----
 
   enum TypeKind {
