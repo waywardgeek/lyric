@@ -58,8 +58,14 @@ func (t *Type) String() string {
 	}
 	switch t.Kind {
 	case TyInt:
+		if t.Bits == -1 {
+			return "int"
+		}
 		return fmt.Sprintf("i%d", t.Bits)
 	case TyUint:
+		if t.Bits == -1 {
+			return "uint"
+		}
 		return fmt.Sprintf("u%d", t.Bits)
 	case TyFloat:
 		return fmt.Sprintf("f%d", t.Bits)
@@ -386,9 +392,9 @@ func (c *Checker) resolveNamedType(name string, args []ast.TypeExpr) *Type {
 	case "string":
 		return TypeString
 	case "int":
-		return IntType(64) // default int
+		return IntType(-1) // Go platform-sized int (for stdlib interop casts)
 	case "uint":
-		return UintType(64)
+		return UintType(-1) // Go platform-sized uint (for stdlib interop casts)
 	case "float":
 		return FloatType(64)
 	default:
@@ -407,6 +413,27 @@ func (c *Checker) resolveNamedType(name string, args []ast.TypeExpr) *Type {
 func (c *Checker) assignableTo(from, to *Type) bool {
 	if from.Equal(to) {
 		return true
+	}
+	// Numeric widening (e.g., int → i32, i32 → i64)
+	if numericWidens(from, to) {
+		return true
+	}
+	// Composite types: recurse into element types
+	if from.Kind == to.Kind {
+		switch from.Kind {
+		case TyList:
+			if from.Elem != nil && to.Elem != nil {
+				return c.assignableTo(from.Elem, to.Elem)
+			}
+		case TyMap:
+			if from.Key != nil && to.Key != nil && from.Val != nil && to.Val != nil {
+				return c.assignableTo(from.Key, to.Key) && c.assignableTo(from.Val, to.Val)
+			}
+		case TyOptional:
+			if from.Elem != nil && to.Elem != nil {
+				return c.assignableTo(from.Elem, to.Elem)
+			}
+		}
 	}
 	// Interface subtyping: class/struct → interface
 	if to.Kind == TyInterface {
@@ -496,6 +523,8 @@ func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 		return c.checkStructLit(expr)
 	case ast.ExprMatch:
 		return c.checkMatchExpr(expr)
+	case ast.ExprCast:
+		return c.checkCast(expr)
 	default:
 		return TypeUnknown
 	}
@@ -546,9 +575,11 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 		return TypeError
 
 	case ast.OpEq, ast.OpNeq:
-		// Any two equal types can be compared for equality
+		// Any two compatible types can be compared for equality
 		if !left.Equal(right) && left.Kind != TyUnknown && right.Kind != TyUnknown {
-			c.error(expr.Span, "cannot compare %s and %s for equality", left, right)
+			if !numericWidens(left, right) && !numericWidens(right, left) {
+				c.error(expr.Span, "cannot compare %s and %s for equality", left, right)
+			}
 		}
 		return TypeBool
 
@@ -601,9 +632,7 @@ func (c *Checker) checkCall(expr *ast.Expr) *Type {
 		for i := range call.Args {
 			argType := c.checkExpr(&call.Args[i])
 			if !c.assignableTo(argType, fnType.Params[i]) && argType.Kind != TyUnknown && fnType.Params[i].Kind != TyVar {
-				if !numericWidens(argType, fnType.Params[i]) {
-					c.error(call.Args[i].Span, "argument %d: expected %s, got %s", i+1, fnType.Params[i], argType)
-				}
+				c.error(call.Args[i].Span, "argument %d: expected %s, got %s", i+1, fnType.Params[i], argType)
 			}
 		}
 	}
@@ -742,6 +771,21 @@ func (c *Checker) checkMatchExpr(expr *ast.Expr) *Type {
 	return resultType
 }
 
+func (c *Checker) checkCast(expr *ast.Expr) *Type {
+	cast := expr.Data.(*ast.CastExpr)
+	targetType := c.resolveTypeExpr(&cast.TargetType)
+	fromType := c.checkExpr(&cast.Operand)
+	// For now, only validate numeric ↔ numeric casts
+	if fromType.Kind != TyUnknown && targetType.Kind != TyUnknown {
+		fromNumeric := fromType.IsNumeric()
+		toNumeric := targetType.IsNumeric()
+		if !fromNumeric || !toNumeric {
+			c.error(expr.Span, "cannot cast %s to %s (only numeric casts supported)", fromType, targetType)
+		}
+	}
+	return targetType
+}
+
 // --- Statement checking ---
 
 func (c *Checker) checkStmt(stmt *ast.Stmt) {
@@ -793,11 +837,13 @@ func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 
 	var finalType *Type
 	if declaredType != nil && inferredType != nil {
-		// Both present: check compatibility (allow numeric widening)
-		if !inferredType.Equal(declaredType) && inferredType.Kind != TyUnknown {
-			if !numericWidens(inferredType, declaredType) {
-				c.error(stmt.Span, "type mismatch in variable %q: declared %s, got %s", decl.Name, declaredType, inferredType)
-			}
+		// Both present: check compatibility (widening, interface subtyping, composites)
+		if !c.assignableTo(inferredType, declaredType) && inferredType.Kind != TyUnknown {
+			c.error(stmt.Span, "type mismatch in variable %q: declared %s, got %s", decl.Name, declaredType, inferredType)
+		}
+		// Propagate declared type to the value expression (e.g., int literal 100 becomes i64 not i32)
+		if decl.Value != nil {
+			decl.Value.ResolvedType = declaredType
 		}
 		finalType = declaredType
 	} else if declaredType != nil {
@@ -827,10 +873,8 @@ func (c *Checker) checkAssign(stmt *ast.Stmt) {
 			c.error(stmt.Span, "cannot assign to immutable variable %q (use 'let mut')", id.Name)
 		}
 	}
-	if !targetType.Equal(valueType) && targetType.Kind != TyUnknown && valueType.Kind != TyUnknown {
-		if !numericWidens(valueType, targetType) {
-			c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
-		}
+	if !c.assignableTo(valueType, targetType) && targetType.Kind != TyUnknown && valueType.Kind != TyUnknown {
+		c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
 	}
 }
 
@@ -839,10 +883,8 @@ func (c *Checker) checkReturn(stmt *ast.Stmt) {
 	if ret.Value != nil {
 		valType := c.checkExpr(ret.Value)
 		if c.currentReturn != nil {
-			if !c.currentReturn.Equal(valType) && valType.Kind != TyUnknown && c.currentReturn.Kind != TyUnknown {
-				if !numericWidens(valType, c.currentReturn) {
-					c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
-				}
+			if !c.assignableTo(valType, c.currentReturn) && valType.Kind != TyUnknown && c.currentReturn.Kind != TyUnknown {
+				c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
 			}
 		}
 	} else {
@@ -1178,7 +1220,7 @@ func (c *Checker) checkStructLit(expr *ast.Expr) *Type {
 			fieldType, ok = info.Fields[lower]
 		}
 		if ok {
-			if !fieldType.Equal(valType) && valType.Kind != TyUnknown && fieldType.Kind != TyUnknown {
+			if !c.assignableTo(valType, fieldType) && valType.Kind != TyUnknown && fieldType.Kind != TyUnknown {
 				c.error(expr.Span, "field %s: expected %s, got %s", f.Name, fieldType, valType)
 			}
 		} else {

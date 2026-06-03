@@ -25,6 +25,7 @@ const (
 	ExprLambda                    // (x: T) -> x + 1
 	ExprMatch                     // match value { ... } as expression
 	ExprStructLit                 // Point{X: 3.0, Y: 4.0}
+	ExprCast                      // <i64>x — type cast
 )
 
 // Expr is any expression node.
@@ -157,6 +158,12 @@ type LambdaExpr struct {
 	Params     []Param
 	ReturnType *TypeExpr
 	Body       *Block // single expression or block
+}
+
+// CastExpr represents <TargetType>expr — explicit type conversion.
+type CastExpr struct {
+	TargetType TypeExpr
+	Operand    Expr
 }
 
 // --- Statements ---

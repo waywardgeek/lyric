@@ -65,10 +65,12 @@ grok Checker {
     - Idents: scope lookup
     - Binary: validates operand types match and operator is valid for the type
       (arithmetic for numerics, comparison returns bool, logical for bools,
-      equality for any matching pair, bitwise for integers, shifts for integers)
+      equality for any matching pair with numeric widening, bitwise for integers,
+      shifts for integers)
     - Unary: neg requires numeric, not requires bool
     - Call: looks up function in scope/registry, checks arg count and types.
-      Uses assignableTo() for argument compatibility (supports interface subtyping).
+      Uses assignableTo() for argument compatibility (supports interface subtyping,
+      numeric widening, and recursive composite type compatibility).
     - Method call: resolves receiver type, finds method, checks args
     - Field access: resolves receiver type, finds field by name
     - Index: validates receiver is list/map/string, returns element type
@@ -76,6 +78,8 @@ grok Checker {
       key/value consistency (maps). Annotates ResolvedType for typed emit.
     - Match-as-expression (ExprMatch): checks match value, binds pattern vars,
       infers result type from first arm's last expression.
+    - Cast (<Type>expr): resolves target type, checks inner expr, validates
+      conversion is supported (numeric ↔ numeric). Returns target type.
   """
 
   doc "Statement Checking": """
@@ -95,7 +99,7 @@ grok Checker {
   doc "Known Limitations": """
     - Generic type instantiation: TypeVar exists but no constraint solving
     - No error recovery: first error stops checking that branch
-    - assignableTo only used in function args; assignment/return still use Equal()
+    - Cast only supports numeric ↔ numeric; string conversion etc. not yet modeled
   """
 
   // ---- Type system ----

@@ -627,10 +627,30 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 	switch expr.Kind {
 	case ast.ExprIntLit:
 		lit := expr.Data.(*ast.IntLitExpr)
-		t.writef("%s", lit.Value)
+		// If the checker resolved this to a specific int type, emit a cast
+		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyInt {
+			goType := checkerTypeToGo(rt)
+			if goType != "" && goType != "int" {
+				t.writef("%s(%s)", goType, lit.Value)
+			} else {
+				t.writef("%s", lit.Value)
+			}
+		} else {
+			t.writef("%s", lit.Value)
+		}
 	case ast.ExprFloatLit:
 		lit := expr.Data.(*ast.FloatLitExpr)
-		t.writef("%s", lit.Value)
+		// If the checker resolved this to a specific float type, emit a cast
+		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyFloat {
+			goType := checkerTypeToGo(rt)
+			if goType != "" && goType != "float64" {
+				t.writef("%s(%s)", goType, lit.Value)
+			} else {
+				t.writef("%s", lit.Value)
+			}
+		} else {
+			t.writef("%s", lit.Value)
+		}
 	case ast.ExprStringLit:
 		lit := expr.Data.(*ast.StringLitExpr)
 		t.writef("%q", lit.Value)
@@ -912,6 +932,12 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.indent--
 		t.writeIndent()
 		t.writef("}()")
+	case ast.ExprCast:
+		cast := expr.Data.(*ast.CastExpr)
+		goType := t.goType(&cast.TargetType)
+		t.writef("%s(", goType)
+		t.transpileExpr(&cast.Operand)
+		t.writef(")")
 	}
 }
 
@@ -953,8 +979,14 @@ func (t *Transpiler) transpileExprWithCast(expr *ast.Expr, targetGoType string) 
 func checkerTypeToGo(ct *checker.Type) string {
 	switch ct.Kind {
 	case checker.TyInt:
+		if ct.Bits == -1 {
+			return "int"
+		}
 		return fmt.Sprintf("int%d", ct.Bits)
 	case checker.TyUint:
+		if ct.Bits == -1 {
+			return "uint"
+		}
 		return fmt.Sprintf("uint%d", ct.Bits)
 	case checker.TyFloat:
 		return fmt.Sprintf("float%d", ct.Bits)

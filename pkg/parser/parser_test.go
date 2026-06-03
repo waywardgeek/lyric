@@ -411,3 +411,37 @@ func TestParseFString(t *testing.T) {
 		t.Fatal("expected function body")
 	}
 }
+
+
+func TestParseCastExpr(t *testing.T) {
+	input := `grok test {
+  func f() {
+    let x = <i64>42
+    let y = <int>x
+  }
+}`
+	file, err := ParseString(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	fn := file.Blocks[0].Functions[0]
+	if fn.Body == nil || len(fn.Body.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(fn.Body.Stmts))
+	}
+	// First: let x = <i64>42
+	decl := fn.Body.Stmts[0].Data.(*ast.VarDeclStmt)
+	if decl.Value.Kind != ast.ExprCast {
+		t.Fatalf("expected ExprCast, got %v", decl.Value.Kind)
+	}
+	cast := decl.Value.Data.(*ast.CastExpr)
+	if cast.TargetType.Kind != ast.TypeNamed {
+		t.Fatalf("expected TypeNamed, got %v", cast.TargetType.Kind)
+	}
+	nt := cast.TargetType.Data.(ast.NamedType)
+	if nt.Name != "i64" {
+		t.Errorf("expected target type i64, got %s", nt.Name)
+	}
+	if cast.Operand.Kind != ast.ExprIntLit {
+		t.Errorf("expected IntLit operand, got %v", cast.Operand.Kind)
+	}
+}

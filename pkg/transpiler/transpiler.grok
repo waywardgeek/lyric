@@ -92,6 +92,11 @@ grok Transpiler {
     - self: emits receiver name (e.g., `r`) when inside a method body
     - Binary ops with differing numeric types: inserts explicit Go cast using
       ResolvedType annotations from checker
+    - Cast expressions (<Type>expr): emit Go type conversion `TargetType(expr)`.
+      For numeric types, uses checkerTypeToGo to resolve the Go type name.
+    - Integer/float literals with ResolvedType: emit typed literals (e.g.,
+      `int32(42)`) when checker annotated them, bare literals otherwise
+      (unit tests without checker pass produce bare output).
 
     Binary operators map directly. Precedence is encoded in the AST structure
     (parser handles it), so no parenthesization logic needed here.
@@ -99,7 +104,6 @@ grok Transpiler {
 
   doc "Known Limitations": """
     - i128/i256 silently downcast to int64 (data loss)
-    - No import management — user must add imports manually
     - Tuple types emit as multi-value but tuple literals emit as comma-separated
     - For loops always discard the index variable
     - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)

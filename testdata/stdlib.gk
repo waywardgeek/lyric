@@ -1,4 +1,4 @@
-// stdlib.gk — tests Go stdlib import and usage
+// stdlib.gk — tests Go stdlib import and usage, including type casts
 grok stdlib_test {
   import fmt from "fmt"
   import strings from "strings"
@@ -9,9 +9,15 @@ grok stdlib_test {
     let greeting = strings.ToUpper("hello, grok!")
     fmt.Println(greeting)
 
-    // String conversion
+    // String conversion — strconv.Itoa expects Go's int, so cast from i32
     let num = 42
-    let s = strconv.Itoa(num)
-    fmt.Println(strings.Join(["The answer is ", s], ""))
+    let s = strconv.Itoa(<int>num)
+    fmt.Println("The answer is " + s)
+
+    // Numeric casts between Grok types
+    let x: i32 = 100
+    let y: i64 = <i64>x
+    let z: i32 = <i32>y
+    fmt.Println(f"x={x}, y={y}, z={z}")
   }
 }

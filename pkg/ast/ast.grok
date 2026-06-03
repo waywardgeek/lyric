@@ -165,11 +165,11 @@ grok AST {
   // ---- Expressions (.gk) ----
 
   enum ExprKind {
-    Ident IntLit FloatLit StringLit BoolLit Nil
+    Ident IntLit FloatLit StringLit StringInterp BoolLit Nil
     Unary Binary
     Call MethodCall FieldAccess Index
-    ListLit TupleLit MapLit
-    Lambda Match
+    ListLit TupleLit MapLit StructLit
+    Lambda Match Cast
   }
 
   struct Expr {
@@ -239,6 +239,12 @@ grok AST {
     Params:     [Param]
     ReturnType: TypeExpr?
     Body:       Block?
+  }
+
+  struct CastExpr {
+    why: "<TargetType>expr — explicit type conversion. Rune heritage."
+    TargetType: TypeExpr
+    Operand:    Expr
   }
 
   // ---- Statements (.gk) ----

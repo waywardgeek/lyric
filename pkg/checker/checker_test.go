@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/waywardgeek/grok/pkg/parser"
@@ -799,3 +800,37 @@ func TestFStringTypeChecks(t *testing.T) {
 }`)
 	expectNoErrors(t, c)
 }
+func TestCastNumeric(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  func f() {
+    let x: i32 = 42
+    let y: i64 = <i64>x
+    let z: i32 = <i32>y
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestCastInvalidNonNumeric(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  func f() {
+    let s: string = "hello"
+    let x = <i32>s
+  }
+}`)
+	expectErrors(t, c, 1)
+	if len(c.Errors()) > 0 && !strings.Contains(c.Errors()[0].Error(), "cannot cast") {
+		t.Errorf("expected cast error, got: %s", c.Errors()[0])
+	}
+}
+
+func TestCastPlatformInt(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  func f() {
+    let x: i32 = 42
+    let y = <int>x
+  }
+}`)
+	expectNoErrors(t, c)
+}
+

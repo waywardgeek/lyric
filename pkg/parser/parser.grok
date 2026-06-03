@@ -74,8 +74,8 @@ grok Parser {
 
     Primary expressions: identifiers, all literal types (int, float, string, bool,
     nil), parenthesized expressions, list literals [a, b], map literals map[K]V{...},
-    lambda |params| -> RetType { body }, match expressions, and .gk keywords used
-    as identifiers (true, false, nil, map).
+    lambda |params| -> RetType { body }, match expressions, cast expressions
+    <Type>expr, and .gk keywords used as identifiers (true, false, nil, map).
   """
 
   doc "Statement Parsing": """
