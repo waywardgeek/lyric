@@ -117,6 +117,14 @@ grok Transpiler {
     - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)
   """
 
+  // ---- Variant info ----
+
+  struct variantCtorInfo {
+    why: "Holds info for transpiling enum variant constructor calls into Go struct literals."
+    enumName:   string
+    fieldNames: [string]
+  }
+
   // ---- Core transpiler ----
 
   class Transpiler() {
@@ -133,7 +141,7 @@ grok Transpiler {
       why: "Tracks which type names are classes (vs structs). Class struct literals emit with & prefix for pointer receiver compatibility."
     topFuncs:          map[string]bool
       why: "Tracks top-level function names. Call expressions export these names but leave local variables as-is."
-    variantCtors:      map[string]any
+    variantCtors:      map[string]variantCtorInfo?
       why: "Maps variant name → {enumName, fieldNames}. Enables variant constructor calls to emit struct literals."
     unitVariants:      map[string]string
       why: "Maps unit variant name → enum name. Enables identifier refs to emit ShapeEmpty{} instead of Empty."
