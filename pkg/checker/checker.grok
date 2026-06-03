@@ -15,6 +15,10 @@ grok Checker {
        performing type inference and validation. Each expression returns its
        inferred *Type; each statement is checked for type consistency.
 
+    3. Annotation: checkExpr annotates each AST Expr node with ResolvedType
+       (stored as `any` to avoid import cycles). The transpiler reads these
+       annotations to emit typed literals and insert explicit Go casts.
+
     State is maintained in three structures:
     - Scope: lexical variable bindings (nested push/pop for blocks)
     - Registry: named type definitions (structs, classes, enums, functions)
@@ -63,7 +67,9 @@ grok Checker {
     - Field access: resolves receiver type, finds field by name
     - Index: validates receiver is list/map/string, returns element type
     - List/tuple/map literals: check element types for homogeneity (lists) or
-      key/value consistency (maps)
+      key/value consistency (maps). Annotates ResolvedType for typed emit.
+    - Match-as-expression (ExprMatch): checks match value, binds pattern vars,
+      infers result type from first arm's last expression.
   """
 
   doc "Statement Checking": """

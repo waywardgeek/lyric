@@ -9,9 +9,9 @@ grok Transpiler {
 
     Pipeline: parser → checker → transpiler → Go source → go build
 
-    The transpiler does NOT read type information from the checker — it works
-    purely from AST structure and type annotations (TypeExpr nodes). This means
-    some type-dependent decisions (like typed list literals) aren't yet possible.
+    The transpiler reads type information from the checker via ResolvedType
+    annotations on AST Expr nodes. This enables typed literal emission and
+    automatic cast insertion where Go requires explicit type conversion.
   """
 
   doc "Type Mapping": """
@@ -32,6 +32,9 @@ grok Transpiler {
 
     Named types pass through as-is (user-defined). Generic types emit Go 1.18+
     type parameter syntax: Type[A, B].
+
+    checkerTypeToGo() converts checker.Type to Go type strings, handling
+    composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T.
   """
 
   doc "Declaration Transpilation": """
@@ -39,23 +42,26 @@ grok Transpiler {
 
     Classes: emit struct (ctor params + fields), NewX() constructor returning
     pointer, and pointer-receiver methods. The receiver name defaults to "r"
-    unless a self parameter provides a name.
+    unless a self parameter provides a name. The selfName field tracks the
+    current receiver name so `self` in expressions emits the correct Go name.
 
     Enums: tagged union pattern — interface with private marker method, variant
     structs implementing it. Unnamed variant fields get positional names (V0, V1).
 
     Functions: regular Go funcs. Self params skipped from parameter list.
     Type parameters emit Go 1.18+ constraint syntax (default: any).
+    Special case: Main→main for package main entry point.
   """
 
   doc "Statement Transpilation": """
     - VarDecl: `:=` for inferred, `var T =` for annotated, `_ =` for blank
     - Assign: direct assignment (compound operators desugared in parser)
-    - Return: `return` with optional value
+    - Return: `return` with optional value; inserts explicit Go cast when return
+      expr type differs from function return type (via currentReturnType)
     - If/ElseIf/Else: direct Go if/else chain
     - For: `for _, var := range collection` (always discards index)
     - While: `for condition { ... }`
-    - Match: `switch value { case pattern: ... }`
+    - Match: `switch value { case pattern: ... }`; wildcard → default:
     - Cascade: `defer func() { ... }()`
     - Break/Continue: direct Go keywords
     - Block: bare `{ ... }` block
@@ -64,34 +70,44 @@ grok Transpiler {
   doc "Expression Transpilation": """
     All expression nodes map to Go equivalents. Notable cases:
 
-    - List literals: emit `[]any{...}` (no type context yet)
-    - Map literals: emit `map[any]any{...}` (no type context yet)
+    - List literals: emit typed `[]int32{...}` when ResolvedType available,
+      else `[]any{...}`
+    - Map literals: emit typed `map[string]int32{...}` when ResolvedType
+      available, else `map[any]any{...}`
     - Tuple literals: emit comma-separated (works for multi-return)
     - Struct literals: `TypeName{Field: val}` with exportName
     - Lambdas: `func(params) retType { body }`
-    - Match-as-expression: placeholder `nil` (Go switch is statement-only)
+    - Match-as-expression: IIFE pattern `func() T { switch _m := val; _m { ... } }()`
+      Return type is inferred from checker's ResolvedType on the match expr.
+      Wildcard arms emit `default:`; fallback default uses typed zero value.
+    - self: emits receiver name (e.g., `r`) when inside a method body
+    - Binary ops with differing numeric types: inserts explicit Go cast using
+      ResolvedType annotations from checker
 
     Binary operators map directly. Precedence is encoded in the AST structure
     (parser handles it), so no parenthesization logic needed here.
   """
 
   doc "Known Limitations": """
-    - List/map literals emit []any / map[any]any without type context
-    - Match-as-expression not implementable in Go (would need IIFE)
     - i128/i256 silently downcast to int64 (data loss)
     - No import management — user must add imports manually
     - Tuple types emit as multi-value but tuple literals emit as comma-separated
     - For loops always discard the index variable
+    - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)
   """
 
   // ---- Core transpiler ----
 
   class Transpiler() {
     why: "Stateful code generator. Accumulates output in a string builder."
-    buf:    any  // strings.Builder — no Grok equivalent, accepted error
-    indent: int
-    pkg:    string
+    buf:               any  // strings.Builder — no Grok equivalent, accepted error
+    indent:            int
+    pkg:               string
       why: "Go package name for the output file header."
+    currentReturnType: string
+      why: "Go return type of the function currently being transpiled. Used to insert explicit casts in return statements."
+    selfName:          string
+      why: "Receiver name to replace 'self' with in method bodies. Set when entering a method, cleared on exit."
 
     func Transpile(mut self, file: File?) -> string
       why: "Primary entry point. Emits package declaration then all blocks."
@@ -107,6 +123,9 @@ grok Transpiler {
 
   func grokPrimitiveToGo(name: string) -> string
     why: "Maps Grok primitive type names to Go equivalents."
+
+  func checkerTypeToGo(ct: Type?) -> string
+    why: "Converts checker.Type to Go type string. Handles composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T."
 
   func binaryOpString(op: BinaryOp) -> string
 
