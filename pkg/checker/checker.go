@@ -972,6 +972,11 @@ func (c *Checker) checkGrokBlock(block *ast.GrokBlock) {
 		c.checkImplements(&block.Classes[i])
 	}
 
+	// Register import aliases in scope (packages are opaque types)
+	for _, imp := range block.Imports {
+		c.scope.Define(imp.Alias, &Type{Kind: TyUnknown, Name: imp.Path})
+	}
+
 	// Register functions in scope
 	for i := range block.Functions {
 		c.registerFunc(&block.Functions[i])

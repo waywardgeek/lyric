@@ -1,0 +1,17 @@
+// stdlib.gk — tests Go stdlib import and usage
+grok stdlib_test {
+  import fmt from "fmt"
+  import strings from "strings"
+  import strconv from "strconv"
+
+  func main() {
+    // String operations
+    let greeting = strings.ToUpper("hello, grok!")
+    fmt.Println(greeting)
+
+    // String conversion
+    let num = 42
+    let s = strconv.Itoa(num)
+    fmt.Println(strings.Join(["The answer is ", s], ""))
+  }
+}

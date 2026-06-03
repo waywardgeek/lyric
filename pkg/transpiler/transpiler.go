@@ -30,6 +30,26 @@ func (t *Transpiler) Transpile(file *ast.File) string {
 	t.buf.Reset()
 	t.writef("package %s\n", t.pkg)
 
+	// Collect and emit imports
+	var imports []ast.ImportDecl
+	for _, block := range file.Blocks {
+		imports = append(imports, block.Imports...)
+	}
+	if len(imports) > 0 {
+		t.writef("\nimport (\n")
+		t.indent++
+		for _, imp := range imports {
+			t.writeIndent()
+			if imp.Alias != "" && imp.Alias != imp.Path {
+				t.writef("%s %q\n", imp.Alias, imp.Path)
+			} else {
+				t.writef("%q\n", imp.Path)
+			}
+		}
+		t.indent--
+		t.writef(")\n")
+	}
+
 	for _, block := range file.Blocks {
 		t.transpileBlock(&block)
 	}
