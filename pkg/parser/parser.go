@@ -683,6 +683,15 @@ func (p *Parser) parseFunc() (*ast.FuncDecl, error) {
 	// Annotations
 	fn.Annotations = p.parseAnnotations()
 
+	// Optional body for .gk files
+	if p.peek().Kind == TLBrace {
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		fn.Body = body
+	}
+
 	fn.Span = ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: p.peek().Span.End}
 	return fn, nil
 }

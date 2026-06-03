@@ -32,6 +32,20 @@ const (
 	TFrom
 	TTrue
 	TFalse
+	TNil
+
+	// .gk keywords
+	TLet
+	TIf
+	TElse
+	TFor
+	TIn
+	TWhile
+	TMatch
+	TReturn
+	TBreak
+	TContinue
+	TCascadeKw // cascade (keyword, not annotation)
 
 	// Literals
 	TIdent
@@ -56,6 +70,29 @@ const (
 	TQuestion  // ?
 	TLt        // <
 	TGt        // >
+
+	// Operators (.gk)
+	TAssign    // =
+	TPlus      // +
+	TMinus     // -
+	TStar      // *
+	TSlash     // /
+	TPercent   // %
+	TEqEq      // ==
+	TBangEq    // !=
+	TLtEq      // <=
+	TGtEq      // >=
+	TAmpAmp    // &&
+	TPipePipe  // ||
+	TBang      // !
+	TAmp       // &
+	TCaret     // ^
+	TShl       // <<
+	TShr       // >>
+	TPlusEq    // +=
+	TMinusEq   // -=
+	TStarEq    // *=
+	TSlashEq   // /=
 
 	// Annotations (contextual keywords)
 	TWhy
@@ -97,6 +134,18 @@ var keywords = map[string]TokenKind{
 	"from":       TFrom,
 	"true":       TTrue,
 	"false":      TFalse,
+	"nil":        TNil,
+	"let":        TLet,
+	"if":         TIf,
+	"else":       TElse,
+	"for":        TFor,
+	"in":         TIn,
+	"while":      TWhile,
+	"match":      TMatch,
+	"return":     TReturn,
+	"break":      TBreak,
+	"continue":   TContinue,
+	"cascade":    TCascadeKw,
 }
 
 // Annotation keywords are only recognized in annotation position (after newline + indent).
@@ -134,13 +183,21 @@ var tokenNames = map[TokenKind]string{
 	TEnum: "enum", TInterface: "interface", TRelation: "relation",
 	TImport: "import", TImplements: "implements", TWhere: "where",
 	TOwns: "owns", TRefs: "refs", TMut: "mut", TSelf: "self",
-	TFrom: "from", TTrue: "true", TFalse: "false",
+	TFrom: "from", TTrue: "true", TFalse: "false", TNil: "nil",
+	TLet: "let", TIf: "if", TElse: "else", TFor: "for", TIn: "in",
+	TWhile: "while", TMatch: "match", TReturn: "return",
+	TBreak: "break", TContinue: "continue", TCascadeKw: "cascade",
 	TIdent: "ident", TIntLit: "int", TFloatLit: "float",
 	TStringLit: "string", TTripleStringLit: "triple_string",
 	TLParen: "(", TRParen: ")", TLBrace: "{", TRBrace: "}",
 	TLBracket: "[", TRBracket: "]", TComma: ",", TColon: ":",
 	TDot: ".", TArrow: "->", TFatArrow: "=>", TPipe: "|",
 	TQuestion: "?", TLt: "<", TGt: ">",
+	TAssign: "=", TPlus: "+", TMinus: "-", TStar: "*", TSlash: "/",
+	TPercent: "%", TEqEq: "==", TBangEq: "!=", TLtEq: "<=", TGtEq: ">=",
+	TAmpAmp: "&&", TPipePipe: "||", TBang: "!", TAmp: "&", TCaret: "^",
+	TShl: "<<", TShr: ">>", TPlusEq: "+=", TMinusEq: "-=",
+	TStarEq: "*=", TSlashEq: "/=",
 	TWhy: "why", TDoc: "doc", TInvariant: "invariant",
 	TRequires: "requires", TEnsures: "ensures", TRaises: "raises",
 	TConcurrent: "concurrent", TRequiresLock: "requires_lock",
@@ -309,26 +366,88 @@ func (l *Lexer) scan() Token {
 		return Token{Kind: TColon, Text: ":", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '.':
 		return Token{Kind: TDot, Text: ".", Span: ast.Span{Start: start, End: l.currentPos()}}
-	case '|':
-		return Token{Kind: TPipe, Text: "|", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '?':
 		return Token{Kind: TQuestion, Text: "?", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '^':
+		return Token{Kind: TCaret, Text: "^", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '%':
+		return Token{Kind: TPercent, Text: "%", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '!':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TBangEq, Text: "!=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TBang, Text: "!", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '|':
+		if l.peek() == '|' {
+			l.advance()
+			return Token{Kind: TPipePipe, Text: "||", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TPipe, Text: "|", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '&':
+		if l.peek() == '&' {
+			l.advance()
+			return Token{Kind: TAmpAmp, Text: "&&", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TAmp, Text: "&", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '<':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TLtEq, Text: "<=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		if l.peek() == '<' {
+			l.advance()
+			return Token{Kind: TShl, Text: "<<", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
 		return Token{Kind: TLt, Text: "<", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '>':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TGtEq, Text: ">=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		if l.peek() == '>' {
+			l.advance()
+			return Token{Kind: TShr, Text: ">>", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
 		return Token{Kind: TGt, Text: ">", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '-':
 		if l.peek() == '>' {
 			l.advance()
 			return Token{Kind: TArrow, Text: "->", Span: ast.Span{Start: start, End: l.currentPos()}}
 		}
-		return Token{Kind: TIdent, Text: "-", Span: ast.Span{Start: start, End: l.currentPos()}}
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TMinusEq, Text: "-=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TMinus, Text: "-", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '+':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TPlusEq, Text: "+=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TPlus, Text: "+", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '*':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TStarEq, Text: "*=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TStar, Text: "*", Span: ast.Span{Start: start, End: l.currentPos()}}
+	case '/':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TSlashEq, Text: "/=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
+		return Token{Kind: TSlash, Text: "/", Span: ast.Span{Start: start, End: l.currentPos()}}
 	case '=':
+		if l.peek() == '=' {
+			l.advance()
+			return Token{Kind: TEqEq, Text: "==", Span: ast.Span{Start: start, End: l.currentPos()}}
+		}
 		if l.peek() == '>' {
 			l.advance()
 			return Token{Kind: TFatArrow, Text: "=>", Span: ast.Span{Start: start, End: l.currentPos()}}
 		}
-		return Token{Kind: TIdent, Text: "=", Span: ast.Span{Start: start, End: l.currentPos()}}
+		return Token{Kind: TAssign, Text: "=", Span: ast.Span{Start: start, End: l.currentPos()}}
 	}
 
 	return Token{Kind: TIdent, Text: string(r), Span: ast.Span{Start: start, End: l.currentPos()}}

@@ -129,7 +129,8 @@ type FuncDecl struct {
 	ReturnType *TypeExpr // nil for missing (error in .grok)
 	Where      []WhereClause
 	Annotations Annotations
-	// Body is nil in .grok files. Will hold *Block for .gk files.
+	// Body is nil in .grok files, holds the function body in .gk files.
+	Body *Block
 	Span Span
 }
 
