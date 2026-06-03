@@ -877,6 +877,16 @@ func (p *Parser) parseFor() (*ast.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Check for index variable: for i, x in xs
+	var indexVar string
+	if p.peek().Kind == TComma {
+		p.next() // consume ','
+		indexVar = varName.Text
+		varName, err = p.expectIdentLike()
+		if err != nil {
+			return nil, err
+		}
+	}
 	if _, err := p.expect(TIn); err != nil {
 		return nil, err
 	}
@@ -890,7 +900,7 @@ func (p *Parser) parseFor() (*ast.Stmt, error) {
 	}
 	return &ast.Stmt{
 		Kind: ast.StmtFor,
-		Data: &ast.ForStmt{Var: varName.Text, Collection: *collection, Body: *body},
+		Data: &ast.ForStmt{Var: varName.Text, IndexVar: indexVar, Collection: *collection, Body: *body},
 		Span: ast.Span{Start: start, End: body.Span.End},
 	}, nil
 }

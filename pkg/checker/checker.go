@@ -1182,6 +1182,10 @@ func (c *Checker) checkFor(stmt *ast.Stmt) {
 		}
 		elemType = TypeUnknown
 	}
+	if forStmt.IndexVar != "" {
+		// Platform int type for index
+		c.scope.Define(forStmt.IndexVar, &Type{Kind: TyInt, Bits: -1})
+	}
 	c.scope.Define(forStmt.Var, elemType)
 	c.loopDepth++
 	c.checkBlock(&forStmt.Body)

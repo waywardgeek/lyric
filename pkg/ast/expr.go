@@ -248,6 +248,7 @@ type ElseIf struct {
 
 type ForStmt struct {
 	Var        string
+	IndexVar   string // optional: for i, x in xs — empty if not used
 	Collection Expr
 	Body       Block
 }

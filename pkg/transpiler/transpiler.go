@@ -640,7 +640,11 @@ func (t *Transpiler) transpileIf(stmt *ast.Stmt) {
 func (t *Transpiler) transpileFor(stmt *ast.Stmt) {
 	forStmt := stmt.Data.(*ast.ForStmt)
 	t.writeIndent()
-	t.writef("for _, %s := range ", forStmt.Var)
+	if forStmt.IndexVar != "" {
+		t.writef("for %s, %s := range ", forStmt.IndexVar, forStmt.Var)
+	} else {
+		t.writef("for _, %s := range ", forStmt.Var)
+	}
 	t.transpileExpr(&forStmt.Collection)
 	t.writef(" {\n")
 	t.indent++
