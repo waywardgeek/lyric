@@ -1,0 +1,247 @@
+// ast.grok — the Grok AST's own understanding
+
+grok AST {
+  why: "Defines all AST node types for the Grok language. Both .grok and .gk files parse into these types."
+
+  doc "Architecture": """
+    Single AST for both .grok (declaration-only) and .gk (full code).
+    .grok is a strict subset: FuncDecl.Body is nil.
+    Positions tracked on every node via Span for error reporting.
+    TypeExpr uses a tagged-union pattern: Kind discriminates, Data holds the payload.
+  """
+
+  // ---- Source positions ----
+
+  struct Pos {
+    file:   string
+    line:   int
+    column: int
+  }
+
+  struct Span {
+    start: Pos
+    end:   Pos
+  }
+
+  // ---- Type expressions ----
+
+  struct TypeExpr {
+    why: "All type expressions. Kind discriminates; Data holds the typed payload."
+    kind: TypeExprKind
+    data: any
+    span: Span
+  }
+
+  enum TypeExprKind {
+    Named       // T, Stack<T>
+    Optional    // T?
+    Union       // T | U
+    Sequence    // [T]
+    Map         // map[K]V
+    Tuple       // (T, U) or (x: T, y: U)
+    Func        // T -> U
+    Channel     // channel<T>
+    Lock        // lock
+    Unit        // unit
+  }
+
+  struct NamedType {
+    name: string
+    args: [TypeExpr]
+  }
+
+  struct OptionalType {
+    inner: TypeExpr
+  }
+
+  struct UnionType {
+    variants: [TypeExpr]
+  }
+
+  struct SequenceType {
+    elem: TypeExpr
+  }
+
+  struct MapType {
+    key:   TypeExpr
+    value: TypeExpr
+  }
+
+  struct TupleField {
+    name: string     // empty for positional
+    type: TypeExpr
+  }
+
+  struct TupleType {
+    fields: [TupleField]
+  }
+
+  struct FuncType {
+    params: [TypeExpr]
+    return: TypeExpr
+  }
+
+  struct ChannelType {
+    elem: TypeExpr
+  }
+
+  // ---- Declarations ----
+
+  struct TypeParam {
+    name:       string
+    constraint: string     // empty if unconstrained
+    span:       Span
+  }
+
+  struct Param {
+    name:    string
+    type:    TypeExpr
+    is_mut:  bool
+    is_self: bool
+    span:    Span
+  }
+
+  struct WhereClause {
+    variable:   string
+    constraint: string
+    span:       Span
+  }
+
+  struct Annotations {
+    why:           string
+    concurrent:    bool?
+    requires_lock: [string]
+    excludes_lock: [string]
+    raises:        [string]
+    requires:      [string]
+    ensures:       [string]
+    spawns:        bool
+    pure:          bool
+  }
+
+  struct FuncDecl {
+    name:        string
+    params:      [Param]
+    return_type: TypeExpr?
+    where:       [WhereClause]
+    annotations: Annotations
+    span:        Span
+  }
+
+  struct Field {
+    name:       string
+    type:       TypeExpr
+    guarded_by: string
+    why:        string
+    span:       Span
+  }
+
+  struct ClassDecl {
+    name:        string
+    type_params: [TypeParam]
+    ctor_params: [Param]
+    implements:  [string]
+    fields:      [Field]
+    methods:     [FuncDecl]
+    why:         string
+    source:      [string]
+    span:        Span
+  }
+
+  struct StructDecl {
+    name:        string
+    type_params: [TypeParam]
+    fields:      [Field]
+    why:         string
+    span:        Span
+  }
+
+  struct EnumVariant {
+    name:   string
+    fields: [TupleField]
+    span:   Span
+  }
+
+  struct EnumDecl {
+    name:        string
+    type_params: [TypeParam]
+    variants:    [EnumVariant]
+    why:         string
+    span:        Span
+  }
+
+  struct InterfaceDecl {
+    name:        string
+    type_params: [TypeParam]
+    implements:  [string]
+    methods:     [FuncDecl]
+    why:         string
+    span:        Span
+  }
+
+  // ---- Relations ----
+
+  enum RelationKind { Owns Refs }
+
+  struct RelationSide {
+    type_name: string
+    label:     string
+  }
+
+  struct RelationDecl {
+    hint:     string
+    parent:   RelationSide
+    kind:     RelationKind
+    child:    RelationSide
+    is_many:  bool
+    span:     Span
+  }
+
+  // ---- Metadata ----
+
+  struct DocBlock {
+    section: string
+    content: string
+    span:    Span
+  }
+
+  struct InvariantDecl {
+    claim:       string
+    verified_at: string
+    span:        Span
+  }
+
+  struct ImportDecl {
+    alias: string
+    path:  string
+    span:  Span
+  }
+
+  // ---- Top-level ----
+
+  struct GrokBlock {
+    name:       string
+    why:        string
+    imports:    [ImportDecl]
+    docs:       [DocBlock]
+    invariants: [InvariantDecl]
+    structs:    [StructDecl]
+    enums:      [EnumDecl]
+    interfaces: [InterfaceDecl]
+    classes:    [ClassDecl]
+    functions:  [FuncDecl]
+    relations:  [RelationDecl]
+    source:     [string]
+    fake:       string
+    span:       Span
+  }
+
+  struct File {
+    why: "Top-level AST node."
+    filename: string
+    blocks:   [GrokBlock]
+    span:     Span
+  }
+
+  source: ["pkg/ast/ast.go"]
+}

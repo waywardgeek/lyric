@@ -7,15 +7,15 @@ import (
 	"testing"
 )
 
-func TestVerifyParserGrok(t *testing.T) {
-	// Find project root (contains go.mod)
+func findProjectRoot(t *testing.T) string {
+	t.Helper()
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			break
+			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -23,6 +23,10 @@ func TestVerifyParserGrok(t *testing.T) {
 		}
 		dir = parent
 	}
+}
+
+func TestVerifyParserGrok(t *testing.T) {
+	dir := findProjectRoot(t)
 
 	grokFile := filepath.Join(dir, "grok", "parser.grok")
 	result, err := Verify(grokFile, dir)
@@ -30,6 +34,25 @@ func TestVerifyParserGrok(t *testing.T) {
 		t.Fatalf("Verify failed: %v", err)
 	}
 
+	for _, f := range result.Findings {
+		switch f.Severity {
+		case Error:
+			t.Errorf("%s", f)
+		case Warning:
+			t.Logf("%s", f)
+		case Info:
+			t.Logf("%s", f)
+		}
+	}
+}
+
+func TestVerifyAstGrok(t *testing.T) {
+	dir := findProjectRoot(t)
+	grokFile := filepath.Join(dir, "grok", "ast.grok")
+	result, err := Verify(grokFile, dir)
+	if err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
 	for _, f := range result.Findings {
 		switch f.Severity {
 		case Error:
