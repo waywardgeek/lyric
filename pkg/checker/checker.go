@@ -179,7 +179,14 @@ func numericWidens(from, to *Type) bool {
 	if from.Kind == to.Kind {
 		switch from.Kind {
 		case TyInt, TyUint, TyFloat:
-			return from.Bits < to.Bits
+			// Platform int (Bits:-1) accepts any same-kind integer
+			if to.Bits == -1 && from.Bits > 0 {
+				return true
+			}
+			if from.Bits == -1 && to.Bits > 0 {
+				return true
+			}
+			return from.Bits > 0 && to.Bits > 0 && from.Bits < to.Bits
 		}
 	}
 	return false
@@ -187,6 +194,15 @@ func numericWidens(from, to *Type) bool {
 
 // coerceNumeric returns the wider type if one side can widen to the other, else nil.
 func coerceNumeric(left, right *Type) *Type {
+	// Platform int (Bits:-1) always wins in coercion
+	if left.Kind == right.Kind {
+		if left.Bits == -1 {
+			return left
+		}
+		if right.Bits == -1 {
+			return right
+		}
+	}
 	if numericWidens(left, right) {
 		return right
 	}
@@ -312,8 +328,8 @@ func New() *Checker {
 	// println(...) — variadic, accepts any types, returns unit
 	c.scope.Define("println", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "println"})
 	c.scope.Define("print", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "print"})
-	// len(collection) -> i32 — works on lists, strings, maps
-	c.scope.Define("len", &Type{Kind: TyFunc, Params: nil, Return: TypeI32, Name: "len"})
+	// len(collection) -> int — works on lists, strings, maps (Go's len returns int)
+	c.scope.Define("len", &Type{Kind: TyFunc, Params: nil, Return: &Type{Kind: TyInt, Bits: -1}, Name: "len"})
 	// append(list, elem) -> list — adds element to list, returns new list
 	c.scope.Define("append", &Type{Kind: TyFunc, Params: nil, Return: TypeUnknown, Name: "append"})
 	// isnull(optional) -> bool — checks if an optional value is nil
@@ -672,6 +688,14 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 				return left
 			}
 			if wider := coerceNumeric(left, right); wider != nil {
+				// Propagate wider type to literal operands so transpiler emits correct type
+				// Only for literals — variables keep their original type for proper casting
+				if b.Left.Kind == ast.ExprIntLit || b.Left.Kind == ast.ExprFloatLit {
+					b.Left.ResolvedType = wider
+				}
+				if b.Right.Kind == ast.ExprIntLit || b.Right.Kind == ast.ExprFloatLit {
+					b.Right.ResolvedType = wider
+				}
 				return wider
 			}
 			c.error(expr.Span, "mismatched numeric types: %s and %s", left, right)
@@ -687,7 +711,15 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 	case ast.OpEq, ast.OpNeq:
 		// Any two compatible types can be compared for equality
 		if !left.Equal(right) && left.Kind != TyUnknown && right.Kind != TyUnknown {
-			if !numericWidens(left, right) && !numericWidens(right, left) {
+			if numericWidens(left, right) || numericWidens(right, left) {
+				// Propagate platform int to literal operands
+				if left.Bits == -1 && (b.Right.Kind == ast.ExprIntLit || b.Right.Kind == ast.ExprFloatLit) {
+					b.Right.ResolvedType = left
+				}
+				if right.Bits == -1 && (b.Left.Kind == ast.ExprIntLit || b.Left.Kind == ast.ExprFloatLit) {
+					b.Left.ResolvedType = right
+				}
+			} else {
 				c.error(expr.Span, "cannot compare %s and %s for equality", left, right)
 			}
 		}
@@ -695,7 +727,17 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 
 	case ast.OpLt, ast.OpLe, ast.OpGt, ast.OpGe:
 		if left.IsNumeric() && right.IsNumeric() {
-			if left.Equal(right) || coerceNumeric(left, right) != nil {
+			if left.Equal(right) {
+				return TypeBool
+			}
+			if wider := coerceNumeric(left, right); wider != nil {
+				// Propagate to literals only
+				if b.Left.Kind == ast.ExprIntLit || b.Left.Kind == ast.ExprFloatLit {
+					b.Left.ResolvedType = wider
+				}
+				if b.Right.Kind == ast.ExprIntLit || b.Right.Kind == ast.ExprFloatLit {
+					b.Right.ResolvedType = wider
+				}
 				return TypeBool
 			}
 		}
@@ -1241,6 +1283,27 @@ func (c *Checker) checkGrokBlock(block *ast.GrokBlock) {
 			c.checkFuncBody(&block.Functions[i])
 		}
 	}
+
+	// Check class method bodies
+	for i := range block.Classes {
+		cls := &block.Classes[i]
+		classType := c.registry.Lookup(cls.Name)
+		for j := range cls.Methods {
+			if cls.Methods[j].Body != nil {
+				// Define 'self' in the method's scope
+				c.scope = NewScope(c.scope)
+				if classType != nil {
+					c.scope.Define("self", classType.Type)
+				}
+				// Register type params for generic classes
+				for _, tp := range cls.TypeParams {
+					c.scope.Define(tp.Name, &Type{Kind: TyVar, Name: tp.Name})
+				}
+				c.checkFuncBody(&cls.Methods[j])
+				c.scope = c.scope.parent
+			}
+		}
+	}
 }
 
 func (c *Checker) registerStruct(s *ast.StructDecl) {
@@ -1277,6 +1340,17 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 	}
 	c.popScope()
 	c.registry.Register(cls.Name, info)
+	// Define class name in scope as constructor function
+	var ctorParams []*Type
+	for _, p := range cls.CtorParams {
+		ctorParams = append(ctorParams, c.resolveTypeExpr(&p.Type))
+	}
+	c.scope.Define(cls.Name, &Type{
+		Kind:   TyFunc,
+		Name:   cls.Name,
+		Params: ctorParams,
+		Return: info.Type,
+	})
 }
 
 func (c *Checker) registerEnum(e *ast.EnumDecl) {

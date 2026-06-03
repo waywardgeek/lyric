@@ -25,13 +25,15 @@ type Transpiler struct {
 	classes           map[string]bool   // tracks which types are classes (pointer receiver methods)
 	topFuncs          map[string]bool   // tracks top-level function names
 	autoImports       map[string]bool   // auto-detected import requirements (e.g., "fmt" for Sprintf)
+	classTypeParams       map[string][]ast.TypeParam // class name → type params for receiver emission
 	variantCtors      map[string]*variantCtorInfo // variant name → constructor info
 	unitVariants      map[string]string           // variant name → enum name (for unit variants)
+	classCtorFields   map[string][]string         // class name → constructor field names
 }
 
 // New creates a transpiler targeting the given Go package name.
 func New(pkg string) *Transpiler {
-	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string)}
+	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string), classTypeParams: make(map[string][]ast.TypeParam), classCtorFields: make(map[string][]string)}
 }
 
 func (t *Transpiler) needsImport(pkg string) {
@@ -92,6 +94,12 @@ func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
 	// Register class names and top-level function names
 	for i := range block.Classes {
 		t.classes[block.Classes[i].Name] = true
+		// Register constructor parameter names for struct literal emission
+		var ctorFields []string
+		for _, p := range block.Classes[i].CtorParams {
+			ctorFields = append(ctorFields, p.Name)
+		}
+		t.classCtorFields[block.Classes[i].Name] = ctorFields
 	}
 	for i := range block.Functions {
 		t.topFuncs[block.Functions[i].Name] = true
@@ -288,6 +296,9 @@ func (t *Transpiler) transpileStruct(s *ast.StructDecl) {
 func (t *Transpiler) transpileClass(cls *ast.ClassDecl) {
 	name := exportName(cls.Name)
 	typeParams := t.typeParamList(cls.TypeParams)
+	if len(cls.TypeParams) > 0 {
+		t.classTypeParams[name] = cls.TypeParams
+	}
 
 	// Struct with fields (including ctor params as fields)
 	t.writef("type %s%s struct {\n", name, typeParams)
@@ -397,7 +408,19 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 				break
 			}
 		}
-		t.writef("(%s *%s) ", recvName, receiver)
+		t.writef("(%s *%s", recvName, receiver)
+		// Add type params for generic classes
+		if tps, ok := t.classTypeParams[receiver]; ok && len(tps) > 0 {
+			t.writef("[")
+			for i, tp := range tps {
+				if i > 0 {
+					t.writef(", ")
+				}
+				t.writef("%s", tp.Name)
+			}
+			t.writef("]")
+		}
+		t.writef(") ")
 		t.selfName = recvName
 	} else {
 		t.selfName = ""
@@ -806,6 +829,9 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		} else if enumName, ok := t.unitVariants[name]; ok {
 			// Unit enum variant: emit as struct literal
 			name = fmt.Sprintf("%s%s{}", exportName(enumName), exportName(name))
+		} else if t.topFuncs[name] {
+			// Top-level function reference (not a call) — export the name
+			name = exportName(name)
 		}
 		t.writef("%s", name)
 	case ast.ExprUnary:
@@ -838,6 +864,44 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 					}
 					t.writef("%s: ", exportName(fieldName))
 					t.transpileExpr(&call.Args[i])
+				}
+				t.writef("}")
+				break
+			}
+			// Check if this is a class constructor: ClassName<T>() → &ClassName[T]{}
+			if t.classes[id.Name] {
+				t.writef("&%s", exportName(id.Name))
+				if len(call.TypeArgs) > 0 {
+					t.writef("[")
+					for i := range call.TypeArgs {
+						if i > 0 {
+							t.writef(", ")
+						}
+						t.writef("%s", t.goType(&call.TypeArgs[i]))
+					}
+					t.writef("]")
+				}
+				t.writef("{")
+				// Map positional args to constructor fields
+				if ci, ok := t.classCtorFields[id.Name]; ok {
+					for i := range call.Args {
+						if i > 0 {
+							t.writef(", ")
+						}
+						fieldName := fmt.Sprintf("V%d", i)
+						if i < len(ci) {
+							fieldName = ci[i]
+						}
+						t.writef("%s: ", exportName(fieldName))
+						t.transpileExpr(&call.Args[i])
+					}
+				} else {
+					for i := range call.Args {
+						if i > 0 {
+							t.writef(", ")
+						}
+						t.transpileExpr(&call.Args[i])
+					}
 				}
 				t.writef("}")
 				break
@@ -1212,9 +1276,14 @@ func checkerTypeToGo(ct *checker.Type) string {
 		if ct.Name != "" {
 			return ct.Name
 		}
-		return ""
+		return "any"
+	case checker.TyVar:
+		if ct.Name != "" {
+			return ct.Name
+		}
+		return "any"
 	default:
-		return ""
+		return "any"
 	}
 }
 
