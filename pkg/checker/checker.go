@@ -154,6 +154,30 @@ func (t *Type) Equal(other *Type) bool {
 	}
 }
 
+// numericWidens checks if 'from' can implicitly widen to 'to'.
+// Same-sign integers widen to larger bit widths. Floats widen to larger bit widths.
+// No cross-kind coercion (int→float requires explicit cast).
+func numericWidens(from, to *Type) bool {
+	if from.Kind == to.Kind {
+		switch from.Kind {
+		case TyInt, TyUint, TyFloat:
+			return from.Bits < to.Bits
+		}
+	}
+	return false
+}
+
+// coerceNumeric returns the wider type if one side can widen to the other, else nil.
+func coerceNumeric(left, right *Type) *Type {
+	if numericWidens(left, right) {
+		return right
+	}
+	if numericWidens(right, left) {
+		return left
+	}
+	return nil
+}
+
 // IsNumeric returns true for int, uint, and float types.
 func (t *Type) IsNumeric() bool {
 	return t.Kind == TyInt || t.Kind == TyUint || t.Kind == TyFloat
@@ -250,6 +274,7 @@ type Checker struct {
 	errors        []error
 	scope         *Scope
 	currentReturn *Type // expected return type of current function (nil = void/unit)
+	loopDepth     int   // tracks nesting depth inside loops (for break/continue validation)
 }
 
 // New creates a new type checker.
@@ -450,6 +475,9 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 			if left.Equal(right) {
 				return left
 			}
+			if wider := coerceNumeric(left, right); wider != nil {
+				return wider
+			}
 			c.error(expr.Span, "mismatched numeric types: %s and %s", left, right)
 			return TypeError
 		}
@@ -468,8 +496,10 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 		return TypeBool
 
 	case ast.OpLt, ast.OpLe, ast.OpGt, ast.OpGe:
-		if left.IsNumeric() && right.IsNumeric() && left.Equal(right) {
-			return TypeBool
+		if left.IsNumeric() && right.IsNumeric() {
+			if left.Equal(right) || coerceNumeric(left, right) != nil {
+				return TypeBool
+			}
 		}
 		if left.Equal(TypeString) && right.Equal(TypeString) {
 			return TypeBool
@@ -509,7 +539,9 @@ func (c *Checker) checkCall(expr *ast.Expr) *Type {
 		for i := range call.Args {
 			argType := c.checkExpr(&call.Args[i])
 			if !argType.Equal(fnType.Params[i]) && argType.Kind != TyUnknown && fnType.Params[i].Kind != TyVar {
-				c.error(call.Args[i].Span, "argument %d: expected %s, got %s", i+1, fnType.Params[i], argType)
+				if !numericWidens(argType, fnType.Params[i]) {
+					c.error(call.Args[i].Span, "argument %d: expected %s, got %s", i+1, fnType.Params[i], argType)
+				}
 			}
 		}
 	}
@@ -645,8 +677,14 @@ func (c *Checker) checkStmt(stmt *ast.Stmt) {
 	case ast.StmtCascade:
 		cs := stmt.Data.(*ast.CascadeStmt)
 		c.checkBlock(&cs.Body)
-	case ast.StmtBreak, ast.StmtContinue:
-		// Valid only inside loops — could add loop depth tracking later
+	case ast.StmtBreak:
+		if c.loopDepth == 0 {
+			c.error(stmt.Span, "break outside of loop")
+		}
+	case ast.StmtContinue:
+		if c.loopDepth == 0 {
+			c.error(stmt.Span, "continue outside of loop")
+		}
 	}
 }
 
@@ -663,9 +701,11 @@ func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 
 	var finalType *Type
 	if declaredType != nil && inferredType != nil {
-		// Both present: check compatibility
+		// Both present: check compatibility (allow numeric widening)
 		if !inferredType.Equal(declaredType) && inferredType.Kind != TyUnknown {
-			c.error(stmt.Span, "type mismatch in variable %q: declared %s, got %s", decl.Name, declaredType, inferredType)
+			if !numericWidens(inferredType, declaredType) {
+				c.error(stmt.Span, "type mismatch in variable %q: declared %s, got %s", decl.Name, declaredType, inferredType)
+			}
 		}
 		finalType = declaredType
 	} else if declaredType != nil {
@@ -696,7 +736,9 @@ func (c *Checker) checkAssign(stmt *ast.Stmt) {
 		}
 	}
 	if !targetType.Equal(valueType) && targetType.Kind != TyUnknown && valueType.Kind != TyUnknown {
-		c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
+		if !numericWidens(valueType, targetType) {
+			c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
+		}
 	}
 }
 
@@ -706,7 +748,9 @@ func (c *Checker) checkReturn(stmt *ast.Stmt) {
 		valType := c.checkExpr(ret.Value)
 		if c.currentReturn != nil {
 			if !c.currentReturn.Equal(valType) && valType.Kind != TyUnknown && c.currentReturn.Kind != TyUnknown {
-				c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
+				if !numericWidens(valType, c.currentReturn) {
+					c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
+				}
 			}
 		}
 	} else {
@@ -757,7 +801,9 @@ func (c *Checker) checkFor(stmt *ast.Stmt) {
 		elemType = TypeUnknown
 	}
 	c.scope.Define(forStmt.Var, elemType)
+	c.loopDepth++
 	c.checkBlock(&forStmt.Body)
+	c.loopDepth--
 }
 
 func (c *Checker) checkWhile(stmt *ast.Stmt) {
@@ -766,17 +812,51 @@ func (c *Checker) checkWhile(stmt *ast.Stmt) {
 	if !condType.Equal(TypeBool) && condType.Kind != TyUnknown && condType.Kind != TyError {
 		c.error(stmt.Span, "while condition must be bool, got %s", condType)
 	}
+	c.loopDepth++
 	c.checkBlock(&whileStmt.Body)
+	c.loopDepth--
 }
 
 func (c *Checker) checkMatch(stmt *ast.Stmt) {
 	matchStmt := stmt.Data.(*ast.MatchStmt)
-	c.checkExpr(&matchStmt.Value)
+	matchType := c.checkExpr(&matchStmt.Value)
 	for i := range matchStmt.Arms {
 		c.pushScope()
-		// TODO: bind pattern variables into scope
+		c.bindPattern(&matchStmt.Arms[i].Pattern, matchType)
 		c.checkBlock(&matchStmt.Arms[i].Body)
 		c.popScope()
+	}
+}
+
+// bindPattern introduces variables from a pattern into the current scope.
+func (c *Checker) bindPattern(pat *ast.Pattern, matchType *Type) {
+	switch pat.Kind {
+	case ast.PatIdent:
+		id := pat.Data.(*ast.IdentPattern)
+		if id.Name != "_" {
+			c.scope.Define(id.Name, matchType)
+		}
+	case ast.PatVariant:
+		vp := pat.Data.(*ast.VariantPattern)
+		// Bind sub-patterns as unknown (enum variant field types not tracked yet)
+		for i := range vp.Bindings {
+			c.bindPattern(&vp.Bindings[i], TypeUnknown)
+		}
+	case ast.PatTuple:
+		tp := pat.Data.(*ast.TuplePattern)
+		for i := range tp.Elems {
+			var elemType *Type
+			if matchType.Kind == TyTuple && i < len(matchType.Fields) {
+				elemType = matchType.Fields[i].Type
+			} else {
+				elemType = TypeUnknown
+			}
+			c.bindPattern(&tp.Elems[i], elemType)
+		}
+	case ast.PatLiteral:
+		// Literals don't bind variables
+	case ast.PatWildcard:
+		// Wildcards don't bind variables
 	}
 }
 

@@ -446,3 +446,160 @@ func TestMutabilityAllowed(t *testing.T) {
 	}`)
 	expectNoErrors(t, c)
 }
+
+func TestBreakOutsideLoop(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			break
+		}
+	}`)
+	expectErrors(t, c, 1)
+}
+
+func TestContinueOutsideLoop(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			continue
+		}
+	}`)
+	expectErrors(t, c, 1)
+}
+
+func TestBreakInsideLoop(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			while true {
+				break
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestContinueInsideForLoop(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let xs: [i32] = [1, 2, 3]
+			for x in xs {
+				continue
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestBreakNestedLoop(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			while true {
+				while true {
+					break
+				}
+				break
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestPatternBindingInMatch(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i32 = 42
+			match x {
+				y => {
+					let z: i32 = y
+				}
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestPatternBindingTypeMismatch(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i32 = 42
+			match x {
+				y => {
+					let z: string = y
+				}
+			}
+		}
+	}`)
+	expectErrors(t, c, 1) // y is i32, z declared string
+}
+
+func TestNumericWidening(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i32 = 1
+			let y: i64 = x
+		}
+	}`)
+	expectNoErrors(t, c) // i32 widens to i64
+}
+
+func TestNumericWideningInArithmetic(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i32 = 1
+			let y: i64 = 2
+			let z = x + y
+		}
+	}`)
+	expectNoErrors(t, c) // i32 + i64 -> i64
+}
+
+func TestNumericNoNarrow(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i64 = 1
+			let y: i32 = x
+		}
+	}`)
+	expectErrors(t, c, 1) // i64 does NOT narrow to i32
+}
+
+func TestNumericCrossKindNoCoerce(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: i32 = 1
+			let y: f64 = x
+		}
+	}`)
+	expectErrors(t, c, 1) // int -> float requires explicit cast
+}
+
+func TestNumericWideningInReturn(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() -> i64 {
+			let x: i32 = 1
+			return x
+		}
+	}`)
+	expectNoErrors(t, c) // i32 return widens to i64
+}
+
+func TestNumericWideningInFuncArgs(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func take64(x: i64) -> i64 {
+			return x
+		}
+		func f() {
+			let x: i32 = 1
+			let y = take64(x)
+		}
+	}`)
+	expectNoErrors(t, c) // i32 arg widens to i64 param
+}
+
+func TestFloatWidening(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(x: f32) {
+			let y: f64 = 1.0
+			let z = x + y
+		}
+	}`)
+	expectNoErrors(t, c) // f32 + f64 -> f64 via widening
+}
