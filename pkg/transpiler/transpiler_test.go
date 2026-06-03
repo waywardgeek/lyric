@@ -334,3 +334,71 @@ func TestTranspileMatchExpr(t *testing.T) {
 	assertContains(t, got, "return 0")
 	assertContains(t, got, "}()")
 }
+
+func TestSelfToReceiver(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Classes: []ast.ClassDecl{{
+				Name: "Counter",
+				CtorParams: []ast.Param{
+					{Name: "count", Type: namedType("i32")},
+				},
+				Methods: []ast.FuncDecl{{
+					Name: "Get",
+					Params: []ast.Param{
+						{Name: "self", IsSelf: true},
+					},
+					ReturnType: func() *ast.TypeExpr { t := namedType("i32"); return &t }(),
+					Body: &ast.Block{Stmts: []ast.Stmt{
+						{
+							Kind: ast.StmtReturn,
+							Data: &ast.ReturnStmt{Value: &ast.Expr{
+								Kind: ast.ExprFieldAccess,
+								Data: &ast.FieldAccessExpr{
+									Receiver: ast.Expr{Kind: ast.ExprIdent, Data: &ast.IdentExpr{Name: "self"}},
+									Field:    "count",
+								},
+							}},
+						},
+					}},
+				}},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "r.Count")
+	if strings.Contains(got, "self.") {
+		t.Errorf("output still contains 'self.': %s", got)
+	}
+}
+
+func TestTypedListLiteral(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Main",
+				Body: &ast.Block{Stmts: []ast.Stmt{
+					{
+						Kind: ast.StmtVarDecl,
+						Data: &ast.VarDeclStmt{
+							Name: "nums",
+							Value: &ast.Expr{
+								Kind: ast.ExprListLit,
+								Data: &ast.ListLitExpr{
+									Elems: []ast.Expr{
+										{Kind: ast.ExprIntLit, Data: &ast.IntLitExpr{Value: "1"}},
+										{Kind: ast.ExprIntLit, Data: &ast.IntLitExpr{Value: "2"}},
+									},
+								},
+							},
+						},
+					},
+				}},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "[]any{1, 2}")
+}
