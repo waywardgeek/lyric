@@ -13,14 +13,16 @@ import (
 type Transpiler struct {
 	buf               strings.Builder
 	indent            int
-	pkg               string // Go package name
-	currentReturnType string // Go return type of current function
-	selfName          string // receiver name to replace "self" with
+	pkg               string            // Go package name
+	currentReturnType string            // Go return type of current function
+	selfName          string            // receiver name to replace "self" with
+	classes           map[string]bool   // tracks which types are classes (pointer receiver methods)
+	topFuncs          map[string]bool   // tracks top-level function names
 }
 
 // New creates a transpiler targeting the given Go package name.
 func New(pkg string) *Transpiler {
-	return &Transpiler{pkg: pkg}
+	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool)}
 }
 
 // Transpile converts an AST file to Go source code.
@@ -35,6 +37,17 @@ func (t *Transpiler) Transpile(file *ast.File) string {
 }
 
 func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
+	// Register class names and top-level function names
+	for i := range block.Classes {
+		t.classes[block.Classes[i].Name] = true
+	}
+	for i := range block.Functions {
+		t.topFuncs[block.Functions[i].Name] = true
+	}
+	for i := range block.Interfaces {
+		t.writef("\n")
+		t.transpileInterface(&block.Interfaces[i])
+	}
 	for i := range block.Structs {
 		t.writef("\n")
 		t.transpileStruct(&block.Structs[i])
@@ -168,6 +181,45 @@ func grokPrimitiveToGo(name string) string {
 
 // --- Declarations ---
 
+func (t *Transpiler) transpileInterface(iface *ast.InterfaceDecl) {
+	name := exportName(iface.Name)
+	typeParams := t.typeParamList(iface.TypeParams)
+
+	t.writef("type %s%s interface {\n", name, typeParams)
+	t.indent++
+
+	// Embed composed interfaces
+	for _, parent := range iface.Implements {
+		t.writeIndent()
+		t.writef("%s\n", exportName(parent))
+	}
+
+	// Method signatures
+	for _, m := range iface.Methods {
+		t.writeIndent()
+		t.writef("%s(", exportName(m.Name))
+		first := true
+		for _, p := range m.Params {
+			if p.IsSelf {
+				continue
+			}
+			if !first {
+				t.writef(", ")
+			}
+			t.writef("%s %s", p.Name, t.goType(&p.Type))
+			first = false
+		}
+		t.writef(")")
+		if m.ReturnType != nil {
+			t.writef(" %s", t.goType(m.ReturnType))
+		}
+		t.writef("\n")
+	}
+
+	t.indent--
+	t.writef("}\n")
+}
+
 func (t *Transpiler) transpileStruct(s *ast.StructDecl) {
 	name := exportName(s.Name)
 	typeParams := t.typeParamList(s.TypeParams)
@@ -289,7 +341,7 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 
 	// Special-case: Main -> main for Go entry point
 	funcName := exportName(fn.Name)
-	if fn.Name == "Main" && t.pkg == "main" {
+	if (fn.Name == "Main" || fn.Name == "main") && t.pkg == "main" {
 		funcName = "main"
 	}
 	t.writef("%s(", funcName)
@@ -567,7 +619,21 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.transpileBinary(expr)
 	case ast.ExprCall:
 		call := expr.Data.(*ast.CallExpr)
-		t.transpileExpr(&call.Func)
+		// Export top-level function names; leave local variables as-is
+		if call.Func.Kind == ast.ExprIdent {
+			id := call.Func.Data.(*ast.IdentExpr)
+			if t.topFuncs[id.Name] {
+				if (id.Name == "Main" || id.Name == "main") && t.pkg == "main" {
+					t.writef("main")
+				} else {
+					t.writef("%s", exportName(id.Name))
+				}
+			} else {
+				t.writef("%s", id.Name)
+			}
+		} else {
+			t.transpileExpr(&call.Func)
+		}
 		t.writef("(")
 		for i := range call.Args {
 			if i > 0 {
@@ -640,6 +706,10 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.writef("}")
 	case ast.ExprStructLit:
 		sl := expr.Data.(*ast.StructLitExpr)
+		// Classes use pointer receivers, so emit &ClassName{...}
+		if t.classes[sl.TypeName] {
+			t.writef("&")
+		}
 		t.writef("%s{", exportName(sl.TypeName))
 		for i, f := range sl.Fields {
 			if i > 0 {

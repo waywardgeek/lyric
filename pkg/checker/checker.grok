@@ -6,10 +6,13 @@ grok Checker {
   doc "Architecture": """
     The checker performs a single forward pass over the AST:
 
-    1. Registration Phase: walks all structs, classes, enums, and top-level functions
-       in each GrokBlock, registering them into a type Registry. Class ctor params
+    1. Registration Phase: walks all interfaces, structs, classes, enums, and
+       top-level functions in each GrokBlock, registering them into a type Registry.
+       Interfaces are registered first (classes may implement them). Class ctor params
        are registered as fields (alongside explicit Fields), enabling struct literal
        validation. Case-insensitive field lookup handles Grok→Go name capitalization.
+       After registration, checkImplements verifies each class satisfies its declared
+       interfaces (method signature matching).
 
     2. Checking Phase: walks function bodies (statements and expressions),
        performing type inference and validation. Each expression returns its
@@ -30,13 +33,15 @@ grok Checker {
 
     Primitive kinds: TyInt, TyUint, TyFloat (with Bits for width), TyBool, TyString.
     Composite kinds: TyList (Elem), TyMap (Key, Val), TyTuple (Fields), TyOptional
-    (Elem), TyChannel (Elem), TyStruct/TyClass/TyEnum (Name + Fields for member
-    access), TyFunc (Params, Returns, Name).
+    (Elem), TyChannel (Elem), TyStruct/TyClass/TyEnum/TyInterface (Name + Fields
+    for member access), TyFunc (Params, Returns, Name).
     Special: TyUnit (no value), TyAny (top type), TyTypeVar (for future generics).
 
     Type equality is structural via Equal(): two types match if Kind, Bits, Name,
-    and recursive sub-types all match. IsNumeric() and IsInteger() helpers simplify
-    arithmetic checking.
+    and recursive sub-types all match. assignableTo() extends Equal() with interface
+    subtyping: a class/struct satisfies an interface if it has all required methods
+    with matching signatures (structural subtyping). IsNumeric() and IsInteger()
+    helpers simplify arithmetic checking.
   """
 
   doc "Type Inference": """
@@ -62,7 +67,8 @@ grok Checker {
       (arithmetic for numerics, comparison returns bool, logical for bools,
       equality for any matching pair, bitwise for integers, shifts for integers)
     - Unary: neg requires numeric, not requires bool
-    - Call: looks up function in scope/registry, checks arg count and types
+    - Call: looks up function in scope/registry, checks arg count and types.
+      Uses assignableTo() for argument compatibility (supports interface subtyping).
     - Method call: resolves receiver type, finds method, checks args
     - Field access: resolves receiver type, finds field by name
     - Index: validates receiver is list/map/string, returns element type
@@ -89,6 +95,7 @@ grok Checker {
   doc "Known Limitations": """
     - Generic type instantiation: TypeVar exists but no constraint solving
     - No error recovery: first error stops checking that branch
+    - assignableTo only used in function args; assignment/return still use Equal()
   """
 
   // ---- Type system ----
@@ -96,7 +103,7 @@ grok Checker {
   enum TypeKind {
     TyInt TyUint TyFloat TyBool TyString TyUnit TyAny
     TyList TyMap TyTuple TyOptional TyChannel
-    TyStruct TyClass TyEnum TyFunc TyTypeVar
+    TyStruct TyClass TyEnum TyInterface TyFunc TyTypeVar
   }
 
   struct Type {
@@ -143,7 +150,7 @@ grok Checker {
   }
 
   class Registry() {
-    why: "Named type definitions. Structs, classes, enums, and functions registered during the first pass."
+    why: "Named type definitions. Structs, classes, enums, interfaces, and functions registered during the first pass."
     types: map[string]TypeInfo?
 
     func Register(mut self, name: string, info: TypeInfo?)

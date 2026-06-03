@@ -402,3 +402,47 @@ func TestTypedListLiteral(t *testing.T) {
 	got := tr.Transpile(file)
 	assertContains(t, got, "[]any{1, 2}")
 }
+
+func TestTranspileInterface(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Interfaces: []ast.InterfaceDecl{{
+				Name: "Greeter",
+				Methods: []ast.FuncDecl{
+					{
+						Name:       "Greet",
+						Params:     []ast.Param{{Name: "self", IsSelf: true}},
+						ReturnType: &ast.TypeExpr{Kind: ast.TypeNamed, Data: ast.NamedType{Name: "string"}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "type Greeter interface {")
+	assertContains(t, got, "Greet() string")
+}
+
+func TestTranspileInterfaceComposition(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Interfaces: []ast.InterfaceDecl{{
+				Name: "ReadWriter",
+				Implements: []string{"Reader", "Writer"},
+				Methods: []ast.FuncDecl{
+					{
+						Name:   "Close",
+						Params: []ast.Param{{Name: "self", IsSelf: true}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "type ReadWriter interface {")
+	assertContains(t, got, "Reader")
+	assertContains(t, got, "Writer")
+	assertContains(t, got, "Close()")
+}

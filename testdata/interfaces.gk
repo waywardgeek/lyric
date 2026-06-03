@@ -1,0 +1,75 @@
+// interfaces.gk — end-to-end test for interface support
+// Tests: interface declaration, implements checking, composition,
+//        polymorphic function parameters
+
+grok interfaces {
+
+  // Basic interface
+  interface Shape {
+    func area(self) -> f64
+    func name(self) -> string
+  }
+
+  // Struct-like class implementing an interface
+  class Circle(radius: f64) implements Shape {
+    func area(self) -> f64 {
+      return 3.14159 * self.radius * self.radius
+    }
+
+    func name(self) -> string {
+      return "circle"
+    }
+  }
+
+  class Rectangle(width: f64, height: f64) implements Shape {
+    func area(self) -> f64 {
+      return self.width * self.height
+    }
+
+    func name(self) -> string {
+      return "rectangle"
+    }
+  }
+
+  // Interface composition
+  interface Printable {
+    func to_string(self) -> string
+  }
+
+  interface PrintableShape {
+    implements Shape
+    implements Printable
+  }
+
+  class Square(side: f64) implements PrintableShape {
+    func area(self) -> f64 {
+      return self.side * self.side
+    }
+
+    func name(self) -> string {
+      return "square"
+    }
+
+    func to_string(self) -> string {
+      return "a square"
+    }
+  }
+
+  // Function taking interface parameter
+  func describe(s: Shape) -> string {
+    return s.name()
+  }
+
+  func main() {
+    let c = Circle{Radius: 5.0}
+    let r = Rectangle{Width: 3.0, Height: 4.0}
+    let sq = Square{Side: 7.0}
+
+    let _ = c.area()
+    let _ = r.area()
+    let _ = sq.area()
+
+    let _ = describe(c)
+    let _ = describe(r)
+  }
+}

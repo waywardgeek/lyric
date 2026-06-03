@@ -27,6 +27,7 @@ const (
 	TyStruct                  // named struct type
 	TyClass                   // named class type
 	TyEnum                    // named enum type
+	TyInterface               // named interface type
 	TyVar                     // type variable (for generics)
 	TyUnknown                 // not yet resolved
 	TyError                   // error sentinel
@@ -76,7 +77,7 @@ func (t *Type) String() string {
 		return fmt.Sprintf("%s?", t.Elem)
 	case TyChannel:
 		return fmt.Sprintf("channel<%s>", t.Elem)
-	case TyStruct, TyClass, TyEnum:
+	case TyStruct, TyClass, TyEnum, TyInterface:
 		return t.Name
 	case TyVar:
 		return t.Name
@@ -134,7 +135,7 @@ func (t *Type) Equal(other *Type) bool {
 		return t.Bits == other.Bits
 	case TyBool, TyString, TyUnit:
 		return true
-	case TyStruct, TyClass, TyEnum, TyVar:
+	case TyStruct, TyClass, TyEnum, TyInterface, TyVar:
 		return t.Name == other.Name
 	case TyList, TyOptional, TyChannel:
 		return t.Elem.Equal(other.Elem)
@@ -395,6 +396,40 @@ func (c *Checker) resolveNamedType(name string, args []ast.TypeExpr) *Type {
 	}
 }
 
+// assignableTo checks if 'from' type can be used where 'to' type is expected.
+// Extends Equal() with interface subtyping: a class/struct with all required
+// methods satisfies an interface (structural subtyping).
+func (c *Checker) assignableTo(from, to *Type) bool {
+	if from.Equal(to) {
+		return true
+	}
+	// Interface subtyping: class/struct → interface
+	if to.Kind == TyInterface {
+		ifaceInfo := c.registry.Lookup(to.Name)
+		if ifaceInfo == nil {
+			return false
+		}
+		var fromInfo *TypeInfo
+		if from.Kind == TyClass || from.Kind == TyStruct {
+			fromInfo = c.registry.Lookup(from.Name)
+		}
+		if fromInfo == nil {
+			return false
+		}
+		for methodName, ifaceMethod := range ifaceInfo.Methods {
+			classMethod, ok := fromInfo.Methods[methodName]
+			if !ok {
+				return false
+			}
+			if !classMethod.Equal(ifaceMethod) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // --- Expression type inference ---
 
 func (c *Checker) checkExpr(expr *ast.Expr) *Type {
@@ -547,7 +582,7 @@ func (c *Checker) checkCall(expr *ast.Expr) *Type {
 	} else {
 		for i := range call.Args {
 			argType := c.checkExpr(&call.Args[i])
-			if !argType.Equal(fnType.Params[i]) && argType.Kind != TyUnknown && fnType.Params[i].Kind != TyVar {
+			if !c.assignableTo(argType, fnType.Params[i]) && argType.Kind != TyUnknown && fnType.Params[i].Kind != TyVar {
 				if !numericWidens(argType, fnType.Params[i]) {
 					c.error(call.Args[i].Span, "argument %d: expected %s, got %s", i+1, fnType.Params[i], argType)
 				}
@@ -917,7 +952,11 @@ func (c *Checker) CheckFile(file *ast.File) {
 }
 
 func (c *Checker) checkGrokBlock(block *ast.GrokBlock) {
-	// Register all types first (forward declarations)
+	// Register interfaces first (classes may implement them)
+	for i := range block.Interfaces {
+		c.registerInterface(&block.Interfaces[i])
+	}
+	// Register all types (forward declarations)
 	for i := range block.Structs {
 		c.registerStruct(&block.Structs[i])
 	}
@@ -926,6 +965,11 @@ func (c *Checker) checkGrokBlock(block *ast.GrokBlock) {
 	}
 	for i := range block.Enums {
 		c.registerEnum(&block.Enums[i])
+	}
+
+	// Check implements satisfaction
+	for i := range block.Classes {
+		c.checkImplements(&block.Classes[i])
 	}
 
 	// Register functions in scope
@@ -976,6 +1020,72 @@ func (c *Checker) registerEnum(e *ast.EnumDecl) {
 		Type: &Type{Kind: TyEnum, Name: e.Name},
 	}
 	c.registry.Register(e.Name, info)
+}
+
+func (c *Checker) registerInterface(iface *ast.InterfaceDecl) {
+	info := &TypeInfo{
+		Type:    &Type{Kind: TyInterface, Name: iface.Name},
+		Methods: make(map[string]*Type),
+	}
+	for _, m := range iface.Methods {
+		info.Methods[m.Name] = c.funcDeclToType(&m)
+	}
+	// Compose parent interfaces: copy their methods
+	for _, parent := range iface.Implements {
+		parentInfo := c.registry.Lookup(parent)
+		if parentInfo == nil {
+			c.error(ast.Span{}, "interface %s implements unknown type %s", iface.Name, parent)
+			continue
+		}
+		for name, typ := range parentInfo.Methods {
+			if _, exists := info.Methods[name]; !exists {
+				info.Methods[name] = typ
+			}
+		}
+	}
+	c.registry.Register(iface.Name, info)
+}
+
+// checkImplements verifies that a class satisfies all its declared interfaces.
+func (c *Checker) checkImplements(cls *ast.ClassDecl) {
+	classInfo := c.registry.Lookup(cls.Name)
+	if classInfo == nil {
+		return
+	}
+	for _, ifaceName := range cls.Implements {
+		ifaceInfo := c.registry.Lookup(ifaceName)
+		if ifaceInfo == nil {
+			c.error(ast.Span{}, "class %s implements unknown type %s", cls.Name, ifaceName)
+			continue
+		}
+		if ifaceInfo.Type.Kind != TyInterface {
+			c.error(ast.Span{}, "class %s implements %s which is not an interface", cls.Name, ifaceName)
+			continue
+		}
+		for methodName, ifaceMethod := range ifaceInfo.Methods {
+			classMethod, ok := classInfo.Methods[methodName]
+			if !ok {
+				c.error(ast.Span{}, "class %s missing method %s required by interface %s", cls.Name, methodName, ifaceName)
+				continue
+			}
+			// Check method signature compatibility (param count + types, return type)
+			if len(classMethod.Params) != len(ifaceMethod.Params) {
+				c.error(ast.Span{}, "class %s method %s has %d params, interface %s requires %d",
+					cls.Name, methodName, len(classMethod.Params), ifaceName, len(ifaceMethod.Params))
+				continue
+			}
+			for i, p := range ifaceMethod.Params {
+				if !p.Equal(classMethod.Params[i]) {
+					c.error(ast.Span{}, "class %s method %s param %d type mismatch: got %s, want %s",
+						cls.Name, methodName, i+1, classMethod.Params[i], p)
+				}
+			}
+			if !ifaceMethod.Return.Equal(classMethod.Return) {
+				c.error(ast.Span{}, "class %s method %s return type mismatch: got %s, want %s",
+					cls.Name, methodName, classMethod.Return, ifaceMethod.Return)
+			}
+		}
+	}
 }
 
 func (c *Checker) registerFunc(fn *ast.FuncDecl) {

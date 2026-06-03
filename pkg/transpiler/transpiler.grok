@@ -38,19 +38,24 @@ grok Transpiler {
   """
 
   doc "Declaration Transpilation": """
+    Interfaces: Go interface type with method signatures. Self params are skipped.
+    Composed interfaces (implements) are embedded. Method names are exported.
+
     Structs: struct fields with exportName() capitalization.
 
     Classes: emit struct (ctor params + fields), NewX() constructor returning
-    pointer, and pointer-receiver methods. The receiver name defaults to "r"
-    unless a self parameter provides a name. The selfName field tracks the
-    current receiver name so `self` in expressions emits the correct Go name.
+    pointer, and pointer-receiver methods. Class struct literals emit with &
+    prefix (pointer) since methods use pointer receivers. The receiver name
+    defaults to "r". The selfName field tracks the current receiver name so
+    `self` in expressions emits the correct Go name.
 
     Enums: tagged union pattern — interface with private marker method, variant
     structs implementing it. Unnamed variant fields get positional names (V0, V1).
 
     Functions: regular Go funcs. Self params skipped from parameter list.
     Type parameters emit Go 1.18+ constraint syntax (default: any).
-    Special case: Main→main for package main entry point.
+    Special case: main/Main→main for package main entry point.
+    Function calls export top-level function names but leave local variables as-is.
   """
 
   doc "Statement Transpilation": """
@@ -75,7 +80,9 @@ grok Transpiler {
     - Map literals: emit typed `map[string]int32{...}` when ResolvedType
       available, else `map[any]any{...}`
     - Tuple literals: emit comma-separated (works for multi-return)
-    - Struct literals: `TypeName{Field: val}` with exportName
+    - Struct literals: `TypeName{Field: val}` with exportName. Class struct
+      literals emit `&TypeName{...}` (pointer) since class methods use pointer
+      receivers, required for Go interface satisfaction.
     - Lambdas: `func(params) retType { body }`. When a return type is present
       and the last statement is an expression, it is implicitly emitted as a
       `return` statement (expression-body lambdas).
@@ -110,6 +117,10 @@ grok Transpiler {
       why: "Go return type of the function currently being transpiled. Used to insert explicit casts in return statements."
     selfName:          string
       why: "Receiver name to replace 'self' with in method bodies. Set when entering a method, cleared on exit."
+    classes:           map[string]bool
+      why: "Tracks which type names are classes (vs structs). Class struct literals emit with & prefix for pointer receiver compatibility."
+    topFuncs:          map[string]bool
+      why: "Tracks top-level function names. Call expressions export these names but leave local variables as-is."
 
     func Transpile(mut self, file: File?) -> string
       why: "Primary entry point. Emits package declaration then all blocks."

@@ -603,3 +603,188 @@ func TestFloatWidening(t *testing.T) {
 	}`)
 	expectNoErrors(t, c) // f32 + f64 -> f64 via widening
 }
+
+func TestInterfaceRegistration(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+}`)
+	expectNoErrors(t, c)
+	info := c.registry.Lookup("Greeter")
+	if info == nil {
+		t.Fatal("Greeter not registered")
+	}
+	if info.Type.Kind != TyInterface {
+		t.Errorf("expected TyInterface, got %v", info.Type.Kind)
+	}
+	if _, ok := info.Methods["greet"]; !ok {
+		t.Error("method greet not found")
+	}
+}
+
+func TestInterfaceImplementsSatisfied(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Dog() implements Greeter {
+    func greet(self) -> string {
+      return "woof"
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestInterfaceMissingMethod(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Dog() implements Greeter {
+    func bark(self) -> string {
+      return "woof"
+    }
+  }
+}`)
+	expectErrors(t, c, 1)
+}
+
+func TestInterfaceWrongReturnType(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Dog() implements Greeter {
+    func greet(self) -> i32 {
+      return 42
+    }
+  }
+}`)
+	expectErrors(t, c, 1)
+}
+
+func TestInterfaceWrongParamCount(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Dog() implements Greeter {
+    func greet(self, name: string) -> string {
+      return "woof"
+    }
+  }
+}`)
+	expectErrors(t, c, 1)
+}
+
+func TestInterfaceComposition(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Reader {
+    func read(self) -> string
+  }
+
+  interface Writer {
+    func write(self, data: string)
+  }
+
+  interface ReadWriter {
+    implements Reader
+    implements Writer
+  }
+
+  class File() implements ReadWriter {
+    func read(self) -> string {
+      return ""
+    }
+    func write(self, data: string) {
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+	// ReadWriter should have both read and write methods
+	info := c.registry.Lookup("ReadWriter")
+	if info == nil {
+		t.Fatal("ReadWriter not registered")
+	}
+	if len(info.Methods) != 2 {
+		t.Errorf("expected 2 methods, got %d", len(info.Methods))
+	}
+}
+
+func TestInterfaceCompositionMissingMethod(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Reader {
+    func read(self) -> string
+  }
+
+  interface Writer {
+    func write(self, data: string)
+  }
+
+  interface ReadWriter {
+    implements Reader
+    implements Writer
+  }
+
+  class File() implements ReadWriter {
+    func read(self) -> string {
+      return ""
+    }
+  }
+}`)
+	expectErrors(t, c, 1) // missing write
+}
+
+func TestInterfaceSubtyping(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Dog() implements Greeter {
+    func greet(self) -> string {
+      return "woof"
+    }
+  }
+
+  func say_hello(g: Greeter) -> string {
+    return g.greet()
+  }
+
+  func main() {
+    let d = Dog{}
+    let result = say_hello(d)
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestInterfaceSubtypingFails(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  interface Greeter {
+    func greet(self) -> string
+  }
+
+  class Cat() {
+    func meow(self) -> string {
+      return "meow"
+    }
+  }
+
+  func say_hello(g: Greeter) -> string {
+    return g.greet()
+  }
+
+  func main() {
+    let c = Cat{}
+    let result = say_hello(c)
+  }
+}`)
+	expectErrors(t, c, 1) // Cat doesn't implement Greeter
+}
