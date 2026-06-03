@@ -12,3 +12,4 @@ grok-verify
 # OS
 .DS_Store
 Thumbs.db
+grok-compile
