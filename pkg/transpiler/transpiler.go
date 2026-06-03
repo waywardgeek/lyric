@@ -692,17 +692,26 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.transpileBinary(expr)
 	case ast.ExprCall:
 		call := expr.Data.(*ast.CallExpr)
-		// Export top-level function names; leave local variables as-is
+		// Handle builtins and top-level function names
 		if call.Func.Kind == ast.ExprIdent {
 			id := call.Func.Data.(*ast.IdentExpr)
-			if t.topFuncs[id.Name] {
-				if (id.Name == "Main" || id.Name == "main") && t.pkg == "main" {
-					t.writef("main")
+			switch id.Name {
+			case "println":
+				t.needsImport("fmt")
+				t.writef("fmt.Println")
+			case "print":
+				t.needsImport("fmt")
+				t.writef("fmt.Print")
+			default:
+				if t.topFuncs[id.Name] {
+					if (id.Name == "Main" || id.Name == "main") && t.pkg == "main" {
+						t.writef("main")
+					} else {
+						t.writef("%s", exportName(id.Name))
+					}
 				} else {
-					t.writef("%s", exportName(id.Name))
+					t.writef("%s", id.Name)
 				}
-			} else {
-				t.writef("%s", id.Name)
 			}
 		} else {
 			t.transpileExpr(&call.Func)

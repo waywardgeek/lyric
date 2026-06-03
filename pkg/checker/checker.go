@@ -281,10 +281,15 @@ type Checker struct {
 
 // New creates a new type checker.
 func New() *Checker {
-	return &Checker{
+	c := &Checker{
 		registry: NewRegistry(),
 		scope:    NewScope(nil),
 	}
+	// Register builtin functions
+	// println(...) — variadic, accepts any types, returns unit
+	c.scope.Define("println", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "println"})
+	c.scope.Define("print", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "print"})
+	return c
 }
 
 // Errors returns all accumulated type errors.
@@ -585,7 +590,12 @@ func (c *Checker) checkCall(expr *ast.Expr) *Type {
 		c.error(expr.Span, "cannot call non-function type %s", fnType)
 		return TypeError
 	}
-	if len(call.Args) != len(fnType.Params) {
+	if fnType.Params == nil {
+		// Variadic/builtin — just check each arg is valid
+		for i := range call.Args {
+			c.checkExpr(&call.Args[i])
+		}
+	} else if len(call.Args) != len(fnType.Params) {
 		c.error(expr.Span, "expected %d arguments, got %d", len(fnType.Params), len(call.Args))
 	} else {
 		for i := range call.Args {
