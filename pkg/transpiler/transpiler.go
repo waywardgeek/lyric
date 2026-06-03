@@ -556,12 +556,20 @@ func (t *Transpiler) transpileReturn(stmt *ast.Stmt) {
 	t.writeIndent()
 	if ret.Value != nil {
 		t.writef("return ")
-		// Insert cast if return value type differs from function return type
-		// Skip for tuple literals — they emit comma-separated values naturally
-		if t.currentReturnType != "" && ret.Value.Kind != ast.ExprTupleLit {
+		// Handle optional wrapping: if return type is *T and value is T, wrap with pointer
+		if t.currentReturnType != "" && ret.Value.Kind != ast.ExprTupleLit && ret.Value.Kind != ast.ExprNil {
 			if rt, ok := ret.Value.ResolvedType.(*checker.Type); ok {
 				exprGoType := checkerTypeToGo(rt)
 				if exprGoType != "" && exprGoType != t.currentReturnType {
+					// Check if it's an optional wrapping case: *T vs T
+					if strings.HasPrefix(t.currentReturnType, "*") && t.currentReturnType[1:] == exprGoType {
+						// Emit: func() *T { v := expr; return &v }()
+						t.writef("func() %s { _v := ", t.currentReturnType)
+						t.transpileExpr(ret.Value)
+						t.writef("; return &_v }()")
+						t.writef("\n")
+						return
+					}
 					t.writef("%s(", t.currentReturnType)
 					t.transpileExpr(ret.Value)
 					t.writef(")")
@@ -836,6 +844,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			}
 		}
 		// Handle builtins and top-level function names
+		callDone := false
 		if call.Func.Kind == ast.ExprIdent {
 			id := call.Func.Data.(*ast.IdentExpr)
 			switch id.Name {
@@ -845,6 +854,18 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			case "print":
 				t.needsImport("fmt")
 				t.writef("fmt.Print")
+			case "len":
+				t.writef("len")
+			case "append":
+				t.writef("append")
+			case "isnull":
+				// isnull(expr) → (expr == nil)
+				t.writef("(")
+				if len(call.Args) > 0 {
+					t.transpileExpr(&call.Args[0])
+				}
+				t.writef(" == nil)")
+				callDone = true
 			default:
 				if t.topFuncs[id.Name] {
 					if (id.Name == "Main" || id.Name == "main") && t.pkg == "main" {
@@ -859,8 +880,9 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		} else {
 			t.transpileExpr(&call.Func)
 		}
-		// Emit type arguments: func[T, U](...)
-		if len(call.TypeArgs) > 0 {
+		if !callDone {
+			// Emit type arguments: func[T, U](...)
+			if len(call.TypeArgs) > 0 {
 			t.writef("[")
 			for i := range call.TypeArgs {
 				if i > 0 {
@@ -878,6 +900,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			t.transpileExpr(&call.Args[i])
 		}
 		t.writef(")")
+		}
 	case ast.ExprMethodCall:
 		mc := expr.Data.(*ast.MethodCallExpr)
 		t.transpileExpr(&mc.Receiver)
@@ -1092,6 +1115,13 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.writef("%s(", goType)
 		t.transpileExpr(&cast.Operand)
 		t.writef(")")
+	case ast.ExprUnwrap:
+		// expr! → dereference pointer (panic if nil via Go's nil pointer deref)
+		// Emit: func() T { if _v := expr; _v != nil { return *_v }; panic("unwrap of nil optional") }()
+		unwrap := expr.Data.(*ast.UnwrapExpr)
+		// Simple form: just dereference with *
+		t.writef("*")
+		t.transpileExpr(&unwrap.Operand)
 	}
 }
 

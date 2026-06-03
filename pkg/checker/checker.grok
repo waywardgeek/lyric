@@ -56,6 +56,7 @@ grok Checker {
     - Numeric widening: same-sign integers/floats widen to larger bit widths
     - Recursive composite matching: list/map/optional/tuple element types
     - nil (TyUnknown) assignable to optional and interface types
+    - T assignable to T? (optional wrapping): any value auto-wraps into optional
     - TyVar compatible with anything (constraints deferred to Go for now)
   """
 
@@ -138,6 +139,7 @@ grok Checker {
     - Match-as-expression: checks match value, binds pattern vars, infers result
       type from first arm.
     - Cast (<Type>expr): validates numeric ↔ numeric conversion.
+    - Unwrap (expr!): validates operand is optional, returns inner type.
     - Lambda: checks body, infers return type
     - Struct literal: resolves type from registry, checks field types
     - String interpolation: checks each interpolated expression
@@ -167,6 +169,12 @@ grok Checker {
     - Cast only supports numeric ↔ numeric
     - resolveNamedType falls through to TyVar for unknown names (should error
       when not a registered type variable, but kept for .grok compatibility)
+  """
+
+  doc "Built-in Functions": """
+    Registered in New(): println, print (variadic, any types, unit return),
+    len (collection → i32), append (list + elem → list), isnull (optional → bool).
+    These are treated as TyFunc with nil Params (variadic/special).
   """
 
   // ---- Type system ----

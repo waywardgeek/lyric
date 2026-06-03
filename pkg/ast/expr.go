@@ -26,6 +26,7 @@ const (
 	ExprMatch                     // match value { ... } as expression
 	ExprStructLit                 // Point{X: 3.0, Y: 4.0}
 	ExprCast                      // <i64>x — type cast
+	ExprUnwrap                    // x! — unwrap optional, panic if nil
 )
 
 // Expr is any expression node.
@@ -164,6 +165,11 @@ type LambdaExpr struct {
 type CastExpr struct {
 	TargetType TypeExpr
 	Operand    Expr
+}
+
+// UnwrapExpr represents expr! — unwrap an optional value, panic if nil.
+type UnwrapExpr struct {
+	Operand Expr
 }
 
 // --- Statements ---

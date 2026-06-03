@@ -524,3 +524,27 @@ func TestParseGenericCallSite(t *testing.T) {
 		t.Errorf("expected i32, got %s", nt.Name)
 	}
 }
+
+func TestParseUnwrapExpr(t *testing.T) {
+	input := `grok test {
+  func f(x: i32?) {
+    let y = x!
+  }
+}`
+	file, err := ParseString(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	fn := file.Blocks[0].Functions[0]
+	if fn.Body == nil || len(fn.Body.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(fn.Body.Stmts))
+	}
+	decl := fn.Body.Stmts[0].Data.(*ast.VarDeclStmt)
+	if decl.Value.Kind != ast.ExprUnwrap {
+		t.Fatalf("expected ExprUnwrap, got %v", decl.Value.Kind)
+	}
+	unwrap := decl.Value.Data.(*ast.UnwrapExpr)
+	if unwrap.Operand.Kind != ast.ExprIdent {
+		t.Fatalf("expected ExprIdent operand, got %v", unwrap.Operand.Kind)
+	}
+}

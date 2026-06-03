@@ -312,6 +312,12 @@ func New() *Checker {
 	// println(...) — variadic, accepts any types, returns unit
 	c.scope.Define("println", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "println"})
 	c.scope.Define("print", &Type{Kind: TyFunc, Params: nil, Return: TypeUnit, Name: "print"})
+	// len(collection) -> i32 — works on lists, strings, maps
+	c.scope.Define("len", &Type{Kind: TyFunc, Params: nil, Return: TypeI32, Name: "len"})
+	// append(list, elem) -> list — adds element to list, returns new list
+	c.scope.Define("append", &Type{Kind: TyFunc, Params: nil, Return: TypeUnknown, Name: "append"})
+	// isnull(optional) -> bool — checks if an optional value is nil
+	c.scope.Define("isnull", &Type{Kind: TyFunc, Params: nil, Return: TypeBool, Name: "isnull"})
 	// Register builtin types
 	// error — Go's error interface, used in (T, error) return patterns
 	c.registry.Register("error", &TypeInfo{
@@ -458,6 +464,10 @@ func (c *Checker) assignableTo(from, to *Type) bool {
 	}
 	// Numeric widening (e.g., int → i32, i32 → i64)
 	if numericWidens(from, to) {
+		return true
+	}
+	// T is assignable to T? (optional wrapping)
+	if to.Kind == TyOptional && to.Elem != nil && c.assignableTo(from, to.Elem) {
 		return true
 	}
 	// Composite types: recurse into element types
@@ -610,6 +620,8 @@ func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 		return c.checkMatchExpr(expr)
 	case ast.ExprCast:
 		return c.checkCast(expr)
+	case ast.ExprUnwrap:
+		return c.checkUnwrap(expr)
 	default:
 		return TypeUnknown
 	}
@@ -907,6 +919,18 @@ func (c *Checker) checkCast(expr *ast.Expr) *Type {
 		}
 	}
 	return targetType
+}
+
+func (c *Checker) checkUnwrap(expr *ast.Expr) *Type {
+	unwrap := expr.Data.(*ast.UnwrapExpr)
+	operandType := c.checkExpr(&unwrap.Operand)
+	if operandType.Kind == TyOptional {
+		return operandType.Elem
+	}
+	if operandType.Kind != TyUnknown {
+		c.error(expr.Span, "cannot unwrap non-optional type %s", operandType)
+	}
+	return TypeUnknown
 }
 
 // --- Statement checking ---

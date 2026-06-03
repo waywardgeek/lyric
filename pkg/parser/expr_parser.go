@@ -260,6 +260,14 @@ func (p *Parser) parsePostfixExpr() (*ast.Expr, error) {
 				Data: &ast.IndexExpr{Receiver: *expr, Index: *index},
 				Span: ast.Span{Start: expr.Span.Start, End: end.Span.End},
 			}
+		case TBang:
+			// Postfix ! — unwrap optional, panic if nil
+			bang := p.next()
+			expr = &ast.Expr{
+				Kind: ast.ExprUnwrap,
+				Data: &ast.UnwrapExpr{Operand: *expr},
+				Span: ast.Span{Start: expr.Span.Start, End: bang.Span.End},
+			}
 		default:
 			return expr, nil
 		}

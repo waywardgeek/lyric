@@ -110,9 +110,14 @@ grok Transpiler {
       ResolvedType annotations from checker
     - Cast expressions (<Type>expr): emit Go type conversion `TargetType(expr)`.
       For numeric types, uses checkerTypeToGo to resolve the Go type name.
+    - Unwrap (expr!): emits `*expr` (Go pointer dereference). Nil dereference
+      panics at runtime, matching Rune semantics.
     - Integer/float literals with ResolvedType: emit typed literals (e.g.,
       `int32(42)`) when checker annotated them, bare literals otherwise
       (unit tests without checker pass produce bare output).
+    - Return with optional wrapping: when return type is *T and expr type is T,
+      emits IIFE `func() *T { _v := expr; return &_v }()` (Go can't take address
+      of rvalues directly).
 
     Binary operators map directly. Precedence is encoded in the AST structure
     (parser handles it), so no parenthesization logic needed here.
@@ -122,6 +127,14 @@ grok Transpiler {
     - i128/i256 silently downcast to int64 (data loss)
     - For loops always discard the index variable
     - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)
+  """
+
+  doc "Built-in Function Emission": """
+    Builtins are detected by name in ExprCall transpilation:
+    - println/print → fmt.Println/fmt.Print (auto-imports "fmt")
+    - len → Go len() (direct)
+    - append → Go append() (direct)
+    - isnull(expr) → (expr == nil) — emits inline, skips normal arg emission
   """
 
   doc "Error Handling & Tuple Returns": """
@@ -186,12 +199,6 @@ grok Transpiler {
     why: "Converts checker.Type to Go type string. Handles composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T."
 
   func binaryOpString(op: BinaryOp) -> string
-
-  func mapConstraint(self, name: string) -> string
-    why: "Maps Grok constraint names to Go equivalents. Comparable→cmp.Ordered (with auto-import), Equatable/Hashable→comparable, others pass through."
-
-  func typeParamList(self, params: [TypeParam]) -> string
-    why: "Emits Go type parameter list [T any, U cmp.Ordered]. Unconstrained params get 'any'. Returns empty string when params is empty."
 
   source: ["transpiler.go"]
 }

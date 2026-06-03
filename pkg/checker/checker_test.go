@@ -970,3 +970,50 @@ func TestGenericReturnTypeSubstitution(t *testing.T) {
 	}`)
 	expectNoErrors(t, c)
 }
+
+func TestUnwrapOptional(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(x: i32?) -> i32 {
+			return x!
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestUnwrapNonOptionalError(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(x: i32) -> i32 {
+			return x!
+		}
+	}`)
+	if len(c.Errors()) == 0 {
+		t.Error("expected error for unwrapping non-optional type")
+	}
+}
+
+func TestAssignToOptional(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() -> i32? {
+			return 42
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestIsnullBuiltin(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(x: i32?) -> bool {
+			return isnull(x)
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestLenBuiltin(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(xs: [i32]) -> i32 {
+			return len(xs)
+		}
+	}`)
+	expectNoErrors(t, c)
+}

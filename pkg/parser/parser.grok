@@ -87,7 +87,11 @@ grok Parser {
     <Type>expr, f-string interpolation f"text {expr}", and .gk keywords used as
     identifiers (true, false, nil, map).
 
-    Postfix operations include generic call disambiguation: when a postfix `<` is
+    Postfix operations include: method calls (obj.method()), field access (obj.field),
+    generic call disambiguation (tryParseTypeArgs with backtracking), function calls,
+    indexing (xs[i]), and unwrap (expr! — ExprUnwrap, for optional dereferencing).
+
+    Generic call disambiguation: when a postfix `<` is
     encountered, tryParseTypeArgs() saves lexer state, attempts to parse type args,
     and checks for a following `(`. On failure, backtracks and exits the postfix
     loop so the `<` is treated as a binary comparison operator.

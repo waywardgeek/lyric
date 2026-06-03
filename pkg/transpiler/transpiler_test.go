@@ -577,3 +577,47 @@ func TestTranspileGenericFuncWithConstraint(t *testing.T) {
 		t.Errorf("expected constraint mapping, got:\n%s", out)
 	}
 }
+
+func TestTranspileUnwrap(t *testing.T) {
+	src := `grok test {
+		func f(x: i32?) -> i32 {
+			return x!
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "*x") {
+		t.Errorf("expected *x for unwrap, got:\n%s", out)
+	}
+}
+
+func TestTranspileIsnull(t *testing.T) {
+	src := `grok test {
+		func f(x: i32?) -> bool {
+			if isnull(x) {
+				return true
+			}
+			return false
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "(x == nil)") {
+		t.Errorf("expected (x == nil) for isnull, got:\n%s", out)
+	}
+}
+
+func TestTranspileLenAppend(t *testing.T) {
+	src := `grok test {
+		func f() {
+			let xs = [1, 2, 3]
+			let n = len(xs)
+			let ys = append(xs, 4)
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "len(xs)") {
+		t.Errorf("expected len(xs), got:\n%s", out)
+	}
+	if !strings.Contains(out, "append(xs, int32(4))") {
+		t.Errorf("expected append(xs, int32(4)), got:\n%s", out)
+	}
+}

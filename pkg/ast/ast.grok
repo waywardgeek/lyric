@@ -169,7 +169,7 @@ grok AST {
     Unary Binary
     Call MethodCall FieldAccess Index
     ListLit TupleLit MapLit StructLit
-    Lambda Match Cast
+    Lambda Match Cast Unwrap
   }
 
   struct Expr {
@@ -263,6 +263,11 @@ grok AST {
     why: "<TargetType>expr — explicit type conversion. Rune heritage."
     TargetType: TypeExpr
     Operand:    Expr
+  }
+
+  struct UnwrapExpr {
+    why: "expr! — unwrap optional, panic if nil. Rune heritage."
+    Operand: Expr
   }
 
   // ---- Statements (.gk) ----
