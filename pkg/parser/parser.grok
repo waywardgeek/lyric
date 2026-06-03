@@ -1,31 +1,40 @@
 // parser.grok — the Grok parser's own understanding
 
 grok Parser {
-  why: "Frontend of the Grok toolchain. Transforms raw Grok source into a structured AST via a two-phase pipeline: hand-written stateful lexer + recursive descent parser following PEG principles."
+  why: "Frontend of the Grok toolchain. Transforms raw Grok source into a structured AST via a two-phase pipeline: hand-written stateful lexer + recursive descent parser. Handles both .grok (declaration-only) and .gk (full implementation with expressions and statements) files through the same parser with mode detection."
 
   doc "Architecture": """
     Linear pipeline: raw text → Lexer (tokens) → Parser (AST).
 
-    1. Lexical Analysis: Lexer scans char-by-char producing Token objects. Stateful:
-       tracks line/column for source mapping, handles triple-quoted strings, collapses
-       multiple newlines into single TNewline tokens.
-    2. Syntactic Analysis: Parser consumes token stream via recursive descent. Each
-       major construct has a corresponding method (parseStruct, parseFunc, etc.).
-       Largely LL(1) but uses lookahead with state save/restore for ambiguous cases.
-    3. AST Construction: Parser instantiates nodes from pkg/ast. Every node gets a
+    1. Lexical Analysis (lexer.go): Lexer scans char-by-char producing Token objects.
+       Stateful: tracks line/column for source mapping, handles triple-quoted strings,
+       collapses multiple newlines into single TNewline tokens.
+
+    2. Declaration Parsing (parser.go): Recursive descent parser for .grok and .gk
+       top-level structure. Each major construct has a corresponding method
+       (parseStruct, parseFunc, parseEnum, etc.). Largely LL(1) with state
+       save/restore lookahead for ambiguous cases.
+
+    3. Expression/Statement Parsing (expr_parser.go): Pratt/precedence-climbing
+       parser for .gk function bodies. Activated when parseFunc detects a `{` after
+       annotations — same function handles both .grok signatures and .gk bodies.
+
+    4. AST Construction: Parser instantiates nodes from pkg/ast. Every node gets a
        Span for precise source location. Output is ast.File.
   """
 
   doc "Key Decisions": """
     PEG over LALR: no ambiguity, ordered choice, composable. Rejected tree-sitter
-    (external dependency, incremental parsing not needed for verification use case)
-    and parser generators (hand-written gives full control over error messages).
+    (external dependency, incremental parsing not needed) and parser generators
+    (hand-written gives full control over error messages).
 
     Single AST for both .grok and .gk: .grok is the declaration-only subset.
-    FuncDecl.Body is nil for .grok files.
+    FuncDecl.Body is nil for .grok files, *Block for .gk files.
 
-    Positions tracked on every node via Span — memory cost accepted for
-    high-quality error reporting and future IDE integration.
+    Pratt parsing for expressions: clean precedence handling for 12 binary
+    precedence levels without explicit grammar rules. Each token maps to a
+    binding power via binaryPrec(); the parser recursively descends only when
+    the next operator has higher precedence.
   """
 
   doc "Contextual Keywords": """
@@ -45,6 +54,57 @@ grok Parser {
     Cost is negligible — Lexer is a small struct, and ambiguities are rare.
   """
 
+  doc "Expression Parsing (Pratt/Precedence-Climbing)": """
+    expr_parser.go implements a Pratt parser with 12 precedence levels:
+
+    Level  1: || (logical or)
+    Level  2: && (logical and)
+    Level  3: == != (equality)
+    Level  4: < <= > >= (comparison)
+    Level  5: | (bitwise or)
+    Level  6: ^ (bitwise xor)
+    Level  7: & (bitwise and)
+    Level  8: << >> (shifts)
+    Level  9: + - (additive)
+    Level 10: * / % (multiplicative)
+
+    Unary prefix operators (-, !) are handled in parseUnaryExpr before entering
+    the precedence loop. Postfix operations (field access, method call, index,
+    function call) are handled in parsePostfixExpr with a tight loop.
+
+    Primary expressions: identifiers, all literal types (int, float, string, bool,
+    nil), parenthesized expressions, list literals [a, b], map literals map[K]V{...},
+    lambda |params| -> RetType { body }, match expressions, and .gk keywords used
+    as identifiers (true, false, nil, map).
+  """
+
+  doc "Statement Parsing": """
+    parseStmt() dispatches on the current token:
+    - let/let mut → parseVarDecl (type annotation and/or initializer)
+    - return → parseReturn (optional value)
+    - if → parseIf (with else if / else chains)
+    - for → parseFor (for var in collection)
+    - while → parseWhile
+    - match → parseMatchStmt (value + arms with patterns)
+    - cascade → parseCascade (deferred cleanup block)
+    - break/continue → direct AST nodes
+    - Otherwise → parseExprOrAssign (expression or assignment statement)
+
+    Compound assignment (+=, -=, *=, /=) is desugared in the parser:
+    `x += y` becomes `x = x + y` at the AST level, keeping the transpiler simple.
+
+    Pattern parsing for match arms supports: identifier, variant(bindings),
+    literal, wildcard (_), and tuple patterns.
+  """
+
+  doc ".gk Token Extensions": """
+    The lexer recognizes 15 .gk-specific keywords (let, mut, if, else, for, in,
+    while, match, return, break, continue, cascade, true, false, nil) and 22
+    operator tokens (arithmetic, comparison, logical, bitwise, shift, assignment,
+    compound assignment, fat arrow). These are only meaningful in function body
+    context but are always lexed — the parser determines context.
+  """
+
   doc "Recursive Type Parsing": """
     parseTypeExpr handles Grok's full recursive type system: sequences [T],
     tuples (T, U), maps map[K]V, channels channel<T>, optionals T?, unions A | B,
@@ -52,65 +112,71 @@ grok Parser {
     parse base → check for ? suffix → check for | infix → check for -> infix.
   """
 
-  doc "Relation Parsing": """
-    Unique syntax: `relation [hint] Parent[:label] owns|refs [Child[:label]]`
-    Hint is optional (DoublyLinked, ArrayList, Hashed). Brackets around child type
-    indicate one-to-many (IsMany). Labels on both sides support named navigation
-    paths (Node:outEdges owns [Edge:fromNode]).
-  """
-
   doc "Technical Debt": """
     - Error recovery: currently fail-fast (first error). Synchronizing on next
       grok block would improve IDE/bulk-processing experience.
-    - Expression parsing: requires/ensures capture raw text strings. Full expression
-      parser needed for formal verification of preconditions/postconditions.
-    - Function bodies: signatures only — no statements/expressions yet for .gk.
-    - Multi-line arrays: source: [...] must be single-line (parser limitation).
-    - Performance: state-restoration lookahead is simple but could be optimized
-      for extremely large files if parsing becomes a bottleneck.
+    - Struct literal syntax: `Point{X: 3.0}` not yet supported in expression parser
+    - Multi-line arrays: source: [...] must be single-line (parser limitation)
+    - requires/ensures: capture raw text strings, not parsed expressions
+    - For-loop index: no syntax for `for i, x in collection`
   """
 
   // ---- Token layer ----
 
   enum TokenKind {
-    // Keywords
+    // .grok keywords
     Grok Func Class Struct Enum Interface Relation Import
     Implements Where Owns Refs Mut Self
+
+    // .gk keywords
+    Let If Else For In While Match Return
+    Break Continue Cascade True False Nil Map
+
     // Literals
     Ident IntLit FloatLit StringLit
+
     // Punctuation
     LParen RParen LBrace RBrace LBracket RBracket
     Comma Colon ColonColon Dot Arrow FatArrow Pipe Question
     Lt Gt
-    // Annotations — tokenized separately but accepted as idents via expectIdentLike()
+
+    // Operators (.gk)
+    Plus Minus Star Slash Percent
+    EqEq BangEq LtEq GtEq
+    AmpAmp PipePipe Bang
+    Amp Caret LtLt GtGt
+    Eq PlusEq MinusEq StarEq SlashEq
+
+    // Annotations
     Why Doc Invariant Requires Ensures Raises
     Concurrent RequiresLock ExcludesLock GuardedBy
     Spawns Pure Source Fake VerifiedAt
+
     // Special
     Newline EOF
   }
 
   struct Token {
-    kind: TokenKind
-    text: string
-    span: Span
+    Kind: TokenKind
+    Text: string
+    Span: Span
   }
 
-  class Lexer(source: string, filename: string) {
-    why: "Stateful scanner. Handles triple-quoted strings (auto-trims leading/trailing whitespace lines), collapses newline sequences, tracks line/column. State is copyable for parser lookahead save/restore."
+  class Lexer(Source: string, Filename: string) {
+    why: "Stateful scanner. Handles triple-quoted strings, collapses newline sequences, tracks line/column. State is copyable for parser lookahead save/restore."
 
     func Next(mut self) -> Token
     func Peek(self) -> Token
   }
 
   struct ParseError {
-    why: "Implements Go error interface. Includes Span for filename:line:column error messages."
+    why: "Implements Go error interface. Includes Span for filename:line:column."
     Message: string
     Span:    Span
   }
 
-  class Parser(lex: Lexer) {
-    why: "Recursive descent parser. Consumes tokens from Lexer, produces ast.File. Internal methods (parseStruct, parseFunc, parseTypeExpr, etc.) are unexported — only ParseFile/ParseString are public entry points."
+  class Parser(Lex: Lexer) {
+    why: "Recursive descent + Pratt hybrid parser. Declaration parsing via recursive descent; expression parsing via precedence climbing. Internal methods are unexported — only ParseFile/ParseString are public."
   }
 
   // ---- Public API ----
@@ -119,7 +185,7 @@ grok Parser {
     why: "Primary entry point. Manages lexer/parser lifecycle, returns AST or ParseError."
 
   func ParseString(source: string) -> (File?, error)
-    why: "Convenience wrapper using '<string>' as filename. Ideal for tests and dynamic snippets."
+    why: "Convenience wrapper using '<string>' as filename. Ideal for tests."
 
-  source: ["lexer.go", "parser.go"]
+  source: ["lexer.go", "parser.go", "expr_parser.go"]
 }

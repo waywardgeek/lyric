@@ -1,437 +1,261 @@
-2026/06/03 08:46:48 ✅ Created default project: grok (reasoning: enabled)
-2026/06/03 08:46:48 ✅ Agent 'DesignGen-Scout' initialized with 0 tools on port 8084
-2026/06/03 08:46:48    Project path: /Users/bill/projects/grok
-2026/06/03 08:46:48    GUI files path: /Users/bill/projects/designgen/coderhapsody/web/gui/dist
-2026/06/03 08:46:48 🚀 Starting agent 'DesignGen-Scout' on port 8084...
-2026/06/03 08:46:48 ✅ Changed working directory to project: /Users/bill/projects/grok
-2026/06/03 08:46:48 ✅ Found web GUI files at configured path: /Users/bill/projects/designgen/coderhapsody/web/gui/dist
-2026/06/03 08:46:48 ✅ Web GUI static file serving enabled
-2026/06/03 08:46:48    Access the interface at: http://localhost:8084
-2026/06/03 08:46:48 Starting CodeRhapsody server on :8084
-2026/06/03 08:46:50 Processing user message with 0 images and 0 audio clips for AI client
-2026/06/03 08:46:50 Added text content (1183 chars) to user message
-2026/06/03 08:46:50 💬 User message queued successfully
-2026/06/03 08:46:50 Sent mixed-content message to AI client (queued)
-2026/06/03 08:46:50 💬 User message received, processing as prompt...
-2026/06/03 08:46:50 ✅ Added prompt to database history
-2026/06/03 08:46:50 🧠 Reset thinking history and captured initial prompt for new tool chain
-2026/06/03 08:46:50 [DEBUG_GEMINI] sendMessage START - clearing previous state
-2026/06/03 08:46:50 💾 TTL Math (gemini-3.1-pro-preview): V=$1.80/M, S=$4.50/M/hr, tau=1hr -> Break-even: 1069s
-2026/06/03 08:46:50 💾 Using GeminiCacheTTL from settings: 3600s
-2026/06/03 08:46:51 💾 Cache created: 4094 tokens, creation cost: $0.008188
-2026/06/03 08:46:51 ⏱️  Storage tracking started: $0.018423 per hour for 4094 tokens
-2026/06/03 08:46:51 💰 Initialized cost-based cache refresh tracking (accumulated cost: $0.000000)
-2026/06/03 08:46:51 📊 Cache metadata (creation): 4094 tokens cached, expires in 60m (coderhapsody_context_0_turns)
-2026/06/03 08:46:51 [DEBUG_GEMINI] Using model from settings: gemini-3.1-pro-preview
-2026/06/03 08:46:51 💾 Using cached context (0 turns) + 1 new turns
-2026/06/03 08:46:51 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:46:51 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:46:51 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:46:54 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:46:54 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:46:54 🔧 Function call during streaming: read_file
-2026/06/03 08:46:54 🧠 Thought signature received: EoADCv0CAQw51seO2dSA6tbQPrsp5Nl2IuioEHYFrpR6Ai80Bo...
-2026/06/03 08:46:54 [DEBUG_GEMINI] Executing tool: read_file
-2026/06/03 08:46:54 🔧 [ToolExecutor] Executing image-capable tool: read_file
-2026/06/03 08:46:54 ✅ Tool execution completed: read_file -> 4933 chars
-2026/06/03 08:46:54 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:46:54 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:46:54 💾 Cache storage: 4094 tokens × 0.05 min = $0.000014 (incremental: $0.000014, total: $0.000014)
-2026/06/03 08:46:54 💰 API call: 4094 cached, 297 non-cached input, 107 output tokens
-2026/06/03 08:46:54 💰 Request cost: $0.002697, Extra cost: $0.000535 (accumulated: $0.000535)
-2026/06/03 08:46:54 💰 Cache refresh cost analysis:
-2026/06/03 08:46:54    Accumulated extra token cost: $0.000535
-2026/06/03 08:46:54    Cache storage cost (0.0 min): $0.000014
-2026/06/03 08:46:54    Total extra cost: $0.000549
-2026/06/03 08:46:54    Tokens to cache in refresh: 4498 (prompt: 4391 + candidate: 107)
-2026/06/03 08:46:54    Cost to refresh cache: $0.008996
-2026/06/03 08:46:54 💰 [DEBUG] Comparison: 0.000548821 >= 0.008996000 = false
-2026/06/03 08:46:54 ⏸️  Cost-based refresh not yet beneficial: $0.000549 total extra cost < $0.008996 refresh cost
-2026/06/03 08:46:54 💾 Using cached context (0 turns) + 3 new turns
-2026/06/03 08:46:54 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:46:54 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:46:54 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:47:01 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:47:01 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:47:01 🔧 Function call during streaming: read_file
-2026/06/03 08:47:01 🧠 Thought signature received: EmwKagEMOdbHJwr5KQQXQdNw0DDH/gH5utHEPGqPm9kRb44m0S...
-2026/06/03 08:47:01 [DEBUG_GEMINI] Executing tool: read_file
-2026/06/03 08:47:01 🔧 [ToolExecutor] Executing image-capable tool: read_file
-2026/06/03 08:47:01 ✅ Tool execution completed: read_file -> 6445 chars
-2026/06/03 08:47:01 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:47:01 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:47:01 💾 Cache storage: 4094 tokens × 0.17 min = $0.000052 (incremental: $0.000038, total: $0.000052)
-2026/06/03 08:47:01 💰 API call: 4094 cached, 1517 non-cached input, 34 output tokens
-2026/06/03 08:47:01 💰 Request cost: $0.004261, Extra cost: $0.002731 (accumulated: $0.003265)
-2026/06/03 08:47:01 💰 Cache refresh cost analysis:
-2026/06/03 08:47:01    Accumulated extra token cost: $0.003265
-2026/06/03 08:47:01    Cache storage cost (0.2 min): $0.000052
-2026/06/03 08:47:01    Total extra cost: $0.003318
-2026/06/03 08:47:01    Tokens to cache in refresh: 5645 (prompt: 5611 + candidate: 34)
-2026/06/03 08:47:01    Cost to refresh cache: $0.011290
-2026/06/03 08:47:01 💰 [DEBUG] Comparison: 0.003317550 >= 0.011290000 = false
-2026/06/03 08:47:01 ⏸️  Cost-based refresh not yet beneficial: $0.003318 total extra cost < $0.011290 refresh cost
-2026/06/03 08:47:01 💾 Using cached context (0 turns) + 5 new turns
-2026/06/03 08:47:01 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:47:01 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:47:01 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:47:07 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:47:07 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:47:07 🔧 Function call during streaming: read_file
-2026/06/03 08:47:07 🧠 Thought signature received: Em4KbAEMOdbHu9D2g+2Zxsln+wVRR2hPpmma4rhisBAl+IrpuR...
-2026/06/03 08:47:07 [DEBUG_GEMINI] Executing tool: read_file
-2026/06/03 08:47:07 🔧 [ToolExecutor] Executing image-capable tool: read_file
-2026/06/03 08:47:07 ✅ Tool execution completed: read_file -> 6469 chars
-2026/06/03 08:47:07 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:47:07 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:47:07 💾 Cache storage: 4094 tokens × 0.26 min = $0.000080 (incremental: $0.000027, total: $0.000080)
-2026/06/03 08:47:07 💰 API call: 4094 cached, 3002 non-cached input, 35 output tokens
-2026/06/03 08:47:07 💰 Request cost: $0.007243, Extra cost: $0.005404 (accumulated: $0.008669)
-2026/06/03 08:47:07 💰 Cache refresh cost analysis:
-2026/06/03 08:47:07    Accumulated extra token cost: $0.008669
-2026/06/03 08:47:07    Cache storage cost (0.3 min): $0.000080
-2026/06/03 08:47:07    Total extra cost: $0.008748
-2026/06/03 08:47:07    Tokens to cache in refresh: 7131 (prompt: 7096 + candidate: 35)
-2026/06/03 08:47:07    Cost to refresh cache: $0.014262
-2026/06/03 08:47:07 💰 [DEBUG] Comparison: 0.008748456 >= 0.014262000 = false
-2026/06/03 08:47:07 ⏸️  Cost-based refresh not yet beneficial: $0.008748 total extra cost < $0.014262 refresh cost
-2026/06/03 08:47:07 💾 Using cached context (0 turns) + 7 new turns
-2026/06/03 08:47:07 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:47:07 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:47:07 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:47:36 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:47:36 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:47:36 🔧 Function call during streaming: write_file
-2026/06/03 08:47:36 🧠 Thought signature received: Eo9NCoxNAQw51sd9VXdM8CtO+WgJ6uB8qooZpZOak187bIUkVi...
-2026/06/03 08:47:36 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:47:36 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:47:36 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:47:36 ✅ Tool execution completed: write_file -> 172 chars
-2026/06/03 08:47:36 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:47:36 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:47:36 💾 Cache storage: 4094 tokens × 0.74 min = $0.000228 (incremental: $0.000148, total: $0.000228)
-2026/06/03 08:47:36 💰 API call: 4094 cached, 4485 non-cached input, 1930 output tokens
-2026/06/03 08:47:36 💰 Request cost: $0.032949, Extra cost: $0.008073 (accumulated: $0.016742)
-2026/06/03 08:47:36 💰 Cache refresh cost analysis:
-2026/06/03 08:47:36    Accumulated extra token cost: $0.016742
-2026/06/03 08:47:36    Cache storage cost (0.7 min): $0.000228
-2026/06/03 08:47:36    Total extra cost: $0.016970
-2026/06/03 08:47:36    Tokens to cache in refresh: 10509 (prompt: 8579 + candidate: 1930)
-2026/06/03 08:47:36    Cost to refresh cache: $0.021018
-2026/06/03 08:47:36 💰 [DEBUG] Comparison: 0.016969591 >= 0.021018000 = false
-2026/06/03 08:47:36 ⏸️  Cost-based refresh not yet beneficial: $0.016970 total extra cost < $0.021018 refresh cost
-2026/06/03 08:47:36 💾 Using cached context (0 turns) + 9 new turns
-2026/06/03 08:47:36 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:47:36 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:47:36 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:47:41 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:47:41 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:47:41 🔧 Function call during streaming: write_file
-2026/06/03 08:47:41 🧠 Thought signature received: EnUKcwEMOdbHZaHg/YGuadmXLfnz6EtbTahd+a7oPcq8HN8HEy...
-2026/06/03 08:47:41 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:47:41 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:47:41 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:47:41 ✅ Tool execution completed: write_file -> 173 chars
-2026/06/03 08:47:41 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:47:41 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:47:41 💾 Cache storage: 4094 tokens × 0.82 min = $0.000253 (incremental: $0.000025, total: $0.000253)
-2026/06/03 08:47:41 💰 API call: 4094 cached, 6491 non-cached input, 218 output tokens
-2026/06/03 08:47:41 💰 Request cost: $0.016417, Extra cost: $0.011684 (accumulated: $0.028426)
-2026/06/03 08:47:41 💰 Cache refresh cost analysis:
-2026/06/03 08:47:41    Accumulated extra token cost: $0.028426
-2026/06/03 08:47:41    Cache storage cost (0.8 min): $0.000253
-2026/06/03 08:47:41    Total extra cost: $0.028679
-2026/06/03 08:47:41    Tokens to cache in refresh: 10803 (prompt: 10585 + candidate: 218)
-2026/06/03 08:47:41    Cost to refresh cache: $0.021606
-2026/06/03 08:47:41 💰 [DEBUG] Comparison: 0.028678717 >= 0.021606000 = true
-2026/06/03 08:47:41 ✅ Cost-based refresh beneficial: $0.028679 total extra cost >= $0.021606 refresh cost
-2026/06/03 08:47:41 💰 Cost-based cache refresh triggered - non-cached input costs exceed refresh cost
-2026/06/03 08:47:41 📊 Cache metadata (before deletion): 4094 tokens cached, expires in 59m (coderhapsody_context_0_turns)
-2026/06/03 08:47:41 💾 Final cache storage cost: 4094 tokens × 0.83 minutes = $0.000254 (incremental: $0.000001, total storage: $0.000254)
-2026/06/03 08:47:41 📊 Cache metadata (before cleanup): 4094 tokens cached, expires in 59m (coderhapsody_context_0_turns)
-2026/06/03 08:47:41 🗑️  Deleted cache: cachedContents/qobdj50obl3xjp8sx2s8jb3bblsxsnn5whizrxw2
-2026/06/03 08:47:41 💰 Reset accumulated extra token cost to $0.000000
-2026/06/03 08:47:41 💾 TTL Math (gemini-3.1-pro-preview): V=$1.80/M, S=$4.50/M/hr, tau=1hr -> Break-even: 1069s
-2026/06/03 08:47:41 💾 Using GeminiCacheTTL from settings: 3600s
-2026/06/03 08:47:41 💾 Caching conversation: 9 turns
-2026/06/03 08:47:41 💾 Applied message numbering and hint separation preprocessing to 9 messages for cache creation
-2026/06/03 08:47:42 💾 Cache created: 8712 tokens, creation cost: $0.017424
-2026/06/03 08:47:42 ⏱️  Storage tracking started: $0.039204 per hour for 8712 tokens
-2026/06/03 08:47:42 💰 Initialized cost-based cache refresh tracking (accumulated cost: $0.000000)
-2026/06/03 08:47:42 📊 Cache metadata (creation): 8712 tokens cached, expires in 60m (coderhapsody_context_9_turns)
-2026/06/03 08:47:42 💾 Using cached context (9 turns) + 2 new turns
-2026/06/03 08:47:42 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:47:42 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:47:42 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:47:52 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:47:52 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:47:52 🔧 Function call during streaming: write_file
-2026/06/03 08:47:52 🧠 Thought signature received: EnoKeAEMOdbHrS2cVTEgbx/fFzMazRHNoWtDW60FLLeFqmOlSb...
-2026/06/03 08:47:52 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:47:52 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:47:52 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:47:52 ✅ Tool execution completed: write_file -> 173 chars
-2026/06/03 08:47:52 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:47:52 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:47:52 💾 Cache storage: 8712 tokens × 0.17 min = $0.000111 (incremental: $0.000111, total: $0.000365)
-2026/06/03 08:47:52 💰 API call: 8712 cached, 2168 non-cached input, 271 output tokens
-2026/06/03 08:47:52 💰 Request cost: $0.009330, Extra cost: $0.003902 (accumulated: $0.003902)
-2026/06/03 08:47:52 💰 Cache refresh cost analysis:
-2026/06/03 08:47:52    Accumulated extra token cost: $0.003902
-2026/06/03 08:47:52    Cache storage cost (0.2 min): $0.000111
-2026/06/03 08:47:52    Total extra cost: $0.004014
-2026/06/03 08:47:52    Tokens to cache in refresh: 11151 (prompt: 10880 + candidate: 271)
-2026/06/03 08:47:52    Cost to refresh cache: $0.022302
-2026/06/03 08:47:52 💰 [DEBUG] Comparison: 0.004013626 >= 0.022302000 = false
-2026/06/03 08:47:52 ⏸️  Cost-based refresh not yet beneficial: $0.004014 total extra cost < $0.022302 refresh cost
-2026/06/03 08:47:52 💾 Using cached context (9 turns) + 4 new turns
-2026/06/03 08:47:52 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:47:52 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:47:52 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:48:02 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:48:02 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:48:02 🔧 Function call during streaming: write_file
-2026/06/03 08:48:02 🧠 Thought signature received: EmwKagEMOdbHaBBqFEwMxCK5xqnYRgXpc/ECy+NAmt9HJhRfZi...
-2026/06/03 08:48:02 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:48:02 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:48:02 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:48:02 ✅ Tool execution completed: write_file -> 174 chars
-2026/06/03 08:48:02 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:48:02 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:48:02 💾 Cache storage: 8712 tokens × 0.34 min = $0.000222 (incremental: $0.000110, total: $0.000475)
-2026/06/03 08:48:02 💰 API call: 8712 cached, 2516 non-cached input, 449 output tokens
-2026/06/03 08:48:02 💰 Request cost: $0.012162, Extra cost: $0.004529 (accumulated: $0.008431)
-2026/06/03 08:48:02 💰 Cache refresh cost analysis:
-2026/06/03 08:48:02    Accumulated extra token cost: $0.008431
-2026/06/03 08:48:02    Cache storage cost (0.3 min): $0.000222
-2026/06/03 08:48:02    Total extra cost: $0.008653
-2026/06/03 08:48:02    Tokens to cache in refresh: 11677 (prompt: 11228 + candidate: 449)
-2026/06/03 08:48:02    Cost to refresh cache: $0.023354
-2026/06/03 08:48:02 💰 [DEBUG] Comparison: 0.008652862 >= 0.023354000 = false
-2026/06/03 08:48:02 ⏸️  Cost-based refresh not yet beneficial: $0.008653 total extra cost < $0.023354 refresh cost
-2026/06/03 08:48:02 💾 Using cached context (9 turns) + 6 new turns
-2026/06/03 08:48:02 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:48:02 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:48:02 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:48:16 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:48:16 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:48:16 🔧 Function call during streaming: write_file
-2026/06/03 08:48:16 🧠 Thought signature received: EoMBCoABAQw51sf41xmodDqUblxLUGPR0qTfb0EQN6rUcxXRaI...
-2026/06/03 08:48:16 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:48:16 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:48:16 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:48:16 ✅ Tool execution completed: write_file -> 173 chars
-2026/06/03 08:48:16 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:48:16 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:48:16 💾 Cache storage: 8712 tokens × 0.57 min = $0.000373 (incremental: $0.000152, total: $0.000627)
-2026/06/03 08:48:16 💰 API call: 8712 cached, 3043 non-cached input, 307 output tokens
-2026/06/03 08:48:16 💰 Request cost: $0.011512, Extra cost: $0.005477 (accumulated: $0.013909)
-2026/06/03 08:48:16 💰 Cache refresh cost analysis:
-2026/06/03 08:48:16    Accumulated extra token cost: $0.013909
-2026/06/03 08:48:16    Cache storage cost (0.6 min): $0.000373
-2026/06/03 08:48:16    Total extra cost: $0.014282
-2026/06/03 08:48:16    Tokens to cache in refresh: 12062 (prompt: 11755 + candidate: 307)
-2026/06/03 08:48:16    Cost to refresh cache: $0.024124
-2026/06/03 08:48:16 💰 [DEBUG] Comparison: 0.014281919 >= 0.024124000 = false
-2026/06/03 08:48:16 ⏸️  Cost-based refresh not yet beneficial: $0.014282 total extra cost < $0.024124 refresh cost
-2026/06/03 08:48:16 💾 Using cached context (9 turns) + 8 new turns
-2026/06/03 08:48:16 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:48:16 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:48:16 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:48:31 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:48:31 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:48:31 🔧 Function call during streaming: write_file
-2026/06/03 08:48:31 🧠 Thought signature received: EnUKcwEMOdbHuxo+nZlaIWEOq1qfn580ohhcD6jsRVIM9ABcNg...
-2026/06/03 08:48:31 [DEBUG_GEMINI] Executing tool: write_file
-2026/06/03 08:48:31 🔧 [ToolExecutor] Executing image-capable tool: write_file
-2026/06/03 08:48:31 🔧 [ToolExecutor] Executing tool: write_file
-2026/06/03 08:48:31 ✅ Tool execution completed: write_file -> 173 chars
-2026/06/03 08:48:31 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:48:31 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:48:31 💾 Cache storage: 8712 tokens × 0.82 min = $0.000534 (incremental: $0.000161, total: $0.000788)
-2026/06/03 08:48:31 💰 API call: 8712 cached, 3427 non-cached input, 220 output tokens
-2026/06/03 08:48:31 💰 Request cost: $0.011236, Extra cost: $0.006169 (accumulated: $0.020077)
-2026/06/03 08:48:31 💰 Cache refresh cost analysis:
-2026/06/03 08:48:31    Accumulated extra token cost: $0.020077
-2026/06/03 08:48:31    Cache storage cost (0.8 min): $0.000534
-2026/06/03 08:48:31    Total extra cost: $0.020612
-2026/06/03 08:48:31    Tokens to cache in refresh: 12359 (prompt: 12139 + candidate: 220)
-2026/06/03 08:48:31    Cost to refresh cache: $0.024718
-2026/06/03 08:48:31 💰 [DEBUG] Comparison: 0.020611645 >= 0.024718000 = false
-2026/06/03 08:48:31 ⏸️  Cost-based refresh not yet beneficial: $0.020612 total extra cost < $0.024718 refresh cost
-2026/06/03 08:48:31 💾 Using cached context (9 turns) + 10 new turns
-2026/06/03 08:48:31 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:48:31 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:48:31 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:48:35 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:48:35 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:48:35 🔧 Function call during streaming: read_file
-2026/06/03 08:48:35 🧠 Thought signature received: Ep0DCpoDAQw51se+tgFmtDnwxerwql6lzKxsu0Ck1W//w2xgL5...
-2026/06/03 08:48:35 [DEBUG_GEMINI] Executing tool: read_file
-2026/06/03 08:48:35 🔧 [ToolExecutor] Executing image-capable tool: read_file
-2026/06/03 08:48:35 ✅ Tool execution completed: read_file -> 7015 chars
-2026/06/03 08:48:35 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:48:35 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:48:35 💾 Cache storage: 8712 tokens × 0.89 min = $0.000583 (incremental: $0.000049, total: $0.000837)
-2026/06/03 08:48:35 💰 API call: 8712 cached, 3724 non-cached input, 86 output tokens
-2026/06/03 08:48:35 💰 Request cost: $0.010222, Extra cost: $0.006703 (accumulated: $0.026780)
-2026/06/03 08:48:35 💰 Cache refresh cost analysis:
-2026/06/03 08:48:35    Accumulated extra token cost: $0.026780
-2026/06/03 08:48:35    Cache storage cost (0.9 min): $0.000583
-2026/06/03 08:48:35    Total extra cost: $0.027364
-2026/06/03 08:48:35    Tokens to cache in refresh: 12522 (prompt: 12436 + candidate: 86)
-2026/06/03 08:48:35    Cost to refresh cache: $0.025044
-2026/06/03 08:48:35 💰 [DEBUG] Comparison: 0.027363749 >= 0.025044000 = true
-2026/06/03 08:48:35 ✅ Cost-based refresh beneficial: $0.027364 total extra cost >= $0.025044 refresh cost
-2026/06/03 08:48:35 💰 Cost-based cache refresh triggered - non-cached input costs exceed refresh cost
-2026/06/03 08:48:35 📊 Cache metadata (before deletion): 8712 tokens cached, expires in 59m (coderhapsody_context_9_turns)
-2026/06/03 08:48:35 💾 Final cache storage cost: 8712 tokens × 0.90 minutes = $0.000585 (incremental: $0.000002, total storage: $0.000839)
-2026/06/03 08:48:36 📊 Cache metadata (before cleanup): 8712 tokens cached, expires in 59m (coderhapsody_context_9_turns)
-2026/06/03 08:48:36 🗑️  Deleted cache: cachedContents/opmo77qmtzagquiu03okb8umwo0dq3dd6o6kcuhv
-2026/06/03 08:48:36 💰 Reset accumulated extra token cost to $0.000000
-2026/06/03 08:48:36 💾 TTL Math (gemini-3.1-pro-preview): V=$1.80/M, S=$4.50/M/hr, tau=1hr -> Break-even: 1069s
-2026/06/03 08:48:36 💾 Using GeminiCacheTTL from settings: 3600s
-2026/06/03 08:48:36 💾 Caching conversation: 19 turns
-2026/06/03 08:48:36 💾 Applied message numbering and hint separation preprocessing to 19 messages for cache creation
-2026/06/03 08:48:37 💾 Cache created: 10508 tokens, creation cost: $0.021016
-2026/06/03 08:48:37 ⏱️  Storage tracking started: $0.047286 per hour for 10508 tokens
-2026/06/03 08:48:37 💰 Initialized cost-based cache refresh tracking (accumulated cost: $0.000000)
-2026/06/03 08:48:37 📊 Cache metadata (creation): 10508 tokens cached, expires in 60m (coderhapsody_context_19_turns)
-2026/06/03 08:48:37 💾 Using cached context (19 turns) + 2 new turns
-2026/06/03 08:48:37 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:48:37 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:48:37 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:48:59 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:48:59 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:48:59 🔧 Function call during streaming: edit_file
-2026/06/03 08:48:59 🧠 Thought signature received: EosCCogCAQw51scf55aiilX0ovyEWkEzXSdNV5xV6HL3+FLnlp...
-2026/06/03 08:48:59 [DEBUG_GEMINI] Executing tool: edit_file
-2026/06/03 08:48:59 🔧 [ToolExecutor] Executing image-capable tool: edit_file
-2026/06/03 08:48:59 🔧 [ToolExecutor] Executing tool: edit_file
-2026/06/03 08:48:59 ✅ Tool execution completed: edit_file -> 202 chars
-2026/06/03 08:48:59 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:48:59 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:48:59 💾 Cache storage: 10508 tokens × 0.37 min = $0.000295 (incremental: $0.000295, total: $0.001134)
-2026/06/03 08:48:59 💰 API call: 10508 cached, 3456 non-cached input, 515 output tokens
-2026/06/03 08:48:59 💰 Request cost: $0.015194, Extra cost: $0.006221 (accumulated: $0.006221)
-2026/06/03 08:48:59 💰 Cache refresh cost analysis:
-2026/06/03 08:48:59    Accumulated extra token cost: $0.006221
-2026/06/03 08:48:59    Cache storage cost (0.4 min): $0.000295
-2026/06/03 08:48:59    Total extra cost: $0.006516
-2026/06/03 08:48:59    Tokens to cache in refresh: 14479 (prompt: 13964 + candidate: 515)
-2026/06/03 08:48:59    Cost to refresh cache: $0.028958
-2026/06/03 08:48:59 💰 [DEBUG] Comparison: 0.006515641 >= 0.028958000 = false
-2026/06/03 08:48:59 ⏸️  Cost-based refresh not yet beneficial: $0.006516 total extra cost < $0.028958 refresh cost
-2026/06/03 08:48:59 💾 Using cached context (19 turns) + 4 new turns
-2026/06/03 08:48:59 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:48:59 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:48:59 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:49:10 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:49:10 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:49:10 🔧 Function call during streaming: read_file
-2026/06/03 08:49:10 🧠 Thought signature received: EocECoQEAQw51sdz2PGKh9s4xO2JNHbXfxhb358qB57La06wC6...
-2026/06/03 08:49:10 [DEBUG_GEMINI] Executing tool: read_file
-2026/06/03 08:49:10 🔧 [ToolExecutor] Executing image-capable tool: read_file
-2026/06/03 08:49:10 ✅ Tool execution completed: read_file -> 7175 chars
-2026/06/03 08:49:10 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
-2026/06/03 08:49:10 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
-2026/06/03 08:49:10 💾 Cache storage: 10508 tokens × 0.56 min = $0.000442 (incremental: $0.000147, total: $0.001281)
-2026/06/03 08:49:10 💰 API call: 10508 cached, 4053 non-cached input, 109 output tokens
-2026/06/03 08:49:10 💰 Request cost: $0.011516, Extra cost: $0.007295 (accumulated: $0.013516)
-2026/06/03 08:49:10 💰 Cache refresh cost analysis:
-2026/06/03 08:49:10    Accumulated extra token cost: $0.013516
-2026/06/03 08:49:10    Cache storage cost (0.6 min): $0.000442
-2026/06/03 08:49:10    Total extra cost: $0.013958
-2026/06/03 08:49:10    Tokens to cache in refresh: 14670 (prompt: 14561 + candidate: 109)
-2026/06/03 08:49:10    Cost to refresh cache: $0.029340
-2026/06/03 08:49:10 💰 [DEBUG] Comparison: 0.013958444 >= 0.029340000 = false
-2026/06/03 08:49:10 ⏸️  Cost-based refresh not yet beneficial: $0.013958 total extra cost < $0.029340 refresh cost
-2026/06/03 08:49:10 💾 Using cached context (19 turns) + 6 new turns
-2026/06/03 08:49:10 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
-2026/06/03 08:49:10 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
-2026/06/03 08:49:10 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
-2026/06/03 08:49:15 🔄 [Throttle] ResetTurnState: GUI=false
-2026/06/03 08:49:15 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
-2026/06/03 08:49:15 [DEBUG_GEMINI] Wrote 21 chars delta to currentStreamResponse, now 21 bytes total
-2026/06/03 08:49:15 🔢 [Throttle] Accumulated 4 words from 21 chars (total now: 4)
-2026/06/03 08:49:15 [DEBUG_GEMINI] Wrote 145 chars delta to currentStreamResponse, now 166 bytes total
-2026/06/03 08:49:15 🔢 [Throttle] Accumulated 28 words from 145 chars (total now: 32)
-2026/06/03 08:49:15 [DEBUG_GEMINI] Wrote 99 chars delta to currentStreamResponse, now 265 bytes total
-2026/06/03 08:49:15 🔢 [Throttle] Accumulated 19 words from 99 chars (total now: 51)
-2026/06/03 08:49:15 [DEBUG_GEMINI] Wrote 136 chars delta to currentStreamResponse, now 401 bytes total
-2026/06/03 08:49:15 🔢 [Throttle] Accumulated 27 words from 136 chars (total now: 78)
-2026/06/03 08:49:16 [DEBUG_GEMINI] Wrote 160 chars delta to currentStreamResponse, now 561 bytes total
-2026/06/03 08:49:16 🔢 [Throttle] Accumulated 31 words from 160 chars (total now: 109)
-2026/06/03 08:49:16 [DEBUG_GEMINI] Wrote 39 chars delta to currentStreamResponse, now 600 bytes total
-2026/06/03 08:49:16 🔢 [Throttle] Accumulated 7 words from 39 chars (total now: 116)
-2026/06/03 08:49:16 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 600 bytes
-2026/06/03 08:49:16 [DEBUG_GEMINI] Adding text part with 600 chars: Project documentation complete. I have successfully synthesized the architectural designs of the `as...
-2026/06/03 08:49:16 [DEBUG_GEMINI] Rebuilt final response with 1 parts (1 text, 0 function calls)
-2026/06/03 08:49:16 💾 Cache storage: 10508 tokens × 0.65 min = $0.000513 (incremental: $0.000071, total: $0.001352)
-2026/06/03 08:49:16 💰 API call: 10508 cached, 5600 non-cached input, 216 output tokens
-2026/06/03 08:49:16 💰 Request cost: $0.015894, Extra cost: $0.010080 (accumulated: $0.023596)
-2026/06/03 08:49:16 💰 Cache refresh cost analysis:
-2026/06/03 08:49:16    Accumulated extra token cost: $0.023596
-2026/06/03 08:49:16    Cache storage cost (0.7 min): $0.000513
-2026/06/03 08:49:16    Total extra cost: $0.024110
-2026/06/03 08:49:16    Tokens to cache in refresh: 16324 (prompt: 16108 + candidate: 216)
-2026/06/03 08:49:16    Cost to refresh cache: $0.032648
-2026/06/03 08:49:16 💰 [DEBUG] Comparison: 0.024109504 >= 0.032648000 = false
-2026/06/03 08:49:16 ⏸️  Cost-based refresh not yet beneficial: $0.024110 total extra cost < $0.032648 refresh cost
-2026/06/03 08:49:16 [DEBUG_GEMINI] Added assistant message to conversation history (1 parts)
-2026/06/03 08:49:16 💰 Cache refresh cost analysis:
-2026/06/03 08:49:16    Accumulated extra token cost: $0.023596
-2026/06/03 08:49:16    Cache storage cost (0.7 min): $0.000513
-2026/06/03 08:49:16    Total extra cost: $0.024110
-2026/06/03 08:49:16    Tokens to cache in refresh: 16324 (prompt: 16108 + candidate: 216)
-2026/06/03 08:49:16    Cost to refresh cache: $0.032648
-2026/06/03 08:49:16 💰 [DEBUG] Comparison: 0.024109507 >= 0.032648000 = false
-2026/06/03 08:49:16 ⏸️  Cost-based refresh not yet beneficial: $0.024110 total extra cost < $0.032648 refresh cost
-2026/06/03 08:49:16 [DEBUG_GEMINI] Converting to database message format...
-2026/06/03 08:49:16 [DEBUG_GEMINI] Database message created with 1 content blocks
-2026/06/03 08:49:16 [DEBUG_GEMINI] Saved assistant message to project database
-2026/06/03 08:49:16 [DEBUG_GEMINI] Tool execution completed successfully
-2026/06/03 08:49:16 [DEBUG_GEMINI] Returning database message
-2026/06/03 08:49:16 🔄 Invoking turn complete callback
-2026/06/03 08:49:16 🛑 Shutting down agent 'DesignGen-Scout'...
-2026/06/03 08:49:16 Shutting down server, saving conversation histories...
-2026/06/03 08:49:16 🔍 Onboarding check: OnboardingMode is false
-2026/06/03 08:49:16 Saved conversation history for project /Users/bill/projects/grok
-2026/06/03 08:49:16 Closing HTTP server...
-2026/06/03 08:49:16 Closing AI client...
-2026/06/03 08:49:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2026/06/03 08:49:16 📊 GEMINI SESSION STATISTICS - gemini-3.1-pro-preview
-2026/06/03 08:49:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2026/06/03 08:49:16 
-2026/06/03 08:49:16 TOKEN USAGE:
-2026/06/03 08:49:16   Regular Input Tokens:             43779 × $2.000000/M = $0.087558
-2026/06/03 08:49:16   Cache Creation Tokens:            23314 × $2.000000/M = $0.046628
-2026/06/03 08:49:16   Cache Read Tokens:                95554 × $0.200000/M = $0.019111
-2026/06/03 08:49:16   Output Tokens:                     4497 × $12.000000/M = $0.053964
-2026/06/03 08:49:16 
-2026/06/03 08:49:16 CACHE STORAGE:
-2026/06/03 08:49:16   Main Cache Storage:                      $0.001353
-2026/06/03 08:49:16   Main Cache Age:              39s
-2026/06/03 08:49:16   Main Cached Token Count:     10508 tokens
-2026/06/03 08:49:16   Thinking Cache Storage:                  $0.000000
-2026/06/03 08:49:16   Total Storage Cost:                      $0.001353
-2026/06/03 08:49:16 
-2026/06/03 08:49:16 THINKING SUMMARIZATION (Flash Lite):
-2026/06/03 08:49:16   Total Thinking Input Tokens:          0
-2026/06/03 08:49:16   Total Thinking Output Tokens:         0
-2026/06/03 08:49:16 
-2026/06/03 08:49:16 TOTAL SESSION COST:            $0.208614
-2026/06/03 08:49:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2026/06/03 08:49:16 📊 GEMINI CACHE STATISTICS - gemini-3.1-pro-preview
-2026/06/03 08:49:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2026/06/03 08:49:16   Total Prompt Tokens:             139333
-2026/06/03 08:49:16   Total Cache Read Tokens:          95554
-2026/06/03 08:49:16   Total Output Tokens:               4497
-2026/06/03 08:49:16   Cache Hit Rate:                   68.58%
-2026/06/03 08:49:16 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2026/06/03 08:49:16 💾 Final cache storage cost: 10508 tokens × 0.65 minutes = $0.000515 (incremental: $0.000001, total storage: $0.001355)
-2026/06/03 08:49:16 📊 Cache metadata (before cleanup): 10508 tokens cached, expires in 59m (coderhapsody_context_19_turns)
-2026/06/03 08:49:16 🗑️  Deleted cache: cachedContents/gq0ehv5luxl38w8a7mpowhqey1lconarsizjttho
-2026/06/03 08:49:16 Server shutdown complete
-2026/06/03 08:49:16 🗑️  Unregistered agent 'DesignGen-Scout' from registry
-2026/06/03 08:49:16 ✅ Agent 'DesignGen-Scout' shutdown complete
+2026/06/03 09:33:07 ✅ Created default project: grok (reasoning: enabled)
+2026/06/03 09:33:07 ✅ Agent 'DesignGen-Scout' initialized with 0 tools on port 8084
+2026/06/03 09:33:07    Project path: /Users/bill/projects/grok
+2026/06/03 09:33:07    GUI files path: /Users/bill/projects/designgen/coderhapsody/web/gui/dist
+2026/06/03 09:33:07 🚀 Starting agent 'DesignGen-Scout' on port 8084...
+2026/06/03 09:33:07 ✅ Changed working directory to project: /Users/bill/projects/grok
+2026/06/03 09:33:07 ✅ Found web GUI files at configured path: /Users/bill/projects/designgen/coderhapsody/web/gui/dist
+2026/06/03 09:33:07 ✅ Web GUI static file serving enabled
+2026/06/03 09:33:07    Access the interface at: http://localhost:8084
+2026/06/03 09:33:07 Starting CodeRhapsody server on :8084
+2026/06/03 09:33:09 Processing user message with 0 images and 0 audio clips for AI client
+2026/06/03 09:33:09 Added text content (1657 chars) to user message
+2026/06/03 09:33:09 💬 User message queued successfully
+2026/06/03 09:33:09 Sent mixed-content message to AI client (queued)
+2026/06/03 09:33:09 💬 User message received, processing as prompt...
+2026/06/03 09:33:09 ✅ Added prompt to database history
+2026/06/03 09:33:09 🧠 Reset thinking history and captured initial prompt for new tool chain
+2026/06/03 09:33:09 [DEBUG_GEMINI] sendMessage START - clearing previous state
+2026/06/03 09:33:09 💾 TTL Math (gemini-3.1-pro-preview): V=$1.80/M, S=$4.50/M/hr, tau=1hr -> Break-even: 1069s
+2026/06/03 09:33:09 💾 Using GeminiCacheTTL from settings: 3600s
+2026/06/03 09:33:10 💾 Cache created: 4094 tokens, creation cost: $0.008188
+2026/06/03 09:33:10 ⏱️  Storage tracking started: $0.018423 per hour for 4094 tokens
+2026/06/03 09:33:10 💰 Initialized cost-based cache refresh tracking (accumulated cost: $0.000000)
+2026/06/03 09:33:10 📊 Cache metadata (creation): 4094 tokens cached, expires in 60m (coderhapsody_context_0_turns)
+2026/06/03 09:33:10 [DEBUG_GEMINI] Using model from settings: gemini-3.1-pro-preview
+2026/06/03 09:33:10 💾 Using cached context (0 turns) + 1 new turns
+2026/06/03 09:33:10 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:33:10 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:33:10 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:33:15 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:33:15 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:33:15 🔧 Function call during streaming: read_file
+2026/06/03 09:33:15 🧠 Thought signature received: EpgJCpUJAQw51seik3OixXLKlwO2sLwj7sD/gEleSv8+MgdSMg...
+2026/06/03 09:33:15 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:15 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:15 ✅ Tool execution completed: read_file -> 7175 chars
+2026/06/03 09:33:15 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
+2026/06/03 09:33:15 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
+2026/06/03 09:33:15 💾 Cache storage: 4094 tokens × 0.09 min = $0.000028 (incremental: $0.000028, total: $0.000028)
+2026/06/03 09:33:15 💰 API call: 4094 cached, 421 non-cached input, 283 output tokens
+2026/06/03 09:33:15 💰 Request cost: $0.005057, Extra cost: $0.000758 (accumulated: $0.000758)
+2026/06/03 09:33:15 💰 Cache refresh cost analysis:
+2026/06/03 09:33:15    Accumulated extra token cost: $0.000758
+2026/06/03 09:33:15    Cache storage cost (0.1 min): $0.000028
+2026/06/03 09:33:15    Total extra cost: $0.000786
+2026/06/03 09:33:15    Tokens to cache in refresh: 4798 (prompt: 4515 + candidate: 283)
+2026/06/03 09:33:15    Cost to refresh cache: $0.009596
+2026/06/03 09:33:15 💰 [DEBUG] Comparison: 0.000786076 >= 0.009596000 = false
+2026/06/03 09:33:15 ⏸️  Cost-based refresh not yet beneficial: $0.000786 total extra cost < $0.009596 refresh cost
+2026/06/03 09:33:15 💾 Using cached context (0 turns) + 3 new turns
+2026/06/03 09:33:15 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:33:15 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:33:15 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:33:20 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:33:20 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:33:20 🔧 Function call during streaming: read_file
+2026/06/03 09:33:20 🧠 Thought signature received: EuwBCukBAQw51sexyCPURRx6cuMaj3bSWnAxJqkxg/Qw7JNf49...
+2026/06/03 09:33:20 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:20 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:20 ✅ Tool execution completed: read_file -> 4070 chars
+2026/06/03 09:33:21 🔧 Function call during streaming: read_file
+2026/06/03 09:33:21 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:21 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:21 ✅ Tool execution completed: read_file -> 7401 chars
+2026/06/03 09:33:21 🔧 Function call during streaming: read_file
+2026/06/03 09:33:21 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:21 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:21 ✅ Tool execution completed: read_file -> 8129 chars
+2026/06/03 09:33:21 🔧 Function call during streaming: read_file
+2026/06/03 09:33:21 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:21 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:21 ✅ Tool execution completed: read_file -> 8821 chars
+2026/06/03 09:33:21 🔧 Function call during streaming: read_file
+2026/06/03 09:33:21 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:21 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:21 ✅ Tool execution completed: read_file -> 7073 chars
+2026/06/03 09:33:21 🔧 Function call during streaming: read_file
+2026/06/03 09:33:21 [DEBUG_GEMINI] Executing tool: read_file
+2026/06/03 09:33:21 🔧 [ToolExecutor] Executing image-capable tool: read_file
+2026/06/03 09:33:21 ✅ Tool execution completed: read_file -> 8730 chars
+2026/06/03 09:33:21 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
+2026/06/03 09:33:21 [DEBUG_GEMINI] Rebuilt final response with 6 parts (0 text, 6 function calls)
+2026/06/03 09:33:21 💾 Cache storage: 4094 tokens × 0.20 min = $0.000060 (incremental: $0.000032, total: $0.000060)
+2026/06/03 09:33:21 💰 API call: 4094 cached, 2143 non-cached input, 185 output tokens
+2026/06/03 09:33:21 💰 Request cost: $0.007325, Extra cost: $0.003857 (accumulated: $0.004615)
+2026/06/03 09:33:21 💰 Cache refresh cost analysis:
+2026/06/03 09:33:21    Accumulated extra token cost: $0.004615
+2026/06/03 09:33:21    Cache storage cost (0.2 min): $0.000060
+2026/06/03 09:33:21    Total extra cost: $0.004675
+2026/06/03 09:33:21    Tokens to cache in refresh: 6422 (prompt: 6237 + candidate: 185)
+2026/06/03 09:33:21    Cost to refresh cache: $0.012844
+2026/06/03 09:33:21 💰 [DEBUG] Comparison: 0.004675188 >= 0.012844000 = false
+2026/06/03 09:33:21 ⏸️  Cost-based refresh not yet beneficial: $0.004675 total extra cost < $0.012844 refresh cost
+2026/06/03 09:33:21 💾 Using cached context (0 turns) + 5 new turns
+2026/06/03 09:33:21 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:33:21 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:33:21 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:33:46 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:33:46 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:33:46 🔧 Function call during streaming: write_file
+2026/06/03 09:33:46 🧠 Thought signature received: Eot1Coh1AQw51sfqEvXA/CLYDG5hSesgkEa8NEX2HKA0v5d4Q4...
+2026/06/03 09:33:46 [DEBUG_GEMINI] Executing tool: write_file
+2026/06/03 09:33:46 🔧 [ToolExecutor] Executing image-capable tool: write_file
+2026/06/03 09:33:46 🔧 [ToolExecutor] Executing tool: write_file
+2026/06/03 09:33:46 ✅ Tool execution completed: write_file -> 174 chars
+2026/06/03 09:33:46 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
+2026/06/03 09:33:46 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
+2026/06/03 09:33:46 💾 Cache storage: 4094 tokens × 0.61 min = $0.000189 (incremental: $0.000129, total: $0.000189)
+2026/06/03 09:33:46 💰 API call: 4094 cached, 12093 non-cached input, 3297 output tokens
+2026/06/03 09:33:46 💰 Request cost: $0.064569, Extra cost: $0.021767 (accumulated: $0.026383)
+2026/06/03 09:33:46 💰 Cache refresh cost analysis:
+2026/06/03 09:33:46    Accumulated extra token cost: $0.026383
+2026/06/03 09:33:46    Cache storage cost (0.6 min): $0.000189
+2026/06/03 09:33:46    Total extra cost: $0.026571
+2026/06/03 09:33:46    Tokens to cache in refresh: 19484 (prompt: 16187 + candidate: 3297)
+2026/06/03 09:33:46    Cost to refresh cache: $0.038968
+2026/06/03 09:33:46 💰 [DEBUG] Comparison: 0.026571322 >= 0.038968000 = false
+2026/06/03 09:33:46 ⏸️  Cost-based refresh not yet beneficial: $0.026571 total extra cost < $0.038968 refresh cost
+2026/06/03 09:33:46 💾 Using cached context (0 turns) + 7 new turns
+2026/06/03 09:33:46 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:33:46 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:33:46 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:33:54 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:33:54 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:33:54 🔧 Function call during streaming: write_file
+2026/06/03 09:33:54 🧠 Thought signature received: Em4KbAEMOdbHzBNJYxwm+zh1QryA8e9Ohtp8viAzn0ke6GhbJV...
+2026/06/03 09:33:54 [DEBUG_GEMINI] Executing tool: write_file
+2026/06/03 09:33:54 🔧 [ToolExecutor] Executing image-capable tool: write_file
+2026/06/03 09:33:54 🔧 [ToolExecutor] Executing tool: write_file
+2026/06/03 09:33:54 ✅ Tool execution completed: write_file -> 174 chars
+2026/06/03 09:33:54 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
+2026/06/03 09:33:54 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
+2026/06/03 09:33:54 💾 Cache storage: 4094 tokens × 0.75 min = $0.000229 (incremental: $0.000040, total: $0.000229)
+2026/06/03 09:33:54 💰 API call: 4094 cached, 15468 non-cached input, 860 output tokens
+2026/06/03 09:33:54 💰 Request cost: $0.042075, Extra cost: $0.027842 (accumulated: $0.054225)
+2026/06/03 09:33:54 💰 Cache refresh cost analysis:
+2026/06/03 09:33:54    Accumulated extra token cost: $0.054225
+2026/06/03 09:33:54    Cache storage cost (0.7 min): $0.000229
+2026/06/03 09:33:54    Total extra cost: $0.054454
+2026/06/03 09:33:54    Tokens to cache in refresh: 20422 (prompt: 19562 + candidate: 860)
+2026/06/03 09:33:54    Cost to refresh cache: $0.040844
+2026/06/03 09:33:54 💰 [DEBUG] Comparison: 0.054453977 >= 0.040844000 = true
+2026/06/03 09:33:54 ✅ Cost-based refresh beneficial: $0.054454 total extra cost >= $0.040844 refresh cost
+2026/06/03 09:33:54 💰 Cost-based cache refresh triggered - non-cached input costs exceed refresh cost
+2026/06/03 09:33:54 📊 Cache metadata (before deletion): 4094 tokens cached, expires in 59m (coderhapsody_context_0_turns)
+2026/06/03 09:33:54 💾 Final cache storage cost: 4094 tokens × 0.75 minutes = $0.000230 (incremental: $0.000001, total storage: $0.000230)
+2026/06/03 09:33:55 📊 Cache metadata (before cleanup): 4094 tokens cached, expires in 59m (coderhapsody_context_0_turns)
+2026/06/03 09:33:55 🗑️  Deleted cache: cachedContents/cfxp2hujc259bzlj7otmuxtnnoq00cz2fiq7qtql
+2026/06/03 09:33:55 💰 Reset accumulated extra token cost to $0.000000
+2026/06/03 09:33:55 💾 TTL Math (gemini-3.1-pro-preview): V=$1.80/M, S=$4.50/M/hr, tau=1hr -> Break-even: 1069s
+2026/06/03 09:33:55 💾 Using GeminiCacheTTL from settings: 3600s
+2026/06/03 09:33:55 💾 Caching conversation: 7 turns
+2026/06/03 09:33:55 💾 Applied message numbering and hint separation preprocessing to 7 messages for cache creation
+2026/06/03 09:33:55 💾 Cache created: 16669 tokens, creation cost: $0.033338
+2026/06/03 09:33:55 ⏱️  Storage tracking started: $0.075010 per hour for 16669 tokens
+2026/06/03 09:33:55 💰 Initialized cost-based cache refresh tracking (accumulated cost: $0.000000)
+2026/06/03 09:33:56 📊 Cache metadata (creation): 16669 tokens cached, expires in 60m (coderhapsody_context_7_turns)
+2026/06/03 09:33:56 💾 Using cached context (7 turns) + 2 new turns
+2026/06/03 09:33:56 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:33:56 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:33:56 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:34:02 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:34:02 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:34:02 🔧 Function call during streaming: write_file
+2026/06/03 09:34:02 🧠 Thought signature received: Ep4BCpsBAQw51sdpsZg/ULd0UWW3eMFHjoAQXyAjjEgMaDIPnM...
+2026/06/03 09:34:02 [DEBUG_GEMINI] Executing tool: write_file
+2026/06/03 09:34:02 🔧 [ToolExecutor] Executing image-capable tool: write_file
+2026/06/03 09:34:02 🔧 [ToolExecutor] Executing tool: write_file
+2026/06/03 09:34:02 ✅ Tool execution completed: write_file -> 175 chars
+2026/06/03 09:34:02 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 0 bytes
+2026/06/03 09:34:02 [DEBUG_GEMINI] Rebuilt final response with 1 parts (0 text, 1 function calls)
+2026/06/03 09:34:02 💾 Cache storage: 16669 tokens × 0.11 min = $0.000143 (incremental: $0.000143, total: $0.000373)
+2026/06/03 09:34:02 💰 API call: 16669 cached, 3831 non-cached input, 721 output tokens
+2026/06/03 09:34:02 💰 Request cost: $0.019648, Extra cost: $0.006896 (accumulated: $0.006896)
+2026/06/03 09:34:02 💰 Cache refresh cost analysis:
+2026/06/03 09:34:02    Accumulated extra token cost: $0.006896
+2026/06/03 09:34:02    Cache storage cost (0.1 min): $0.000143
+2026/06/03 09:34:02    Total extra cost: $0.007039
+2026/06/03 09:34:02    Tokens to cache in refresh: 21221 (prompt: 20500 + candidate: 721)
+2026/06/03 09:34:02    Cost to refresh cache: $0.042442
+2026/06/03 09:34:02 💰 [DEBUG] Comparison: 0.007038986 >= 0.042442000 = false
+2026/06/03 09:34:02 ⏸️  Cost-based refresh not yet beneficial: $0.007039 total extra cost < $0.042442 refresh cost
+2026/06/03 09:34:02 💾 Using cached context (7 turns) + 4 new turns
+2026/06/03 09:34:02 [DEBUG_GEMINI] GenerationConfig built (Gemini 3.0): temp=0.30, maxTokens=8192, thinking_level=high, includeThoughts=false
+2026/06/03 09:34:02 [DEBUG_GEMINI] Streaming request URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent?alt=sse
+2026/06/03 09:34:02 [DEBUG_GEMINI] Current model: gemini-3.1-pro-preview
+2026/06/03 09:34:05 🔄 [Throttle] ResetTurnState: GUI=false
+2026/06/03 09:34:05 [DEBUG_GEMINI] processStreamingResponse START - reset text accumulation buffer
+2026/06/03 09:34:05 [DEBUG_GEMINI] Wrote 31 chars delta to currentStreamResponse, now 31 bytes total
+2026/06/03 09:34:05 🔢 [Throttle] Accumulated 6 words from 31 chars (total now: 6)
+2026/06/03 09:34:05 [DEBUG_GEMINI] Rebuilding response - currentStreamResponse has 31 bytes
+2026/06/03 09:34:05 [DEBUG_GEMINI] Adding text part with 31 chars: Project documentation complete....
+2026/06/03 09:34:05 [DEBUG_GEMINI] Rebuilt final response with 1 parts (1 text, 0 function calls)
+2026/06/03 09:34:05 💾 Cache storage: 16669 tokens × 0.16 min = $0.000201 (incremental: $0.000058, total: $0.000430)
+2026/06/03 09:34:05 💰 API call: 16669 cached, 4631 non-cached input, 26 output tokens
+2026/06/03 09:34:05 💰 Request cost: $0.012908, Extra cost: $0.008336 (accumulated: $0.015232)
+2026/06/03 09:34:05 💰 Cache refresh cost analysis:
+2026/06/03 09:34:05    Accumulated extra token cost: $0.015232
+2026/06/03 09:34:05    Cache storage cost (0.2 min): $0.000201
+2026/06/03 09:34:05    Total extra cost: $0.015432
+2026/06/03 09:34:05    Tokens to cache in refresh: 21326 (prompt: 21300 + candidate: 26)
+2026/06/03 09:34:05    Cost to refresh cache: $0.042652
+2026/06/03 09:34:05 💰 [DEBUG] Comparison: 0.015432362 >= 0.042652000 = false
+2026/06/03 09:34:05 ⏸️  Cost-based refresh not yet beneficial: $0.015432 total extra cost < $0.042652 refresh cost
+2026/06/03 09:34:05 [DEBUG_GEMINI] Added assistant message to conversation history (1 parts)
+2026/06/03 09:34:05 💰 Cache refresh cost analysis:
+2026/06/03 09:34:05    Accumulated extra token cost: $0.015232
+2026/06/03 09:34:05    Cache storage cost (0.2 min): $0.000201
+2026/06/03 09:34:05    Total extra cost: $0.015432
+2026/06/03 09:34:05    Tokens to cache in refresh: 21326 (prompt: 21300 + candidate: 26)
+2026/06/03 09:34:05    Cost to refresh cache: $0.042652
+2026/06/03 09:34:05 💰 [DEBUG] Comparison: 0.015432363 >= 0.042652000 = false
+2026/06/03 09:34:05 ⏸️  Cost-based refresh not yet beneficial: $0.015432 total extra cost < $0.042652 refresh cost
+2026/06/03 09:34:05 [DEBUG_GEMINI] Converting to database message format...
+2026/06/03 09:34:05 [DEBUG_GEMINI] Database message created with 1 content blocks
+2026/06/03 09:34:05 [DEBUG_GEMINI] Saved assistant message to project database
+2026/06/03 09:34:05 [DEBUG_GEMINI] Tool execution completed successfully
+2026/06/03 09:34:05 [DEBUG_GEMINI] Returning database message
+2026/06/03 09:34:05 🔄 Invoking turn complete callback
+2026/06/03 09:34:05 🛑 Shutting down agent 'DesignGen-Scout'...
+2026/06/03 09:34:05 Shutting down server, saving conversation histories...
+2026/06/03 09:34:05 🔍 Onboarding check: OnboardingMode is false
+2026/06/03 09:34:05 Saved conversation history for project /Users/bill/projects/grok
+2026/06/03 09:34:05 Closing HTTP server...
+2026/06/03 09:34:05 Closing AI client...
+2026/06/03 09:34:05 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026/06/03 09:34:05 📊 GEMINI SESSION STATISTICS - gemini-3.1-pro-preview
+2026/06/03 09:34:05 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026/06/03 09:34:05 
+2026/06/03 09:34:05 TOKEN USAGE:
+2026/06/03 09:34:05   Regular Input Tokens:             38587 × $2.000000/M = $0.077174
+2026/06/03 09:34:05   Cache Creation Tokens:            20763 × $2.000000/M = $0.041526
+2026/06/03 09:34:05   Cache Read Tokens:                49714 × $0.200000/M = $0.009943
+2026/06/03 09:34:05   Output Tokens:                     5372 × $12.000000/M = $0.064464
+2026/06/03 09:34:05 
+2026/06/03 09:34:05 CACHE STORAGE:
+2026/06/03 09:34:05   Main Cache Storage:                      $0.000432
+2026/06/03 09:34:05   Main Cache Age:              10s
+2026/06/03 09:34:05   Main Cached Token Count:     16669 tokens
+2026/06/03 09:34:05   Thinking Cache Storage:                  $0.000000
+2026/06/03 09:34:05   Total Storage Cost:                      $0.000432
+2026/06/03 09:34:05 
+2026/06/03 09:34:05 THINKING SUMMARIZATION (Flash Lite):
+2026/06/03 09:34:05   Total Thinking Input Tokens:          0
+2026/06/03 09:34:05   Total Thinking Output Tokens:         0
+2026/06/03 09:34:05 
+2026/06/03 09:34:05 TOTAL SESSION COST:            $0.193538
+2026/06/03 09:34:05 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026/06/03 09:34:05 📊 GEMINI CACHE STATISTICS - gemini-3.1-pro-preview
+2026/06/03 09:34:05 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026/06/03 09:34:05   Total Prompt Tokens:              88301
+2026/06/03 09:34:05   Total Cache Read Tokens:          49714
+2026/06/03 09:34:05   Total Output Tokens:               5372
+2026/06/03 09:34:05   Cache Hit Rate:                   56.30%
+2026/06/03 09:34:05 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026/06/03 09:34:05 💾 Final cache storage cost: 16669 tokens × 0.16 minutes = $0.000202 (incremental: $0.000001, total storage: $0.000433)
+2026/06/03 09:34:05 📊 Cache metadata (before cleanup): 16669 tokens cached, expires in 60m (coderhapsody_context_7_turns)
+2026/06/03 09:34:06 🗑️  Deleted cache: cachedContents/q3h29ingzbmk37kwsvvy9werbanfgzca6r790sxt
+2026/06/03 09:34:06 Server shutdown complete
+2026/06/03 09:34:06 🗑️  Unregistered agent 'DesignGen-Scout' from registry
+2026/06/03 09:34:06 ✅ Agent 'DesignGen-Scout' shutdown complete

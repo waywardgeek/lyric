@@ -1,0 +1,131 @@
+// transpiler.grok — the Grok Go transpiler's own understanding
+
+grok Transpiler {
+  why: "Backend code generator. Transforms a Grok AST into idiomatic Go source code. Final stage of the .gk compilation pipeline: source text → parser → checker → transpiler → .go file."
+
+  doc "Architecture": """
+    The transpiler performs a single recursive walk of the AST, emitting Go source
+    into a strings.Builder. No intermediate representation — AST nodes map directly
+    to Go syntax constructs. This keeps the implementation simple (~740 LOC) at the
+    cost of some output quality (no goimports, no line-length wrapping).
+
+    Key design: the transpiler is stateless except for indentation level and output
+    buffer. No type information from the checker is used — all type mapping is done
+    from AST TypeExpr nodes via goType(). This means the transpiler can run without
+    the checker, though the output may have type issues (e.g., []any for untyped
+    list literals).
+  """
+
+  doc "Type Mapping": """
+    goType() recursively converts Grok TypeExpr → Go type string:
+
+      Named types: grokPrimitiveToGo() maps all primitive names:
+        i8-i256   → int8-int64 (i128/i256 downcast — needs big.Int)
+        u8-u256   → uint8-uint64
+        f32-f128  → float32-float64 (f128 lossy)
+        bool/string/any/int/uint/float → direct Go equivalents
+
+      Composite types:
+        T?          → *T         (optional = pointer)
+        [T]         → []T        (sequence = slice)
+        map[K]V     → map[K]V    (direct)
+        (T, U)      → (T, U)     (tuple = multi-return for function returns)
+        T -> U      → func(T) U
+        channel<T>  → chan T
+        lock        → sync.Mutex
+        unit        → ""          (void — omitted from signatures)
+
+      Generics: Type[A, B] → Type[A, B] (Go 1.18+ syntax). Constraint-less
+      type params default to `any`.
+  """
+
+  doc "Declaration Mapping": """
+    Structs: direct mapping. Fields exported via exportName (capitalize first letter).
+
+    Classes: split into Go struct (ctor params + fields) + NewX constructor function
+    (returns pointer) + pointer-receiver methods. Self param stripped from method
+    signatures; receiver name defaults to "r" unless named in Grok source.
+
+    Enums: tagged union pattern — Go interface with private marker method (isX()),
+    plus one struct per variant implementing the interface. Variants with fields get
+    real struct fields; empty variants get struct{}. This is idiomatic Go for sum
+    types and enables type-switch matching.
+
+    Functions: direct mapping. Export all names. Params emitted positionally.
+  """
+
+  doc "Statement Mapping": """
+    VarDecl → `:=` (inferred) or `var T` (explicit type) or `_ =` (blank identifier).
+    Blank identifier special-cased because Go rejects `_ :=`.
+
+    Assign → `target = value` (compound assignment desugared in parser, not here).
+
+    If/ElseIf/Else → direct Go if/else if/else chain.
+
+    For → `for _, var := range collection` (always discards index — future: expose it).
+
+    While → `for condition { ... }` (Go's only loop).
+
+    Match → `switch value { case pattern: body }` (wildcard pattern → default).
+
+    Cascade → `defer func() { body }()` (Grok's deferred cleanup = Go's defer).
+
+    Break/Continue → direct.
+
+    Block → `{ ... }` with scope isolation via indentation.
+  """
+
+  doc "Expression Mapping": """
+    Literals: int/float/bool/nil → direct. String → %q (Go-escaped).
+
+    Binary/unary operators: direct Go equivalents for all 18 binary ops and 2 unary ops.
+
+    Call → `func(args)`. Method call → `receiver.Method(args)`.
+    Field access → `receiver.Field`. Index → `receiver[index]`.
+
+    List literals → `[]any{...}` (no type context from checker — a known limitation).
+    Map literals → `map[any]any{...}` (same limitation).
+    Tuple literals → comma-separated values (works for multi-return).
+
+    Lambda → `func(params) RetType { body }`.
+
+    Match-as-expression → placeholder `nil` with comment (Go switch is statement-only;
+    needs IIFE wrapper or temp variable to support expression context).
+  """
+
+  doc "Known Limitations": """
+    - Struct literal syntax: not yet supported in parser (Point{X: 3.0})
+    - Untyped collection literals: []any / map[any]any without checker integration
+    - Match-as-expression: emits placeholder — needs IIFE or temp-var pattern
+    - i128/i256: downcast to int64 (needs math/big integration)
+    - For-loop index: always discarded with `_`
+    - No goimports/gofmt: output compiles but isn't formatted
+    - No unused variable detection: Go will reject unused `let` bindings
+    - exportName is naive: doesn't handle acronyms (id → Id not ID)
+  """
+
+  // ---- Core ----
+
+  class Transpiler(Pkg: string) {
+    why: "Stateful writer. Tracks indentation depth and accumulates output into a string builder."
+
+    func Transpile(mut self, file: File?) -> string
+      why: "Primary entry point. Emits package declaration + all blocks."
+  }
+
+  func New(pkg: string) -> Transpiler?
+    why: "Creates a transpiler targeting the given Go package name."
+
+  // ---- Helpers ----
+
+  func exportName(name: string) -> string
+    why: "Capitalizes first letter for Go export. Naive — doesn't handle acronyms."
+
+  func grokPrimitiveToGo(name: string) -> string
+    why: "Maps Grok primitive type names to Go equivalents. Unknown names pass through as user-defined types."
+
+  func binaryOpString(op: BinaryOp) -> string
+    why: "Maps Grok BinaryOp enum to Go operator string."
+
+  source: ["transpiler.go"]
+}

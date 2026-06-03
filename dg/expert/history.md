@@ -2,29 +2,29 @@
 
 # Task: Expert Module Analysis
 
-Create or improve `pkg/verifier/design.md` — the expert-level design documentation for the **verifier** module.
+Create or improve `pkg/transpiler/design.md` — the expert-level design documentation for the **transpiler** module.
 
 ## Module Context
 
-- Name: verifier
-- Path: pkg/verifier
-- Output: `pkg/verifier/design.md`
+- Name: transpiler
+- Path: pkg/transpiler
+- Output: `pkg/transpiler/design.md`
 - Files: 2 source files
 
 ## Files to Analyze
 
-- pkg/verifier/verifier.go
-- pkg/verifier/verifier_test.go
+- pkg/transpiler/transpiler.go
+- pkg/transpiler/transpiler_test.go
 
 ## Your Strategy
 
-1. **Read Existing Design**: Read `pkg/verifier/design.md` if it exists. This is your starting point — it may contain valuable architectural insights from prior runs that you MUST preserve. Also read `project-design.md` at the project root for system-wide context.
+1. **Read Existing Design**: Read `pkg/transpiler/design.md` if it exists. This is your starting point — it may contain valuable architectural insights from prior runs that you MUST preserve. Also read `project-design.md` at the project root for system-wide context.
 2. **Analyze Code**: Read ALL source files in this module. Identify internal dependencies and read their `design.md` files to understand the interfaces you consume.
 3. **Cross-Link**: In your documentation, include **clickable markdown links** to the `design.md` files of any modules this package depends on (e.g., `[pkg/database](../database/design.md)`).
 4. **Map Interfaces**: Explicitly identify which interfaces this module implements (e.g., check pkg/database/interfaces.go).
 5. **Verify and Update**: Check that all information in the existing doc is still accurate against the current source files. Fix any bit-rot — but **do not drop design insights that are still valid**. Enhance, don't replace.
 6. **Document Deeply**: Create a technical narrative that passes the Reimplementation Test. Ensure EVERY non-test source file is accounted for in your File Inventory, and **link to each file** (e.g., `[main.go](main.go)`).
-7. **Write Output**: Use `write_file` to create `pkg/verifier/design.md`. Use `edit_file` to append additional sections if needed to stay under output token limits.
+7. **Write Output**: Use `write_file` to create `pkg/transpiler/design.md`. Use `edit_file` to append additional sections if needed to stay under output token limits.
 
 When finished, confirm: 'Documentation complete.'
 
@@ -36,7 +36,7 @@ When finished, confirm: 'Documentation complete.'
 **Tool Call: `list_directory`**
 ```json
 {
-  "directory": "pkg/verifier"
+  "directory": "pkg/transpiler"
 }
 ```
 
@@ -46,14 +46,13 @@ When finished, confirm: 'Documentation complete.'
 
 **Tool Result:**
 ```
-📁 **Directory Listing: /Users/bill/projects/grok/pkg/verifier**
+📁 **Directory Listing: /Users/bill/projects/grok/pkg/transpiler**
 
-📄 design.md (6.2 KB)
-📄 verifier.go (23.6 KB)
-📄 verifier.grok (1.4 KB)
-📄 verifier_test.go (3.4 KB)
+📄 design.md (6.8 KB)
+📄 transpiler.go (15.7 KB)
+📄 transpiler_test.go (7.0 KB)
 
-**Summary:** 4 items (4 files, 0 directories)
+**Summary:** 3 items (3 files, 0 directories)
 **Total Size:** 0.03 MB
 ```
 
@@ -64,23 +63,110 @@ When finished, confirm: 'Documentation complete.'
 **Tool Call: `read_file`**
 ```json
 {
-  "file_path": "pkg/verifier/design.md"
+  "file_path": "pkg/transpiler/design.md"
 }
 ```
 
-**Tool Call: `read_file`**
-```json
-{
-  "file_path": "pkg/verifier/verifier.go"
-}
+---
+
+### USER (gemini)
+
+**Tool Result:**
+```
+[ID: tool_4552087668e3f118]
+File: /Users/bill/projects/grok/pkg/transpiler/design.md (87 lines)
+
+# Transpiler Module Design
+
+## Executive Summary
+
+The `transpiler` module is responsible for converting a Grok Abstract Syntax Tree (AST) into idiomatic Go source code. While the `verifier` module ensures that Go code matches a Grok specification, the `transpiler` enables the inverse workflow: generating a Go implementation skeleton or a full implementation from a Grok model. It bridges the semantic gap between Grok's high-level constructs (like enums with variants, classes with constructors, and cascade statements) and Go's language primitives. The transpiler is designed to produce clean, readable, and compilable Go code that follows standard Go naming conventions and structural patterns.
+
+## File Inventory
+
+- [transpiler.go](transpiler.go): The core implementation of the transpiler, containing the logic for traversing the Grok AST and emitting Go source code.
+- [transpiler_test.go](transpiler_test.go): Comprehensive unit tests for the transpiler, covering various Grok constructs and their Go translations.
+
+## Architecture and Data Flow
+
+The transpiler follows a visitor-like pattern, though implemented as a set of recursive methods on the `Transpiler` struct rather than a formal visitor interface. The primary entry point is the `Transpile` method, which takes an `ast.File` and returns a string containing the generated Go source.
+
+The data flow is strictly linear:
+1.  **Initialization**: A `Transpiler` instance is created with a target Go package name.
+2.  **Package Declaration**: The transpiler starts by emitting the `package` header.
+3.  **AST Traversal**: The transpiler iterates through the blocks in the `ast.File`.
+4.  **Recursive Emission**: For each block, it recursively visits declarations (structs, enums, classes, functions), statements, and expressions.
+5.  **Buffer Accumulation**: All generated text is written to an internal `strings.Builder`.
+6.  **Final Output**: The accumulated string is returned to the caller.
+
+The transpiler maintains minimal state during this process, primarily tracking the current indentation level and the target package name.
+
+## Interface Implementations
+
+The `transpiler` module does not currently implement any external interfaces. It provides a concrete `Transpiler` type that acts as a standalone tool for AST-to-Go conversion.
+
+## Public API
+
+The public API is intentionally small and focused:
+
+- **`New(pkg string) *Transpiler`**: Creates a new transpiler instance. The `pkg` argument specifies the name of the Go package to be generated (e.g., "main" or "models").
+- **`Transpiler.Transpile(file *ast.File) string`**: The main execution method. It resets the internal buffer, processes the entire AST file, and returns the resulting Go source code.
+
+The `Transpiler` struct is not thread-safe for concurrent calls to `Transpile` on the same instance, as it uses a shared internal buffer. However, multiple instances can be used concurrently.
+
+## Implementation Details
+
+The transpiler performs a sophisticated mapping between Grok's rich type system and Go's simpler primitives.
+
+### Type Mapping
+Grok primitives are mapped to their closest Go equivalents. For example, `i32` becomes `int32`, `f64` becomes `float64`, and `string` remains `string`. Types like `i128` or `f128`, which do not have direct Go equivalents, are currently mapped to `int64` or `float64` as a placeholder, though a more robust implementation might use `math/big`.
+
+Grok's complex types are handled as follows:
+- **Optional Types**: `Option[T]` is transpiled to a pointer `*T` in Go.
+- **Sequence Types**: `Seq[T]` becomes a slice `[]T`.
+- **Map Types**: `Map[K, V]` becomes `map[K]V`.
+- **Tuple Types**: These are transpiled as multiple return values in function signatures or as anonymous structs in other contexts.
+- **Function Types**: These are mapped directly to Go's `func` types.
+- **Channel Types**: These are mapped to Go's `chan` types.
+- **Lock Types**: These are mapped to `sync.Mutex`.
+
+### Declarations
+- **Structs**: Transpiled directly to Go structs. Field names are automatically capitalized using the `exportName` helper to ensure they are exported in Go.
+- **Enums**: Since Go lacks native sum types, Grok enums are transpiled using an interface-based pattern. An interface is created with a private marker method (e.g., `isOption()`), and each variant is transpiled as a struct that implements this interface.
+- **Classes**: Grok classes are transpiled to a Go struct containing both the constructor parameters and the class fields. A `New<ClassName>` function is generated as a constructor, and class methods are transpiled as Go methods with a pointer receiver.
+- **Functions**: Transpiled to Go functions. The transpiler handles the conversion of Grok's `self` and `mut self` parameters into Go's receiver syntax.
+
+### Statements and Expressions
+The transpiler supports a wide range of statements, including variable declarations (using `:=` for inference or `var` for explicit types), assignments, returns, and control flow (if/else, for, while).
+
+A notable translation is the **Cascade Statement**, which is transpiled to a Go `defer` block. This captures the semantic intent of "execute this at the end of the scope."
+
+**Match Statements** are transpiled to Go `switch` statements. While Grok's match is more powerful (supporting pattern matching on variants), the current transpiler implementation focuses on basic value switching.
+
+### Naming Conventions
+The transpiler uses the `exportName` helper to ensure that all generated types, fields, and methods are exported (capitalized) in Go. This aligns with the expectation that a Grok specification defines a public interface.
+
+## Dependencies
+
+The `transpiler` module has a single internal dependency:
+
+- **[pkg/ast](../ast/design.md)**: The transpiler consumes the `ast.File` and its constituent nodes to drive the code generation process.
+
+It also depends on the Go standard library (`fmt`, `strings`).
+
+## Technical Debt and Future Work
+
+- **Match Expression Support**: Currently, `match` used as an expression (rather than a statement) is not fully supported and emits a placeholder comment.
+- **Complex Pattern Matching**: The transpilation of complex patterns in `match` statements (like destructuring) is currently limited.
+- **Import Management**: The transpiler does not yet automatically manage Go imports (e.g., adding `import "sync"` when a `Lock` type is used). This currently requires manual intervention or a post-processing step like `goimports`.
+- **Generic Constraints**: While basic type parameters are supported, complex generic constraints are not yet fully mapped to Go's `any` or specific interface constraints.
+- **Large Integer/Float Support**: Types like `i128` and `f128` should be handled more robustly, possibly using `math/big`.
+- **Error Handling**: The transpiler assumes a valid, type-checked AST. It does not currently perform its own validation or provide detailed error messages for unsupported constructs.
 ```
 
-**Tool Call: `read_file`**
-```json
-{
-  "file_path": "pkg/verifier/verifier_test.go"
-}
-```
+---
+
+### ASSISTANT (gemini)
 
 **Tool Call: `read_file`**
 ```json
@@ -95,1208 +181,71 @@ When finished, confirm: 'Documentation complete.'
 
 **Tool Result:**
 ```
-[ID: tool_852cc24b49ee758b]
-File: /Users/bill/projects/grok/pkg/verifier/design.md (72 lines)
-
-# Verifier Module Design
-
-## Executive Summary
-
-The `verifier` module is the structural integrity engine of the Grok system. Its primary purpose is to detect "architectural drift"—the divergence between the high-level design declared in `.grok` files and the actual implementation in Go source code. By comparing the Abstract Syntax Tree (AST) of a Grok specification against the AST of the corresponding Go code, the verifier ensures that the developer's mental model (as captured in Grok) remains synchronized with the reality of the codebase. It reports mismatches in types, field names, function signatures, and interface implementations as errors, warnings, or informational findings.
-
-## File Inventory
-
-- [verifier.go](verifier.go): The core implementation of the verification logic. It handles Go source parsing, type extraction, and the recursive comparison of Grok declarations against Go implementations.
-- [verifier_test.go](verifier_test.go): Comprehensive tests for the verifier, including integration tests that run the verifier against the project's own `.grok` files and unit tests for naming convention conversions.
-
-## Architecture and Data Flow
-
-The verifier operates in a multi-stage pipeline that bridges the gap between the Grok and Go type systems.
-
-1.  **Grok Parsing**: The process begins by using the [pkg/parser](../parser/design.md) to transform a `.grok` file into a [pkg/ast](../ast/design.md) representation.
-2.  **Go Source Discovery**: For each `grok` block in the file, the verifier identifies the associated Go source files or directories specified in the `source:` annotations.
-3.  **Go Type Extraction**: The verifier uses the standard library's `go/parser` and `go/ast` packages to parse the referenced Go code. It then traverses the Go AST to build an internal `goTypeInfo` map, which aggregates all structs, interfaces, functions, and type definitions found across the specified sources.
-4.  **Structural Comparison**: The verifier performs a deep, recursive comparison between the Grok AST nodes and the extracted Go type information. It maps Grok's snake_case identifiers to Go's PascalCase or camelCase conventions and converts Grok's type expressions into a normalized string format for comparison.
-5.  **Finding Generation**: Any discrepancies found during comparison are recorded as `Finding` objects, categorized by `Severity` (Error, Warning, or Info).
-
-## Interface Implementations
-
-The `verifier` module does not currently implement any external interfaces. It provides a functional API for performing verification and returning a structured `Result`.
-
-## Public API
-
-The public API is designed for simplicity and integration into build pipelines or CI/CD workflows.
-
-- **Verify(grokPath string) (*Result, error)**: The primary entry point. It parses the specified `.grok` file, locates the corresponding Go source code, performs the verification, and returns a `Result` containing all findings.
-- **Result**: A container for the findings of a verification run. It provides an `ErrorCount()` method to quickly determine if any critical drift was detected.
-- **Finding**: Represents a single instance of drift. It includes the `Severity`, the paths to the involved files, and a descriptive message.
-- **Severity**: An enumeration (`Error`, `Warning`, `Info`) that classifies the impact of a finding.
-
-## Implementation Details
-
-### Go Type Extraction
-
-The `extractGoTypes` function is the heart of the Go analysis phase. It processes `*ast.File` nodes and populates a `goTypeInfo` structure. It specifically handles:
--   **Structs**: Capturing field names and types.
--   **Interfaces**: Capturing method signatures.
--   **Functions**: Capturing top-level functions and their signatures.
--   **Methods**: Identifying receiver types to associate methods with their respective structs.
--   **Type Definitions**: Tracking simple type aliases.
-
-### Type Mapping and Comparison
-
-Grok and Go have different type systems and naming conventions. The verifier bridges these using several strategies:
--   **Naming Conventions**: The `snakeToPascal` and `snakeToCamel` helpers allow the verifier to match a Grok field like `user_id` to a Go field `UserID` or `userId`.
--   **Type Normalization**: The `grokTypeToGoString` function converts complex Grok `TypeExpr` nodes (like `[string]?`) into their Go equivalents (like `*[]string`).
--   **Fuzzy Matching**: The `typesMatch` function handles Go-specific nuances, such as the equivalence of `any` and `interface{}` and the presence of package prefixes (e.g., matching `ast.File` in Go to `File` in Grok).
-
-### Verification Logic
-
-The verification is partitioned by declaration type:
--   **Structs/Classes**: Checks for field existence and type compatibility. It also reports "extra" fields in Go that are missing from Grok as warnings, encouraging complete documentation.
--   **Interfaces**: Ensures that all methods declared in the Grok interface exist in the Go interface with matching signatures.
--   **Functions**: Compares parameter counts, parameter types, and return types. It handles Grok's "self" parameter (used in class methods) by excluding it from the positional comparison with Go parameters.
-
-## Dependencies
-
--   [pkg/ast](../ast/design.md): Provides the AST structures for the Grok language.
--   [pkg/parser](../parser/design.md): Used to parse `.grok` files.
--   **Go Standard Library**: Relies heavily on `go/ast`, `go/parser`, and `go/token` for analyzing Go source code.
-
-## Technical Debt and Future Work
-
--   **Expression Verification**: Currently, the verifier only checks structural types. Future versions should verify the `requires` and `ensures` contracts by parsing the expressions and potentially using static analysis or symbolic execution.
--   **Pointer Nuances**: The current type comparison is somewhat simplified regarding pointer indirection. More robust handling of pointer vs. value receivers and types would reduce false positives/negatives.
--   **Import Resolution**: The verifier currently assumes that unqualified types in Grok match types in the Go package being analyzed. Support for cross-package type verification would be a significant improvement.
--   **Performance**: For very large projects, parsing all Go files for every `grok` block might become slow. Implementing a cache for parsed Go type information would improve performance.
-```
-
-**Tool Result:**
-```
-[ID: tool_c640243cb72efdf1]
-File: /Users/bill/projects/grok/pkg/verifier/verifier.go (892 lines)
-
-// Package verifier compares .grok understanding files against Go source code,
-// reporting structural drift between the declared understanding and the implementation.
-package verifier
-
-import (
-	"fmt"
-	"go/ast"
-	goparser "go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-
-	grokast "github.com/waywardgeek/grok/pkg/ast"
-	"github.com/waywardgeek/grok/pkg/parser"
-)
-
-// Severity classifies how serious a drift finding is.
-type Severity int
-
-const (
-	Error   Severity = iota // missing type, wrong field type
-	Warning                 // extra fields not in .grok, naming convention mismatch
-	Info                    // informational (e.g., Go has more methods than .grok declares)
-)
-
-func (s Severity) String() string {
-	switch s {
-	case Error:
-		return "ERROR"
-	case Warning:
-		return "WARNING"
-	case Info:
-		return "INFO"
-	}
-	return "UNKNOWN"
-}
-
-// Finding is a single drift report.
-type Finding struct {
-	Severity Severity
-	GrokFile string
-	GoFile   string
-	Message  string
-}
-
-func (f Finding) String() string {
-	loc := f.GrokFile
-	if f.GoFile != "" {
-		loc = fmt.Sprintf("%s ↔ %s", f.GrokFile, f.GoFile)
-	}
-	return fmt.Sprintf("[%s] %s: %s", f.Severity, loc, f.Message)
-}
-
-// Result holds all findings from a verification run.
-type Result struct {
-	Findings []Finding
-}
-
-func (r *Result) add(sev Severity, grokFile, goFile, msg string) {
-	r.Findings = append(r.Findings, Finding{
-		Severity: sev,
-		GrokFile: grokFile,
-		GoFile:   goFile,
-		Message:  msg,
-	})
-}
-
-// ErrorCount returns the number of error-level findings.
-func (r *Result) ErrorCount() int {
-	n := 0
-	for _, f := range r.Findings {
-		if f.Severity == Error {
-			n++
-		}
-	}
-	return n
-}
-
-// Verify parses a .grok file and compares it against the Go source files
-// referenced in source: annotations. baseDir is the project root used to
-// resolve relative source paths.
-func Verify(grokPath string) (*Result, error) {
-	src, err := os.ReadFile(grokPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", grokPath, err)
-	}
-
-	grokFile, err := parser.ParseFile(string(src), grokPath)
-	if err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", grokPath, err)
-	}
-
-	result := &Result{}
-
-	grokDir := filepath.Dir(grokPath)
-
-	for _, block := range grokFile.Blocks {
-		if len(block.Source) == 0 {
-			result.add(Info, grokPath, "", fmt.Sprintf("grok block %q has no source: annotations", block.Name))
-			continue
-		}
-
-		// Aggregate all Go types across all source files
-		goInfo := &goTypeInfo{
-			Structs:    make(map[string]*goStructInfo),
-			Interfaces: make(map[string]*goInterfaceInfo),
-			Functions:  make(map[string]*goFuncInfo),
-			TypeDefs:   make(map[string]bool),
-		}
-
-		for _, srcPath := range block.Source {
-			// Resolve source paths relative to the .grok file's directory
-			goFullPath := filepath.Join(grokDir, srcPath)
-			info, err := os.Stat(goFullPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					result.add(Error, grokPath, srcPath, "source file does not exist")
-				} else {
-					result.add(Error, grokPath, srcPath, fmt.Sprintf("cannot stat: %v", err))
-				}
-				continue
-			}
-
-			var fileInfo *goTypeInfo
-			if info.IsDir() {
-				fileInfo, err = parseGoDir(goFullPath)
-			} else {
-				fileInfo, err = parseGoFile(goFullPath)
-			}
-			if err != nil {
-				result.add(Error, grokPath, srcPath, fmt.Sprintf("failed to parse Go file: %v", err))
-				continue
-			}
-			mergeGoInfo(goInfo, fileInfo)
-		}
-
-		// Now compare the grok block against the aggregated Go types
-		verifyBlock(block, goInfo, grokPath, result)
-	}
-
-	return result, nil
-}
-
-// goTypeInfo holds extracted Go type information.
-type goTypeInfo struct {
-	Structs    map[string]*goStructInfo
-	Interfaces map[string]*goInterfaceInfo
-	Functions  map[string]*goFuncInfo
-	TypeDefs   map[string]bool // type names that are simple typedefs (e.g., type Foo int)
-}
-
-type goStructInfo struct {
-	Fields  map[string]string // field name → type string
-	Methods map[string]*goFuncInfo
-}
-
-type goInterfaceInfo struct {
-	Methods map[string]*goFuncInfo
-}
-
-type goFuncInfo struct {
-	Params  []goParam
-	Returns []string
-}
-
-type goParam struct {
-	Name string
-	Type string
-}
-
-func mergeGoInfo(dst, src *goTypeInfo) {
-	for k, v := range src.Structs {
-		if existing, ok := dst.Structs[k]; ok {
-			// Merge methods
-			for mk, mv := range v.Methods {
-				existing.Methods[mk] = mv
-			}
-			for fk, fv := range v.Fields {
-				existing.Fields[fk] = fv
-			}
-		} else {
-			dst.Structs[k] = v
-		}
-	}
-	for k, v := range src.Interfaces {
-		dst.Interfaces[k] = v
-	}
-	for k, v := range src.Functions {
-		dst.Functions[k] = v
-	}
-	for k, v := range src.TypeDefs {
-		dst.TypeDefs[k] = v
-	}
-}
-
-func verifyBlock(block grokast.GrokBlock, goInfo *goTypeInfo, grokPath string, result *Result) {
-	srcStr := strings.Join(block.Source, ", ")
-
-	for _, s := range block.Structs {
-		verifyStruct(s, goInfo, grokPath, srcStr, result)
-	}
-	for _, c := range block.Classes {
-		verifyClass(c, goInfo, grokPath, srcStr, result)
-	}
-	for _, e := range block.Enums {
-		verifyEnum(e, goInfo, grokPath, srcStr, result)
-	}
-	for _, i := range block.Interfaces {
-		verifyInterface(i, goInfo, grokPath, srcStr, result)
-	}
-	for _, f := range block.Functions {
-		verifyFunction(f, goInfo, grokPath, srcStr, result)
-	}
-}
-
-func parseGoDir(dir string) (*goTypeInfo, error) {
-	fset := token.NewFileSet()
-	pkgs, err := goparser.ParseDir(fset, dir, nil, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	info := &goTypeInfo{
-		Structs:    make(map[string]*goStructInfo),
-		Interfaces: make(map[string]*goInterfaceInfo),
-		Functions:  make(map[string]*goFuncInfo),
-		TypeDefs:   make(map[string]bool),
-	}
-
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Files {
-			extractGoTypes(file, info)
-		}
-	}
-	return info, nil
-}
-
-func parseGoFile(path string) (*goTypeInfo, error) {
-	fset := token.NewFileSet()
-	file, err := goparser.ParseFile(fset, path, nil, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	info := &goTypeInfo{
-		Structs:    make(map[string]*goStructInfo),
-		Interfaces: make(map[string]*goInterfaceInfo),
-		Functions:  make(map[string]*goFuncInfo),
-		TypeDefs:   make(map[string]bool),
-	}
-
-	extractGoTypes(file, info)
-	return info, nil
-}
-
-func extractGoTypes(file *ast.File, info *goTypeInfo) {
-	for _, decl := range file.Decls {
-		switch d := decl.(type) {
-		case *ast.GenDecl:
-			for _, spec := range d.Specs {
-				if ts, ok := spec.(*ast.TypeSpec); ok {
-					switch t := ts.Type.(type) {
-					case *ast.StructType:
-						si := &goStructInfo{
-							Fields:  make(map[string]string),
-							Methods: make(map[string]*goFuncInfo),
-						}
-						if t.Fields != nil {
-							for _, f := range t.Fields.List {
-								typStr := typeExprString(f.Type)
-								for _, name := range f.Names {
-									si.Fields[name.Name] = typStr
-								}
-							}
-						}
-						info.Structs[ts.Name.Name] = si
-
-					case *ast.InterfaceType:
-						ii := &goInterfaceInfo{
-							Methods: make(map[string]*goFuncInfo),
-						}
-						if t.Methods != nil {
-							for _, m := range t.Methods.List {
-								if ft, ok := m.Type.(*ast.FuncType); ok {
-									for _, name := range m.Names {
-										ii.Methods[name.Name] = extractFuncType(ft)
-									}
-								}
-							}
-						}
-						info.Interfaces[ts.Name.Name] = ii
-
-					default:
-						// Simple typedef (type Foo int, type Bar string, etc.)
-						info.TypeDefs[ts.Name.Name] = true
-					}
-				}
-			}
-
-		case *ast.FuncDecl:
-			fi := extractFuncInfo(d)
-			if d.Recv != nil && len(d.Recv.List) > 0 {
-				recvType := receiverTypeName(d.Recv.List[0].Type)
-				if recvType != "" {
-					si, ok := info.Structs[recvType]
-					if !ok {
-						si = &goStructInfo{
-							Fields:  make(map[string]string),
-							Methods: make(map[string]*goFuncInfo),
-						}
-						info.Structs[recvType] = si
-					}
-					si.Methods[d.Name.Name] = fi
-				}
-			} else {
-				info.Functions[d.Name.Name] = fi
-			}
-		}
-	}
-}
-
-func extractFuncInfo(d *ast.FuncDecl) *goFuncInfo {
-	return extractFuncType(d.Type)
-}
-
-func extractFuncType(ft *ast.FuncType) *goFuncInfo {
-	fi := &goFuncInfo{}
-	if ft.Params != nil {
-		for _, p := range ft.Params.List {
-			typStr := typeExprString(p.Type)
-			if len(p.Names) == 0 {
-				fi.Params = append(fi.Params, goParam{Type: typStr})
-			} else {
-				for _, name := range p.Names {
-					fi.Params = append(fi.Params, goParam{Name: name.Name, Type: typStr})
-				}
-			}
-		}
-	}
-	if ft.Results != nil {
-		for _, r := range ft.Results.List {
-			typStr := typeExprString(r.Type)
-			count := len(r.Names)
-			if count == 0 {
-				count = 1
-			}
-			for i := 0; i < count; i++ {
-				fi.Returns = append(fi.Returns, typStr)
-			}
-		}
-	}
-	return fi
-}
-
-func receiverTypeName(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.StarExpr:
-		return receiverTypeName(t.X)
-	case *ast.Ident:
-		return t.Name
-	case *ast.IndexExpr:
-		if id, ok := t.X.(*ast.Ident); ok {
-			return id.Name
-		}
-	case *ast.IndexListExpr:
-		if id, ok := t.X.(*ast.Ident); ok {
-			return id.Name
-		}
-	}
-	return ""
-}
-
-func typeExprString(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.StarExpr:
-		return "*" + typeExprString(t.X)
-	case *ast.ArrayType:
-		if t.Len == nil {
-			return "[]" + typeExprString(t.Elt)
-		}
-		return "[...]" + typeExprString(t.Elt)
-	case *ast.MapType:
-		return "map[" + typeExprString(t.Key) + "]" + typeExprString(t.Value)
-	case *ast.SelectorExpr:
-		return typeExprString(t.X) + "." + t.Sel.Name
-	case *ast.InterfaceType:
-		return "interface{}"
-	case *ast.FuncType:
-		return "func(...)"
-	case *ast.ChanType:
-		return "chan " + typeExprString(t.Value)
-	case *ast.Ellipsis:
-		return "..." + typeExprString(t.Elt)
-	case *ast.IndexExpr:
-		return typeExprString(t.X) + "[" + typeExprString(t.Index) + "]"
-	case *ast.IndexListExpr:
-		var parts []string
-		for _, idx := range t.Indices {
-			parts = append(parts, typeExprString(idx))
-		}
-		return typeExprString(t.X) + "[" + strings.Join(parts, ", ") + "]"
-	default:
-		return "?"
-	}
-}
-
-// ---- Grok type → Go type string conversion ----
-
-// grokTypeToGoString converts a grok TypeExpr into the string format that
-// typeExprString produces from Go AST, enabling structural comparison.
-func grokTypeToGoString(t grokast.TypeExpr) string {
-	switch t.Kind {
-	case grokast.TypeNamed:
-		if t.Data == nil {
-			return "?"
-		}
-		nt := t.Data.(grokast.NamedType)
-		name := grokNameToGo(nt.Name)
-		if len(nt.Args) == 0 {
-			return name
-		}
-		// Generic: Stack<T> → Stack[T], Map<K,V> → Map[K, V]
-		var args []string
-		for _, a := range nt.Args {
-			args = append(args, grokTypeToGoString(a))
-		}
-		return name + "[" + strings.Join(args, ", ") + "]"
-
-	case grokast.TypeOptional:
-		if t.Data == nil {
-			return "?"
-		}
-		ot := t.Data.(grokast.OptionalType)
-		// T? in grok → *T in Go
-		return "*" + grokTypeToGoString(ot.Inner)
-
-	case grokast.TypeSequence:
-		if t.Data == nil {
-			return "[]?"
-		}
-		st := t.Data.(grokast.SequenceType)
-		return "[]" + grokTypeToGoString(st.Elem)
-
-	case grokast.TypeMap:
-		if t.Data == nil {
-			return "map[?]?"
-		}
-		mt := t.Data.(grokast.MapType)
-		return "map[" + grokTypeToGoString(mt.Key) + "]" + grokTypeToGoString(mt.Value)
-
-	case grokast.TypeTuple:
-		// Go doesn't have tuples; skip comparison
-		return "?"
-
-	case grokast.TypeFunc:
-		return "func(...)"
-
-	case grokast.TypeChannel:
-		if t.Data == nil {
-			return "chan ?"
-		}
-		ct := t.Data.(grokast.ChannelType)
-		return "chan " + grokTypeToGoString(ct.Elem)
-
-	case grokast.TypeLock:
-		return "sync.Mutex"
-
-	case grokast.TypeUnit:
-		return ""
-
-	default:
-		return "?"
-	}
-}
-
-// grokNameToGo maps grok primitive type names to Go equivalents.
-func grokNameToGo(name string) string {
-	switch name {
-	case "string":
-		return "string"
-	case "bool":
-		return "bool"
-	case "i8":
-		return "int8"
-	case "i16":
-		return "int16"
-	case "i32":
-		return "int32"
-	case "i64":
-		return "int64"
-	case "i128", "i256":
-		return name // no Go equivalent, keep as-is
-	case "u8":
-		return "uint8"
-	case "u16":
-		return "uint16"
-	case "u32":
-		return "uint32"
-	case "u64":
-		return "uint64"
-	case "f32":
-		return "float32"
-	case "f64":
-		return "float64"
-	case "f128":
-		return name
-	case "int":
-		return "int"
-	case "any":
-		return "any"
-	case "error":
-		return "error"
-	default:
-		return name // user-defined types pass through
-	}
-}
-
-// typesMatch compares a grok type string against a Go type string.
-// Returns true if they match or if the grok type is "?" (unknown/unconvertible).
-func typesMatch(grokStr, goStr string) bool {
-	if grokStr == "?" || grokStr == "" {
-		return true // can't compare, don't report false positive
-	}
-	if grokStr == goStr {
-		return true
-	}
-	// Go 1.18+: "any" is an alias for "interface{}"
-	if (grokStr == "any" && goStr == "interface{}") || (grokStr == "interface{}" && goStr == "any") {
-		return true
-	}
-	// Also handle in composite types: map[string]any == map[string]interface{}, etc.
-	if strings.ReplaceAll(grokStr, "any", "interface{}") == goStr || grokStr == strings.ReplaceAll(goStr, "interface{}", "any") {
-		return true
-	}
-	// Strip Go package prefix: "ast.Span" → "Span", "*ast.File" → "*File"
-	// since .grok files use unqualified type names
-	stripped := stripPackagePrefix(goStr)
-	if grokStr == stripped {
-		return true
-	}
-	return false
-}
-
-// stripPackagePrefix removes Go package qualifiers from a type string.
-// Handles nested cases like "*ast.File", "[]ast.Node", "map[string]*ast.File".
-func stripPackagePrefix(goType string) string {
-	// Handle pointer prefix
-	if strings.HasPrefix(goType, "*") {
-		return "*" + stripPackagePrefix(goType[1:])
-	}
-	// Handle slice prefix
-	if strings.HasPrefix(goType, "[]") {
-		return "[]" + stripPackagePrefix(goType[2:])
-	}
-	// Handle map
-	if strings.HasPrefix(goType, "map[") {
-		// Find the ] that closes the key
-		depth := 1
-		i := 4
-		for i < len(goType) && depth > 0 {
-			if goType[i] == '[' {
-				depth++
-			} else if goType[i] == ']' {
-				depth--
-			}
-			i++
-		}
-		return "map[" + stripPackagePrefix(goType[4:i-1]) + "]" + stripPackagePrefix(goType[i:])
-	}
-	// Strip package prefix from qualified name: "ast.File" → "File"
-	if idx := strings.LastIndex(goType, "."); idx >= 0 {
-		return goType[idx+1:]
-	}
-	return goType
-}
-
-// ---- Verification helpers ----
-
-// findGoName checks if a name exists in a map, trying both PascalCase and camelCase.
-// Returns the found name and whether it was found.
-func findGoName(name string, names map[string]*goFuncInfo) (string, bool) {
-	pascal := snakeToPascal(name)
-	if _, ok := names[pascal]; ok {
-		return pascal, true
-	}
-	camel := snakeToCamel(name)
-	if _, ok := names[camel]; ok {
-		return camel, true
-	}
-	// Try exact match
-	if _, ok := names[name]; ok {
-		return name, true
-	}
-	return pascal, false
-}
-
-func verifyStruct(s grokast.StructDecl, goInfo *goTypeInfo, grokFile, goFile string, result *Result) {
-	goStruct, ok := goInfo.Structs[s.Name]
-	if !ok {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("struct %s declared in .grok but not found in Go", s.Name))
-		return
-	}
-
-	for _, grokField := range s.Fields {
-		goType, found := findGoFieldType(grokField.Name, goStruct.Fields)
-		if !found {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("struct %s: field %s not found in Go", s.Name, grokField.Name))
-			continue
-		}
-		grokType := grokTypeToGoString(grokField.Type)
-		if !typesMatch(grokType, goType) {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("struct %s: field %s type mismatch: .grok=%s, Go=%s", s.Name, grokField.Name, grokType, goType))
-		}
-	}
-
-	grokFieldSet := make(map[string]bool)
-	for _, f := range s.Fields {
-		grokFieldSet[snakeToPascal(f.Name)] = true
-		grokFieldSet[snakeToCamel(f.Name)] = true
-		grokFieldSet[f.Name] = true
-	}
-	var extras []string
-	for goField := range goStruct.Fields {
-		if !grokFieldSet[goField] {
-			extras = append(extras, goField)
-		}
-	}
-	sort.Strings(extras)
-	for _, extra := range extras {
-		result.add(Warning, grokFile, goFile, fmt.Sprintf("struct %s: Go has field %s not in .grok", s.Name, extra))
-	}
-}
-
-func verifyClass(c grokast.ClassDecl, goInfo *goTypeInfo, grokFile, goFile string, result *Result) {
-	goStruct, ok := goInfo.Structs[c.Name]
-	if !ok {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("class %s declared in .grok but not found as Go struct", c.Name))
-		return
-	}
-
-	for _, grokField := range c.Fields {
-		goType, found := findGoFieldType(grokField.Name, goStruct.Fields)
-		if !found {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("class %s: field %s not found in Go", c.Name, grokField.Name))
-			continue
-		}
-		grokType := grokTypeToGoString(grokField.Type)
-		if !typesMatch(grokType, goType) {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("class %s: field %s type mismatch: .grok=%s, Go=%s", c.Name, grokField.Name, grokType, goType))
-		}
-	}
-
-	for _, param := range c.CtorParams {
-		if param.IsSelf {
-			continue
-		}
-		if !findGoField(param.Name, goStruct.Fields) {
-			result.add(Warning, grokFile, goFile, fmt.Sprintf("class %s: ctor param %s not found as field", c.Name, param.Name))
-		}
-	}
-
-	for _, grokMethod := range c.Methods {
-		goName, found := findGoName(grokMethod.Name, goStruct.Methods)
-		if !found {
-			pascal := snakeToPascal(grokMethod.Name)
-			camel := snakeToCamel(grokMethod.Name)
-			result.add(Error, grokFile, goFile, fmt.Sprintf("class %s: method %s (tried Go: %s, %s) not found", c.Name, grokMethod.Name, pascal, camel))
-			continue
-		}
-		goFunc := goStruct.Methods[goName]
-		verifyFuncSignature(fmt.Sprintf("class %s method %s", c.Name, grokMethod.Name), grokMethod, goFunc, grokFile, goFile, result)
-	}
-
-	grokMethodSet := make(map[string]bool)
-	for _, m := range c.Methods {
-		grokMethodSet[snakeToPascal(m.Name)] = true
-		grokMethodSet[snakeToCamel(m.Name)] = true
-		grokMethodSet[m.Name] = true
-	}
-	var extras []string
-	for goMethod := range goStruct.Methods {
-		if !grokMethodSet[goMethod] {
-			extras = append(extras, goMethod)
-		}
-	}
-	sort.Strings(extras)
-	for _, extra := range extras {
-		result.add(Info, grokFile, goFile, fmt.Sprintf("class %s: Go has method %s not in .grok", c.Name, extra))
-	}
-}
-
-func verifyEnum(e grokast.EnumDecl, goInfo *goTypeInfo, grokFile, goFile string, result *Result) {
-	// Go enums are typically: type FooKind int (typedef) or type Foo int
-	// Check for the type as a typedef, struct, or interface
-	_, hasStruct := goInfo.Structs[e.Name]
-	_, hasIface := goInfo.Interfaces[e.Name]
-	_, hasTypedef := goInfo.TypeDefs[e.Name]
-
-	if hasStruct || hasIface || hasTypedef {
-		return
-	}
-
-	// Also check XxxKind pattern
-	kindName := e.Name + "Kind"
-	if goInfo.TypeDefs[kindName] {
-		return
-	}
-
-	result.add(Warning, grokFile, goFile, fmt.Sprintf("enum %s: no matching Go type found (looked for %s, %s as typedef/struct/interface)", e.Name, e.Name, kindName))
-}
-
-func verifyInterface(i grokast.InterfaceDecl, goInfo *goTypeInfo, grokFile, goFile string, result *Result) {
-	goIface, ok := goInfo.Interfaces[i.Name]
-	if !ok {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("interface %s declared in .grok but not found in Go", i.Name))
-		return
-	}
-
-	for _, grokMethod := range i.Methods {
-		goName := toGoMethodName(grokMethod.Name)
-		goFunc, ok := goIface.Methods[goName]
-		if !ok {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("interface %s: method %s (Go: %s) not found", i.Name, grokMethod.Name, goName))
-			continue
-		}
-		verifyFuncSignature(fmt.Sprintf("interface %s method %s", i.Name, grokMethod.Name), grokMethod, goFunc, grokFile, goFile, result)
-	}
-}
-
-func verifyFunction(f grokast.FuncDecl, goInfo *goTypeInfo, grokFile, goFile string, result *Result) {
-	pascal := snakeToPascal(f.Name)
-	camel := snakeToCamel(f.Name)
-
-	var goFunc *goFuncInfo
-	if fn, ok := goInfo.Functions[pascal]; ok {
-		goFunc = fn
-	} else if fn, ok := goInfo.Functions[camel]; ok {
-		goFunc = fn
-	} else if fn, ok := goInfo.Functions[f.Name]; ok {
-		goFunc = fn
-	}
-
-	if goFunc == nil {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("function %s (tried Go: %s, %s) not found", f.Name, pascal, camel))
-		return
-	}
-
-	verifyFuncSignature(fmt.Sprintf("function %s", f.Name), f, goFunc, grokFile, goFile, result)
-}
-
-// ---- Naming convention helpers ----
-
-// toGoFieldName tries PascalCase first (exported), then the original name (unexported).
-func toGoFieldName(name string) string {
-	return snakeToPascal(name)
-}
-
-// findGoField checks if a field exists, trying PascalCase, camelCase, and exact match.
-func findGoField(name string, fields map[string]string) bool {
-	_, found := findGoFieldType(name, fields)
-	return found
-}
-
-// findGoFieldType returns the Go type string for a field, trying PascalCase, camelCase, and exact match.
-func findGoFieldType(name string, fields map[string]string) (string, bool) {
-	pascal := snakeToPascal(name)
-	if typ, ok := fields[pascal]; ok {
-		return typ, true
-	}
-	camel := snakeToCamel(name)
-	if typ, ok := fields[camel]; ok {
-		return typ, true
-	}
-	if typ, ok := fields[name]; ok {
-		return typ, true
-	}
-	return "", false
-}
-
-// verifyFuncSignature checks parameter count and return type of a grok function against Go.
-func verifyFuncSignature(context string, grokFunc grokast.FuncDecl, goFunc *goFuncInfo, grokFile, goFile string, result *Result) {
-	// Count grok params excluding self
-	grokParamCount := 0
-	for _, p := range grokFunc.Params {
-		if !p.IsSelf {
-			grokParamCount++
-		}
-	}
-	goParamCount := len(goFunc.Params)
-
-	if grokParamCount != goParamCount {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("%s: param count mismatch: .grok=%d, Go=%d", context, grokParamCount, goParamCount))
-	} else {
-		// Check param types positionally
-		gi := 0
-		for _, grokParam := range grokFunc.Params {
-			if grokParam.IsSelf {
-				continue
-			}
-			if gi < len(goFunc.Params) {
-				grokType := grokTypeToGoString(grokParam.Type)
-				goType := goFunc.Params[gi].Type
-				if !typesMatch(grokType, goType) {
-					paramName := grokParam.Name
-					if paramName == "" {
-						paramName = fmt.Sprintf("#%d", gi+1)
-					}
-					result.add(Error, grokFile, goFile, fmt.Sprintf("%s: param %s type mismatch: .grok=%s, Go=%s", context, paramName, grokType, goType))
-				}
-			}
-			gi++
-		}
-	}
-
-	// Check return types
-	grokReturnCount := 0
-	var grokReturnStr string
-	if grokFunc.ReturnType != nil {
-		grokReturnStr = grokTypeToGoString(*grokFunc.ReturnType)
-		if grokFunc.ReturnType.Kind == grokast.TypeTuple {
-			if grokFunc.ReturnType.Data != nil {
-				tt := grokFunc.ReturnType.Data.(grokast.TupleType)
-				grokReturnCount = len(tt.Fields)
-			}
-		} else if grokFunc.ReturnType.Kind == grokast.TypeUnit {
-			grokReturnCount = 0
-		} else {
-			grokReturnCount = 1
-		}
-	}
-	goReturnCount := len(goFunc.Returns)
-
-	if grokReturnCount != goReturnCount {
-		result.add(Error, grokFile, goFile, fmt.Sprintf("%s: return count mismatch: .grok=%d, Go=%d", context, grokReturnCount, goReturnCount))
-	} else if grokReturnCount == 1 && goReturnCount == 1 {
-		if !typesMatch(grokReturnStr, goFunc.Returns[0]) {
-			result.add(Error, grokFile, goFile, fmt.Sprintf("%s: return type mismatch: .grok=%s, Go=%s", context, grokReturnStr, goFunc.Returns[0]))
-		}
-	} else if grokReturnCount > 1 && grokFunc.ReturnType != nil && grokFunc.ReturnType.Kind == grokast.TypeTuple {
-		// Element-wise comparison for tuple returns
-		tt := grokFunc.ReturnType.Data.(grokast.TupleType)
-		for i, field := range tt.Fields {
-			if i < len(goFunc.Returns) {
-				grokElemStr := grokTypeToGoString(field.Type)
-				if !typesMatch(grokElemStr, goFunc.Returns[i]) {
-					result.add(Error, grokFile, goFile, fmt.Sprintf("%s: return #%d type mismatch: .grok=%s, Go=%s", context, i+1, grokElemStr, goFunc.Returns[i]))
-				}
-			}
-		}
-	}
-}
-
-func toGoMethodName(name string) string {
-	return snakeToPascal(name)
-}
-
-// snakeToPascal converts snake_case to PascalCase.
-func snakeToPascal(s string) string {
-	parts := strings.Split(s, "_")
-	var result strings.Builder
-	for _, p := range parts {
-		if p == "" {
-			continue
-		}
-		result.WriteString(strings.ToUpper(p[:1]))
-		result.WriteString(p[1:])
-	}
-	return result.String()
-}
-
-// snakeToCamel converts snake_case to camelCase.
-func snakeToCamel(s string) string {
-	parts := strings.Split(s, "_")
-	var result strings.Builder
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		if i == 0 {
-			result.WriteString(p)
-		} else {
-			result.WriteString(strings.ToUpper(p[:1]))
-			result.WriteString(p[1:])
-		}
-	}
-	return result.String()
-}
-```
-
-**Tool Result:**
-```
-[ID: tool_81d844dcbb49fecc]
-File: /Users/bill/projects/grok/pkg/verifier/verifier_test.go (170 lines)
-
-package verifier
-
-import (
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-)
-
-func findProjectRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("could not find project root")
-		}
-		dir = parent
-	}
-}
-
-func TestVerifyParserGrok(t *testing.T) {
-	dir := findProjectRoot(t)
-
-	grokFile := filepath.Join(dir, "pkg", "parser", "parser.grok")
-	result, err := Verify(grokFile)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
-	}
-
-	for _, f := range result.Findings {
-		switch f.Severity {
-		case Error:
-			t.Errorf("%s", f)
-		case Warning:
-			t.Logf("%s", f)
-		case Info:
-			t.Logf("%s", f)
-		}
-	}
-}
-
-func TestVerifyAstGrok(t *testing.T) {
-	dir := findProjectRoot(t)
-	grokFile := filepath.Join(dir, "pkg", "ast", "ast.grok")
-	result, err := Verify(grokFile)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
-	}
-	for _, f := range result.Findings {
-		switch f.Severity {
-		case Error:
-			t.Errorf("%s", f)
-		case Warning:
-			t.Logf("%s", f)
-		case Info:
-			t.Logf("%s", f)
-		}
-	}
-}
-
-func TestTypeDriftDetected(t *testing.T) {
-	// Create a temporary Go file and .grok file with deliberate type mismatches
-	dir := t.TempDir()
-
-	// Write a Go source file
-	goSrc := `package example
-
-type Widget struct {
-	Name    string
-	Count   int
-	Tags    []string
-	Options map[string]bool
-}
-
-func NewWidget(name string, count int) *Widget {
-	return &Widget{Name: name, Count: count}
-}
-`
-	goFile := filepath.Join(dir, "widget.go")
-	if err := os.WriteFile(goFile, []byte(goSrc), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write a .grok file with deliberate drift
-	grokSrc := `grok Example {
-  struct Widget {
-    name:    string
-    count:   string
-    tags:    [int]
-    options: map[string]string
-    missing: bool
-  }
-
-  func new_widget(name: string) -> Widget
-
-  source: ["widget.go"]
-}
-`
-	grokFile := filepath.Join(dir, "example.grok")
-	if err := os.WriteFile(grokFile, []byte(grokSrc), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := Verify(grokFile)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
-	}
-
-	// Collect error messages
-	var errors []string
-	for _, f := range result.Findings {
-		if f.Severity == Error {
-			errors = append(errors, f.Message)
-		}
-	}
-
-	// Expected errors:
-	// 1. count type mismatch (string vs int)
-	// 2. tags type mismatch ([]int vs []string)
-	// 3. options type mismatch (map[string]string vs map[string]bool)
-	// 4. missing field not in Go
-	// 5. new_widget param count mismatch (1 vs 2)
-	if len(errors) < 5 {
-		t.Errorf("expected at least 5 errors, got %d:", len(errors))
-		for _, e := range errors {
-			t.Logf("  %s", e)
-		}
-	}
-
-	// Verify specific drift was caught
-	assertContains := func(substr string) {
-		for _, e := range errors {
-			if strings.Contains(e, substr) {
-				return
-			}
-		}
-		t.Errorf("expected error containing %q, not found in: %v", substr, errors)
-	}
-
-	assertContains("count")
-	assertContains("type mismatch")
-	assertContains("missing")
-	assertContains("param count mismatch")
-}
-
-func TestSnakeToPascal(t *testing.T) {
-	tests := []struct {
-		in, want string
-	}{
-		{"name", "Name"},
-		{"type_params", "TypeParams"},
-		{"is_many", "IsMany"},
-		{"return_type", "ReturnType"},
-		{"parse_grok_block", "ParseGrokBlock"},
-	}
-	for _, tt := range tests {
-		got := snakeToPascal(tt.in)
-		if got != tt.want {
-			t.Errorf("snakeToPascal(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
-}
-```
-
-**Tool Result:**
-```
-[ID: tool_efca99c28a24c65d]
-File: /Users/bill/projects/grok/project-design.md (48 lines)
+[ID: tool_d5381818a7a7deab]
+File: /Users/bill/projects/grok/project-design.md (63 lines)
 
 # Grok Project Architecture
 
 ## Executive Summary
 
-The Grok project is a structural integrity engine and language toolchain designed to bridge the gap between high-level architectural design and concrete implementation. It introduces the Grok language, which allows developers to declare the structural and semantic contracts of their systems—such as types, relations, and concurrency constraints—in `.grok` files. The primary goal of the project is to detect "architectural drift" by comparing these declarative models against the actual Go source code implementation. By ensuring that the developer's mental model remains synchronized with the reality of the codebase, Grok acts as a continuous verification system for software architecture.
+The Grok project is a structural integrity engine and language toolchain designed to bridge the gap between high-level architectural design and concrete implementation. It introduces the Grok language, which allows developers to declare the structural and semantic contracts of their systems—such as types, relations, and concurrency constraints—in `.grok` files, as well as full procedural logic in `.gk` files. The primary goal of the project is to detect "architectural drift" by comparing these declarative models against the actual Go source code implementation, acting as a continuous verification system for software architecture. Furthermore, the toolchain supports transpilation, enabling the generation of idiomatic Go code directly from Grok models, and semantic analysis to ensure the soundness of the architectural declarations. By ensuring that the developer's mental model remains synchronized with the reality of the codebase, Grok serves as a comprehensive ecosystem for architectural design, verification, and code generation.
 
 ## System Architecture
 
-The architecture of the Grok project follows a classic compiler frontend pipeline integrated with a static analysis engine. The system is composed of three primary modules: the Abstract Syntax Tree (`ast`), the `parser`, and the `verifier`. The philosophy of the architecture is centered around a single source of truth for the structural model, which is the AST. Data flows linearly from source text into the parser, which constructs the AST. This AST then serves as the foundational data structure for the verifier. The verifier acts as a bridge between two distinct type systems, extracting type information from the target Go source code and performing a deep, recursive comparison against the Grok AST. This decoupled design ensures that the parsing logic is entirely independent of the verification logic, allowing the AST to potentially be used for other tooling, such as code generation or language servers, in the future.
+The architecture of the Grok project follows a classic compiler frontend pipeline integrated with a static analysis engine and a code generation backend. The system is composed of several primary modules: the Abstract Syntax Tree (`ast`), the `parser`, the `checker`, the `transpiler`, and the `verifier`. The philosophy of the architecture is centered around a single source of truth for the structural model, which is the AST. Data flows linearly from source text into the parser, which constructs the AST. This AST then serves as the foundational data structure for all subsequent operations. The checker performs deep semantic analysis and type inference on the AST to ensure correctness. The verifier acts as a bridge between two distinct type systems, extracting type information from the target Go source code and performing a deep, recursive comparison against the Grok AST to detect architectural drift. Alternatively, the transpiler consumes the AST to generate idiomatic Go source code, enabling a forward-engineering workflow. This decoupled design ensures that the parsing logic is entirely independent of the verification, checking, and transpilation logic, allowing the AST to serve as a versatile foundation for a growing suite of tools.
 
 ## Interface & Contract Map
 
 While the Grok project currently relies on concrete data structures rather than abstract Go interfaces for its internal boundaries, the system is defined by several critical contracts that govern module interactions.
 
-The primary structural contract for the entire system is defined by the AST file structure. The parser module acts as the sole producer of this contract, transforming raw source text into a valid syntax tree. The verifier module acts as the primary consumer, traversing this file structure to drive its analysis of the Go source code.
+The primary structural contract for the entire system is defined by the AST file structure. The parser module acts as the sole producer of this contract, transforming raw source text into a valid syntax tree. The checker, transpiler, and verifier modules act as the primary consumers, traversing this file structure to drive their respective analyses and transformations.
 
-Another critical contract is the verification result structure exposed by the verifier module. This structure contains a collection of finding objects, serving as the external contract for any build pipeline, continuous integration system, or integrated development environment that consumes the output of the Grok toolchain.
+Another critical contract is the verification result structure exposed by the verifier module. This structure contains a collection of finding objects, serving as the external contract for any build pipeline, continuous integration system, or integrated development environment that consumes the output of the Grok toolchain. Similarly, the checker produces a collection of semantic errors that serve as a contract for validating the correctness of the Grok source.
 
 Finally, the verifier heavily consumes the Go standard library's abstract syntax tree and parser interfaces to extract type information from the target codebase. In this capacity, the verifier acts as a client to the Go compiler's frontend, relying on these external interfaces to build its internal representation of the implementation's reality.
 
 ## Module Map
 
+- **Root Module**
+  - [grok](design.md)
 - **Core Data Structures**
   - [pkg/ast](pkg/ast/design.md)
 - **Frontend Toolchain**
   - [pkg/parser](pkg/parser/design.md)
-- **Analysis Engine**
+  - [pkg/checker](pkg/checker/design.md)
+- **Code Generation & Analysis**
+  - [pkg/transpiler](pkg/transpiler/design.md)
   - [pkg/verifier](pkg/verifier/design.md)
 
+### Grok Root Module
+The root module serves as the primary demonstration and testing ground for the Grok structural integrity engine. It contains sample Go implementations that provide a concrete target for the Grok verifier, illustrating how Go source code is structured and how it can be mapped to architectural declarations in `.grok` files. It manages no internal state and acts as a passive data source for the analysis engine, showcasing basic types, recursive functions, and structural patterns that the verifier is designed to analyze.
+
 ### AST Module
-The `ast` module is the foundational data model for the Grok language. It defines the Abstract Syntax Tree, capturing the hierarchical structure of `.grok` files, including blocks, type declarations, functions, and complex relations. A critical aspect of its design is the use of a tagged union pattern for type expressions, allowing for a flexible and recursive representation of Grok's rich type system. It manages no internal state, serving purely as a collection of data structures. It implements no external interfaces but provides the core types consumed by the parser and verifier.
+The `ast` module is the foundational data model for the Grok language. It defines the Abstract Syntax Tree, capturing the hierarchical structure of `.grok` and `.gk` files, including blocks, type declarations, functions, complex relations, and procedural logic. A critical aspect of its design is the use of a tagged union pattern for type expressions and statements, allowing for a flexible and recursive representation of Grok's rich type system and execution flow. It manages no internal state, serving purely as a collection of data structures. It implements no external interfaces but provides the core types consumed by the parser, checker, transpiler, and verifier.
 
 ### Parser Module
-The `parser` module is responsible for lexical and syntactic analysis, transforming raw Grok source code into the structured AST. It employs a two-phase architecture with a hand-written, stateful lexer and a recursive descent parser. The lexer manages state to handle complex tokens like triple-quoted strings and significant newlines, while the parser manages the state of the token stream, occasionally using lookahead and state restoration to resolve ambiguities. The parser consumes raw text and produces the `ast.File` contract.
+The `parser` module is responsible for lexical and syntactic analysis, transforming raw Grok source code into the structured AST. It employs a two-phase architecture with a hand-written, stateful lexer and a hybrid parser that combines recursive descent for declarations with Pratt parsing for expressions. The lexer manages state to handle complex tokens like triple-quoted strings and significant newlines, while the parser manages the state of the token stream, occasionally using lookahead and state restoration to resolve ambiguities. The parser consumes raw text and produces the `ast.File` contract.
+
+### Checker Module
+The `checker` module provides the semantic analysis engine for the Grok language, focusing on type checking and type inference. It traverses the AST produced by the parser, maintaining a stateful environment that tracks the types of all declared entities and the current lexical scope. It verifies that variables are used consistently, function calls provide correct arguments, and complex expressions resolve to valid types. The checker consumes the `ast.File` contract and produces a collection of semantic errors, acting as the final gatekeeper before architectural verification or code generation.
+
+### Transpiler Module
+The `transpiler` module is responsible for converting a Grok AST into idiomatic Go source code. It follows a visitor-like pattern, recursively traversing the AST and emitting Go source code that maps Grok's high-level constructs, such as enums with variants and cascade statements, to Go's language primitives. The transpiler maintains minimal state, primarily tracking the current indentation level and target package name within an internal buffer. It consumes the `ast.File` contract and produces a string containing the generated Go source, enabling a forward-engineering workflow from Grok models to Go implementations.
 
 ### Verifier Module
-The `verifier` module is the structural integrity engine that detects architectural drift. It manages a complex internal state during execution, specifically the `goTypeInfo` map, which aggregates all structs, interfaces, and functions extracted from the target Go source code. The verifier consumes the `ast.File` contract produced by the parser and the Go AST produced by the standard library. It bridges the gap between these two models by normalizing naming conventions and type expressions, ultimately producing a structured `Result` containing any detected discrepancies.
+The `verifier` module is the structural integrity engine that detects architectural drift. It manages a complex internal state during execution, specifically aggregating all structs, interfaces, and functions extracted from the target Go source code. The verifier consumes the `ast.File` contract produced by the parser and the Go AST produced by the standard library. It bridges the gap between these two models by normalizing naming conventions and type expressions, ultimately producing a structured result containing any detected discrepancies.
 
 ## Integration Patterns & Workflows
 
 The most critical cross-module workflow is the end-to-end verification process. When a user invokes the verifier on a `.grok` file, the workflow begins in the `verifier` module, which immediately delegates to the `parser` module. The `parser` instantiates its lexer, tokenizes the source, and constructs an `ast.File` tree, returning it to the verifier. The verifier then inspects the source annotations within the AST to locate the corresponding Go files. It invokes the Go standard library parser to build a Go AST and extracts the relevant type information into its internal state. Finally, the verifier recursively traverses the Grok AST, comparing each declaration against the extracted Go types, normalizing names and types on the fly, and accumulating findings into a final result.
 
-A complex micro-workflow occurs during the structural comparison phase. When the verifier encounters a Grok type expression, it must compare this against a Go type. The verifier traverses the Grok type expression AST node, recursively building a normalized Go string representation. It simultaneously applies naming convention transformations, converting Grok's snake case identifiers to Go's Pascal case or camel case, ensuring that the conceptual model accurately maps to the idiomatic implementation.
+Another complex workflow is the semantic checking and type inference pipeline. After the parser generates the AST, the `checker` module takes over to ensure semantic soundness. The checker performs a first pass over the AST to register all top-level declarations into its internal registry, allowing for forward references. It then performs a deep recursive traversal of all expressions and statements, managing a stack of lexical scopes. When it encounters a variable declaration with an implicit type, it evaluates the initializer expression, infers the type, and binds it to the variable in the current scope. This workflow ensures that the AST is not only syntactically correct but also semantically valid before it is passed to the transpiler or verifier.
+
+The transpilation workflow represents the forward-engineering path of the Grok toolchain. Once the AST is parsed and optionally checked for semantic correctness, the `transpiler` module is invoked. The transpiler iterates through the blocks in the AST file, recursively visiting declarations, statements, and expressions. It performs a sophisticated mapping between Grok's rich type system and Go's simpler primitives, such as converting Grok enums into Go interface-based patterns and Grok cascade statements into Go defer blocks. The transpiler accumulates the generated Go source code in an internal buffer and returns the final string, providing a seamless transition from architectural design to concrete implementation.
 
 ## Dependency Overview
 
-The dependency graph of the Grok project is strictly layered and unidirectional, preventing circular dependencies and ensuring a clean separation of concerns. At the base of the graph is the `ast` module, which is a leaf package depending only on the Go standard library. The `parser` module sits above the `ast`, depending on it to construct the syntax tree. At the top of the hierarchy is the `verifier` module, which depends on both the `parser` to read `.grok` files and the `ast` to traverse the resulting model. The verifier also introduces a heavy dependency on the Go standard library's `go/ast` and `go/parser` packages. This layered architecture constrains the flow of information: the AST has no knowledge of how it is parsed, and the parser has no knowledge of how the AST will be verified.
+The dependency graph of the Grok project is strictly layered and unidirectional, preventing circular dependencies and ensuring a clean separation of concerns. At the base of the graph is the `ast` module, which is a leaf package depending only on the Go standard library. The `parser` module sits above the `ast`, depending on it to construct the syntax tree. The `checker`, `transpiler`, and `verifier` modules all sit at the top of the hierarchy, depending on the `ast` to traverse the data model. The `checker` and `transpiler` operate directly on the AST, while the `verifier` also introduces a heavy dependency on the Go standard library's `go/ast` and `go/parser` packages to analyze the target implementation. Furthermore, the testing suites for the checker and verifier rely on the parser to generate the necessary ASTs for their integration tests. This layered architecture constrains the flow of information: the AST has no knowledge of how it is parsed, and the parser has no knowledge of how the AST will be checked, transpiled, or verified.
 ```
 
 ---
@@ -1306,7 +255,7 @@ The dependency graph of the Grok project is strictly layered and unidirectional,
 **Tool Call: `read_file`**
 ```json
 {
-  "file_path": "pkg/verifier/verifier.grok"
+  "file_path": "pkg/transpiler/transpiler.go"
 }
 ```
 
@@ -1316,55 +265,1056 @@ The dependency graph of the Grok project is strictly layered and unidirectional,
 
 **Tool Result:**
 ```
-[ID: tool_b74ee0945967a137]
-File: /Users/bill/projects/grok/pkg/verifier/verifier.grok (48 lines)
+[ID: tool_9717b2ff5a5b7b07]
+File: /Users/bill/projects/grok/pkg/transpiler/transpiler.go (738 lines)
 
-// verifier.grok — the Grok verifier's own understanding
+// Package transpiler converts a type-checked Grok AST into Go source code.
+package transpiler
 
-grok Verifier {
-  why: "Compares .grok understanding files against Go source code, reporting structural drift."
+import (
+	"fmt"
+	"strings"
 
-  doc "Architecture": """
-    Parse .grok file → AST (via pkg/parser). For each source: annotation,
-    parse the Go file(s) with go/ast. Aggregate all Go types, then compare
-    structurally: structs, classes, enums, interfaces, functions.
-    Deep type comparison: field types, param counts, return types.
-    Package-prefix stripping for cross-package type references.
-  """
+	"github.com/waywardgeek/grok/pkg/ast"
+)
 
-  doc "Key Decisions": """
-    Aggregate all source files before comparing (not per-file).
-    Three severity levels: Error (missing/wrong type), Warning (extra fields), Info (undocumented Go methods).
-    Enums check for typedef, struct, and interface forms in Go.
-    Classes map to Go structs with methods; ctor params checked as fields.
-    Grok T? maps to Go *T; Go zero-value optionals (string) should be string not string?.
-  """
+// Transpiler converts Grok AST to Go source.
+type Transpiler struct {
+	buf    strings.Builder
+	indent int
+	pkg    string // Go package name
+}
 
-  // ---- Severity ----
+// New creates a transpiler targeting the given Go package name.
+func New(pkg string) *Transpiler {
+	return &Transpiler{pkg: pkg}
+}
 
-  enum Severity { Error Warning Info }
+// Transpile converts an AST file to Go source code.
+func (t *Transpiler) Transpile(file *ast.File) string {
+	t.buf.Reset()
+	t.writef("package %s\n", t.pkg)
 
-  // ---- Findings ----
+	for _, block := range file.Blocks {
+		t.transpileBlock(&block)
+	}
+	return t.buf.String()
+}
 
-  struct Finding {
-    Severity: Severity
-    GrokFile: string
-    GoFile:   string
-    Message:  string
-  }
+func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
+	for i := range block.Structs {
+		t.writef("\n")
+		t.transpileStruct(&block.Structs[i])
+	}
+	for i := range block.Enums {
+		t.writef("\n")
+		t.transpileEnum(&block.Enums[i])
+	}
+	for i := range block.Classes {
+		t.writef("\n")
+		t.transpileClass(&block.Classes[i])
+	}
+	for i := range block.Functions {
+		t.writef("\n")
+		t.transpileFunc(&block.Functions[i], "")
+	}
+}
 
-  class Result() {
-    Findings: [Finding]
+// --- Type transpilation ---
 
-    func ErrorCount(self) -> int
-  }
+func (t *Transpiler) goType(te *ast.TypeExpr) string {
+	if te == nil {
+		return ""
+	}
+	switch te.Kind {
+	case ast.TypeNamed:
+		nt := te.Data.(ast.NamedType)
+		return t.goNamedType(nt.Name, nt.Args)
+	case ast.TypeOptional:
+		ot := te.Data.(ast.OptionalType)
+		inner := t.goType(&ot.Inner)
+		return "*" + inner
+	case ast.TypeSequence:
+		st := te.Data.(ast.SequenceType)
+		return "[]" + t.goType(&st.Elem)
+	case ast.TypeMap:
+		mt := te.Data.(ast.MapType)
+		return fmt.Sprintf("map[%s]%s", t.goType(&mt.Key), t.goType(&mt.Value))
+	case ast.TypeTuple:
+		// Go doesn't have tuples — generate a struct or use multiple returns
+		tt := te.Data.(ast.TupleType)
+		if len(tt.Fields) == 0 {
+			return "struct{}"
+		}
+		// For return types, caller handles multiple returns
+		parts := make([]string, len(tt.Fields))
+		for i, f := range tt.Fields {
+			parts[i] = t.goType(&f.Type)
+		}
+		return "(" + strings.Join(parts, ", ") + ")"
+	case ast.TypeFunc:
+		ft := te.Data.(ast.FuncType)
+		params := make([]string, len(ft.Params))
+		for i := range ft.Params {
+			params[i] = t.goType(&ft.Params[i])
+		}
+		ret := t.goType(&ft.Return)
+		if ret == "" || ret == "struct{}" {
+			return fmt.Sprintf("func(%s)", strings.Join(params, ", "))
+		}
+		return fmt.Sprintf("func(%s) %s", strings.Join(params, ", "), ret)
+	case ast.TypeChannel:
+		ct := te.Data.(ast.ChannelType)
+		return fmt.Sprintf("chan %s", t.goType(&ct.Elem))
+	case ast.TypeLock:
+		return "sync.Mutex"
+	case ast.TypeUnit:
+		return ""
+	default:
+		return "any"
+	}
+}
 
-  // ---- Public API ----
+func (t *Transpiler) goNamedType(name string, args []ast.TypeExpr) string {
+	goName := grokPrimitiveToGo(name)
+	if len(args) == 0 {
+		return goName
+	}
+	// Generic: Type[A, B]
+	typeArgs := make([]string, len(args))
+	for i := range args {
+		typeArgs[i] = t.goType(&args[i])
+	}
+	return fmt.Sprintf("%s[%s]", goName, strings.Join(typeArgs, ", "))
+}
 
-  func Verify(grokPath: string) -> (Result?, error)
-    why: "Entry point. Parses .grok, finds source files, compares structurally."
+func grokPrimitiveToGo(name string) string {
+	switch name {
+	case "i8":
+		return "int8"
+	case "i16":
+		return "int16"
+	case "i32":
+		return "int32"
+	case "i64":
+		return "int64"
+	case "i128", "i256":
+		return "int64" // Go doesn't have i128/i256; needs big.Int in practice
+	case "u8":
+		return "uint8"
+	case "u16":
+		return "uint16"
+	case "u32":
+		return "uint32"
+	case "u64":
+		return "uint64"
+	case "u128", "u256":
+		return "uint64"
+	case "f32":
+		return "float32"
+	case "f64":
+		return "float64"
+	case "f128":
+		return "float64" // Go doesn't have f128
+	case "int":
+		return "int"
+	case "uint":
+		return "uint"
+	case "float":
+		return "float64"
+	case "bool":
+		return "bool"
+	case "string":
+		return "string"
+	case "any":
+		return "any"
+	default:
+		return name // user-defined type
+	}
+}
 
-  source: ["verifier.go"]
+// --- Declarations ---
+
+func (t *Transpiler) transpileStruct(s *ast.StructDecl) {
+	name := exportName(s.Name)
+	typeParams := t.typeParamList(s.TypeParams)
+	t.writef("type %s%s struct {\n", name, typeParams)
+	t.indent++
+	for _, f := range s.Fields {
+		t.writeIndent()
+		t.writef("%s %s\n", exportName(f.Name), t.goType(&f.Type))
+	}
+	t.indent--
+	t.writef("}\n")
+}
+
+func (t *Transpiler) transpileClass(cls *ast.ClassDecl) {
+	name := exportName(cls.Name)
+	typeParams := t.typeParamList(cls.TypeParams)
+
+	// Struct with fields (including ctor params as fields)
+	t.writef("type %s%s struct {\n", name, typeParams)
+	t.indent++
+	for _, p := range cls.CtorParams {
+		t.writeIndent()
+		t.writef("%s %s\n", exportName(p.Name), t.goType(&p.Type))
+	}
+	for _, f := range cls.Fields {
+		t.writeIndent()
+		t.writef("%s %s\n", exportName(f.Name), t.goType(&f.Type))
+	}
+	t.indent--
+	t.writef("}\n")
+
+	// Constructor
+	if len(cls.CtorParams) > 0 {
+		t.writef("\nfunc New%s(", name)
+		for i, p := range cls.CtorParams {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.writef("%s %s", p.Name, t.goType(&p.Type))
+		}
+		t.writef(") *%s {\n", name)
+		t.indent++
+		t.writeIndent()
+		t.writef("return &%s{\n", name)
+		t.indent++
+		for _, p := range cls.CtorParams {
+			t.writeIndent()
+			t.writef("%s: %s,\n", exportName(p.Name), p.Name)
+		}
+		t.indent--
+		t.writeIndent()
+		t.writef("}\n")
+		t.indent--
+		t.writef("}\n")
+	}
+
+	// Methods
+	for i := range cls.Methods {
+		t.writef("\n")
+		t.transpileFunc(&cls.Methods[i], name)
+	}
+}
+
+func (t *Transpiler) transpileEnum(e *ast.EnumDecl) {
+	name := exportName(e.Name)
+
+	// Interface for the enum
+	t.writef("type %s interface {\n", name)
+	t.indent++
+	t.writeIndent()
+	t.writef("is%s()\n", name)
+	t.indent--
+	t.writef("}\n")
+
+	// Variant structs
+	for _, v := range e.Variants {
+		vName := fmt.Sprintf("%s%s", name, exportName(v.Name))
+		if len(v.Fields) == 0 {
+			t.writef("\ntype %s struct{}\n", vName)
+		} else {
+			t.writef("\ntype %s struct {\n", vName)
+			t.indent++
+			for i, f := range v.Fields {
+				t.writeIndent()
+				fieldName := f.Name
+				if fieldName == "" {
+					fieldName = fmt.Sprintf("V%d", i)
+				}
+				t.writef("%s %s\n", exportName(fieldName), t.goType(&f.Type))
+			}
+			t.indent--
+			t.writef("}\n")
+		}
+		t.writef("\nfunc (%s) is%s() {}\n", vName, name)
+	}
+}
+
+func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
+	t.writeIndent()
+	t.writef("func ")
+
+	// Receiver
+	if receiver != "" {
+		// Find if any param is self/mut self
+		recvName := "r"
+		for _, p := range fn.Params {
+			if p.IsSelf {
+				if p.Name != "" && p.Name != "self" {
+					recvName = p.Name
+				}
+				break
+			}
+		}
+		t.writef("(%s *%s) ", recvName, receiver)
+	}
+
+	t.writef("%s(", exportName(fn.Name))
+
+	// Parameters (skip self)
+	first := true
+	for _, p := range fn.Params {
+		if p.IsSelf {
+			continue
+		}
+		if !first {
+			t.writef(", ")
+		}
+		t.writef("%s %s", p.Name, t.goType(&p.Type))
+		first = false
+	}
+	t.writef(")")
+
+	// Return type
+	if fn.ReturnType != nil {
+		ret := t.goType(fn.ReturnType)
+		if ret != "" {
+			t.writef(" %s", ret)
+		}
+	}
+
+	// Body
+	if fn.Body != nil {
+		t.writef(" {\n")
+		t.indent++
+		t.transpileStmts(fn.Body.Stmts)
+		t.indent--
+		t.writeIndent()
+		t.writef("}\n")
+	} else {
+		t.writef("\n")
+	}
+}
+
+// --- Statements ---
+
+func (t *Transpiler) transpileStmts(stmts []ast.Stmt) {
+	for i := range stmts {
+		t.transpileStmt(&stmts[i])
+	}
+}
+
+func (t *Transpiler) transpileStmt(stmt *ast.Stmt) {
+	switch stmt.Kind {
+	case ast.StmtVarDecl:
+		t.transpileVarDecl(stmt)
+	case ast.StmtAssign:
+		t.transpileAssign(stmt)
+	case ast.StmtReturn:
+		t.transpileReturn(stmt)
+	case ast.StmtExpr:
+		es := stmt.Data.(*ast.ExprStmt)
+		t.writeIndent()
+		t.transpileExpr(&es.Expr)
+		t.writef("\n")
+	case ast.StmtIf:
+		t.transpileIf(stmt)
+	case ast.StmtFor:
+		t.transpileFor(stmt)
+	case ast.StmtWhile:
+		t.transpileWhile(stmt)
+	case ast.StmtMatch:
+		t.transpileMatch(stmt)
+	case ast.StmtBlock:
+		blk := stmt.Data.(*ast.Block)
+		t.writeIndent()
+		t.writef("{\n")
+		t.indent++
+		t.transpileStmts(blk.Stmts)
+		t.indent--
+		t.writeIndent()
+		t.writef("}\n")
+	case ast.StmtCascade:
+		cs := stmt.Data.(*ast.CascadeStmt)
+		// cascade → defer func() { ... }()
+		t.writeIndent()
+		t.writef("defer func() {\n")
+		t.indent++
+		t.transpileStmts(cs.Body.Stmts)
+		t.indent--
+		t.writeIndent()
+		t.writef("}()\n")
+	case ast.StmtBreak:
+		t.writeIndent()
+		t.writef("break\n")
+	case ast.StmtContinue:
+		t.writeIndent()
+		t.writef("continue\n")
+	}
+}
+
+func (t *Transpiler) transpileVarDecl(stmt *ast.Stmt) {
+	decl := stmt.Data.(*ast.VarDeclStmt)
+	t.writeIndent()
+	if decl.Value != nil {
+		if decl.Type != nil {
+			t.writef("var %s %s = ", decl.Name, t.goType(decl.Type))
+			t.transpileExpr(decl.Value)
+		} else if decl.Name == "_" {
+			t.writef("_ = ")
+			t.transpileExpr(decl.Value)
+		} else {
+			t.writef("%s := ", decl.Name)
+			t.transpileExpr(decl.Value)
+		}
+	} else if decl.Type != nil {
+		t.writef("var %s %s", decl.Name, t.goType(decl.Type))
+	}
+	t.writef("\n")
+}
+
+func (t *Transpiler) transpileAssign(stmt *ast.Stmt) {
+	assign := stmt.Data.(*ast.AssignStmt)
+	t.writeIndent()
+	t.transpileExpr(&assign.Target)
+	t.writef(" = ")
+	t.transpileExpr(&assign.Value)
+	t.writef("\n")
+}
+
+func (t *Transpiler) transpileReturn(stmt *ast.Stmt) {
+	ret := stmt.Data.(*ast.ReturnStmt)
+	t.writeIndent()
+	if ret.Value != nil {
+		t.writef("return ")
+		t.transpileExpr(ret.Value)
+		t.writef("\n")
+	} else {
+		t.writef("return\n")
+	}
+}
+
+func (t *Transpiler) transpileIf(stmt *ast.Stmt) {
+	ifStmt := stmt.Data.(*ast.IfStmt)
+	t.writeIndent()
+	t.writef("if ")
+	t.transpileExpr(&ifStmt.Condition)
+	t.writef(" {\n")
+	t.indent++
+	t.transpileStmts(ifStmt.Then.Stmts)
+	t.indent--
+	for _, elif := range ifStmt.ElseIfs {
+		t.writeIndent()
+		t.writef("} else if ")
+		t.transpileExpr(&elif.Condition)
+		t.writef(" {\n")
+		t.indent++
+		t.transpileStmts(elif.Body.Stmts)
+		t.indent--
+	}
+	if ifStmt.Else != nil {
+		t.writeIndent()
+		t.writef("} else {\n")
+		t.indent++
+		t.transpileStmts(ifStmt.Else.Stmts)
+		t.indent--
+	}
+	t.writeIndent()
+	t.writef("}\n")
+}
+
+func (t *Transpiler) transpileFor(stmt *ast.Stmt) {
+	forStmt := stmt.Data.(*ast.ForStmt)
+	t.writeIndent()
+	t.writef("for _, %s := range ", forStmt.Var)
+	t.transpileExpr(&forStmt.Collection)
+	t.writef(" {\n")
+	t.indent++
+	t.transpileStmts(forStmt.Body.Stmts)
+	t.indent--
+	t.writeIndent()
+	t.writef("}\n")
+}
+
+func (t *Transpiler) transpileWhile(stmt *ast.Stmt) {
+	whileStmt := stmt.Data.(*ast.WhileStmt)
+	t.writeIndent()
+	t.writef("for ")
+	t.transpileExpr(&whileStmt.Condition)
+	t.writef(" {\n")
+	t.indent++
+	t.transpileStmts(whileStmt.Body.Stmts)
+	t.indent--
+	t.writeIndent()
+	t.writef("}\n")
+}
+
+func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
+	matchStmt := stmt.Data.(*ast.MatchStmt)
+	t.writeIndent()
+	t.writef("switch ")
+	t.transpileExpr(&matchStmt.Value)
+	t.writef(" {\n")
+	for _, arm := range matchStmt.Arms {
+		t.writeIndent()
+		t.writef("case ")
+		t.transpilePattern(&arm.Pattern)
+		t.writef(":\n")
+		t.indent++
+		t.transpileStmts(arm.Body.Stmts)
+		t.indent--
+	}
+	t.writeIndent()
+	t.writef("}\n")
+}
+
+// --- Expressions ---
+
+func (t *Transpiler) transpileExpr(expr *ast.Expr) {
+	switch expr.Kind {
+	case ast.ExprIntLit:
+		lit := expr.Data.(*ast.IntLitExpr)
+		t.writef("%s", lit.Value)
+	case ast.ExprFloatLit:
+		lit := expr.Data.(*ast.FloatLitExpr)
+		t.writef("%s", lit.Value)
+	case ast.ExprStringLit:
+		lit := expr.Data.(*ast.StringLitExpr)
+		t.writef("%q", lit.Value)
+	case ast.ExprBoolLit:
+		lit := expr.Data.(*ast.BoolLitExpr)
+		if lit.Value {
+			t.writef("true")
+		} else {
+			t.writef("false")
+		}
+	case ast.ExprNil:
+		t.writef("nil")
+	case ast.ExprIdent:
+		id := expr.Data.(*ast.IdentExpr)
+		t.writef("%s", id.Name)
+	case ast.ExprUnary:
+		u := expr.Data.(*ast.UnaryExpr)
+		switch u.Op {
+		case ast.OpNeg:
+			t.writef("-")
+		case ast.OpNot:
+			t.writef("!")
+		}
+		t.transpileExpr(&u.Operand)
+	case ast.ExprBinary:
+		t.transpileBinary(expr)
+	case ast.ExprCall:
+		call := expr.Data.(*ast.CallExpr)
+		t.transpileExpr(&call.Func)
+		t.writef("(")
+		for i := range call.Args {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpileExpr(&call.Args[i])
+		}
+		t.writef(")")
+	case ast.ExprMethodCall:
+		mc := expr.Data.(*ast.MethodCallExpr)
+		t.transpileExpr(&mc.Receiver)
+		t.writef(".%s(", exportName(mc.Method))
+		for i := range mc.Args {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpileExpr(&mc.Args[i])
+		}
+		t.writef(")")
+	case ast.ExprFieldAccess:
+		fa := expr.Data.(*ast.FieldAccessExpr)
+		t.transpileExpr(&fa.Receiver)
+		t.writef(".%s", exportName(fa.Field))
+	case ast.ExprIndex:
+		idx := expr.Data.(*ast.IndexExpr)
+		t.transpileExpr(&idx.Receiver)
+		t.writef("[")
+		t.transpileExpr(&idx.Index)
+		t.writef("]")
+	case ast.ExprListLit:
+		lit := expr.Data.(*ast.ListLitExpr)
+		// Without type context we emit []any{...}
+		t.writef("[]any{")
+		for i := range lit.Elems {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpileExpr(&lit.Elems[i])
+		}
+		t.writef("}")
+	case ast.ExprTupleLit:
+		// Go doesn't have tuples — emit as struct literal or just group
+		lit := expr.Data.(*ast.TupleLitExpr)
+		// For now, emit as a function-style grouping (works for returns)
+		for i := range lit.Elems {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpileExpr(&lit.Elems[i])
+		}
+	case ast.ExprMapLit:
+		lit := expr.Data.(*ast.MapLitExpr)
+		t.writef("map[any]any{")
+		for i, e := range lit.Entries {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpileExpr(&e.Key)
+			t.writef(": ")
+			t.transpileExpr(&e.Value)
+		}
+		t.writef("}")
+	case ast.ExprLambda:
+		lam := expr.Data.(*ast.LambdaExpr)
+		t.writef("func(")
+		for i, p := range lam.Params {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.writef("%s %s", p.Name, t.goType(&p.Type))
+		}
+		t.writef(")")
+		if lam.ReturnType != nil {
+			ret := t.goType(lam.ReturnType)
+			if ret != "" {
+				t.writef(" %s", ret)
+			}
+		}
+		t.writef(" {\n")
+		t.indent++
+		if lam.Body != nil {
+			t.transpileStmts(lam.Body.Stmts)
+		}
+		t.indent--
+		t.writeIndent()
+		t.writef("}")
+	case ast.ExprMatch:
+		// match-as-expression is harder in Go; emit a comment
+		t.writef("/* match expr */ nil")
+	}
+}
+
+func (t *Transpiler) transpileBinary(expr *ast.Expr) {
+	b := expr.Data.(*ast.BinaryExpr)
+	t.transpileExpr(&b.Left)
+	t.writef(" %s ", binaryOpString(b.Op))
+	t.transpileExpr(&b.Right)
+}
+
+func binaryOpString(op ast.BinaryOp) string {
+	switch op {
+	case ast.OpAdd:
+		return "+"
+	case ast.OpSub:
+		return "-"
+	case ast.OpMul:
+		return "*"
+	case ast.OpDiv:
+		return "/"
+	case ast.OpMod:
+		return "%"
+	case ast.OpEq:
+		return "=="
+	case ast.OpNeq:
+		return "!="
+	case ast.OpLt:
+		return "<"
+	case ast.OpLe:
+		return "<="
+	case ast.OpGt:
+		return ">"
+	case ast.OpGe:
+		return ">="
+	case ast.OpAnd:
+		return "&&"
+	case ast.OpOr:
+		return "||"
+	case ast.OpBitAnd:
+		return "&"
+	case ast.OpBitOr:
+		return "|"
+	case ast.OpBitXor:
+		return "^"
+	case ast.OpShl:
+		return "<<"
+	case ast.OpShr:
+		return ">>"
+	default:
+		return "?"
+	}
+}
+
+// --- Patterns ---
+
+func (t *Transpiler) transpilePattern(pat *ast.Pattern) {
+	switch pat.Kind {
+	case ast.PatIdent:
+		id := pat.Data.(*ast.IdentPattern)
+		t.writef("%s", id.Name)
+	case ast.PatLiteral:
+		lit := pat.Data.(*ast.LiteralPattern)
+		t.transpileExpr(&lit.Expr)
+	case ast.PatWildcard:
+		t.writef("default")
+	case ast.PatVariant:
+		vp := pat.Data.(*ast.VariantPattern)
+		t.writef("%s", vp.Name)
+	case ast.PatTuple:
+		tp := pat.Data.(*ast.TuplePattern)
+		for i := range tp.Elems {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.transpilePattern(&tp.Elems[i])
+		}
+	}
+}
+
+// --- Helpers ---
+
+func (t *Transpiler) writef(format string, args ...any) {
+	fmt.Fprintf(&t.buf, format, args...)
+}
+
+func (t *Transpiler) writeIndent() {
+	for i := 0; i < t.indent; i++ {
+		t.buf.WriteString("\t")
+	}
+}
+
+func (t *Transpiler) typeParamList(params []ast.TypeParam) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, len(params))
+	for i, p := range params {
+		if p.Constraint != "" {
+			parts[i] = fmt.Sprintf("%s %s", p.Name, p.Constraint)
+		} else {
+			parts[i] = fmt.Sprintf("%s any", p.Name)
+		}
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// exportName capitalizes the first letter for Go export.
+func exportName(name string) string {
+	if name == "" {
+		return ""
+	}
+	// Already capitalized
+	if name[0] >= 'A' && name[0] <= 'Z' {
+		return name
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
+}
+```
+
+---
+
+### ASSISTANT (gemini)
+
+**Tool Call: `read_file`**
+```json
+{
+  "file_path": "pkg/transpiler/transpiler_test.go"
+}
+```
+
+---
+
+### USER (gemini)
+
+**Tool Result:**
+```
+[ID: tool_7d7bf14d95247fee]
+File: /Users/bill/projects/grok/pkg/transpiler/transpiler_test.go (290 lines)
+
+package transpiler
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/waywardgeek/grok/pkg/ast"
+)
+
+func TestTranspileStruct(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Structs: []ast.StructDecl{{
+				Name: "Point",
+				Fields: []ast.Field{
+					{Name: "X", Type: namedType("f64")},
+					{Name: "Y", Type: namedType("f64")},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "type Point struct {")
+	assertContains(t, got, "X float64")
+	assertContains(t, got, "Y float64")
+}
+
+func TestTranspileEnum(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Enums: []ast.EnumDecl{{
+				Name: "Option",
+				Variants: []ast.EnumVariant{
+					{Name: "Some", Fields: []ast.TupleField{{Type: namedType("string")}}},
+					{Name: "None"},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "type Option interface {")
+	assertContains(t, got, "isOption()")
+	assertContains(t, got, "type OptionSome struct {")
+	assertContains(t, got, "type OptionNone struct{}")
+	assertContains(t, got, "func (OptionSome) isOption() {}")
+	assertContains(t, got, "func (OptionNone) isOption() {}")
+}
+
+func TestTranspileClass(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Classes: []ast.ClassDecl{{
+				Name: "Stack",
+				CtorParams: []ast.Param{
+					{Name: "capacity", Type: namedType("i32")},
+				},
+				Fields: []ast.Field{
+					{Name: "Items", Type: seqType("string")},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "type Stack struct {")
+	assertContains(t, got, "Capacity int32")
+	assertContains(t, got, "Items []string")
+	assertContains(t, got, "func NewStack(capacity int32) *Stack {")
+}
+
+func TestTranspileFunction(t *testing.T) {
+	retType := namedType("i32")
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Add",
+				Params: []ast.Param{
+					{Name: "a", Type: namedType("i32")},
+					{Name: "b", Type: namedType("i32")},
+				},
+				ReturnType: &retType,
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtReturn, Data: &ast.ReturnStmt{
+							Value: &ast.Expr{Kind: ast.ExprBinary, Data: &ast.BinaryExpr{
+								Left:  ast.Expr{Kind: ast.ExprIdent, Data: &ast.IdentExpr{Name: "a"}},
+								Op:    ast.OpAdd,
+								Right: ast.Expr{Kind: ast.ExprIdent, Data: &ast.IdentExpr{Name: "b"}},
+							}},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "func Add(a int32, b int32) int32 {")
+	assertContains(t, got, "return a + b")
+}
+
+func TestTranspileVarDecl(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtVarDecl, Data: &ast.VarDeclStmt{
+							Name:  "x",
+							Value: &ast.Expr{Kind: ast.ExprIntLit, Data: &ast.IntLitExpr{Value: "42"}},
+						}},
+						{Kind: ast.StmtVarDecl, Data: &ast.VarDeclStmt{
+							Name: "y",
+							Type: &ast.TypeExpr{Kind: ast.TypeNamed, Data: ast.NamedType{Name: "string"}},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "x := 42")
+	assertContains(t, got, "var y string")
+}
+
+func TestTranspileIfElse(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtIf, Data: &ast.IfStmt{
+							Condition: ast.Expr{Kind: ast.ExprBoolLit, Data: &ast.BoolLitExpr{Value: true}},
+							Then:      ast.Block{Stmts: []ast.Stmt{{Kind: ast.StmtBreak}}},
+							Else:      &ast.Block{Stmts: []ast.Stmt{{Kind: ast.StmtContinue}}},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "if true {")
+	assertContains(t, got, "break")
+	assertContains(t, got, "} else {")
+	assertContains(t, got, "continue")
+}
+
+func TestTranspileForLoop(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtFor, Data: &ast.ForStmt{
+							Var:        "item",
+							Collection: ast.Expr{Kind: ast.ExprIdent, Data: &ast.IdentExpr{Name: "items"}},
+							Body:       ast.Block{},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "for _, item := range items {")
+}
+
+func TestTranspileWhile(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtWhile, Data: &ast.WhileStmt{
+							Condition: ast.Expr{Kind: ast.ExprBoolLit, Data: &ast.BoolLitExpr{Value: true}},
+							Body:      ast.Block{},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "for true {")
+}
+
+func TestTranspileCascade(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtCascade, Data: &ast.CascadeStmt{
+							Body: ast.Block{Stmts: []ast.Stmt{{Kind: ast.StmtBreak}}},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "defer func() {")
+}
+
+func TestTranspileOptionalType(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Structs: []ast.StructDecl{{
+				Name: "Foo",
+				Fields: []ast.Field{
+					{Name: "Val", Type: ast.TypeExpr{Kind: ast.TypeOptional, Data: ast.OptionalType{Inner: namedType("string")}}},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "Val *string")
+}
+
+func TestTranspileMethodCall(t *testing.T) {
+	file := &ast.File{
+		Blocks: []ast.GrokBlock{{
+			Functions: []ast.FuncDecl{{
+				Name: "Test",
+				Body: &ast.Block{
+					Stmts: []ast.Stmt{
+						{Kind: ast.StmtExpr, Data: &ast.ExprStmt{
+							Expr: ast.Expr{Kind: ast.ExprMethodCall, Data: &ast.MethodCallExpr{
+								Receiver: ast.Expr{Kind: ast.ExprIdent, Data: &ast.IdentExpr{Name: "s"}},
+								Method:   "Push",
+								Args: []ast.Expr{
+									{Kind: ast.ExprIntLit, Data: &ast.IntLitExpr{Value: "5"}},
+								},
+							}},
+						}},
+					},
+				},
+			}},
+		}},
+	}
+	tr := New("main")
+	got := tr.Transpile(file)
+	assertContains(t, got, "s.Push(5)")
+}
+
+func TestExportName(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"foo", "Foo"},
+		{"Foo", "Foo"},
+		{"x", "X"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		if got := exportName(tc.in); got != tc.want {
+			t.Errorf("exportName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// Helpers
+
+func namedType(name string) ast.TypeExpr {
+	return ast.TypeExpr{Kind: ast.TypeNamed, Data: ast.NamedType{Name: name}}
+}
+
+func seqType(elem string) ast.TypeExpr {
+	return ast.TypeExpr{Kind: ast.TypeSequence, Data: ast.SequenceType{Elem: namedType(elem)}}
+}
+
+func assertContains(t *testing.T, got, want string) {
+	t.Helper()
+	if !strings.Contains(got, want) {
+		t.Errorf("output does not contain %q\n\ngot:\n%s", want, got)
+	}
 }
 ```
 
@@ -1375,8 +1325,8 @@ grok Verifier {
 **Tool Call: `write_file`**
 ```json
 {
-  "content": "# Verifier Module Design\n\n## Executive Summary\n\nThe `verifier` module serves as the structural integrity engine of the Grok system, acting as the bridge between high-level architectural declarations and concrete implementation. Its primary mission is to detect \"architectural drift\"—the inevitable divergence that occurs as a codebase evolves away from its original design. By performing a deep, recursive comparison between the Abstract Syntax Tree (AST) of a `.grok` specification and the AST of the corresponding Go source code, the verifier ensures that the developer's mental model remains synchronized with reality. It identifies mismatches in types, field names, function signatures, and interface implementations, reporting them as errors, warnings, or informational findings depending on their impact on system integrity.\n\n## File Inventory\n\n- [verifier.go](verifier.go): The primary implementation file containing the core verification logic, Go source analysis, and type normalization routines.\n- [verifier_test.go](verifier_test.go): The test suite for the module, featuring integration tests that run the verifier against the project's own `.grok` files and unit tests for naming convention transformations.\n- [verifier.grok](verifier.grok): The self-documenting Grok specification for the verifier module, defining its own structural contracts and architectural intent.\n\n## Architecture and Data Flow\n\nThe verifier operates as a multi-stage analysis pipeline that translates between two distinct type systems. The process is linear and stateless between calls, though it maintains significant internal state during a single verification run.\n\nThe workflow begins with **Grok Parsing**, where the module utilizes [pkg/parser](../parser/design.md) to transform a target `.grok` file into a [pkg/ast](../ast/design.md) representation. Once the Grok AST is available, the verifier enters the **Go Source Discovery** phase, inspecting the `source:` annotations within each `grok` block to identify the relevant Go files or directories.\n\nThe core of the analysis happens during **Go Type Extraction**. The verifier leverages the Go standard library's `go/parser` and `go/ast` packages to parse the identified source code. It traverses the resulting Go AST to populate an internal `goTypeInfo` structure, which serves as a comprehensive registry of all structs, interfaces, functions, and type definitions found across the specified sources. This aggregation allows the verifier to resolve types that may be spread across multiple files within the same package.\n\nFinally, the module performs a **Structural Comparison**. It recursively walks the Grok AST, comparing each declaration against the aggregated Go type information. This phase involves complex normalization, mapping Grok's snake_case identifiers to Go's PascalCase or camelCase conventions and converting Grok's recursive type expressions into a format compatible with Go's type system. Discrepancies are accumulated into a `Result` object containing a list of `Finding` records.\n\n## Interface Implementations\n\nThe `verifier` module does not implement any external interfaces defined within the Grok project. Instead, it acts as a high-level consumer of the [pkg/parser](../parser/design.md) and [pkg/ast](../ast/design.md) contracts. It also functions as a client to the Go standard library's AST interfaces, specifically consuming `*ast.File` and `*ast.GenDecl` nodes to build its internal model of the implementation.\n\n## Public API\n\nThe public API is centered around a single, powerful entry point designed for integration into developer workflows and CI/CD pipelines.\n\n- **Verify(grokPath string) (*Result, error)**: This is the primary \"front door\" of the module. It accepts a path to a `.grok` file, orchestrates the entire parsing and comparison pipeline, and returns a `Result` object. It handles file I/O and coordinates the interaction between the Grok parser and the Go source analyzer.\n- **Result**: A container for the findings of a verification run. It provides an `ErrorCount()` method, allowing callers to quickly determine if any critical architectural drift was detected that should fail a build.\n- **Finding**: A detailed record of a single discrepancy. Each finding includes a `Severity` (Error, Warning, or Info), the paths to the involved files, and a descriptive message explaining the nature of the drift.\n- **Severity**: An enumeration that classifies the impact of a finding. `Error` indicates a fundamental mismatch (e.g., a missing type or wrong field type), `Warning` indicates minor drift (e.g., extra fields in Go not documented in Grok), and `Info` provides context (e.g., additional methods in Go that are omitted from the Grok interface).\n\n## Implementation Details\n\n### Go Type Extraction\n\nThe extraction process is handled by `extractGoTypes`, which performs a deep traversal of the Go AST. It populates the `goTypeInfo` structure, which is the central repository of implementation facts.\n- **Structs**: The verifier captures field names and their types as strings. It also associates methods with their respective structs by inspecting function receivers.\n- **Interfaces**: It extracts method signatures, including parameter types and return values, to ensure full interface compliance.\n- **Functions**: Top-level functions are captured with their full signatures.\n- **Type Definitions**: Simple type aliases (e.g., `type MyInt int`) are tracked to allow the verifier to recognize them as valid types even if they don't have complex internal structure.\n\n### Type Mapping and Comparison\n\nBridging the gap between Grok and Go requires sophisticated normalization logic:\n- **Naming Conventions**: The `snakeToPascal` and `snakeToCamel` functions are used to match Grok's idiomatic snake_case identifiers to Go's PascalCase (for exported fields/methods) or camelCase (for unexported ones).\n- **Type Normalization**: The `grokTypeToGoString` function recursively converts Grok `TypeExpr` nodes into their Go string equivalents. For example, it maps Grok's optional types (`T?`) to Go pointers (`*T`) and Grok sequences (`[T]`) to Go slices (`[]T`).\n- **Fuzzy Matching**: The `typesMatch` function handles nuances such as the equivalence of `any` and `interface{}`. Crucially, it implements `stripPackagePrefix`, which allows the verifier to match unqualified types in Grok (e.g., `File`) to qualified types in Go (e.g., `ast.File`), facilitating cross-package verification.\n\n### Verification Logic\n\nThe verification logic is partitioned by declaration type, each with its own specific rules:\n- **Structs and Classes**: The verifier checks for field existence and type compatibility. It also identifies \"extra\" fields in the Go implementation that are missing from the Grok declaration, reporting them as warnings to encourage complete documentation. For classes, it additionally verifies that constructor parameters correspond to struct fields.\n- **Interfaces**: It ensures that every method declared in the Grok interface exists in the Go implementation with a matching signature.\n- **Functions**: It performs positional comparison of parameters and return types. It specifically handles Grok's `self` parameter in class methods, excluding it from the positional count when comparing against Go's receiver-based methods.\n\n## Dependencies\n\n- [pkg/ast](../ast/design.md): Provides the foundational data structures for representing the Grok language.\n- [pkg/parser](../parser/design.md): Used to transform Grok source text into the AST consumed by the verifier.\n- **Go Standard Library**: The verifier depends heavily on `go/ast`, `go/parser`, and `go/token` for its analysis of the Go implementation.\n\n## Technical Debt and Future Work\n\n- **Expression Verification**: The current implementation focuses on structural types. Future work should include verifying the `requires` and `ensures` contracts by parsing and analyzing the expressions within those blocks.\n- **Pointer Nuances**: While the verifier handles basic optional-to-pointer mapping, more robust handling of pointer vs. value receivers and complex indirection would reduce false positives in edge cases.\n- **Import Resolution**: The current `stripPackagePrefix` approach is a heuristic. A more robust system would resolve imports to ensure that a Grok type `File` actually refers to the same `ast.File` being used in the Go code.\n- **Performance Optimization**: For large projects, the verifier currently re-parses Go files for every `grok` block. Implementing a cache for parsed Go type information would significantly improve performance in large-scale applications.\n",
-  "file_path": "pkg/verifier/design.md"
+  "content": "# Transpiler Module Design\n\n## Executive Summary\n\nThe `transpiler` module is the forward-engineering engine of the Grok toolchain, responsible for converting a Grok Abstract Syntax Tree (AST) into idiomatic Go source code. While the `verifier` module ensures that existing Go code adheres to a Grok specification, the `transpiler` enables a model-driven workflow where developers can generate Go implementation skeletons or full procedural logic directly from Grok models. It bridges the semantic gap between Grok's high-level constructs—such as enums with variants, classes with constructors, and cascade statements—and Go's language primitives. The transpiler is designed to produce clean, readable, and compilable Go code that follows standard Go naming conventions, specifically ensuring that all generated types and fields are exported.\n\n## File Inventory\n\n- [transpiler.go](transpiler.go): The core implementation of the transpiler, containing the recursive logic for traversing the Grok AST and emitting Go source code into an internal buffer.\n- [transpiler_test.go](transpiler_test.go): A comprehensive suite of unit tests that verify the correct translation of various Grok constructs, including structs, enums, classes, and complex control flow, into their Go equivalents.\n\n## Architecture and Data Flow\n\nThe transpiler is architected as a stateful visitor that performs a single-pass traversal of the Grok AST. It is centered around the `Transpiler` struct, which manages an internal `strings.Builder` for code accumulation and an integer to track the current indentation level. The process begins when the `Transpile` method is called with an `ast.File`.\n\nThe data flow within the module is strictly linear and recursive:\n1.  **Initialization**: A `Transpiler` instance is initialized with a target Go package name.\n2.  **Package Declaration**: The transpiler emits the `package` header using the provided package name.\n3.  **Top-Level Traversal**: The transpiler iterates through the blocks in the `ast.File`, delegating the processing of structs, enums, classes, and functions to specialized methods.\n4.  **Recursive Emission**: Each declaration method recursively visits its constituent parts—such as fields, parameters, and bodies—emitting the corresponding Go syntax. Statements and expressions are handled by a deep recursive descent that mirrors the structure of the AST.\n5.  **Indentation Management**: The transpiler manually manages indentation by incrementing and decrementing its internal counter when entering and exiting blocks, ensuring the generated code is properly formatted.\n6.  **Output Generation**: Once the entire AST has been traversed, the accumulated content in the `strings.Builder` is returned as a single string.\n\n## Interface Implementations\n\nThe `transpiler` module does not currently implement any external interfaces defined in other packages. It provides a concrete `Transpiler` type that serves as a standalone tool for AST-to-Go transformation.\n\n## Public API\n\nThe public API of the `transpiler` module is designed for simplicity and ease of integration:\n\n- **`New(pkg string) *Transpiler`**: This constructor creates a new transpiler instance. The `pkg` argument is critical as it defines the name of the Go package header for the generated file.\n- **`Transpiler.Transpile(file *ast.File) string`**: This is the primary entry point for code generation. It resets the internal buffer, processes the provided AST file, and returns the resulting Go source code.\n\nIt is important to note that the `Transpiler` struct is not thread-safe for concurrent calls to `Transpile` on the same instance due to its shared internal buffer. However, the module is designed such that multiple `Transpiler` instances can be used concurrently across different goroutines.\n\n## Implementation Details\n\nThe transpiler performs a sophisticated mapping between Grok's rich, expressive type system and Go's more minimalist primitives.\n\n### Type Mapping and Primitives\nGrok's primitive types are mapped to their closest Go equivalents. For instance, `i32` becomes `int32`, `f64` becomes `float64`, and `bool` remains `bool`. For types like `i128` or `f128` that lack direct Go equivalents, the transpiler currently uses `int64` or `float64` as placeholders, with the expectation that a more robust implementation might eventually use `math/big`.\n\nComplex Grok types are handled through specific structural patterns:\n- **Optional Types**: `Option[T]` is transpiled to a Go pointer `*T`.\n- **Sequence Types**: `Seq[T]` is converted to a Go slice `[]T`.\n- **Map Types**: `Map[K, V]` becomes a standard Go `map[K]V`.\n- **Tuple Types**: These are transpiled as multiple return values in function signatures or as anonymous structs in other contexts.\n- **Function and Channel Types**: These map directly to Go's `func` and `chan` types.\n- **Lock Types**: These are mapped to `sync.Mutex`.\n\n### Declarations and Structural Patterns\nThe transpiler ensures that all generated types and fields are exported by automatically capitalizing their names using the `exportName` helper.\n\n- **Structs**: These are transpiled directly to Go structs. The transpiler also supports Go's generics by emitting type parameters and constraints (defaulting to `any` if no constraint is specified).\n- **Enums**: Since Go does not have native sum types, the transpiler uses an interface-based pattern. It generates an interface with a private marker method (e.g., `isStatus()`) and then creates a struct for each variant that implements this interface.\n- **Classes**: Grok classes are transpiled into a Go struct that combines constructor parameters and class fields. The transpiler generates a `New\u003cClassName\u003e` function to serve as the constructor and converts class methods into Go methods with a pointer receiver. It intelligently handles `self` and `mut self` parameters to determine the receiver name.\n- **Functions**: These are emitted as standard Go functions, with the transpiler handling the recursive generation of their parameter lists, return types, and statement bodies.\n\n### Statements and Expressions\nThe transpiler supports a wide array of procedural logic. Variable declarations use `:=` for type inference when a value is provided without an explicit type, or `var` when a type is specified. Control flow constructs like `if`, `for` (range-based), and `while` (emitted as `for` in Go) are mapped to their Go equivalents.\n\nA significant translation is the **Cascade Statement**, which is transpiled into a Go `defer` block. This preserves the semantic intent of ensuring a block of code executes at the end of the current scope. **Match Statements** are transpiled into Go `switch` statements, though the current implementation focuses on basic value switching rather than complex pattern destructuring.\n\n## Dependencies\n\nThe `transpiler` module has a single internal dependency:\n\n- **[pkg/ast](../ast/design.md)**: The transpiler is a heavy consumer of the `ast` module, relying on its data structures to represent the source model it is transforming.\n\nThe module also depends on the Go standard library, specifically `fmt` for formatted output and `strings` for buffer management and string manipulation.\n\n## Technical Debt and Future Work\n\n- **Import Management**: The transpiler does not currently track or emit necessary Go imports (e.g., `import \"sync\"` for `Lock` types). This requires a post-processing step like `goimports` or manual intervention.\n- **Match Expression Support**: While `match` statements are supported, `match` used as an expression is not yet implemented and currently emits a placeholder comment.\n- **Complex Pattern Matching**: The transpilation of patterns in `match` statements is currently limited to identifiers, literals, and basic variants; it does not yet support deep destructuring.\n- **Large Number Support**: Robust handling for `i128`, `u128`, and `f128` using `math/big` is a planned improvement.\n- **Error Handling**: The transpiler assumes it is operating on a valid, type-checked AST. It does not perform its own semantic validation or provide detailed error reporting for unsupported constructs.\n",
+  "file_path": "pkg/transpiler/design.md"
 }
 ```
 
@@ -1388,10 +1338,10 @@ grok Verifier {
 ```
 ✅ **File Created Successfully**
 
-**File**: `/Users/bill/projects/grok/pkg/verifier/design.md`
-**Size**: 8635 bytes
+**File**: `/Users/bill/projects/grok/pkg/transpiler/design.md`
+**Size**: 8159 bytes
 **Permissions**: -rw-r--r--
-**Lines**: 72
+**Lines**: 80
 **Duration**: 0.00s
 ```
 

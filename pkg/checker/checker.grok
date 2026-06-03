@@ -1,0 +1,179 @@
+// checker.grok — the Grok type checker's own understanding
+
+grok Checker {
+  why: "Semantic analysis pass. Infers types, validates expressions and statements, and catches type errors before code generation. Sits between parsing and transpilation in the pipeline: parser produces untyped AST, checker annotates and validates it, transpiler consumes the validated result."
+
+  doc "Architecture": """
+    The checker performs a single forward pass over the AST:
+
+    1. Registration Phase: walks all structs, classes, enums, and top-level functions
+       in each GrokBlock, registering them into a type Registry. This makes all
+       user-defined types available before checking function bodies — forward
+       references work naturally.
+
+    2. Checking Phase: walks function bodies (statements and expressions),
+       performing type inference and validation. Each expression returns its
+       inferred *Type; each statement is checked for type consistency.
+
+    State is maintained in three structures:
+    - Scope: lexical variable bindings (nested push/pop for blocks)
+    - Registry: named type definitions (structs, classes, enums, functions)
+    - Checker.errors: accumulated CheckError list
+  """
+
+  doc "Type Representation": """
+    The internal type system is a recursive struct with Kind discriminator:
+
+    Primitive kinds: TyInt, TyUint, TyFloat (with Bits for width), TyBool, TyString.
+    Composite kinds: TyList (Elem), TyMap (Key, Val), TyTuple (Fields), TyOptional
+    (Elem), TyChannel (Elem), TyStruct/TyClass/TyEnum (Name + Fields for member
+    access), TyFunc (Params, Returns, Name).
+    Special: TyUnit (no value), TyAny (top type), TyTypeVar (for future generics).
+
+    Type equality is structural via Equal(): two types match if Kind, Bits, Name,
+    and recursive sub-types all match. IsNumeric() and IsInteger() helpers simplify
+    arithmetic checking.
+  """
+
+  doc "Type Inference": """
+    Variable types are inferred from initializers: `let x = 42` infers i32 (default
+    integer type), `let s = "hello"` infers string. When an explicit type annotation
+    is present, the initializer type is checked against it.
+
+    Integer literals default to i32, float literals to f64. The checker doesn't yet
+    perform numeric coercion — `let x: i64 = 42` would technically fail because
+    the literal infers i32. This is a known limitation.
+
+    For-loop element inference: `for x in collection` infers x's type from the
+    collection's Elem type (list → element, map → key).
+  """
+
+  doc "Expression Checking": """
+    checkExpr dispatches on ExprKind:
+    - Literals: return their natural type (IntLit → i32, FloatLit → f64, etc.)
+    - Idents: scope lookup
+    - Binary: validates operand types match and operator is valid for the type
+      (arithmetic for numerics, comparison returns bool, logical for bools,
+      equality for any matching pair, bitwise for integers, shifts for integers)
+    - Unary: neg requires numeric, not requires bool
+    - Call: looks up function in scope/registry, checks arg count and types
+    - Method call: resolves receiver type, finds method, checks args
+    - Field access: resolves receiver type, finds field by name
+    - Index: validates receiver is list/map/string, returns element type
+    - List/tuple/map literals: check element types for homogeneity (lists) or
+      key/value consistency (maps)
+  """
+
+  doc "Statement Checking": """
+    checkStmt dispatches on StmtKind:
+    - VarDecl: infer or check type, define in current scope
+    - Assign: check target is defined, check value type matches
+    - Return: check value type (no return-type checking against function sig yet)
+    - If/ElseIf: check condition is bool, check body blocks
+    - For: resolve collection element type, bind loop var, check body
+    - While: check condition is bool, check body
+    - Match: check match value, check each arm body
+    - Block: push scope, check stmts, pop scope
+    - Cascade/Expr: check inner expression(s)
+  """
+
+  doc "Known Limitations": """
+    - Return type checking: doesn't verify return expressions match the function's
+      declared return type (needs function context propagation)
+    - Generic type instantiation: TypeVar exists but no constraint solving
+    - Mutability: let vs let mut parsed but not enforced
+    - Pattern variable binding: match arm patterns don't bind variables in scope
+    - Numeric coercion: i32 literal doesn't auto-widen to i64
+    - Loop depth tracking: break/continue validity not checked
+    - No error recovery: first error stops checking that branch
+  """
+
+  // ---- Type system ----
+
+  enum TypeKind {
+    TyInt TyUint TyFloat TyBool TyString TyUnit TyAny
+    TyList TyMap TyTuple TyOptional TyChannel
+    TyStruct TyClass TyEnum TyFunc TyTypeVar
+  }
+
+  struct Type {
+    why: "Recursive type representation. Kind discriminates; sub-fields used per kind."
+    Kind:    TypeKind
+    Bits:    int          // for TyInt/TyUint/TyFloat
+    Name:    string       // for TyStruct/TyClass/TyEnum/TyFunc/TyTypeVar
+    Elem:    Type?        // for TyList/TyOptional/TyChannel
+    Key:     Type?        // for TyMap
+    Val:     Type?        // for TyMap
+    Params:  [Type?]      // for TyFunc
+    Return:  Type?        // for TyFunc
+    Fields:  [TypeField]  // for TyStruct/TyClass
+  }
+
+  struct TypeField {
+    Name: string
+    Type: Type?
+  }
+
+  // ---- Scope ----
+
+  class Scope(parent: Scope?) {
+    why: "Lexical scope with nested lookup. Push for block entry, pop on exit."
+    vars: map[string]Type?
+
+    func Define(mut self, name: string, typ: Type?)
+    func Lookup(self, name: string) -> Type?
+      why: "Walks parent chain until found or nil."
+  }
+
+  // ---- Type registry ----
+
+  struct TypeInfo {
+    Type:    Type?
+    Fields:  map[string]Type?
+    Methods: map[string]Type?
+  }
+
+  class Registry() {
+    why: "Named type definitions. Structs, classes, enums, and functions registered during the first pass."
+    types: map[string]TypeInfo?
+
+    func Register(mut self, name: string, info: TypeInfo?)
+    func Lookup(self, name: string) -> TypeInfo?
+  }
+
+  // ---- Error reporting ----
+
+  struct CheckError {
+    why: "Implements Go error interface. Includes Span for source location."
+    Span:    Span
+    Message: string
+  }
+
+  // ---- Checker ----
+
+  class Checker() {
+    why: "Stateful checker. Call CheckFile to validate an entire AST."
+    scope:    Scope?
+    registry: Registry?
+    errors:   [error]
+
+    func CheckFile(mut self, file: File?)
+      why: "Primary entry point. Registers all types, then checks all function bodies."
+
+    func Errors(self) -> [error]
+  }
+
+  // ---- Convenience constructors ----
+
+  func New() -> Checker?
+    why: "Creates a Checker with fresh scope and registry."
+
+  func IntType(bits: int) -> Type?
+  func UintType(bits: int) -> Type?
+  func FloatType(bits: int) -> Type?
+  func ListType(elem: Type?) -> Type?
+  func MapType(key: Type?, val: Type?) -> Type?
+  func OptionalType(elem: Type?) -> Type?
+
+  source: ["checker.go"]
+}

@@ -19,41 +19,53 @@ grok Verifier {
 
     Critical design choice: aggregate ALL source files before comparing (not per-file).
     A grok block's types may span multiple Go files within the same package.
+
+    Source paths are resolved relative to the .grok file's directory — Verify()
+    takes only the .grok path; no baseDir parameter needed.
   """
 
-  doc "Type Mapping and Comparison": """
-    Bridging Grok to Go requires sophisticated normalization:
+  doc "Deep Type Comparison": """
+    The core of drift detection. grokTypeToGoString() recursively converts Grok
+    TypeExpr nodes into Go type string format for comparison:
 
-    Name mapping (three-way): snakeToPascal (exported Go fields/methods),
-    snakeToCamel (unexported), and exact match. The verifier tries all three
-    when matching field/method names.
-
-    Type normalization via grokTypeToGoString(): recursively converts Grok TypeExpr
-    nodes into Go type string equivalents:
-      T?        → *T         (optional = pointer)
-      [T]       → []T        (sequence = slice)
-      map[K]V   → map[K]V    (direct)
-      (T, U)    → (T, U)     (tuple = multi-return)
-      any       ≡ interface{} (Go 1.18+ equivalence)
+      T?          → *T            (optional = pointer)
+      [T]         → []T           (sequence = slice)
+      map[K]V     → map[K]V       (direct)
+      (T, U)      → (T, U)        (tuple = multi-return)
+      any         ≡ interface{}    (Go 1.18+ equivalence)
 
     Package-prefix stripping is recursive: *ast.File → *File, []ast.Node → []Node,
     map[string]*ast.File → map[string]*File. This allows .grok files to use
     unqualified type names while Go source uses cross-package references.
 
-    typesMatch() returns true for unconvertible "?" types (graceful fallback —
-    don't report false positives for types the converter can't handle).
+    typesMatch() is the final comparison gate. If either side contains "?" (an
+    unconvertible type), it returns true (graceful fallback — don't report false
+    positives for types the converter can't handle).
+  """
+
+  doc "Name Mapping": """
+    Three-way name normalization bridges Grok naming to Go conventions:
+
+    - snakeToPascal: foo_bar → FooBar (exported Go fields/methods/types)
+    - snakeToCamel: foo_bar → fooBar (unexported Go identifiers)
+    - Exact match: when names already align
+
+    The verifier tries all three when matching field and method names against Go
+    source. This allows .grok files to use either convention and still match.
+
+    Grok primitive names map to Go via grokNameToGo():
+      i32 → int32, f64 → float64, u8 → uint8, etc.
   """
 
   doc "Verification Rules": """
-    Partitioned by declaration type, each with specific rules:
+    Partitioned by declaration type, each with specific checks:
 
-    Structs: check field existence and type compatibility. Extra Go fields not in
-    .grok are warnings (encourage documentation). Missing .grok fields are errors.
+    Structs: field existence + field type comparison. Extra Go fields not in .grok
+    are warnings. Missing .grok fields in Go are errors.
 
     Classes: same as structs, plus constructor params checked as fields, plus
-    method signature verification (param count, positional type matching).
-    Grok's `self` param is excluded from positional count when comparing against
-    Go's receiver-based methods.
+    method signature verification — param count (positional, excluding self),
+    positional param type matching, return count + element-wise return type matching.
 
     Interfaces: every method in Grok interface must exist in Go with matching
     signature (params + returns).
@@ -65,22 +77,24 @@ grok Verifier {
   """
 
   doc "Severity Levels": """
-    Error:   fundamental mismatch — missing type, wrong field type, signature mismatch.
-             These should fail a build/CI.
+    Error:   fundamental mismatch — missing type, wrong field type, param count
+             mismatch, return type mismatch. These should fail CI.
     Warning: minor drift — extra Go fields not documented in .grok, constructor
              parameter mismatches. Encourages completeness.
-    Info:    context — additional Go methods not in .grok interface. Expected and
-             correct for .grok files that capture cross-file public concepts only.
+    Info:    context — additional Go methods not in .grok interface. Expected for
+             .grok files that capture cross-file public concepts only.
   """
 
   doc "Technical Debt": """
-    - Expression verification: requires/ensures are raw strings, not parsed expressions
-    - Pointer nuances: basic T? → *T works but complex indirection causes false positives
-    - Import resolution: stripPackagePrefix is heuristic — doesn't verify that Grok's
-      File actually refers to the same ast.File used in Go code
-    - Performance: re-parses Go files for every grok block — needs cache for large projects
-    - func types: map[string]func(...) can't be expressed in Grok (typed as any, causes
-      known false-positive errors)
+    - Expression verification: requires/ensures are raw strings, not parsed
+    - Complex pointer indirection: basic T? → *T works but nested cases may
+      cause false positives
+    - Import resolution: stripPackagePrefix is heuristic — doesn't verify cross-
+      package identity
+    - Performance: re-parses Go files for every grok block — needs cache for large
+      projects
+    - func types: map[string]func(...) can't be expressed in Grok (typed as any,
+      causes known false-positive errors)
   """
 
   // ---- Severity ----
