@@ -44,8 +44,9 @@ grok Transpiler {
 
     Structs: struct fields with exportName() capitalization. Type parameters emitted.
 
-    Classes: emit struct (ctor params + fields), NewX() constructor returning
-    pointer, and pointer-receiver methods. Class struct literals emit with &
+    Classes: emit struct (ctor params + fields), and pointer-receiver methods.
+    Class constructor calls (ClassName<T>(...)) emit as &ClassName[T]{Field: val}
+    using classCtorFields map for field names. Class struct literals emit with &
     prefix (pointer) since methods use pointer receivers. The receiver name
     defaults to "r". The selfName field tracks the current receiver name so
     `self` in expressions emits the correct Go name. Type parameters emitted.
@@ -177,6 +178,8 @@ grok Transpiler {
       why: "Maps variant name → {enumName, fieldNames}. Enables variant constructor calls to emit struct literals."
     unitVariants:      map[string]string
       why: "Maps unit variant name → enum name. Enables identifier refs to emit ShapeEmpty{} instead of Empty."
+    classCtorFields:   map[string][string]
+      why: "Maps class name → constructor parameter names. Enables ClassName<T>() calls to emit &ClassName[T]{Field: val} struct literals."
     autoImports:       map[string]bool
       why: "Auto-detected import requirements. Populated during body transpilation (e.g. 'fmt' for Sprintf, 'cmp' for Ordered), merged with user imports in header. Two-pass: body first (discovers imports), then package+imports."
 

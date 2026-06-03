@@ -21,7 +21,8 @@ grok Checker {
 
        Classes: registerClass pushes a temporary scope, registers TypeParams as
        TyVar in that scope so field/method types can reference the type parameters,
-       then pops after registration.
+       then pops after registration. Also defines the class name in scope as a
+       TyFunc constructor (ctor params → class type) so ClassName() calls type-check.
 
     2. Checking Phase: walks function bodies (statements and expressions),
        performing type inference and validation. Each expression returns its
@@ -100,9 +101,12 @@ grok Checker {
     gets i64 not i32).
 
     Integer literals default to i32, float literals to f64. Numeric widening:
-    same-sign integers and floats widen to larger bit widths. No cross-kind coercion
-    (int→float requires explicit cast). No narrowing. Widening applies in
-    assignments, returns, function arguments, binary arithmetic, and comparisons.
+    same-sign integers and floats widen to larger bit widths. Platform int (Bits:-1,
+    from len/append) is compatible with any same-kind integer and dominates in
+    coercion. No cross-kind coercion (int→float requires explicit cast). No narrowing.
+    Widening applies in assignments, returns, function arguments, binary arithmetic,
+    and comparisons. In binary ops, coerced type is propagated to literal operands
+    (not variables) so the transpiler emits correct Go types.
 
     For-loop element inference: `for x in collection` infers x's type from the
     collection's Elem type (list → element, map → key).
