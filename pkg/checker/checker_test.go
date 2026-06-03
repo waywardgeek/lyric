@@ -370,3 +370,79 @@ func TestTypeString(t *testing.T) {
 		}
 	}
 }
+
+
+func TestStructLiteralTypeCheck(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		struct Point {
+			X: f64
+			Y: f64
+		}
+		func test() {
+			let p = Point{X: 3.0, Y: 4.0}
+			let _ = p
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestStructLiteralBadField(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		struct Point {
+			X: f64
+			Y: f64
+		}
+		func test() {
+			let p = Point{X: 3.0, Z: 4.0}
+			let _ = p
+		}
+	}`)
+	expectErrors(t, c, 1) // no field Z
+}
+
+func TestReturnTypeCheck(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func add(x: i32, y: i32) -> i32 {
+			return x + y
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestReturnTypeMismatch(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func bad() -> i32 {
+			return true
+		}
+	}`)
+	expectErrors(t, c, 1) // return bool, expected i32
+}
+
+func TestMissingReturnValue(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func bad() -> i32 {
+			return
+		}
+	}`)
+	expectErrors(t, c, 1) // missing return value
+}
+
+func TestMutabilityEnforcement(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func test() {
+			let x: i32 = 1
+			x = 2
+		}
+	}`)
+	expectErrors(t, c, 1) // immutable variable
+}
+
+func TestMutabilityAllowed(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func test() {
+			let mut x: i32 = 1
+			x = 2
+		}
+	}`)
+	expectNoErrors(t, c)
+}

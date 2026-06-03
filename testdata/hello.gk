@@ -17,6 +17,8 @@ grok hello {
 
     func Main() {
         let _ = Factorial(5)
+        let p = Point{X: 3.0, Y: 4.0}
+        let _ = Abs(p)
         let mut i: i32 = 0
         while i < 10 {
             i = i + 1

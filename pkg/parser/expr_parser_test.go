@@ -388,3 +388,46 @@ func TestExistingGrokStillWorks(t *testing.T) {
 		t.Error("expected nil body for .grok func")
 	}
 }
+
+
+func TestStructLiteral(t *testing.T) {
+	fn := parseFuncBody(t, `func test() {
+		let p = Point{X: 3.0, Y: 4.0}
+		let _ = p
+	}`)
+	if fn.Body == nil || len(fn.Body.Stmts) < 1 {
+		t.Fatal("expected at least 1 statement")
+	}
+	decl := fn.Body.Stmts[0].Data.(*ast.VarDeclStmt)
+	if decl.Value == nil {
+		t.Fatal("expected initializer")
+	}
+	if decl.Value.Kind != ast.ExprStructLit {
+		t.Fatalf("expected ExprStructLit, got %v", decl.Value.Kind)
+	}
+	sl := decl.Value.Data.(*ast.StructLitExpr)
+	if sl.TypeName != "Point" {
+		t.Errorf("expected type name Point, got %s", sl.TypeName)
+	}
+	if len(sl.Fields) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(sl.Fields))
+	}
+	if sl.Fields[0].Name != "X" || sl.Fields[1].Name != "Y" {
+		t.Errorf("unexpected field names: %s, %s", sl.Fields[0].Name, sl.Fields[1].Name)
+	}
+}
+
+func TestEmptyStructLiteral(t *testing.T) {
+	fn := parseFuncBody(t, `func test() {
+		let p = Empty{}
+		let _ = p
+	}`)
+	decl := fn.Body.Stmts[0].Data.(*ast.VarDeclStmt)
+	sl := decl.Value.Data.(*ast.StructLitExpr)
+	if sl.TypeName != "Empty" {
+		t.Errorf("expected Empty, got %s", sl.TypeName)
+	}
+	if len(sl.Fields) != 0 {
+		t.Errorf("expected 0 fields, got %d", len(sl.Fields))
+	}
+}

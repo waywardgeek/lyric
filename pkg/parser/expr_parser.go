@@ -288,6 +288,11 @@ func (p *Parser) parsePrimaryExpr() (*ast.Expr, error) {
 		if tok.Text == "map" && p.peek().Kind == TLBracket {
 			return p.parseMapLit(tok)
 		}
+		// Check for struct literal: TypeName{Field: value, ...}
+		// Disambiguate from block by checking for Ident: pattern inside braces
+		if p.peek().Kind == TLBrace && p.isStructLitAhead() {
+			return p.parseStructLit(tok)
+		}
 		return &ast.Expr{
 			Kind: ast.ExprIdent,
 			Data: &ast.IdentExpr{Name: tok.Text},
@@ -851,5 +856,61 @@ func (p *Parser) parseExprOrAssign() (*ast.Stmt, error) {
 		Kind: ast.StmtExpr,
 		Data: &ast.ExprStmt{Expr: *expr},
 		Span: ast.Span{Start: start, End: expr.Span.End},
+	}, nil
+}
+
+// isStructLitAhead peeks past { to see if the first content is Ident: (field initializer).
+// An empty {} is also treated as a struct literal.
+func (p *Parser) isStructLitAhead() bool {
+	// Save lexer state for lookahead
+	saved := *p.lex
+	p.next() // consume {
+	p.skipNewlines()
+	result := false
+	if p.peek().Kind == TRBrace {
+		// Empty struct literal: TypeName{}
+		result = true
+	} else if p.peek().Kind == TIdent {
+		// Check for FieldName:
+		p.next()
+		if p.peek().Kind == TColon {
+			result = true
+		}
+	}
+	*p.lex = saved // restore
+	return result
+}
+
+func (p *Parser) parseStructLit(nameTok Token) (*ast.Expr, error) {
+	p.next() // consume {
+	var fields []ast.StructLitField
+	p.skipNewlines()
+	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
+		fieldName := p.peek()
+		if fieldName.Kind != TIdent {
+			return nil, fmt.Errorf("%v: expected field name in struct literal, got %s", fieldName.Span.Start, fieldName.Text)
+		}
+		p.next()
+		if _, err := p.expect(TColon); err != nil {
+			return nil, err
+		}
+		val, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, ast.StructLitField{Name: fieldName.Text, Value: *val})
+		if p.peek().Kind == TComma {
+			p.next()
+		}
+		p.skipNewlines()
+	}
+	end, err := p.expect(TRBrace)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.Expr{
+		Kind: ast.ExprStructLit,
+		Data: &ast.StructLitExpr{TypeName: nameTok.Text, Fields: fields},
+		Span: ast.Span{Start: nameTok.Span.Start, End: end.Span.End},
 	}, nil
 }

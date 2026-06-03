@@ -18,6 +18,8 @@ func Abs(p Point) float64 {
 
 func Main() {
 	_ = Factorial(5)
+	p := Point{X: 3.0, Y: 4.0}
+	_ = Abs(p)
 	var i int32 = 0
 	for i < 10 {
 		i = i + 1

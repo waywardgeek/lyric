@@ -23,6 +23,7 @@ const (
 	ExprMapLit                    // map[K]V{k1: v1, k2: v2}
 	ExprLambda                    // (x: T) -> x + 1
 	ExprMatch                     // match value { ... } as expression
+	ExprStructLit                 // Point{X: 3.0, Y: 4.0}
 )
 
 // Expr is any expression node.
@@ -131,6 +132,16 @@ type MapEntry struct {
 
 type MapLitExpr struct {
 	Entries []MapEntry
+}
+
+type StructLitField struct {
+	Name  string
+	Value Expr
+}
+
+type StructLitExpr struct {
+	TypeName string
+	Fields   []StructLitField
 }
 
 type LambdaExpr struct {

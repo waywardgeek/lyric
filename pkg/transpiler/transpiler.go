@@ -591,6 +591,17 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			t.transpileExpr(&e.Value)
 		}
 		t.writef("}")
+	case ast.ExprStructLit:
+		sl := expr.Data.(*ast.StructLitExpr)
+		t.writef("%s{", exportName(sl.TypeName))
+		for i, f := range sl.Fields {
+			if i > 0 {
+				t.writef(", ")
+			}
+			t.writef("%s: ", exportName(f.Name))
+			t.transpileExpr(&f.Value)
+		}
+		t.writef("}")
 	case ast.ExprLambda:
 		lam := expr.Data.(*ast.LambdaExpr)
 		t.writef("func(")

@@ -168,16 +168,32 @@ func (t *Type) IsInteger() bool {
 
 // Scope maps variable names to types.
 type Scope struct {
-	parent *Scope
-	vars   map[string]*Type
+	parent   *Scope
+	vars     map[string]*Type
+	mutables map[string]bool // tracks which variables are mutable (let mut)
 }
 
 func NewScope(parent *Scope) *Scope {
-	return &Scope{parent: parent, vars: make(map[string]*Type)}
+	return &Scope{parent: parent, vars: make(map[string]*Type), mutables: make(map[string]bool)}
 }
 
 func (s *Scope) Define(name string, typ *Type) {
 	s.vars[name] = typ
+}
+
+func (s *Scope) DefineMut(name string, typ *Type) {
+	s.vars[name] = typ
+	s.mutables[name] = true
+}
+
+func (s *Scope) IsMutable(name string) bool {
+	if _, ok := s.mutables[name]; ok {
+		return true
+	}
+	if s.parent != nil {
+		return s.parent.IsMutable(name)
+	}
+	return false
 }
 
 func (s *Scope) Lookup(name string) *Type {
@@ -230,9 +246,10 @@ func (e *CheckError) Error() string {
 
 // Checker performs type checking on a Grok AST.
 type Checker struct {
-	registry *Registry
-	errors   []error
-	scope    *Scope
+	registry      *Registry
+	errors        []error
+	scope         *Scope
+	currentReturn *Type // expected return type of current function (nil = void/unit)
 }
 
 // New creates a new type checker.
@@ -395,6 +412,8 @@ func (c *Checker) checkExpr(expr *ast.Expr) *Type {
 		return c.checkTupleLit(expr)
 	case ast.ExprMapLit:
 		return c.checkMapLit(expr)
+	case ast.ExprStructLit:
+		return c.checkStructLit(expr)
 	default:
 		return TypeUnknown
 	}
@@ -658,13 +677,24 @@ func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 		finalType = TypeError
 	}
 
-	c.scope.Define(decl.Name, finalType)
+	if decl.IsMut {
+		c.scope.DefineMut(decl.Name, finalType)
+	} else {
+		c.scope.Define(decl.Name, finalType)
+	}
 }
 
 func (c *Checker) checkAssign(stmt *ast.Stmt) {
 	assign := stmt.Data.(*ast.AssignStmt)
 	targetType := c.checkExpr(&assign.Target)
 	valueType := c.checkExpr(&assign.Value)
+	// Check mutability — only for simple identifier targets
+	if assign.Target.Kind == ast.ExprIdent {
+		id := assign.Target.Data.(*ast.IdentExpr)
+		if !c.scope.IsMutable(id.Name) {
+			c.error(stmt.Span, "cannot assign to immutable variable %q (use 'let mut')", id.Name)
+		}
+	}
 	if !targetType.Equal(valueType) && targetType.Kind != TyUnknown && valueType.Kind != TyUnknown {
 		c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
 	}
@@ -673,9 +703,17 @@ func (c *Checker) checkAssign(stmt *ast.Stmt) {
 func (c *Checker) checkReturn(stmt *ast.Stmt) {
 	ret := stmt.Data.(*ast.ReturnStmt)
 	if ret.Value != nil {
-		c.checkExpr(ret.Value)
+		valType := c.checkExpr(ret.Value)
+		if c.currentReturn != nil {
+			if !c.currentReturn.Equal(valType) && valType.Kind != TyUnknown && c.currentReturn.Kind != TyUnknown {
+				c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
+			}
+		}
+	} else {
+		if c.currentReturn != nil {
+			c.error(stmt.Span, "missing return value, expected %s", c.currentReturn)
+		}
 	}
-	// TODO: check against enclosing function's return type
 }
 
 func (c *Checker) checkIf(stmt *ast.Stmt) {
@@ -841,6 +879,15 @@ func (c *Checker) checkFuncBody(fn *ast.FuncDecl) {
 	c.pushScope()
 	defer c.popScope()
 
+	// Set expected return type
+	prevReturn := c.currentReturn
+	if fn.ReturnType != nil {
+		c.currentReturn = c.resolveTypeExpr(fn.ReturnType)
+	} else {
+		c.currentReturn = nil
+	}
+	defer func() { c.currentReturn = prevReturn }()
+
 	// Bind parameters
 	for _, p := range fn.Params {
 		if !p.IsSelf {
@@ -852,4 +899,28 @@ func (c *Checker) checkFuncBody(fn *ast.FuncDecl) {
 	for i := range fn.Body.Stmts {
 		c.checkStmt(&fn.Body.Stmts[i])
 	}
+}
+
+func (c *Checker) checkStructLit(expr *ast.Expr) *Type {
+	sl := expr.Data.(*ast.StructLitExpr)
+	info := c.registry.Lookup(sl.TypeName)
+	if info == nil {
+		c.error(expr.Span, "undefined type %q", sl.TypeName)
+		return TypeError
+	}
+	if info.Type.Kind != TyStruct && info.Type.Kind != TyClass {
+		c.error(expr.Span, "%q is not a struct or class type", sl.TypeName)
+		return TypeError
+	}
+	for _, f := range sl.Fields {
+		valType := c.checkExpr(&f.Value)
+		if fieldType, ok := info.Fields[f.Name]; ok {
+			if !fieldType.Equal(valType) && valType.Kind != TyUnknown && fieldType.Kind != TyUnknown {
+				c.error(expr.Span, "field %s: expected %s, got %s", f.Name, fieldType, valType)
+			}
+		} else {
+			c.error(expr.Span, "struct %s has no field %q", sl.TypeName, f.Name)
+		}
+	}
+	return info.Type
 }
