@@ -1,0 +1,80 @@
+// verifier.grok — the Grok verifier's own understanding
+
+grok Verifier {
+  why: "Compares .grok understanding files against Go source code, reporting structural drift."
+
+  doc "Architecture": """
+    Parse .grok file → AST (via pkg/parser). For each source: annotation,
+    parse the Go file(s) with go/ast. Aggregate all Go types, then compare
+    structurally: structs, classes, enums, interfaces, functions.
+    Name mapping: snake_case → PascalCase and camelCase.
+  """
+
+  doc "Key Decisions": """
+    Aggregate all source files before comparing (not per-file).
+    Three severity levels: Error (missing), Warning (extra/mismatch), Info (undocumented Go methods).
+    Enums check for typedef, struct, and interface forms in Go.
+    Classes map to Go structs with methods; ctor params checked as fields.
+  """
+
+  // ---- Severity ----
+
+  enum Severity { Error Warning Info }
+
+  // ---- Findings ----
+
+  struct Finding {
+    severity:  Severity
+    grok_file: string
+    go_file:   string
+    message:   string
+  }
+
+  class Result() {
+    findings: [Finding]
+
+    func add(mut self, sev: Severity, grok_file: string, go_file: string, msg: string)
+    func error_count(self) -> i32
+  }
+
+  // ---- Go type extraction ----
+
+  struct goTypeInfo {
+    why: "Aggregated type information extracted from Go source files."
+    structs:    map[string]goStructInfo
+    interfaces: map[string]goInterfaceInfo
+    functions:  map[string]goFuncInfo
+    type_defs:  map[string]bool
+  }
+
+  struct goStructInfo {
+    fields:  map[string]string
+    methods: map[string]goFuncInfo
+  }
+
+  struct goInterfaceInfo {
+    methods: map[string]goFuncInfo
+  }
+
+  struct goFuncInfo {
+    params:  [goParam]
+    returns: [string]
+  }
+
+  struct goParam {
+    name: string
+    type: string
+  }
+
+  // ---- Public API ----
+
+  func verify(grok_path: string, base_dir: string) -> (Result, error)
+    why: "Entry point. Parses .grok, finds source files, compares structurally."
+
+  // ---- Naming helpers ----
+
+  func snake_to_pascal(s: string) -> string
+  func snake_to_camel(s: string) -> string
+
+  source: ["pkg/verifier/verifier.go"]
+}
