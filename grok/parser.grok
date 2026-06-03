@@ -112,7 +112,7 @@ grok Parser {
     return_type: TypeExpr?
     where:       [WhereClause]
     annotations: Annotations
-    body:        Block?       // nil in .grok files, present in .gk
+    // body: Block?       // future: present in .gk files, not yet in Go AST
     span:        Span
   }
 
@@ -225,7 +225,7 @@ grok Parser {
     imports:    [ImportDecl]
     docs:       [DocBlock]
     invariants: [InvariantDecl]
-    types:      [StructDecl]
+    structs:    [StructDecl]
     enums:      [EnumDecl]
     interfaces: [InterfaceDecl]
     classes:    [ClassDecl]
@@ -248,7 +248,7 @@ grok Parser {
   class Parser(lexer: Lexer) {
     why: "PEG parser. Consumes tokens, produces AST."
 
-    func parse(mut self) -> (File, error)
+    func parse_file(mut self) -> (File, error)
       raises: ParseError
 
     func parse_grok_block(mut self) -> (GrokBlock, error)
@@ -265,7 +265,7 @@ grok Parser {
   // ---- Error reporting ----
 
   class ParseError(message: string, span: Span) implements error {
-    func message(self) -> string
+    func error(self) -> string
   }
 
   // ---- Public API ----
@@ -276,5 +276,5 @@ grok Parser {
   func parse_string(source: string) -> (File, error)
     why: "Convenience. Uses '<string>' as filename."
 
-  source: ["pkg/parser/lexer.go", "pkg/parser/parser.go", "pkg/parser/ast.go"]
+  source: ["pkg/parser/lexer.go", "pkg/parser/parser.go", "pkg/ast/ast.go"]
 }
