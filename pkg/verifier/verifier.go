@@ -528,6 +528,14 @@ func typesMatch(grokStr, goStr string) bool {
 	if grokStr == goStr {
 		return true
 	}
+	// Go 1.18+: "any" is an alias for "interface{}"
+	if (grokStr == "any" && goStr == "interface{}") || (grokStr == "interface{}" && goStr == "any") {
+		return true
+	}
+	// Also handle in composite types: map[string]any == map[string]interface{}, etc.
+	if strings.ReplaceAll(grokStr, "any", "interface{}") == goStr || grokStr == strings.ReplaceAll(goStr, "interface{}", "any") {
+		return true
+	}
 	// Strip Go package prefix: "ast.Span" → "Span", "*ast.File" → "*File"
 	// since .grok files use unqualified type names
 	stripped := stripPackagePrefix(goStr)
