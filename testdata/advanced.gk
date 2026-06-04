@@ -1,24 +1,24 @@
 grok advanced {
     // Enum with variants
-    enum Shape {
+    pub enum Shape {
         Circle(radius: f64)
         Rectangle(width: f64, height: f64)
         Empty
     }
 
     // Class with constructor params and methods
-    class Counter(count: i32) {
-        func Increment(mut self) {
+    pub class Counter(count: i32) {
+        pub func Increment(mut self) {
             self.count = self.count + 1
         }
 
-        func Get(self) -> i32 {
+        pub func Get(self) -> i32 {
             return self.count
         }
     }
 
     // Function using match-as-expression
-    func Describe(x: i32) -> i32 {
+    pub func Describe(x: i32) -> i32 {
         let result = match x {
             0 => { 10 }
             1 => { 20 }
@@ -28,7 +28,7 @@ grok advanced {
     }
 
     // Nested if/else
-    func Abs(x: i32) -> i32 {
+    pub func Abs(x: i32) -> i32 {
         if x < 0 {
             return 0 - x
         } else {
@@ -37,7 +37,7 @@ grok advanced {
     }
 
     // Typed list and map literals
-    func SumList(xs: [i32]) -> i32 {
+    pub func SumList(xs: [i32]) -> i32 {
         let mut total: i32 = 0
         for x in xs {
             total = total + x
@@ -46,17 +46,17 @@ grok advanced {
     }
 
     // Higher-order function with function type param
-    func Apply(f: (i32) -> i32, x: i32) -> i32 {
+    pub func Apply(f: (i32) -> i32, x: i32) -> i32 {
         return f(x)
     }
 
     // Multi-param function type
-    func ApplyBinOp(f: (i32, i32) -> i32, a: i32, b: i32) -> i32 {
+    pub func ApplyBinOp(f: (i32, i32) -> i32, a: i32, b: i32) -> i32 {
         return f(a, b)
     }
 
     // Function that matches on enum variants
-    func Area(s: Shape) -> f64 {
+    pub func Area(s: Shape) -> f64 {
         return match s {
             Circle(r) => { 3.14159 * r * r }
             Rectangle(w, h) => { w * h }

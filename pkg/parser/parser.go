@@ -144,26 +144,47 @@ func (p *Parser) parseGrokBlock() (*ast.GrokBlock, error) {
 
 func (p *Parser) parseGrokItem(block *ast.GrokBlock) error {
 	tok := p.peek()
+
+	// Handle `pub` visibility modifier
+	isPub := false
+	if tok.Kind == TPub {
+		isPub = true
+		p.next() // consume 'pub'
+		tok = p.peek()
+	}
+
 	switch tok.Kind {
 	case TWhy:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to why", Span: tok.Span}
+		}
 		why, err := p.parseWhy()
 		if err != nil {
 			return err
 		}
 		block.Why = why
 	case TDoc:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to doc", Span: tok.Span}
+		}
 		doc, err := p.parseDoc()
 		if err != nil {
 			return err
 		}
 		block.Docs = append(block.Docs, *doc)
 	case TInvariant:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to invariant", Span: tok.Span}
+		}
 		inv, err := p.parseInvariant()
 		if err != nil {
 			return err
 		}
 		block.Invariants = append(block.Invariants, *inv)
 	case TImport:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to import", Span: tok.Span}
+		}
 		imp, err := p.parseImport()
 		if err != nil {
 			return err
@@ -174,32 +195,40 @@ func (p *Parser) parseGrokItem(block *ast.GrokBlock) error {
 		if err != nil {
 			return err
 		}
+		s.IsPublic = isPub
 		block.Structs = append(block.Structs, *s)
 	case TEnum:
 		e, err := p.parseEnum()
 		if err != nil {
 			return err
 		}
+		e.IsPublic = isPub
 		block.Enums = append(block.Enums, *e)
 	case TInterface:
 		iface, err := p.parseInterface()
 		if err != nil {
 			return err
 		}
+		iface.IsPublic = isPub
 		block.Interfaces = append(block.Interfaces, *iface)
 	case TClass:
 		cls, err := p.parseClass()
 		if err != nil {
 			return err
 		}
+		cls.IsPublic = isPub
 		block.Classes = append(block.Classes, *cls)
 	case TFunc:
 		fn, err := p.parseFunc()
 		if err != nil {
 			return err
 		}
+		fn.IsPublic = isPub
 		block.Functions = append(block.Functions, *fn)
 	case TRelation:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to relation", Span: tok.Span}
+		}
 		rel, err := p.parseRelation()
 		if err != nil {
 			return err
@@ -210,14 +239,21 @@ func (p *Parser) parseGrokItem(block *ast.GrokBlock) error {
 		if err != nil {
 			return err
 		}
+		ta.IsPublic = isPub
 		block.TypeAliases = append(block.TypeAliases, *ta)
 	case TSource:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to source", Span: tok.Span}
+		}
 		src, err := p.parseSource()
 		if err != nil {
 			return err
 		}
 		block.Source = src
 	case TFake:
+		if isPub {
+			return &ParseError{Message: "pub cannot be applied to fake", Span: tok.Span}
+		}
 		fake, err := p.parseFake()
 		if err != nil {
 			return err
@@ -627,11 +663,20 @@ func (p *Parser) parseClass() (*ast.ClassDecl, error) {
 				return nil, err
 			}
 			cls.Source = src
-		} else if p.peek().Kind == TFunc {
+		} else if p.peek().Kind == TFunc || p.peek().Kind == TPub {
+			isPubMethod := false
+			if p.peek().Kind == TPub {
+				isPubMethod = true
+				p.next() // consume 'pub'
+				if p.peek().Kind != TFunc {
+					return nil, &ParseError{Message: "expected func after pub in class body", Span: p.peek().Span}
+				}
+			}
 			fn, err := p.parseFunc()
 			if err != nil {
 				return nil, err
 			}
+			fn.IsPublic = isPubMethod
 			cls.Methods = append(cls.Methods, *fn)
 		} else {
 			// Must be a field

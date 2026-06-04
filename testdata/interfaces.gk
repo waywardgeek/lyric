@@ -12,21 +12,21 @@ grok interfaces {
 
   // Struct-like class implementing an interface
   class Circle(radius: f64) implements Shape {
-    func area(self) -> f64 {
+    pub func area(self) -> f64 {
       return 3.14159 * self.radius * self.radius
     }
 
-    func name(self) -> string {
+    pub func name(self) -> string {
       return "circle"
     }
   }
 
   class Rectangle(width: f64, height: f64) implements Shape {
-    func area(self) -> f64 {
+    pub func area(self) -> f64 {
       return self.width * self.height
     }
 
-    func name(self) -> string {
+    pub func name(self) -> string {
       return "rectangle"
     }
   }
@@ -42,15 +42,15 @@ grok interfaces {
   }
 
   class Square(side: f64) implements PrintableShape {
-    func area(self) -> f64 {
+    pub func area(self) -> f64 {
       return self.side * self.side
     }
 
-    func name(self) -> string {
+    pub func name(self) -> string {
       return "square"
     }
 
-    func to_string(self) -> string {
+    pub func to_string(self) -> string {
       return "a square"
     }
   }

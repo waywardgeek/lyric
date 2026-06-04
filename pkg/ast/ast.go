@@ -125,6 +125,7 @@ type Annotations struct {
 // FuncDecl is a function or method declaration.
 type FuncDecl struct {
 	Name       string
+	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
 	Params     []Param
 	ReturnType *TypeExpr // nil for missing (error in .grok)
@@ -147,6 +148,7 @@ type Field struct {
 // ClassDecl is a class declaration.
 type ClassDecl struct {
 	Name       string
+	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
 	CtorParams []Param
 	Implements []string
@@ -160,6 +162,7 @@ type ClassDecl struct {
 // StructDecl is a struct (named tuple) declaration.
 type StructDecl struct {
 	Name       string
+	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
 	Fields     []Field
 	Why        string
@@ -176,6 +179,7 @@ type EnumVariant struct {
 // EnumDecl is an enum (sum type) declaration.
 type EnumDecl struct {
 	Name       string
+	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
 	Variants   []EnumVariant
 	Why        string
@@ -185,6 +189,7 @@ type EnumDecl struct {
 // InterfaceDecl is an interface declaration.
 type InterfaceDecl struct {
 	Name       string
+	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
 	Implements []string // composed interfaces
 	Methods    []FuncDecl
@@ -239,8 +244,9 @@ type ImportDecl struct {
 
 // TypeAliasDecl is a type alias: type Name = OtherType
 type TypeAliasDecl struct {
-	Name string
-	Type TypeExpr
+	Name     string
+	IsPublic bool // true if declared with `pub`
+	Type     TypeExpr
 	Span Span
 }
 

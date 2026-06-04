@@ -30,6 +30,7 @@ func TestTranspileStruct(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Structs: []ast.StructDecl{{
 				Name: "Point",
+				IsPublic: true,
 				Fields: []ast.Field{
 					{Name: "X", Type: namedType("f64")},
 					{Name: "Y", Type: namedType("f64")},
@@ -49,6 +50,7 @@ func TestTranspileEnum(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Enums: []ast.EnumDecl{{
 				Name: "Option",
+				IsPublic: true,
 				Variants: []ast.EnumVariant{
 					{Name: "Some", Fields: []ast.TupleField{{Type: namedType("string")}}},
 					{Name: "None"},
@@ -71,6 +73,7 @@ func TestTranspileClass(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Classes: []ast.ClassDecl{{
 				Name: "Stack",
+				IsPublic: true,
 				CtorParams: []ast.Param{
 					{Name: "capacity", Type: namedType("i32")},
 				},
@@ -94,6 +97,7 @@ func TestTranspileFunction(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Functions: []ast.FuncDecl{{
 				Name: "Add",
+				IsPublic: true,
 				Params: []ast.Param{
 					{Name: "a", Type: namedType("i32")},
 					{Name: "b", Type: namedType("i32")},
@@ -259,6 +263,7 @@ func TestTranspileOptionalType(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Structs: []ast.StructDecl{{
 				Name: "Foo",
+				IsPublic: true,
 				Fields: []ast.Field{
 					{Name: "Val", Type: ast.TypeExpr{Kind: ast.TypeOptional, Data: ast.OptionalType{Inner: namedType("string")}}},
 				},
@@ -308,6 +313,52 @@ func TestExportName(t *testing.T) {
 			t.Errorf("exportName(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
+}
+
+func TestUnexportName(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"Foo", "foo"},
+		{"foo", "foo"},
+		{"X", "x"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		if got := unexportName(tc.in); got != tc.want {
+			t.Errorf("unexportName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestVisName(t *testing.T) {
+	if got := visName("foo", true); got != "Foo" {
+		t.Errorf("visName(foo, true) = %q, want Foo", got)
+	}
+	if got := visName("Foo", false); got != "foo" {
+		t.Errorf("visName(Foo, false) = %q, want foo", got)
+	}
+}
+
+func TestTranspileVisibility(t *testing.T) {
+	src := `grok test {
+		pub func greet() -> string {
+			return "hello"
+		}
+		func helper() -> string {
+			return "help"
+		}
+		pub struct Point {
+			x: f64
+			y: f64
+		}
+		struct internal {
+			val: i32
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	assertContains(t, out, "func Greet() string")
+	assertContains(t, out, "func helper() string")
+	assertContains(t, out, "type Point struct")
+	assertContains(t, out, "type internal struct")
 }
 
 // Helpers
@@ -379,6 +430,7 @@ func TestSelfToReceiver(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Classes: []ast.ClassDecl{{
 				Name: "Counter",
+				IsPublic: true,
 				CtorParams: []ast.Param{
 					{Name: "count", Type: namedType("i32")},
 				},
@@ -447,6 +499,7 @@ func TestTranspileInterface(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Interfaces: []ast.InterfaceDecl{{
 				Name: "Greeter",
+				IsPublic: true,
 				Methods: []ast.FuncDecl{
 					{
 						Name:       "Greet",
@@ -468,6 +521,7 @@ func TestTranspileInterfaceComposition(t *testing.T) {
 		Blocks: []ast.GrokBlock{{
 			Interfaces: []ast.InterfaceDecl{{
 				Name: "ReadWriter",
+				IsPublic: true,
 				Implements: []string{"Reader", "Writer"},
 				Methods: []ast.FuncDecl{
 					{
@@ -488,7 +542,7 @@ func TestTranspileInterfaceComposition(t *testing.T) {
 
 func TestTranspileEnumVariantConstructor(t *testing.T) {
 	src := `grok test {
-  enum Shape {
+  pub enum Shape {
     Circle(radius: f64)
     Empty
   }
@@ -510,11 +564,11 @@ func TestTranspileEnumVariantConstructor(t *testing.T) {
 
 func TestTranspileEnumMatchTypeSwitch(t *testing.T) {
 	src := `grok test {
-  enum Shape {
+  pub enum Shape {
     Circle(radius: f64)
     Empty
   }
-  func Area(s: Shape) -> f64 {
+  pub func Area(s: Shape) -> f64 {
     return match s {
       Circle(r) => { r }
       Empty => { 0.0 }
@@ -538,15 +592,15 @@ func TestTranspileEnumMatchTypeSwitch(t *testing.T) {
 
 func TestTranspileNestedPatternMatch(t *testing.T) {
 	src := `grok test {
-  enum Shape {
+  pub enum Shape {
     Circle(radius: f64)
     Rect(w: f64, h: f64)
   }
-  enum Option {
+  pub enum Option {
     Some(value: Shape)
     None
   }
-  fn describe(opt: Option) -> string {
+  pub fn describe(opt: Option) -> string {
     return match opt {
       Some(Circle(r)) => { f"circle {r}" }
       Some(Rect(w, h)) => { f"rect {w}x{h}" }
@@ -589,8 +643,8 @@ func TestTranspileNestedPatternMatch(t *testing.T) {
 
 func TestTranspileEnumMatchNoBinding(t *testing.T) {
 	src := `grok test {
-  enum Color { Red Green Blue }
-  func Name(c: Color) -> string {
+  pub enum Color { Red Green Blue }
+  pub func Name(c: Color) -> string {
     return match c {
       Red => { "red" }
       Green => { "green" }
@@ -612,7 +666,7 @@ func TestTranspileEnumMatchNoBinding(t *testing.T) {
 
 func TestTupleReturn(t *testing.T) {
 	src := `grok test {
-		func divide(a: i32, b: i32) -> (i32, error) {
+		pub func divide(a: i32, b: i32) -> (i32, error) {
 			return (a / b, nil)
 		}
 	}`
@@ -627,7 +681,7 @@ func TestTupleReturn(t *testing.T) {
 
 func TestTupleDestructuring(t *testing.T) {
 	src := `grok test {
-		func getTwo() -> (i32, string) {
+		pub func getTwo() -> (i32, string) {
 			return (42, "hello")
 		}
 		func main() {
@@ -642,7 +696,7 @@ func TestTupleDestructuring(t *testing.T) {
 
 func TestTranspileGenericFunc(t *testing.T) {
 	src := `grok test {
-		func identity<T>(x: T) -> T {
+		pub func identity<T>(x: T) -> T {
 			return x
 		}
 		func main() {
@@ -660,7 +714,7 @@ func TestTranspileGenericFunc(t *testing.T) {
 
 func TestTranspileGenericFuncWithConstraint(t *testing.T) {
 	src := `grok test {
-		func max<T: Comparable>(a: T, b: T) -> T {
+		pub func max<T: Comparable>(a: T, b: T) -> T {
 			if a > b {
 				return a
 			}
@@ -675,7 +729,7 @@ func TestTranspileGenericFuncWithConstraint(t *testing.T) {
 
 func TestTranspileWhereClause(t *testing.T) {
 	src := `grok test {
-		func max_val<T>(a: T, b: T) -> T
+		pub func max_val<T>(a: T, b: T) -> T
 		  where T: Comparable
 		{
 			if a > b {

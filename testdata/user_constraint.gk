@@ -2,12 +2,12 @@
 
 grok constraint_test {
 
-interface Printable {
+pub interface Printable {
   func to_string(self) -> string
 }
 
 class Dog(name: string) {
-  func to_string(self) -> string {
+  pub func to_string(self) -> string {
     return self.name
   }
 }

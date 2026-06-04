@@ -18,11 +18,11 @@ grok demo {
   // --- Task class implementing both interfaces ---
 
   class Task(title: string, desc: string, prio: i32, done: bool) implements Displayable, Prioritizable {
-    func display(self) -> string {
+    pub func display(self) -> string {
       return f"[{self.prio}] {self.title}: {self.desc}"
     }
 
-    func priority(self) -> i32 {
+    pub func priority(self) -> i32 {
       return self.prio
     }
 

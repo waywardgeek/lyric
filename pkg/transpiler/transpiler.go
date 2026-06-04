@@ -34,11 +34,13 @@ type Transpiler struct {
 	classCtorOptional map[string][]bool           // class name → which fields are optional
 	identAlias        map[string]string           // temporary ident substitutions (for guard clause emission)
 	taglessSwitch     bool                        // true when emitting a tagless switch (case conditions are booleans)
+	declVis           map[string]bool             // Grok name → IsPublic for visibility-aware name resolution
+	methodVis         map[string]bool             // method name → IsPublic for method call emission
 }
 
 // New creates a transpiler targeting the given Go package name.
 func New(pkg string) *Transpiler {
-	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string), classTypeParams: make(map[string][]ast.TypeParam), classCtorFields: make(map[string][]string), classCtorOptional: make(map[string][]bool)}
+	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string), classTypeParams: make(map[string][]ast.TypeParam), classCtorFields: make(map[string][]string), classCtorOptional: make(map[string][]bool), declVis: make(map[string]bool), methodVis: make(map[string]bool)}
 }
 
 func (t *Transpiler) needsImport(pkg string) {
@@ -96,9 +98,10 @@ func (t *Transpiler) Transpile(file *ast.File) string {
 }
 
 func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
-	// Register class names and top-level function names
+	// Register class names, top-level function names, and visibility
 	for i := range block.Classes {
 		t.classes[block.Classes[i].Name] = true
+		t.declVis[block.Classes[i].Name] = block.Classes[i].IsPublic
 		// Register constructor parameter names and optional flags for struct literal emission
 		var ctorFields []string
 		var ctorOptional []bool
@@ -108,9 +111,25 @@ func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
 		}
 		t.classCtorFields[block.Classes[i].Name] = ctorFields
 		t.classCtorOptional[block.Classes[i].Name] = ctorOptional
+		for _, m := range block.Classes[i].Methods {
+			t.methodVis[m.Name] = m.IsPublic
+		}
 	}
 	for i := range block.Functions {
 		t.topFuncs[block.Functions[i].Name] = true
+		t.declVis[block.Functions[i].Name] = block.Functions[i].IsPublic
+	}
+	for i := range block.Structs {
+		t.declVis[block.Structs[i].Name] = block.Structs[i].IsPublic
+	}
+	for i := range block.Enums {
+		t.declVis[block.Enums[i].Name] = block.Enums[i].IsPublic
+	}
+	for i := range block.Interfaces {
+		t.declVis[block.Interfaces[i].Name] = block.Interfaces[i].IsPublic
+	}
+	for i := range block.TypeAliases {
+		t.declVis[block.TypeAliases[i].Name] = block.TypeAliases[i].IsPublic
 	}
 	for i := range block.Interfaces {
 		t.writef("\n")
@@ -130,7 +149,7 @@ func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
 	}
 	for i := range block.TypeAliases {
 		ta := &block.TypeAliases[i]
-		t.writef("\ntype %s = %s\n", exportName(ta.Name), t.goType(&ta.Type))
+		t.writef("\ntype %s = %s\n", visName(ta.Name, ta.IsPublic), t.goType(&ta.Type))
 	}
 	for i := range block.Functions {
 		t.writef("\n")
@@ -199,6 +218,10 @@ func (t *Transpiler) goNamedType(name string, args []ast.TypeExpr) string {
 	if t.classes[name] {
 		prefix = "*"
 	}
+	// Apply visibility-aware naming for user-defined types
+	if isPub, ok := t.declVis[name]; ok {
+		goName = visName(name, isPub)
+	}
 	if len(args) == 0 {
 		return prefix + goName
 	}
@@ -258,7 +281,7 @@ func grokPrimitiveToGo(name string) string {
 // --- Declarations ---
 
 func (t *Transpiler) transpileInterface(iface *ast.InterfaceDecl) {
-	name := exportName(iface.Name)
+	name := visName(iface.Name, iface.IsPublic)
 	typeParams := t.typeParamList(iface.TypeParams)
 
 	t.writef("type %s%s interface {\n", name, typeParams)
@@ -267,7 +290,13 @@ func (t *Transpiler) transpileInterface(iface *ast.InterfaceDecl) {
 	// Embed composed interfaces
 	for _, parent := range iface.Implements {
 		t.writeIndent()
-		t.writef("%s\n", exportName(parent))
+		parentName := parent
+		if isPub, ok := t.declVis[parent]; ok {
+			parentName = visName(parent, isPub)
+		} else {
+			parentName = exportName(parent)
+		}
+		t.writef("%s\n", parentName)
 	}
 
 	// Method signatures
@@ -297,7 +326,7 @@ func (t *Transpiler) transpileInterface(iface *ast.InterfaceDecl) {
 }
 
 func (t *Transpiler) transpileStruct(s *ast.StructDecl) {
-	name := exportName(s.Name)
+	name := visName(s.Name, s.IsPublic)
 	typeParams := t.typeParamList(s.TypeParams)
 	t.writef("type %s%s struct {\n", name, typeParams)
 	t.indent++
@@ -310,7 +339,7 @@ func (t *Transpiler) transpileStruct(s *ast.StructDecl) {
 }
 
 func (t *Transpiler) transpileClass(cls *ast.ClassDecl) {
-	name := exportName(cls.Name)
+	name := visName(cls.Name, cls.IsPublic)
 	typeParams := t.typeParamList(cls.TypeParams)
 	if len(cls.TypeParams) > 0 {
 		t.classTypeParams[name] = cls.TypeParams
@@ -332,7 +361,11 @@ func (t *Transpiler) transpileClass(cls *ast.ClassDecl) {
 
 	// Constructor
 	if len(cls.CtorParams) > 0 {
-		t.writef("\nfunc New%s%s(", name, typeParams)
+		ctorName := "New" + exportName(cls.Name)
+		if !cls.IsPublic {
+			ctorName = "new" + exportName(cls.Name)
+		}
+		t.writef("\nfunc %s%s(", ctorName, typeParams)
 		for i, p := range cls.CtorParams {
 			if i > 0 {
 				t.writef(", ")
@@ -372,7 +405,7 @@ func (t *Transpiler) transpileClass(cls *ast.ClassDecl) {
 }
 
 func (t *Transpiler) transpileEnum(e *ast.EnumDecl) {
-	name := exportName(e.Name)
+	name := visName(e.Name, e.IsPublic)
 
 	// Interface for the enum
 	t.writef("type %s interface {\n", name)
@@ -452,7 +485,7 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 	}
 
 	// Special-case: Main -> main for Go entry point
-	funcName := exportName(fn.Name)
+	funcName := visName(fn.Name, fn.IsPublic)
 	if (fn.Name == "Main" || fn.Name == "main") && t.pkg == "main" {
 		funcName = "main"
 	}
@@ -638,7 +671,7 @@ func (t *Transpiler) transpileListMethod(mc *ast.MethodCallExpr) bool {
 		// func() T { _v := xs[len(xs)-1]; xs = xs[:len(xs)-1]; return _v }()
 		retType := "any"
 		if ct, ok := mc.Receiver.ResolvedType.(*checker.Type); ok && ct != nil && ct.Elem != nil {
-			retType = checkerTypeToGo(ct.Elem)
+			retType = t.checkerTypeToGo(ct.Elem)
 		}
 		t.writef("func() %s { _v := ", retType)
 		t.transpileExpr(&mc.Receiver)
@@ -682,10 +715,10 @@ func (t *Transpiler) transpileMapMethod(mc *ast.MethodCallExpr) bool {
 	valGoType := "any"
 	if ct != nil {
 		if ct.Key != nil {
-			keyGoType = checkerTypeToGo(ct.Key)
+			keyGoType = t.checkerTypeToGo(ct.Key)
 		}
 		if ct.Val != nil {
-			valGoType = checkerTypeToGo(ct.Val)
+			valGoType = t.checkerTypeToGo(ct.Val)
 		}
 	}
 	switch mc.Method {
@@ -920,7 +953,7 @@ func (t *Transpiler) transpileVarDecl(stmt *ast.Stmt) {
 			// explicit type so Go's type switch can match them correctly.
 			if goTypeName == "any" && decl.Value.Kind == ast.ExprIntLit {
 				if rt, ok := decl.Value.ResolvedType.(*checker.Type); ok {
-					castType := checkerTypeToGo(rt)
+					castType := t.checkerTypeToGo(rt)
 					if castType != "" && castType != "any" {
 						t.writef("%s(", castType)
 						t.transpileExpr(decl.Value)
@@ -938,7 +971,11 @@ func (t *Transpiler) transpileVarDecl(stmt *ast.Stmt) {
 			// When the resolved type is an enum, emit `var name EnumType = expr`
 			// so Go sees the interface type, enabling type switches in match.
 			if rt, ok := decl.Value.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyEnum {
-				t.writef("var %s %s = ", decl.Name, rt.Name)
+				enumGoName := rt.Name
+				if isPub, ok := t.declVis[rt.Name]; ok {
+					enumGoName = visName(rt.Name, isPub)
+				}
+				t.writef("var %s %s = ", decl.Name, enumGoName)
 			} else {
 				t.writef("%s := ", decl.Name)
 			}
@@ -967,7 +1004,7 @@ func (t *Transpiler) transpileReturn(stmt *ast.Stmt) {
 		// Handle optional wrapping: if return type is *T and value is T, wrap with pointer
 		if t.currentReturnType != "" && ret.Value.Kind != ast.ExprTupleLit && ret.Value.Kind != ast.ExprNil {
 			if rt, ok := ret.Value.ResolvedType.(*checker.Type); ok {
-				exprGoType := checkerTypeToGo(rt)
+				exprGoType := t.checkerTypeToGo(rt)
 				if exprGoType != "" && exprGoType != t.currentReturnType {
 					// Check if it's an optional wrapping case: *T vs T
 					if strings.HasPrefix(t.currentReturnType, "*") && t.currentReturnType[1:] == exprGoType {
@@ -1176,7 +1213,7 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 		} else if arm.Pattern.Kind == ast.PatIdent && isUnionMatch {
 			// Union type match: emit "case GoType:" using the resolved type
 			if rt, ok := arm.Pattern.ResolvedType.(*checker.Type); ok {
-				goType := checkerTypeToGo(rt)
+				goType := t.checkerTypeToGo(rt)
 				t.writef("case %s:\n", goType)
 			} else {
 				id := arm.Pattern.Data.(*ast.IdentPattern)
@@ -1268,10 +1305,12 @@ func (t *Transpiler) enumMatchNeedsBinding(arms []ast.MatchArm) bool {
 // variantGoType returns the Go type name for a variant (e.g., "ShapeCircle").
 func (t *Transpiler) variantGoType(variantName string) string {
 	if vci, ok := t.variantCtors[variantName]; ok {
-		return exportName(vci.enumName) + exportName(variantName)
+		eName := visName(vci.enumName, t.declVis[vci.enumName])
+		return eName + exportName(variantName)
 	}
 	if enumName, ok := t.unitVariants[variantName]; ok {
-		return exportName(enumName) + exportName(variantName)
+		eName := visName(enumName, t.declVis[enumName])
+		return eName + exportName(variantName)
 	}
 	return exportName(variantName)
 }
@@ -1420,7 +1459,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		lit := expr.Data.(*ast.IntLitExpr)
 		// If the checker resolved this to a specific int type, emit a cast
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyInt {
-			goType := checkerTypeToGo(rt)
+			goType := t.checkerTypeToGo(rt)
 			if goType != "" && goType != "int" {
 				t.writef("%s(%s)", goType, lit.Value)
 			} else {
@@ -1433,7 +1472,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		lit := expr.Data.(*ast.FloatLitExpr)
 		// If the checker resolved this to a specific float type, emit a cast
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyFloat {
-			goType := checkerTypeToGo(rt)
+			goType := t.checkerTypeToGo(rt)
 			if goType != "" && goType != "float64" {
 				t.writef("%s(%s)", goType, lit.Value)
 			} else {
@@ -1492,10 +1531,11 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			name = t.selfName
 		} else if enumName, ok := t.unitVariants[name]; ok {
 			// Unit enum variant: emit as struct literal
-			name = fmt.Sprintf("%s%s{}", exportName(enumName), exportName(name))
+			eName := visName(enumName, t.declVis[enumName])
+			name = fmt.Sprintf("%s%s{}", eName, exportName(name))
 		} else if t.topFuncs[name] {
-			// Top-level function reference (not a call) — export the name
-			name = exportName(name)
+			// Top-level function reference (not a call) — use visibility
+			name = visName(name, t.declVis[name])
 		}
 		t.writef("%s", name)
 	case ast.ExprUnary:
@@ -1516,7 +1556,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			id := call.Func.Data.(*ast.IdentExpr)
 			if vci, ok := t.variantCtors[id.Name]; ok {
 				// Emit as struct literal: EnumVariant{Field: val, ...}
-				goName := fmt.Sprintf("%s%s", exportName(vci.enumName), exportName(id.Name))
+				goName := fmt.Sprintf("%s%s", visName(vci.enumName, t.declVis[vci.enumName]), exportName(id.Name))
 				t.writef("%s{", goName)
 				for i := range call.Args {
 					if i > 0 {
@@ -1534,7 +1574,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			}
 			// Check if this is a class constructor: ClassName<T>() → &ClassName[T]{}
 			if t.classes[id.Name] {
-				t.writef("&%s", exportName(id.Name))
+				t.writef("&%s", visName(id.Name, t.declVis[id.Name]))
 				if len(call.TypeArgs) > 0 {
 					t.writef("[")
 					for i := range call.TypeArgs {
@@ -1551,7 +1591,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 							t.writef(", ")
 						}
 						if ct, ok := ta.(*checker.Type); ok {
-							t.writef("%s", checkerTypeToGo(ct))
+							t.writef("%s", t.checkerTypeToGo(ct))
 						} else {
 							t.writef("any")
 						}
@@ -1578,7 +1618,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 							// Get the Go type of the arg for the IIFE wrapper
 							goType := "any"
 							if ct, ok := call.Args[i].ResolvedType.(*checker.Type); ok {
-								goType = checkerTypeToGo(ct)
+								goType = t.checkerTypeToGo(ct)
 							}
 							t.writef("func() *%s { _v := ", goType)
 							t.transpileExpr(&call.Args[i])
@@ -1641,7 +1681,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 					if (id.Name == "Main" || id.Name == "main") && t.pkg == "main" {
 						t.writef("main")
 					} else {
-						t.writef("%s", exportName(id.Name))
+						t.writef("%s", visName(id.Name, t.declVis[id.Name]))
 					}
 				} else {
 					t.writef("%s", id.Name)
@@ -1668,7 +1708,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 						t.writef(", ")
 					}
 					if ct, ok := ta.(*checker.Type); ok {
-						t.writef("%s", checkerTypeToGo(ct))
+						t.writef("%s", t.checkerTypeToGo(ct))
 					} else {
 						t.writef("any")
 					}
@@ -1690,7 +1730,13 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			break
 		}
 		t.transpileExpr(&mc.Receiver)
-		t.writef(".%s(", exportName(mc.Method))
+		methodName := mc.Method
+		if isPub, ok := t.methodVis[methodName]; ok {
+			methodName = visName(methodName, isPub)
+		} else {
+			methodName = exportName(methodName) // fallback: unknown methods stay exported
+		}
+		t.writef(".%s(", methodName)
 		for i := range mc.Args {
 			if i > 0 {
 				t.writef(", ")
@@ -1725,7 +1771,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		// Use resolved type from checker if available
 		typeStr := "[]any"
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyList {
-			typeStr = checkerTypeToGo(rt)
+			typeStr = t.checkerTypeToGo(rt)
 		}
 		t.writef("%s{", typeStr)
 		for i := range lit.Elems {
@@ -1749,7 +1795,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		lit := expr.Data.(*ast.MapLitExpr)
 		typeStr := "map[any]any"
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.Kind == checker.TyMap {
-			typeStr = checkerTypeToGo(rt)
+			typeStr = t.checkerTypeToGo(rt)
 		}
 		t.writef("%s{", typeStr)
 		for i, e := range lit.Entries {
@@ -1767,7 +1813,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		if t.classes[sl.TypeName] {
 			t.writef("&")
 		}
-		t.writef("%s{", exportName(sl.TypeName))
+		t.writef("%s{", visName(sl.TypeName, t.declVis[sl.TypeName]))
 		for i, f := range sl.Fields {
 			if i > 0 {
 				t.writef(", ")
@@ -1821,7 +1867,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		m := expr.Data.(*ast.MatchStmt)
 		retType := "any"
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok {
-			if gt := checkerTypeToGo(rt); gt != "" {
+			if gt := t.checkerTypeToGo(rt); gt != "" {
 				retType = gt
 			}
 		}
@@ -1951,7 +1997,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				t.indent++
 			} else if arm.Pattern.Kind == ast.PatIdent && isUnionMatch {
 				if rt, ok := arm.Pattern.ResolvedType.(*checker.Type); ok {
-					goType := checkerTypeToGo(rt)
+					goType := t.checkerTypeToGo(rt)
 					t.writef("case %s:\n", goType)
 				} else {
 					id := arm.Pattern.Data.(*ast.IdentPattern)
@@ -2136,7 +2182,7 @@ func (t *Transpiler) transpileBinary(expr *ast.Expr) {
 	var targetGoType string
 	if expr.ResolvedType != nil {
 		if rt, ok := expr.ResolvedType.(*checker.Type); ok && rt.IsNumeric() {
-			targetGoType = checkerTypeToGo(rt)
+			targetGoType = t.checkerTypeToGo(rt)
 		}
 	}
 	t.transpileExprWithCast(&b.Left, targetGoType)
@@ -2152,7 +2198,7 @@ func (t *Transpiler) transpileExprWithCast(expr *ast.Expr, targetGoType string) 
 		return
 	}
 	if rt, ok := expr.ResolvedType.(*checker.Type); ok {
-		exprGoType := checkerTypeToGo(rt)
+		exprGoType := t.checkerTypeToGo(rt)
 		if exprGoType != targetGoType && exprGoType != "" {
 			t.writef("%s(", targetGoType)
 			t.transpileExpr(expr)
@@ -2164,7 +2210,7 @@ func (t *Transpiler) transpileExprWithCast(expr *ast.Expr, targetGoType string) 
 }
 
 // checkerTypeToGo converts a checker.Type to a Go type string.
-func checkerTypeToGo(ct *checker.Type) string {
+func (t *Transpiler) checkerTypeToGo(ct *checker.Type) string {
 	switch ct.Kind {
 	case checker.TyInt:
 		if ct.Bits == -1 {
@@ -2184,41 +2230,51 @@ func checkerTypeToGo(ct *checker.Type) string {
 		return "string"
 	case checker.TyList:
 		if ct.Elem != nil {
-			return "[]" + checkerTypeToGo(ct.Elem)
+			return "[]" + t.checkerTypeToGo(ct.Elem)
 		}
 		return "[]any"
 	case checker.TyMap:
 		kt, vt := "any", "any"
 		if ct.Key != nil {
-			kt = checkerTypeToGo(ct.Key)
+			kt = t.checkerTypeToGo(ct.Key)
 		}
 		if ct.Val != nil {
-			vt = checkerTypeToGo(ct.Val)
+			vt = t.checkerTypeToGo(ct.Val)
 		}
 		return "map[" + kt + "]" + vt
 	case checker.TyOptional:
 		if ct.Elem != nil {
-			return "*" + checkerTypeToGo(ct.Elem)
+			return "*" + t.checkerTypeToGo(ct.Elem)
 		}
 		return "*any"
 	case checker.TyTuple:
 		parts := make([]string, len(ct.Fields))
 		for i, f := range ct.Fields {
-			parts[i] = checkerTypeToGo(f.Type)
+			parts[i] = t.checkerTypeToGo(f.Type)
 		}
 		return "(" + strings.Join(parts, ", ") + ")"
 	case checker.TyInterface:
 		if ct.Name != "" {
+			if isPub, ok := t.declVis[ct.Name]; ok {
+				return visName(ct.Name, isPub)
+			}
 			return ct.Name
 		}
 		return "interface{}"
 	case checker.TyClass:
 		if ct.Name != "" {
-			return "*" + ct.Name
+			name := ct.Name
+			if isPub, ok := t.declVis[name]; ok {
+				name = visName(name, isPub)
+			}
+			return "*" + name
 		}
 		return "any"
 	case checker.TyStruct:
 		if ct.Name != "" {
+			if isPub, ok := t.declVis[ct.Name]; ok {
+				return visName(ct.Name, isPub)
+			}
 			return ct.Name
 		}
 		return "any"
@@ -2231,7 +2287,7 @@ func checkerTypeToGo(ct *checker.Type) string {
 		return "any"
 	case checker.TyChannel:
 		if ct.Elem != nil {
-			return "chan " + checkerTypeToGo(ct.Elem)
+			return "chan " + t.checkerTypeToGo(ct.Elem)
 		}
 		return "chan any"
 	default:
@@ -2364,7 +2420,11 @@ func (t *Transpiler) mapConstraint(name string) string {
 	case "Equatable", "Hashable":
 		return "comparable"
 	default:
-		return exportName(name) // pass through user-defined constraints
+		// User-defined constraints use visibility
+		if isPub, ok := t.declVis[name]; ok {
+			return visName(name, isPub)
+		}
+		return exportName(name) // fallback: pass through
 	}
 }
 
@@ -2378,6 +2438,25 @@ func exportName(name string) string {
 		return name
 	}
 	return strings.ToUpper(name[:1]) + name[1:]
+}
+
+// unexportName lowercases the first letter for Go unexported symbols.
+func unexportName(name string) string {
+	if name == "" {
+		return ""
+	}
+	if name[0] >= 'a' && name[0] <= 'z' {
+		return name
+	}
+	return strings.ToLower(name[:1]) + name[1:]
+}
+
+// visName returns the Go name based on visibility. pub = exported, else unexported.
+func visName(name string, isPublic bool) string {
+	if isPublic {
+		return exportName(name)
+	}
+	return unexportName(name)
 }
 
 // bodyRefsIdent checks if a block body references a given identifier name.
