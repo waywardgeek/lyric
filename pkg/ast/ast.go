@@ -269,9 +269,32 @@ type GrokBlock struct {
 	Span        Span
 }
 
+// Comment represents a line comment in the source.
+type Comment struct {
+	Text string // full text including "// " prefix
+	Pos  Pos    // position of the "//"
+}
+
 // File is the top-level AST node.
 type File struct {
 	Filename string
 	Blocks   []GrokBlock
+	Comments []Comment // all comments in the file, ordered by position
 	Span     Span
+}
+
+// DocComment returns the contiguous block of comments immediately preceding
+// the given line, or nil if there are none.
+func (f *File) DocComment(line int) []Comment {
+	// Find comments ending at line-1
+	var result []Comment
+	for i := len(f.Comments) - 1; i >= 0; i-- {
+		c := f.Comments[i]
+		if c.Pos.Line == line-1-len(result) {
+			result = append([]Comment{c}, result...)
+		} else if c.Pos.Line < line-1-len(result) {
+			break
+		}
+	}
+	return result
 }

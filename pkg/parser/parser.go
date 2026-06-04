@@ -107,6 +107,7 @@ func (p *Parser) parseFile() (*ast.File, error) {
 	}
 
 	file.Span = ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: p.peek().Span.End}
+	file.Comments = p.lex.Comments
 	return file, nil
 }
 

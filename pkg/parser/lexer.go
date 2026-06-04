@@ -231,6 +231,7 @@ type Lexer struct {
 	line     int
 	column   int
 	peeked   *Token
+	Comments []ast.Comment // collected during scanning
 }
 
 // NewLexer creates a new lexer for the given source.
@@ -306,10 +307,16 @@ func (l *Lexer) scan() Token {
 		if r == ' ' || r == '\t' || r == '\r' {
 			l.advance()
 		} else if r == '/' && l.peekAt(1) == '/' {
-			// Line comment — skip to end of line
+			// Line comment — collect and skip to end of line
+			commentPos := l.currentPos()
+			var buf strings.Builder
 			for l.pos < len(l.source) && l.peek() != '\n' {
-				l.advance()
+				buf.WriteRune(l.advance())
 			}
+			l.Comments = append(l.Comments, ast.Comment{
+				Text: buf.String(),
+				Pos:  commentPos,
+			})
 		} else {
 			break
 		}

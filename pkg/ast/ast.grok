@@ -1,5 +1,4 @@
 // ast.grok — the Grok AST's own understanding
-
 grok AST {
   why: "Foundational data model for the Grok language. Defines the Abstract Syntax Tree shared by both .grok (declaration-only) and .gk (full implementation) files. A leaf package with no internal dependencies — pure data structures consumed by parser, checker, and transpiler."
 
@@ -60,14 +59,14 @@ grok AST {
     Expressions use a tagged union (ExprKind + Expr.Data):
     - Values: IntLit, FloatLit, StringLit, BoolLit, Nil, Ident
     - Operations: Unary (neg, not), Binary (18 ops: arithmetic, comparison, logical,
-      bitwise, shift)
+    bitwise, shift)
     - Access: Call, MethodCall, FieldAccess, Index
     - Composite: ListLit, TupleLit, MapLit, Lambda, Match-as-expression
 
     Statements use a tagged union (StmtKind + Stmt.Data):
     - Declarations: VarDecl (let/let mut, optional type + initializer)
     - Control flow: If/ElseIf/Else, For (for..in), While, Match (with patterns),
-      Break, Continue, Return
+    Break, Continue, Return
     - Other: Assign, ExprStmt, Block (scoped), Cascade (deferred cleanup)
 
     Patterns (for match arms): Ident, Literal, Variant(bindings), Wildcard, Tuple.
@@ -78,30 +77,28 @@ grok AST {
 
   doc "Technical Debt": """
     - No semantic validation: no checks for circular interface inheritance or
-      duplicate fields at the AST level
+    duplicate fields at the AST level
     - No serialization: no JSON/protobuf support for external tooling or caching
     - No Visitor pattern: as node types grow, traversal logic in consumers gets
-      unwieldy — may need a walker/visitor
+    unwieldy — may need a walker/visitor
     - MatchExpr: match-as-expression exists in AST but Go can't express switch as
-      expression — transpiler emits placeholder
+    expression — transpiler emits placeholder
     - Struct literals: no AST node for Type{field: value} construction syntax
   """
 
   // ---- Source positions ----
-
   struct Pos {
-    File:   string
-    Line:   int
+    File: string
+    Line: int
     Column: int
   }
 
   struct Span {
     Start: Pos
-    End:   Pos
+    End: Pos
   }
 
   // ---- Type expressions ----
-
   struct TypeExpr {
     why: "All type expressions. Kind discriminates; Data holds the typed payload (any — see Tagged Union Pattern doc)."
     Kind: TypeExprKind
@@ -110,18 +107,28 @@ grok AST {
   }
 
   enum TypeExprKind {
-    Named       // T, Stack<T>
-    Optional    // T?
-    Union       // T | U
-    Sequence    // [T]
-    Map         // map[K]V
-    Tuple       // (T, U) or (x: T, y: U)
-    Func        // T -> U
-    Channel     // channel<T>
-    Lock        // lock
-    Unit        // unit
+    Named
+    Optional
+    Union
+    Sequence
+    Map
+    Tuple
+    Func
+    Channel
+    Lock
+    Unit
   }
 
+  // T, Stack<T>
+  // T?
+  // T | U
+  // [T]
+  // map[K]V
+  // (T, U) or (x: T, y: U)
+  // T -> U
+  // channel<T>
+  // lock
+  // unit
   struct NamedType {
     Name: string
     Args: [TypeExpr]
@@ -140,15 +147,16 @@ grok AST {
   }
 
   struct MapType {
-    Key:   TypeExpr
+    Key: TypeExpr
     Value: TypeExpr
   }
 
   struct TupleField {
-    Name: string     // empty for positional
+    Name: string
     Type: TypeExpr
   }
 
+  // empty for positional
   struct TupleType {
     Fields: [TupleField]
   }
@@ -163,103 +171,162 @@ grok AST {
   }
 
   // ---- Expressions (.gk) ----
-
   enum ExprKind {
-    Ident IntLit FloatLit StringLit StringInterp BoolLit Nil
-    Unary Binary
-    Call MethodCall FieldAccess Index
-    ListLit TupleLit MapLit StructLit
-    Lambda Match Cast Unwrap Try Slice
+    Ident
+    IntLit
+    FloatLit
+    StringLit
+    StringInterp
+    BoolLit
+    Nil
+    Unary
+    Binary
+    Call
+    MethodCall
+    FieldAccess
+    Index
+    ListLit
+    TupleLit
+    MapLit
+    StructLit
+    Lambda
+    Match
+    Cast
+    Unwrap
+    Try
+    Slice
   }
 
   struct Expr {
     why: "Tagged union for all expression types. Kind discriminates; Data holds typed payload."
-    Kind:         ExprKind
-    Data:         any
-    Span:         Span
-    ResolvedType: any     // set by checker: *checker.Type (avoids import cycle via any)
+    Kind: ExprKind
+    Data: any
+    Span: Span
+    ResolvedType: any
   }
 
-  struct IdentExpr     { Name: string }
-  struct IntLitExpr    { Value: string }
-  struct FloatLitExpr  { Value: string }
-  struct StringLitExpr { Value: string }
-  struct BoolLitExpr   { Value: bool }
+  // set by checker: *checker.Type (avoids import cycle via any)
+  struct IdentExpr {
+    Name: string
+  }
+
+  struct IntLitExpr {
+    Value: string
+  }
+
+  struct FloatLitExpr {
+    Value: string
+  }
+
+  struct StringLitExpr {
+    Value: string
+  }
+
+  struct BoolLitExpr {
+    Value: bool
+  }
 
   struct CallExpr {
-    Func:             Expr
-    TypeArgs:         [TypeExpr]   // explicit type arguments, e.g. f<i32>(x)
-    Args:             [Expr]
-    InferredTypeArgs: [any]        // set by checker: []*checker.Type — inferred generics (avoids import cycle via any)
+    Func: Expr
+    TypeArgs: [TypeExpr]
+    Args: [Expr]
+    InferredTypeArgs: [any]
   }
 
+  // explicit type arguments, e.g. f<i32>(x)
+  // set by checker: []*checker.Type — inferred generics (avoids import cycle via any)
   struct LambdaExpr {
-    Params:     [Param]
-    ReturnType: TypeExpr?   // optional explicit return type
-    Body:       Block?      // single expression or block
+    Params: [Param]
+    ReturnType: TypeExpr?
+    Body: Block?
   }
 
+  // optional explicit return type
+  // single expression or block
   struct MethodCallExpr {
     Receiver: Expr
-    Method:   string
-    TypeArgs: [TypeExpr]   // explicit type arguments, e.g. obj.method<T>(x)
-    Args:     [Expr]
+    Method: string
+    TypeArgs: [TypeExpr]
+    Args: [Expr]
   }
 
+  // explicit type arguments, e.g. obj.method<T>(x)
   struct FieldAccessExpr {
     Receiver: Expr
-    Field:    string
+    Field: string
   }
 
   struct IndexExpr {
     Receiver: Expr
-    Index:    Expr
+    Index: Expr
   }
 
   struct SliceExpr {
     why: "expr[low:high] slice syntax. Low/High are optional (nil = open bound)."
     Receiver: Expr
-    Low:      Expr?
-    High:     Expr?
+    Low: Expr?
+    High: Expr?
   }
 
-  enum UnaryOp  { Neg Not }
+  enum UnaryOp { Neg Not }
+
   enum BinaryOp {
-    Add Sub Mul Div Mod
-    Eq Neq Lt Le Gt Ge
-    And Or
-    BitAnd BitOr BitXor Shl Shr
+    Add
+    Sub
+    Mul
+    Div
+    Mod
+    Eq
+    Neq
+    Lt
+    Le
+    Gt
+    Ge
+    And
+    Or
+    BitAnd
+    BitOr
+    BitXor
+    Shl
+    Shr
   }
 
   struct UnaryExpr {
-    Op:      UnaryOp
+    Op: UnaryOp
     Operand: Expr
   }
 
   struct BinaryExpr {
-    Left:  Expr
-    Op:    BinaryOp
+    Left: Expr
+    Op: BinaryOp
     Right: Expr
   }
 
-  struct TupleLitExpr { Elems: [Expr] }
-  struct ListLitExpr  { Elems: [Expr] }
+  struct TupleLitExpr {
+    Elems: [Expr]
+  }
+
+  struct ListLitExpr {
+    Elems: [Expr]
+  }
 
   struct MapEntry {
-    Key:   Expr
+    Key: Expr
     Value: Expr
   }
 
-  struct MapLitExpr { Entries: [MapEntry] }
+  struct MapLitExpr {
+    Entries: [MapEntry]
+  }
 
   struct StructLitField {
-    Name:  string
+    Name: string
     Value: Expr
   }
 
   struct StructLitExpr {
     TypeName: string
-    Fields:   [StructLitField]
+    Fields: [StructLitField]
   }
 
   struct StringInterpExpr {
@@ -270,7 +337,7 @@ grok AST {
   struct CastExpr {
     why: "<TargetType>expr — explicit type conversion. Rune heritage."
     TargetType: TypeExpr
-    Operand:    Expr
+    Operand: Expr
   }
 
   struct UnwrapExpr {
@@ -284,12 +351,22 @@ grok AST {
   }
 
   // ---- Statements (.gk) ----
-
   enum StmtKind {
-    VarDecl Assign Return Expr
-    If For While Match
-    Block Cascade Break Continue
-    Spawn Select Lock
+    VarDecl
+    Assign
+    Return
+    Expr
+    If
+    For
+    While
+    Match
+    Block
+    Cascade
+    Break
+    Continue
+    Spawn
+    Select
+    Lock
   }
 
   struct Stmt {
@@ -302,21 +379,21 @@ grok AST {
   struct Block {
     why: "Sequence of statements. Body of functions, loops, if-branches, match arms."
     Stmts: [Stmt]
-    Span:  Span
+    Span: Span
   }
 
   struct VarDeclStmt {
     why: "let or let mut. Type and Value are both optional (but at least one must be present). Names is used for tuple destructuring: let (a, b) = expr."
-    Name:  string
+    Name: string
     Names: [string]
     IsMut: bool
-    Type:  TypeExpr?
+    Type: TypeExpr?
     Value: Expr?
   }
 
   struct AssignStmt {
     Target: Expr
-    Value:  Expr
+    Value: Expr
   }
 
   struct ReturnStmt {
@@ -329,42 +406,43 @@ grok AST {
 
   struct IfStmt {
     Condition: Expr
-    Then:      Block
-    ElseIfs:   [ElseIf]
-    Else:      Block?
+    Then: Block
+    ElseIfs: [ElseIf]
+    Else: Block?
   }
 
   struct ElseIf {
     Condition: Expr
-    Body:      Block
-    Span:      Span
+    Body: Block
+    Span: Span
   }
 
   struct ForStmt {
-    Var:        string
-    IndexVar:   string
-      why: "Optional index variable name for `for i, item in collection` syntax."
+    why: "Optional index variable name for `for i, item in collection` syntax."
+    Var: string
+    IndexVar: string
     Collection: Expr
-    Body:       Block
+    Body: Block
   }
 
   struct WhileStmt {
     Condition: Expr
-    Body:      Block
+    Body: Block
   }
 
   struct MatchStmt {
     Value: Expr
-    Arms:  [MatchArm]
+    Arms: [MatchArm]
   }
 
   struct MatchArm {
     Pattern: Pattern
-    Guard:   Expr?       // optional guard clause: `if <expr>`
-    Body:    Block
-    Span:    Span
+    Guard: Expr?
+    Body: Block
+    Span: Span
   }
 
+  // optional guard clause: `if <expr>`
   struct CascadeStmt {
     Body: Block
   }
@@ -382,179 +460,187 @@ grok AST {
   struct SelectCase {
     why: "A single case in a select statement."
     IsDefault: bool
-    BindVar:   string    // optional: `case val = ch.receive()` binds received value
-    Expr:      Expr?     // nil for default case; ch.receive() or ch.send(val)
-    Body:      Block
-    Span:      Span
+    BindVar: string
+    Expr: Expr?
+    Body: Block
+    Span: Span
   }
 
+  // optional: `case val = ch.receive()` binds received value
+  // nil for default case; ch.receive() or ch.send(val)
   struct LockStmt {
     why: "lock(mu) { body } — scoped mutex lock. Transpiles to { mu.Lock(); defer mu.Unlock(); body }."
     Mutex: Expr
-    Body:  Block
+    Body: Block
   }
 
   // ---- Patterns (.gk) ----
-
   enum PatternKind { Ident Literal Variant Wildcard Tuple }
 
   struct Pattern {
-    Kind:         PatternKind
-    Data:         any
-    Span:         Span
-    ResolvedType: any  // set by checker for union type patterns
+    Kind: PatternKind
+    Data: any
+    Span: Span
+    ResolvedType: any
   }
 
-  struct IdentPattern   { Name: string }
-  struct LiteralPattern { Expr: Expr }
+  // set by checker for union type patterns
+  struct IdentPattern {
+    Name: string
+  }
+
+  struct LiteralPattern {
+    Expr: Expr
+  }
+
   struct VariantPattern {
-    Name:     string
+    Name: string
     Bindings: [Pattern]
   }
-  struct TuplePattern { Elems: [Pattern] }
 
-  // ---- Declarations ----
-
-  struct TypeParam {
-    Name:       string
-    Constraint: string     // empty if unconstrained
-    Span:       Span
+  struct TuplePattern {
+    Elems: [Pattern]
   }
 
+  // ---- Declarations ----
+  struct TypeParam {
+    Name: string
+    Constraint: string
+    Span: Span
+  }
+
+  // empty if unconstrained
   struct Param {
-    Name:   string
-    Type:   TypeExpr
-    IsMut:  bool
+    Name: string
+    Type: TypeExpr
+    IsMut: bool
     IsSelf: bool
-    Span:   Span
+    Span: Span
   }
 
   struct WhereClause {
-    Variable:   string
+    Variable: string
     Constraint: string
-    Span:       Span
+    Span: Span
   }
 
   struct Annotations {
     why: "Safety and concurrency metadata — first-class AST members, not comments."
-    Why:          string
-    Concurrent:   bool?
+    Why: string
+    Concurrent: bool?
     RequiresLock: [string]
     ExcludesLock: [string]
-    Raises:       [string]
-    Requires:     [string]
-    Ensures:      [string]
-    Spawns:       bool
-    Pure:         bool
+    Raises: [string]
+    Requires: [string]
+    Ensures: [string]
+    Spawns: bool
+    Pure: bool
   }
 
   struct FuncDecl {
     why: "Function or method declaration. TypeParams holds generic type parameters (<T: Constraint>). Body is nil for .grok files; holds *Block for .gk."
-    Name:        string
-    TypeParams:  [TypeParam]
-    Params:      [Param]
-    ReturnType:  TypeExpr?
-    Where:       [WhereClause]
+    Name: string
+    TypeParams: [TypeParam]
+    Params: [Param]
+    ReturnType: TypeExpr?
+    Where: [WhereClause]
     Annotations: Annotations
-    Body:        Block?
-    Span:        Span
+    Body: Block?
+    Span: Span
   }
 
   struct Field {
-    Name:      string
-    Type:      TypeExpr
+    Name: string
+    Type: TypeExpr
     GuardedBy: string
-    Why:       string
-    Span:      Span
+    Why: string
+    Span: Span
   }
 
   struct ClassDecl {
     why: "Complex objects with fields, methods, constructor params, and interface satisfaction."
-    Name:       string
+    Name: string
     TypeParams: [TypeParam]
     CtorParams: [Param]
     Implements: [string]
-    Fields:     [Field]
-    Methods:    [FuncDecl]
-    Why:        string
-    Source:     [string]
-    Span:       Span
+    Fields: [Field]
+    Methods: [FuncDecl]
+    Why: string
+    Source: [string]
+    Span: Span
   }
 
   struct StructDecl {
     why: "Named records or tuples. No behavior, no identity."
-    Name:       string
+    Name: string
     TypeParams: [TypeParam]
-    Fields:     [Field]
-    Why:        string
-    Span:       Span
+    Fields: [Field]
+    Why: string
+    Span: Span
   }
 
   struct EnumVariant {
-    Name:   string
+    Name: string
     Fields: [TupleField]
-    Span:   Span
+    Span: Span
   }
 
   struct EnumDecl {
-    Name:       string
+    Name: string
     TypeParams: [TypeParam]
-    Variants:   [EnumVariant]
-    Why:        string
-    Span:       Span
+    Variants: [EnumVariant]
+    Why: string
+    Span: Span
   }
 
   struct InterfaceDecl {
     why: "Method signatures with composition (implements). No inheritance — satisfaction only."
-    Name:       string
+    Name: string
     TypeParams: [TypeParam]
     Implements: [string]
-    Methods:    [FuncDecl]
-    Why:        string
-    Span:       Span
+    Methods: [FuncDecl]
+    Why: string
+    Span: Span
   }
 
   // ---- Relations ----
-
   enum RelationKind { Owns Refs }
 
   struct RelationSide {
     TypeName: string
-    Label:    string
+    Label: string
   }
 
   struct RelationDecl {
     why: "Explicit ownership/reference relationship."
-    Hint:   string
+    Hint: string
     Parent: RelationSide
-    Kind:   RelationKind
-    Child:  RelationSide
+    Kind: RelationKind
+    Child: RelationSide
     IsMany: bool
-    Span:   Span
+    Span: Span
   }
 
   // ---- Metadata ----
-
   struct DocBlock {
     Section: string
     Content: string
-    Span:    Span
+    Span: Span
   }
 
   struct InvariantDecl {
-    Claim:      string
+    Claim: string
     VerifiedAt: string
-    Span:       Span
+    Span: Span
   }
 
   struct ImportDecl {
     Alias: string
-    Path:  string
-    Span:  Span
+    Path: string
+    Span: Span
   }
 
   // ---- Type Aliases ----
-
   struct TypeAliasDecl {
     why: "type Name = OtherType — introduces a named alias for any type expression."
     Name: string
@@ -563,31 +649,37 @@ grok AST {
   }
 
   // ---- Top-level ----
-
   struct GrokBlock {
     why: "Primary container for declarations. A single file can hold multiple blocks."
-    Name:       string
-    Why:        string
-    Imports:    [ImportDecl]
-    Docs:       [DocBlock]
+    Name: string
+    Why: string
+    Imports: [ImportDecl]
+    Docs: [DocBlock]
     Invariants: [InvariantDecl]
-    Structs:    [StructDecl]
-    Enums:      [EnumDecl]
+    Structs: [StructDecl]
+    Enums: [EnumDecl]
     Interfaces: [InterfaceDecl]
-    Classes:    [ClassDecl]
-    Functions:  [FuncDecl]
-    Relations:   [RelationDecl]
+    Classes: [ClassDecl]
+    Functions: [FuncDecl]
+    Relations: [RelationDecl]
     TypeAliases: [TypeAliasDecl]
-    Source:      [string]
-    Fake:       string
-    Span:       Span
+    Source: [string]
+    Fake: string
+    Span: Span
+  }
+
+  struct Comment {
+    why: "Represents a line comment in source, collected by the lexer for fmt and doc generation."
+    Text: string
+    Pos: Pos
   }
 
   struct File {
     why: "Root AST node. Entry point for any parsed Grok source."
     Filename: string
-    Blocks:   [GrokBlock]
-    Span:     Span
+    Blocks: [GrokBlock]
+    Comments: [Comment]
+    Span: Span
   }
 
   source: ["ast.go", "expr.go"]
@@ -598,6 +690,9 @@ grok AST {
 // DO NOT EDIT below this line — regenerated by `grok update`.
 //
 // file: ast.go
+//
+// DocComment returns the contiguous block of comments immediately preceding
+// func (f *File) DocComment(line int) []Comment    :288
 //
 // file: expr.go
 

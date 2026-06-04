@@ -1,5 +1,4 @@
 // transpiler.grok — Grok AST to Go source code generator
-
 grok Transpiler {
   why: "Final stage of the compilation pipeline. Takes a type-checked AST and emits idiomatic Go source code. Sits after the checker; consumes the same AST structures the parser produces."
 
@@ -77,75 +76,75 @@ grok Transpiler {
     - VarDecl: `:=` for inferred, `var T =` for annotated, `_ =` for blank
     - Assign: direct assignment (compound operators desugared in parser)
     - Return: `return` with optional value; inserts explicit Go cast when return
-      expr type differs from function return type (via currentReturnType)
+    expr type differs from function return type (via currentReturnType)
     - If/ElseIf/Else: direct Go if/else chain
     - For: `for _, var := range collection` (discards index by default).
-      When IndexVar is present: `for idx, var := range collection`.
+    When IndexVar is present: `for idx, var := range collection`.
     - While: `for condition { ... }`
     - Match: when match value has enum ResolvedType, emits Go type switch.
-      enumMatchNeedsBinding() scans arms to determine if any destructure variant
-      fields — only emits `_m := val.(type)` when bindings are needed, otherwise
-      emits `val.(type)` (avoids Go "_m declared and not used" error for unit-only
-      enum matches). When match value has union ResolvedType, emits type switch
-      without binding (switch val.(type)). PatIdent arms use Pattern.ResolvedType →
-      checkerTypeToGo for correct Go type names. For non-enum/union matches, emits
-      regular `switch value { ... }`. Wildcard → default:.
-      Nested patterns (e.g. Some(Circle(r))): hasNestedVariantBindings() detects
-      nested PatVariant in bindings, groupArmsByVariant() merges arms sharing the
-      same outer variant into one `case`, emitNestedTypeSwitch() emits inner
-      `switch _m2 := _m.Field.(type)` with recursive field extraction. IIFE path
-      adds fallback zero-value return after nested switch.
+    enumMatchNeedsBinding() scans arms to determine if any destructure variant
+    fields — only emits `_m := val.(type)` when bindings are needed, otherwise
+    emits `val.(type)` (avoids Go "_m declared and not used" error for unit-only
+    enum matches). When match value has union ResolvedType, emits type switch
+    without binding (switch val.(type)). PatIdent arms use Pattern.ResolvedType →
+    checkerTypeToGo for correct Go type names. For non-enum/union matches, emits
+    regular `switch value { ... }`. Wildcard → default:.
+    Nested patterns (e.g. Some(Circle(r))): hasNestedVariantBindings() detects
+    nested PatVariant in bindings, groupArmsByVariant() merges arms sharing the
+    same outer variant into one `case`, emitNestedTypeSwitch() emits inner
+    `switch _m2 := _m.Field.(type)` with recursive field extraction. IIFE path
+    adds fallback zero-value return after nested switch.
     - Cascade: `defer func() { ... }()`
     - Break/Continue: direct Go keywords
     - Block: bare `{ ... }` block
     - Spawn: `go func() { body }()` — wraps body in anonymous goroutine
     - Select: `select { case <-ch: ... case ch <- val: ... default: ... }` —
-      detects .receive()/.send() method calls to emit proper Go channel ops.
-      Receive binding: `case val := <-ch`. Default: bare `default:` arm.
+    detects .receive()/.send() method calls to emit proper Go channel ops.
+    Receive binding: `case val := <-ch`. Default: bare `default:` arm.
     - Lock: `{ mu.Lock(); defer mu.Unlock(); body }` — scoped block with
-      deferred unlock for exception safety
+    deferred unlock for exception safety
   """
 
   doc "Expression Transpilation": """
     All expression nodes map to Go equivalents. Notable cases:
 
     - List literals: emit typed `[]int32{...}` when ResolvedType available,
-      else `[]any{...}`
+    else `[]any{...}`
     - Map literals: emit typed `map[string]int32{...}` when ResolvedType
-      available, else `map[any]any{...}`
+    available, else `map[any]any{...}`
     - Tuple literals: emit comma-separated (works for multi-return)
     - Struct literals: `TypeName{Field: val}` with exportName. Class struct
-      literals emit `&TypeName{...}` (pointer) since class methods use pointer
-      receivers, required for Go interface satisfaction.
+    literals emit `&TypeName{...}` (pointer) since class methods use pointer
+    receivers, required for Go interface satisfaction.
     - Lambdas: `func(params) retType { body }`. When a return type is present
-      and the last statement is an expression, it is implicitly emitted as a
-      `return` statement (expression-body lambdas).
+    and the last statement is an expression, it is implicitly emitted as a
+    `return` statement (expression-body lambdas).
     - Match-as-expression: IIFE pattern `func() T { switch _m := val; _m { ... } }()`
-      Return type is inferred from checker's ResolvedType on the match expr.
-      Wildcard arms emit `default:`; fallback default uses typed zero value.
+    Return type is inferred from checker's ResolvedType on the match expr.
+    Wildcard arms emit `default:`; fallback default uses typed zero value.
     - self: emits receiver name (e.g., `r`) when inside a method body
     - Built-in methods on string/list/map: intercepted via transpileBuiltinMethod.
-      String methods → strings.* stdlib calls (auto-imports "strings").
-      List methods → len/append/slices.* calls (auto-imports "slices").
-      Map methods → len or IIFE patterns for contains_key/keys/values.
+    String methods → strings.* stdlib calls (auto-imports "strings").
+    List methods → len/append/slices.* calls (auto-imports "slices").
+    Map methods → len or IIFE patterns for contains_key/keys/values.
     - Binary ops with differing numeric types: inserts explicit Go cast using
-      ResolvedType annotations from checker
+    ResolvedType annotations from checker
     - Cast expressions (<Type>expr): emit Go type conversion `TargetType(expr)`.
-      For numeric types, uses checkerTypeToGo to resolve the Go type name.
+    For numeric types, uses checkerTypeToGo to resolve the Go type name.
     - Unwrap (expr!): emits `*expr` (Go pointer dereference). Nil dereference
-      panics at runtime, matching Rune semantics.
+    panics at runtime, matching Rune semantics.
     - Slice (expr[low:high]): emits Go slice syntax directly. Omitted bounds
-      emit empty (e.g., `xs[:3]`, `xs[1:]`, `xs[:]`).
+    emit empty (e.g., `xs[:3]`, `xs[1:]`, `xs[:]`).
     - Integer/float literals with ResolvedType: emit typed literals (e.g.,
-      `int32(42)`) when checker annotated them, bare literals otherwise
-      (unit tests without checker pass produce bare output).
+    `int32(42)`) when checker annotated them, bare literals otherwise
+    (unit tests without checker pass produce bare output).
     - Return with optional wrapping: when return type is *T and expr type is T,
-      emits IIFE `func() *T { _v := expr; return &_v }()` (Go can't take address
-      of rvalues directly).
+    emits IIFE `func() *T { _v := expr; return &_v }()` (Go can't take address
+    of rvalues directly).
     - Try (expr?): error propagation, handled at statement level only (VarDecl
-      and ExprStmt). VarDecl emits `_tryValN, _tryErrN := expr` + early return on
-      error. ExprStmt emits `_, _tryErrN := expr` + check. Uses goTypeZeroValue()
-      and currentReturnAST for zero-value generation in return statements.
+    and ExprStmt). VarDecl emits `_tryValN, _tryErrN := expr` + early return on
+    error. ExprStmt emits `_, _tryErrN := expr` + check. Uses goTypeZeroValue()
+    and currentReturnAST for zero-value generation in return statements.
 
     Binary operators map directly. Precedence is encoded in the AST structure
     (parser handles it), so no parenthesization logic needed here.
@@ -177,46 +176,33 @@ grok Transpiler {
   """
 
   // ---- Variant info ----
-
   struct variantCtorInfo {
     why: "Holds info for transpiling enum variant constructor calls into Go struct literals."
-    enumName:   string
+    enumName: string
     fieldNames: [string]
   }
 
   // ---- Core transpiler ----
-
   class Transpiler() {
-    why: "Stateful code generator. Accumulates output in a string builder."
-    buf:               any  // strings.Builder — no Grok equivalent, accepted error
-    indent:            int
-    pkg:               string
-      why: "Go package name for the output file header."
+    why: "Auto-detected import requirements. Populated during body transpilation (e.g. 'fmt' for Sprintf, 'cmp' for Ordered), merged with user imports in header. Two-pass: body first (discovers imports), then package+imports."
+    buf: any
+    indent: int
+    pkg: string
     currentReturnType: string
-      why: "Go return type of the function currently being transpiled. Used to insert explicit casts in return statements."
-    selfName:          string
-      why: "Receiver name to replace 'self' with in method bodies. Set when entering a method, cleared on exit."
-    classes:           map[string]bool
-      why: "Tracks which type names are classes (vs structs). Class struct literals emit with & prefix for pointer receiver compatibility."
-    topFuncs:          map[string]bool
-      why: "Tracks top-level function names. Call expressions export these names but leave local variables as-is."
-    variantCtors:      map[string]variantCtorInfo?
-      why: "Maps variant name → {enumName, fieldNames}. Enables variant constructor calls to emit struct literals."
-    unitVariants:      map[string]string
-      why: "Maps unit variant name → enum name. Enables identifier refs to emit ShapeEmpty{} instead of Empty."
-    classCtorFields:   map[string][string]
-      why: "Maps class name → constructor parameter names. Enables ClassName<T>() calls to emit &ClassName[T]{Field: val} struct literals."
+    selfName: string
+    classes: map[string]bool
+    topFuncs: map[string]bool
+    variantCtors: map[string]variantCtorInfo?
+    unitVariants: map[string]string
+    classCtorFields: map[string][string]
     classCtorOptional: map[string][bool]
-      why: "Maps class name → which ctor params are optional. When true, non-nil args are auto-wrapped with IIFE: func() *T { _v := expr; return &_v }()."
-    autoImports:       map[string]bool
-      why: "Auto-detected import requirements. Populated during body transpilation (e.g. 'fmt' for Sprintf, 'cmp' for Ordered), merged with user imports in header. Two-pass: body first (discovers imports), then package+imports."
-
+    autoImports: map[string]bool
     func Transpile(mut self, file: File?) -> string
       why: "Primary entry point. Emits package declaration then all blocks."
   }
 
+  // strings.Builder — no Grok equivalent, accepted error
   // ---- Helpers ----
-
   func New(pkg: string) -> Transpiler?
     why: "Creates a transpiler targeting the given Go package name."
 

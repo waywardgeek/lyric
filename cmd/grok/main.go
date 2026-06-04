@@ -27,6 +27,7 @@ Commands:
   verify   <file.grok> [...]          Check .grok files against Go source
   update   <file.grok> [...]          Regenerate function index and dependencies
   gen      <package-dir>              Scaffold a new .grok file from Go source
+  fmt      <file.grok> [...]          Format .grok files
   compile  <file.gk> [...] [-o out]   Compile .gk files to Go
 `
 
@@ -47,6 +48,8 @@ func main() {
 		err = cmdUpdate(args)
 	case "gen":
 		err = cmdGen(args)
+	case "fmt":
+		err = cmdFmt(args)
 	case "compile":
 		err = cmdCompile(args)
 	case "help", "-h", "--help":

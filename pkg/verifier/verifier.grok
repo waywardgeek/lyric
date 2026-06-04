@@ -1,5 +1,4 @@
 // verifier.grok — the Grok verifier's own understanding
-
 grok Verifier {
   why: "Structural integrity engine. Detects architectural drift by performing deep, recursive comparison between .grok AST and Go source AST. Bridges two distinct type systems to ensure the developer's mental model stays synchronized with the codebase."
 
@@ -9,13 +8,13 @@ grok Verifier {
 
     1. Grok Parsing: delegates to pkg/parser to produce ast.File from .grok source
     2. Go Source Discovery: inspects source: annotations in each grok block to locate
-       Go files. Paths are relative to the .grok file's directory.
+    Go files. Paths are relative to the .grok file's directory.
     3. Go Type Extraction: uses go/parser and go/ast to parse Go source, populates
-       goTypeInfo — a comprehensive registry of all structs, interfaces, functions,
-       and type definitions across all specified source files.
+    goTypeInfo — a comprehensive registry of all structs, interfaces, functions,
+    and type definitions across all specified source files.
     4. Structural Comparison: recursively walks the Grok AST, comparing each
-       declaration against aggregated Go types. Normalizes naming conventions and
-       type expressions on the fly. Accumulates findings into Result.
+    declaration against aggregated Go types. Normalizes naming conventions and
+    type expressions on the fly. Accumulates findings into Result.
 
     Critical design choice: aggregate ALL source files before comparing (not per-file).
     A grok block's types may span multiple Go files within the same package.
@@ -28,11 +27,11 @@ grok Verifier {
     The core of drift detection. grokTypeToGoString() recursively converts Grok
     TypeExpr nodes into Go type string format for comparison:
 
-      T?          → *T            (optional = pointer)
-      [T]         → []T           (sequence = slice)
-      map[K]V     → map[K]V       (direct)
-      (T, U)      → (T, U)        (tuple = multi-return)
-      any         ≡ interface{}    (Go 1.18+ equivalence)
+    T?          → *T            (optional = pointer)
+    [T]         → []T           (sequence = slice)
+    map[K]V     → map[K]V       (direct)
+    (T, U)      → (T, U)        (tuple = multi-return)
+    any         ≡ interface{}    (Go 1.18+ equivalence)
 
     Package-prefix stripping is recursive: *ast.File → *File, []ast.Node → []Node,
     map[string]*ast.File → map[string]*File. This allows .grok files to use
@@ -54,7 +53,7 @@ grok Verifier {
     source. This allows .grok files to use either convention and still match.
 
     Grok primitive names map to Go via grokNameToGo():
-      i32 → int32, f64 → float64, u8 → uint8, etc.
+    i32 → int32, f64 → float64, u8 → uint8, etc.
   """
 
   doc "Verification Rules": """
@@ -84,48 +83,44 @@ grok Verifier {
 
   doc "Severity Levels": """
     Error:   fundamental mismatch — missing type, wrong field type, param count
-             mismatch, return type mismatch. These should fail CI.
+    mismatch, return type mismatch. These should fail CI.
     Warning: minor drift — extra Go fields not documented in .grok, constructor
-             parameter mismatches. Encourages completeness.
+    parameter mismatches. Encourages completeness.
     Info:    context — additional Go methods not in .grok interface. Expected for
-             .grok files that capture cross-file public concepts only.
+    .grok files that capture cross-file public concepts only.
   """
 
   doc "Technical Debt": """
     - Expression verification: requires/ensures are raw strings, not parsed
     - Complex pointer indirection: basic T? → *T works but nested cases may
-      cause false positives
+    cause false positives
     - Import resolution: stripPackagePrefix is heuristic — doesn't verify cross-
-      package identity
+    package identity
     - Performance: re-parses Go files for every grok block — needs cache for large
-      projects
+    projects
     - func types: map[string]func(...) can't be expressed in Grok (typed as any,
-      causes known false-positive errors)
+    causes known false-positive errors)
   """
 
   // ---- Severity ----
-
   enum Severity { Error Warning Info }
 
   // ---- Findings ----
-
   struct Finding {
     why: "Single discrepancy record with severity, file locations, and descriptive message."
     Severity: Severity
     GrokFile: string
-    GoFile:   string
-    Message:  string
+    GoFile: string
+    Message: string
   }
 
   class Result() {
     why: "Container for verification findings. ErrorCount() determines if drift should fail a build."
     Findings: [Finding]
-
     func ErrorCount(self) -> int
   }
 
   // ---- Public API ----
-
   func Verify(grokPath: string) -> (Result?, error)
     why: "Primary entry point. Orchestrates the full pipeline: parse .grok → discover Go sources → extract types → compare structurally → return findings."
 

@@ -1,5 +1,4 @@
 // checker.grok — the Grok type checker's own understanding
-
 grok Checker {
   why: "Semantic analysis pass. Infers types, validates expressions and statements, and catches type errors before code generation. Sits between parsing and transpilation in the pipeline: parser produces untyped AST, checker annotates and validates it, transpiler consumes the validated result."
 
@@ -7,33 +6,33 @@ grok Checker {
     The checker performs a single forward pass over the AST:
 
     1. Registration Phase: walks all interfaces, structs, classes, enums, and
-       top-level functions in each GrokBlock, registering them into a type Registry.
-       Interfaces are registered first (classes may implement them). Class ctor params
-       are registered as fields (alongside explicit Fields), enabling struct literal
-       validation. Case-insensitive field lookup handles Grok→Go name capitalization.
-       After registration, checkImplements verifies each class satisfies its declared
-       interfaces (method signature matching).
+    top-level functions in each GrokBlock, registering them into a type Registry.
+    Interfaces are registered first (classes may implement them). Class ctor params
+    are registered as fields (alongside explicit Fields), enabling struct literal
+    validation. Case-insensitive field lookup handles Grok→Go name capitalization.
+    After registration, checkImplements verifies each class satisfies its declared
+    interfaces (method signature matching).
 
-       Enums: registerEnum stores variant field info in TypeInfo.Variants and defines
-       variant names in the global scope — unit variants as enum-typed values,
-       field variants as TyFunc constructors (fields → enum type). This enables
-       both variant construction (Circle(5.0)) and typed pattern binding in match.
+    Enums: registerEnum stores variant field info in TypeInfo.Variants and defines
+    variant names in the global scope — unit variants as enum-typed values,
+    field variants as TyFunc constructors (fields → enum type). This enables
+    both variant construction (Circle(5.0)) and typed pattern binding in match.
 
-       Classes: registerClass pushes a temporary scope, registers TypeParams as
-       TyVar in that scope so field/method types can reference the type parameters,
-       then pops after registration. Also defines the class name in scope as a
-       TyFunc constructor (ctor params → class type) so ClassName() calls type-check.
+    Classes: registerClass pushes a temporary scope, registers TypeParams as
+    TyVar in that scope so field/method types can reference the type parameters,
+    then pops after registration. Also defines the class name in scope as a
+    TyFunc constructor (ctor params → class type) so ClassName() calls type-check.
 
     2. Checking Phase: walks function bodies (statements and expressions),
-       performing type inference and validation. Each expression returns its
-       inferred *Type; each statement is checked for type consistency.
+    performing type inference and validation. Each expression returns its
+    inferred *Type; each statement is checked for type consistency.
 
-       For generic functions, checkFuncBody registers TypeParams as TyVar in the
-       function's scope before checking the body.
+    For generic functions, checkFuncBody registers TypeParams as TyVar in the
+    function's scope before checking the body.
 
     3. Annotation: checkExpr annotates each AST Expr node with ResolvedType
-       (stored as `any` to avoid import cycles). The transpiler reads these
-       annotations to emit typed literals and insert explicit Go casts.
+    (stored as `any` to avoid import cycles). The transpiler reads these
+    annotations to emit typed literals and insert explicit Go casts.
 
     State is maintained in three structures:
     - Scope: lexical variable bindings (nested push/pop for blocks)
@@ -60,9 +59,9 @@ grok Checker {
     - T assignable to T? (optional wrapping): any value auto-wraps into optional
     - TyVar compatible with anything (constraints validated by satisfiesConstraint)
     - Union types: any member type assignable TO the union; union assignable to
-      target only if ALL variants are assignable to target
+    target only if ALL variants are assignable to target
     - Union declared types NOT propagated to literal ResolvedType (literals keep
-      concrete type for correct Go type switch emission)
+    concrete type for correct Go type switch emission)
   """
 
   doc "Union Type Matching": """
@@ -95,37 +94,37 @@ grok Checker {
     generics implementation has three parts:
 
     1. Type Variable Scoping: When checking a function body, TypeParams from
-       FuncDecl are registered as TyVar in the function's scope. When registering
-       a class, TypeParams are registered in a temporary scope so field/method
-       types can reference them. resolveNamedType creates TyVar only for names
-       that are registered as type variables in scope — unknown names that aren't
-       type variables fall through as TyVar for .grok compatibility (future: error).
+    FuncDecl are registered as TyVar in the function's scope. When registering
+    a class, TypeParams are registered in a temporary scope so field/method
+    types can reference them. resolveNamedType creates TyVar only for names
+    that are registered as type variables in scope — unknown names that aren't
+    type variables fall through as TyVar for .grok compatibility (future: error).
 
     2. Call-Site Substitution: When a generic function is called with explicit
-       type arguments (e.g. identity<i32>(42)), checkCall:
-       a) Validates type arg count matches TypeParamNames count
-       b) Resolves each type arg to a concrete type
-       c) Builds substitution map: {"T": i32, "U": string}
-       d) Applies substituteType to all formal param types and return type
-       e) Checks actual args against substituted (concrete) param types
+    type arguments (e.g. identity<i32>(42)), checkCall:
+    a) Validates type arg count matches TypeParamNames count
+    b) Resolves each type arg to a concrete type
+    c) Builds substitution map: {"T": i32, "U": string}
+    d) Applies substituteType to all formal param types and return type
+    e) Checks actual args against substituted (concrete) param types
 
     3. Constraint Validation: satisfiesConstraint checks that concrete type
-       arguments satisfy their constraints. Called after substitution map is
-       built (both explicit and inferred paths). TypeParamConstraints stored
-       parallel to TypeParamNames on Type. Built-in constraints:
-       - Comparable: numeric, string, bool (→ Go cmp.Ordered)
-       - Equatable/Hashable: numeric, string, bool (→ Go comparable)
-       Unknown constraints pass through to Go compiler.
+    arguments satisfy their constraints. Called after substitution map is
+    built (both explicit and inferred paths). TypeParamConstraints stored
+    parallel to TypeParamNames on Type. Built-in constraints:
+    - Comparable: numeric, string, bool (→ Go cmp.Ordered)
+    - Equatable/Hashable: numeric, string, bool (→ Go comparable)
+    Unknown constraints pass through to Go compiler.
 
     4. Binary Operator Passthrough: When either operand of a binary expression
-       is TyVar, the checker allows the operation (constraints will be enforced
-       by the target language). Returns TypeBool for comparisons/logical ops,
-       or the TyVar type for arithmetic/bitwise.
+    is TyVar, the checker allows the operation (constraints will be enforced
+    by the target language). Returns TypeBool for comparisons/logical ops,
+    or the TyVar type for arithmetic/bitwise.
 
     4. Call-Site Type Inference: inferTypeArgs walks parameter and argument types
-       in parallel via matchTypeVars, binding type variable names to concrete
-       types (first match wins). Recursive through composite types. Inferred
-       args stored in CallExpr.InferredTypeArgs for the transpiler.
+    in parallel via matchTypeVars, binding type variable names to concrete
+    types (first match wins). Recursive through composite types. Inferred
+    args stored in CallExpr.InferredTypeArgs for the transpiler.
 
     substituteType is recursive: it walks the type structure replacing TyVar
     nodes that appear in the substitution map with their concrete types. Handles
@@ -169,21 +168,21 @@ grok Checker {
     - Literals: return their natural type (IntLit → i32, FloatLit → f64, etc.)
     - Idents: scope lookup; unit variants return their enum type
     - Binary: validates operand types match and operator is valid for the type.
-      TyVar operands pass through (see Generics doc). Arithmetic for numerics
-      with coercion, comparison returns bool, logical for bools, equality for
-      any matching pair with numeric widening, bitwise/shift for integers.
+    TyVar operands pass through (see Generics doc). Arithmetic for numerics
+    with coercion, comparison returns bool, logical for bools, equality for
+    any matching pair with numeric widening, bitwise/shift for integers.
     - Unary: neg requires numeric, not requires bool
     - Call: looks up function, checks arg count and types. For generic calls with
-      TypeArgs, builds substitution map and checks against substituted types.
+    TypeArgs, builds substitution map and checks against substituted types.
     - Method call: resolves receiver type, finds method, checks args
     - Field access: resolves receiver type, finds field by name
     - Index: validates receiver is list/map/string, returns element type
     - Slice (expr[low:high]): validates receiver is list or string, checks
-      bounds are integer types, returns same type as receiver
+    bounds are integer types, returns same type as receiver
     - List/tuple/map literals: check element types. Annotates ResolvedType.
-      Empty list [] (TyList with TyUnknown elem) is assignable to any [T].
+    Empty list [] (TyList with TyUnknown elem) is assignable to any [T].
     - Match-as-expression: checks match value, binds pattern vars, infers result
-      type from first arm.
+    type from first arm.
     - Cast (<Type>expr): validates numeric ↔ numeric conversion.
     - Unwrap (expr!): validates operand is optional, returns inner type.
     - Lambda: checks body, infers return type
@@ -194,21 +193,21 @@ grok Checker {
   doc "Statement Checking": """
     checkStmt dispatches on StmtKind:
     - VarDecl: infer or check type, define in current scope (DefineMut for let mut).
-      Tuple destructuring via Names field.
+    Tuple destructuring via Names field.
     - Assign: check target is defined and mutable, check value type matches
     - Return: check value type matches enclosing function's declared return type.
-      Skip cast for tuple literals to avoid invalid Go emission.
+    Skip cast for tuple literals to avoid invalid Go emission.
     - If/ElseIf: check condition is bool, check body blocks
     - For: resolve collection element type, bind loop var, increment loopDepth.
-      Optional IndexVar binds as platform int (for i, item in collection).
+    Optional IndexVar binds as platform int (for i, item in collection).
     - While: check condition is bool, increment loopDepth, check body
     - Match: check match value, bindPattern into arm scopes (ident, tuple, variant
-      with real field types from registry), check each arm body
+    with real field types from registry), check each arm body
     - Break/Continue: error if loopDepth == 0
     - Block: push scope, check stmts, pop scope
     - Spawn: check body block (no special type context)
     - Select: check each case — validate receive/send channel expressions,
-      bind receive var in case scope, check case bodies
+    bind receive var in case scope, check case bodies
     - Lock: check mutex expression, check body block
     - Cascade/Expr: check inner expression(s)
   """
@@ -217,7 +216,7 @@ grok Checker {
     - No error recovery: first error stops checking that branch
     - Cast only supports numeric ↔ numeric
     - resolveNamedType falls through to TyVar for unknown names (should error
-      when not a registered type variable, but kept for .grok compatibility)
+    when not a registered type variable, but kept for .grok compatibility)
   """
 
   doc "Built-in Functions": """
@@ -247,46 +246,70 @@ grok Checker {
   """
 
   // ---- Type system ----
-
   enum TypeKind {
-    TyInt TyUint TyFloat TyBool TyString TyUnit
-    TyList TyMap TyTuple TyOptional TyChannel
-    TyStruct TyClass TyEnum TyInterface TyFunc
-    TyVar       // type variable (for generics)
-    TyUnion     // union type (T | U)
-    TyUnknown   // not yet resolved
-    TyError     // error sentinel
+    TyInt
+    TyUint
+    TyFloat
+    TyBool
+    TyString
+    TyUnit
+    TyList
+    TyMap
+    TyTuple
+    TyOptional
+    TyChannel
+    TyStruct
+    TyClass
+    TyEnum
+    TyInterface
+    TyFunc
+    TyVar
+    TyUnion
+    TyUnknown
+    TyError
   }
 
+  // type variable (for generics)
+  // union type (T | U)
+  // not yet resolved
+  // error sentinel
   struct Type {
     why: "Recursive type representation. Kind discriminates; sub-fields used per kind."
-    Kind:           TypeKind
-    Bits:           int            // for TyInt/TyUint/TyFloat
-    Name:           string         // for named types and TyVar
-    Elem:           Type?          // for TyList/TyOptional/TyChannel
-    Key:            Type?          // for TyMap
-    Val:            Type?          // for TyMap
-    Params:         [Type?]        // for TyFunc: parameter types
-    Return:         Type?          // for TyFunc: return type
-    Fields:         [TypeField]    // for TyTuple
-    TypeParamNames:       [string]  // for TyFunc: generic type parameter names
-    TypeParamConstraints: [string]  // for TyFunc: constraints (parallel to TypeParamNames)
-    Variants:       [Type?]        // for TyUnion: member types
+    Kind: TypeKind
+    Bits: int
+    Name: string
+    Elem: Type?
+    Key: Type?
+    Val: Type?
+    Params: [Type?]
+    Return: Type?
+    Fields: [TypeField]
+    TypeParamNames: [string]
+    TypeParamConstraints: [string]
+    Variants: [Type?]
   }
 
+  // for TyInt/TyUint/TyFloat
+  // for named types and TyVar
+  // for TyList/TyOptional/TyChannel
+  // for TyMap
+  // for TyMap
+  // for TyFunc: parameter types
+  // for TyFunc: return type
+  // for TyTuple
+  // for TyFunc: generic type parameter names
+  // for TyFunc: constraints (parallel to TypeParamNames)
+  // for TyUnion: member types
   struct TypeField {
     Name: string
     Type: Type?
   }
 
   // ---- Scope ----
-
   class Scope(parent: Scope?) {
-    why: "Lexical scope with nested lookup. Push for block entry, pop on exit."
-    vars:     map[string]Type?
+    why: "Tracks which variables were declared with 'let mut'."
+    vars: map[string]Type?
     mutables: map[string]bool
-      why: "Tracks which variables were declared with 'let mut'."
-
     func Define(mut self, name: string, typ: Type?)
     func DefineMut(mut self, name: string, typ: Type?)
       why: "Defines a mutable variable — adds to both vars and mutables maps."
@@ -297,56 +320,48 @@ grok Checker {
   }
 
   // ---- Type registry ----
-
   struct VariantInfo {
     why: "Holds field information for a single enum variant."
     EnumName: string
-    Fields:   [TypeField]
+    Fields: [TypeField]
   }
 
   struct TypeInfo {
-    Type:     Type?
-    Fields:   map[string]Type?
-    Methods:  map[string]Type?
+    why: "Enum variants: variant name → field info."
+    Type: Type?
+    Fields: map[string]Type?
+    Methods: map[string]Type?
     Variants: map[string]VariantInfo?
-      why: "Enum variants: variant name → field info."
   }
 
   class Registry() {
     why: "Named type definitions. Structs, classes, enums, interfaces registered during first pass."
     types: map[string]TypeInfo?
-
     func Register(mut self, name: string, info: TypeInfo?)
     func Lookup(self, name: string) -> TypeInfo?
   }
 
   // ---- Error reporting ----
-
   struct CheckError {
     why: "Implements Go error interface. Includes Span for source location."
-    Span:    Span
+    Span: Span
     Message: string
   }
 
   // ---- Checker ----
-
   class Checker() {
-    why: "Stateful checker. Call CheckFile to validate an entire AST."
-    scope:         Scope?
-    registry:      Registry?
-    errors:        [error]
+    why: "Tracks nesting depth inside loops for break/continue validation."
+    scope: Scope?
+    registry: Registry?
+    errors: [error]
     currentReturn: Type?
-      why: "Expected return type of the function currently being checked."
     loopDepth: int
-      why: "Tracks nesting depth inside loops for break/continue validation."
-
     func CheckFile(mut self, file: File?)
       why: "Primary entry point. Registers all types, then checks all function bodies."
     func Errors(self) -> [error]
   }
 
   // ---- Standalone functions ----
-
   func New() -> Checker?
     why: "Creates a Checker with fresh scope and registry. Registers built-in type 'error' as interface."
 
@@ -366,10 +381,15 @@ grok Checker {
     why: "Checks if type is error — handles both TyError and TyInterface{Name:'error'} since error is registered as interface."
 
   func IntType(bits: int) -> Type?
+
   func UintType(bits: int) -> Type?
+
   func FloatType(bits: int) -> Type?
+
   func ListType(elem: Type?) -> Type?
+
   func MapType(key: Type?, val: Type?) -> Type?
+
   func OptionalType(elem: Type?) -> Type?
 
   source: ["checker.go"]
