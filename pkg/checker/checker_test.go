@@ -1170,3 +1170,46 @@ func TestLambdaInferenceMultiTypeParam(t *testing.T) {
 	}`)
 	expectNoErrors(t, c)
 }
+
+func TestUnionTypeBasic(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let a: string | i32 = 42
+			let b: string | i32 = "hello"
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestUnionTypeParam(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func describe(val: string | i32) -> string {
+			return "got a value"
+		}
+		func f() {
+			describe(42)
+			describe("hello")
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestUnionTypeThreeVariants(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: string | i32 | bool = true
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestUnionTypeMismatch(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() {
+			let x: string | i32 = true
+		}
+	}`)
+	if len(c.Errors()) == 0 {
+		t.Error("expected error for assigning bool to string | i32")
+	}
+}

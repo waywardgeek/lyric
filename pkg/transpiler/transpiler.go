@@ -1530,6 +1530,8 @@ func checkerTypeToGo(ct *checker.Type) string {
 			return ct.Name
 		}
 		return "any"
+	case checker.TyUnion:
+		return "any"
 	default:
 		return "any"
 	}

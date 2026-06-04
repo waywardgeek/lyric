@@ -29,6 +29,7 @@ const (
 	TyEnum                    // named enum type
 	TyInterface               // named interface type
 	TyVar                     // type variable (for generics)
+	TyUnion                   // union type (T | U)
 	TyUnknown                 // not yet resolved
 	TyError                   // error sentinel
 )
@@ -45,6 +46,7 @@ type Type struct {
 	Params         []*Type     // for func: param types
 	Return         *Type       // for func: return type
 	TypeParamNames []string    // for func: generic type parameter names
+	Variants       []*Type    // for union: member types
 }
 
 // TypeField is a named or positional field in a tuple/struct.
@@ -97,6 +99,15 @@ func (t *Type) String() string {
 		return s + ")"
 	case TyVar:
 		return t.Name
+	case TyUnion:
+		s := ""
+		for i, v := range t.Variants {
+			if i > 0 {
+				s += " | "
+			}
+			s += v.String()
+		}
+		return s
 	case TyFunc:
 		s := "("
 		for i, p := range t.Params {
@@ -167,6 +178,16 @@ func (t *Type) Equal(other *Type) bool {
 			}
 		}
 		return t.Return.Equal(other.Return)
+	case TyUnion:
+		if len(t.Variants) != len(other.Variants) {
+			return false
+		}
+		for i := range t.Variants {
+			if !t.Variants[i].Equal(other.Variants[i]) {
+				return false
+			}
+		}
+		return true
 	default:
 		return false
 	}
@@ -402,6 +423,13 @@ func (c *Checker) resolveTypeExpr(te *ast.TypeExpr) *Type {
 		}
 		ret := c.resolveTypeExpr(&ft.Return)
 		return &Type{Kind: TyFunc, Params: params, Return: ret}
+	case ast.TypeUnion:
+		ut := te.Data.(ast.UnionType)
+		var variants []*Type
+		for i := range ut.Variants {
+			variants = append(variants, c.resolveTypeExpr(&ut.Variants[i]))
+		}
+		return &Type{Kind: TyUnion, Variants: variants}
 	default:
 		return TypeUnknown
 	}
@@ -539,6 +567,23 @@ func (c *Checker) assignableTo(from, to *Type) bool {
 		}
 		return true
 	}
+	// Any member type is assignable to a union containing it
+	if to.Kind == TyUnion {
+		for _, v := range to.Variants {
+			if c.assignableTo(from, v) {
+				return true
+			}
+		}
+	}
+	// Union is assignable to a type if all variants are assignable to it
+	if from.Kind == TyUnion {
+		for _, v := range from.Variants {
+			if !c.assignableTo(v, to) {
+				return false
+			}
+		}
+		return true
+	}
 	return false
 }
 
@@ -571,6 +616,12 @@ func substituteType(t *Type, subst map[string]*Type) *Type {
 			params[i] = substituteType(p, subst)
 		}
 		return &Type{Kind: TyFunc, Params: params, Return: substituteType(t.Return, subst), Name: t.Name}
+	case TyUnion:
+		variants := make([]*Type, len(t.Variants))
+		for i, v := range t.Variants {
+			variants[i] = substituteType(v, subst)
+		}
+		return &Type{Kind: TyUnion, Variants: variants}
 	default:
 		return t
 	}
@@ -638,6 +689,12 @@ func matchTypeVars(param, arg *Type, subst map[string]*Type) {
 				matchTypeVars(param.Params[i], arg.Params[i], subst)
 			}
 			matchTypeVars(param.Return, arg.Return, subst)
+		}
+	case TyUnion:
+		if arg.Kind == TyUnion && len(param.Variants) == len(arg.Variants) {
+			for i := range param.Variants {
+				matchTypeVars(param.Variants[i], arg.Variants[i], subst)
+			}
 		}
 	}
 }

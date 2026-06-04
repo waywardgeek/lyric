@@ -1,0 +1,16 @@
+// unions.gk — end-to-end test for union types
+
+grok unions {
+
+func describe(val: string | i32) -> string {
+    return "got a value"
+}
+
+func main() {
+    let a: string | i32 = 42
+    let b: string | i32 = "hello"
+    println(describe(a))
+    println(describe(b))
+}
+
+}
