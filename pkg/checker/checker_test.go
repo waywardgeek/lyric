@@ -1627,3 +1627,86 @@ func TestModuleImportFileNotFound(t *testing.T) {
 		t.Error("expected error for missing module file")
 	}
 }
+
+func TestGuardedByAccessInsideLock(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  class Counter() {
+    count: i32 guarded_by(mu)
+    mu: lock
+
+    pub fn increment(mut self) {
+      lock(self.mu) {
+        self.count = self.count + 1
+      }
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestGuardedByAccessOutsideLock(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  class Counter() {
+    count: i32 guarded_by(mu)
+    mu: lock
+
+    pub fn bad_read(self) -> i32 {
+      return self.count
+    }
+  }
+}`)
+	expectErrors(t, c, 1)
+	if len(c.Errors()) > 0 && !strings.Contains(c.Errors()[0].Error(), "guarded by") {
+		t.Errorf("expected guarded_by error, got: %v", c.Errors()[0])
+	}
+}
+
+func TestGuardedByWrongLock(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  class TwoLocks() {
+    data: i32 guarded_by(mu1)
+    mu1: lock
+    mu2: lock
+
+    pub fn wrong_lock(mut self) {
+      lock(self.mu2) {
+        self.data = 42
+      }
+    }
+  }
+}`)
+	expectErrors(t, c, 1)
+}
+
+func TestGuardedByFreeFieldAccess(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  class Mixed() {
+    label: string
+    count: i32 guarded_by(mu)
+    mu: lock
+
+    pub fn get_label(self) -> string {
+      return self.label
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+}
+
+func TestGuardedByTopLevelLock(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+  class Counter() {
+    count: i32 guarded_by(mu)
+    mu: lock
+  }
+
+  func main() {
+    let c = Counter()
+    lock(c.mu) {
+      let val = c.count
+      println(val)
+    }
+  }
+}`)
+	expectNoErrors(t, c)
+}

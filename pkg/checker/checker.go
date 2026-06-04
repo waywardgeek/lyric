@@ -302,10 +302,11 @@ type VariantInfo struct {
 
 // TypeInfo holds registered type information.
 type TypeInfo struct {
-	Type     *Type
-	Fields   map[string]*Type    // struct/class fields
-	Methods  map[string]*Type    // method signatures (as TyFunc)
-	Variants map[string]*VariantInfo // enum variants (variant name → info)
+	Type          *Type
+	Fields        map[string]*Type        // struct/class fields
+	Methods       map[string]*Type        // method signatures (as TyFunc)
+	Variants      map[string]*VariantInfo // enum variants (variant name → info)
+	GuardedFields map[string]string       // field name → lock name (guarded_by annotations)
 }
 
 // Registry holds all known types in the program.
@@ -353,6 +354,7 @@ type Checker struct {
 	modules       map[string]*ModuleExports // file path → exports (cache)
 	checking      map[string]bool           // files currently being checked (cycle detection)
 	currentFile   string                    // file path of the file being checked
+	heldLocks     map[string]bool           // lock names currently held (for guarded_by enforcement)
 }
 
 // New creates a new type checker.
@@ -360,8 +362,9 @@ func New() *Checker {
 	c := &Checker{
 		registry: NewRegistry(),
 		scope:    NewScope(nil),
-		modules:  make(map[string]*ModuleExports),
-		checking: make(map[string]bool),
+		modules:   make(map[string]*ModuleExports),
+		checking:  make(map[string]bool),
+		heldLocks: make(map[string]bool),
 	}
 	// Register builtin functions
 	// println(...) — variadic, accepts any types, returns unit
@@ -1352,12 +1355,31 @@ func (c *Checker) expectArgType(method string, arg *ast.Expr, idx int, expected 
 	}
 }
 
+// extractLockName returns the name of the lock expression for guarded_by tracking.
+// Handles simple identifiers (mu) and field access (self.mu).
+func (c *Checker) extractLockName(expr *ast.Expr) string {
+	switch expr.Kind {
+	case ast.ExprIdent:
+		return expr.Data.(*ast.IdentExpr).Name
+	case ast.ExprFieldAccess:
+		fa := expr.Data.(*ast.FieldAccessExpr)
+		return fa.Field
+	}
+	return ""
+}
+
 func (c *Checker) checkFieldAccess(expr *ast.Expr) *Type {
 	fa := expr.Data.(*ast.FieldAccessExpr)
 	recvType := c.checkExpr(&fa.Receiver)
 	if recvType.Kind == TyStruct || recvType.Kind == TyClass {
 		if info := c.registry.Lookup(recvType.Name); info != nil {
 			if fieldType, ok := info.Fields[fa.Field]; ok {
+				// guarded_by enforcement: check field is accessed under the correct lock
+				if lockName, guarded := info.GuardedFields[fa.Field]; guarded {
+					if !c.heldLocks[lockName] {
+						c.error(expr.Span, "field %q is guarded by %q and must be accessed within lock(%s) { ... }", fa.Field, lockName, lockName)
+					}
+				}
 				return fieldType
 			}
 			c.error(expr.Span, "type %s has no field %q", recvType.Name, fa.Field)
@@ -1677,7 +1699,15 @@ func (c *Checker) checkStmt(stmt *ast.Stmt) {
 	case ast.StmtLock:
 		ls := stmt.Data.(*ast.LockStmt)
 		c.checkExpr(&ls.Mutex)
+		// Track the held lock for guarded_by enforcement
+		lockName := c.extractLockName(&ls.Mutex)
+		if lockName != "" {
+			c.heldLocks[lockName] = true
+		}
 		c.checkBlock(&ls.Body)
+		if lockName != "" {
+			delete(c.heldLocks, lockName)
+		}
 	case ast.StmtBreak:
 		if c.loopDepth == 0 {
 			c.error(stmt.Span, "break outside of loop")
@@ -2163,20 +2193,25 @@ func (c *Checker) checkGrokBlock(block *ast.GrokBlock) {
 
 func (c *Checker) registerStruct(s *ast.StructDecl) {
 	info := &TypeInfo{
-		Type:   &Type{Kind: TyStruct, Name: s.Name},
-		Fields: make(map[string]*Type),
+		Type:          &Type{Kind: TyStruct, Name: s.Name},
+		Fields:        make(map[string]*Type),
+		GuardedFields: make(map[string]string),
 	}
 	for _, f := range s.Fields {
 		info.Fields[f.Name] = c.resolveTypeExpr(&f.Type)
+		if f.GuardedBy != "" {
+			info.GuardedFields[f.Name] = f.GuardedBy
+		}
 	}
 	c.registry.Register(s.Name, info)
 }
 
 func (c *Checker) registerClass(cls *ast.ClassDecl) {
 	info := &TypeInfo{
-		Type:    &Type{Kind: TyClass, Name: cls.Name},
-		Fields:  make(map[string]*Type),
-		Methods: make(map[string]*Type),
+		Type:          &Type{Kind: TyClass, Name: cls.Name},
+		Fields:        make(map[string]*Type),
+		Methods:       make(map[string]*Type),
+		GuardedFields: make(map[string]string),
 	}
 	// Register type params as type variables in a temporary scope for resolving field/method types
 	c.pushScope()
@@ -2189,6 +2224,9 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 	}
 	for _, f := range cls.Fields {
 		info.Fields[f.Name] = c.resolveTypeExpr(&f.Type)
+		if f.GuardedBy != "" {
+			info.GuardedFields[f.Name] = f.GuardedBy
+		}
 	}
 	for _, m := range cls.Methods {
 		info.Methods[m.Name] = c.funcDeclToType(&m)
