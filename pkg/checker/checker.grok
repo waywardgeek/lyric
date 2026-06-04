@@ -121,7 +121,7 @@ grok Checker {
     by the target language). Returns TypeBool for comparisons/logical ops,
     or the TyVar type for arithmetic/bitwise.
 
-    4. Call-Site Type Inference: inferTypeArgs walks parameter and argument types
+    5. Call-Site Type Inference: inferTypeArgs walks parameter and argument types
     in parallel via matchTypeVars, binding type variable names to concrete
     types (first match wins). Recursive through composite types. Inferred
     args stored in CallExpr.InferredTypeArgs for the transpiler.

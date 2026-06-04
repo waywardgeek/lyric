@@ -67,7 +67,7 @@ grok Parser {
   """
 
   doc "Expression Parsing (Pratt/Precedence-Climbing)": """
-    expr_parser.go implements a Pratt parser with 12 precedence levels:
+    expr_parser.go implements a Pratt parser with 10 binary precedence levels:
 
     Level  1: || (logical or)
     Level  2: && (logical and)
@@ -147,7 +147,6 @@ grok Parser {
     grok block would improve IDE/bulk-processing experience.
     - Multi-line arrays: source: [...] must be single-line (parser limitation)
     - requires/ensures: capture raw text strings, not parsed expressions
-    - For-loop index: no syntax for `for i, x in collection`
     - Lambda param types: uses parseBaseType to avoid | ambiguity with union types,
     so lambda params cannot have union types (use a type alias instead)
   """

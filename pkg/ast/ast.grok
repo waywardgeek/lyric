@@ -83,7 +83,6 @@ grok AST {
     unwieldy — may need a walker/visitor
     - MatchExpr: match-as-expression exists in AST but Go can't express switch as
     expression — transpiler emits placeholder
-    - Struct literals: no AST node for Type{field: value} construction syntax
   """
 
   // ---- Source positions ----

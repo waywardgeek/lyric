@@ -135,6 +135,7 @@ grok Grok {
     cmd/grok-gen/     — CLI entry point for scaffolding new .grok files.
     cmd/grok-update/  — CLI entry point for .grok Zone 2/3 regeneration.
     cmd/grok-verify/  — CLI entry point for .grok drift detection.
+    cmd/grok/         — Unified CLI with verify/update/gen/fmt/compile subcommands.
   """
 
   doc "Future Roadmap": """
@@ -146,7 +147,7 @@ grok Grok {
     - CI integration: grok-verify as pre-commit hook
   """
 
-  source: ["cmd/grok-verify/main.go", "cmd/grok-compile/main.go", "cmd/grok-update/main.go", "cmd/grok-gen/main.go"]
+  source: ["cmd/grok-verify/main.go", "cmd/grok-compile/main.go", "cmd/grok-update/main.go", "cmd/grok-gen/main.go", "cmd/grok/main.go", "cmd/grok/shared.go", "cmd/grok/fmt.go", "cmd/grok/update.go"]
 }
 // --- index ---
 //
@@ -160,6 +161,14 @@ grok Grok {
 // file: cmd/grok-update/main.go
 //
 // file: cmd/grok-gen/main.go
+//
+// file: cmd/grok/main.go
+//
+// file: cmd/grok/shared.go
+//
+// file: cmd/grok/fmt.go
+//
+// file: cmd/grok/update.go
 
 // --- dependencies ---
 //
