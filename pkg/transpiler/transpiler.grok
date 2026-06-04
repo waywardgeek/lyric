@@ -90,6 +90,11 @@ grok Transpiler {
       without binding (switch val.(type)). PatIdent arms use Pattern.ResolvedType →
       checkerTypeToGo for correct Go type names. For non-enum/union matches, emits
       regular `switch value { ... }`. Wildcard → default:.
+      Nested patterns (e.g. Some(Circle(r))): hasNestedVariantBindings() detects
+      nested PatVariant in bindings, groupArmsByVariant() merges arms sharing the
+      same outer variant into one `case`, emitNestedTypeSwitch() emits inner
+      `switch _m2 := _m.Field.(type)` with recursive field extraction. IIFE path
+      adds fallback zero-value return after nested switch.
     - Cascade: `defer func() { ... }()`
     - Break/Continue: direct Go keywords
     - Block: bare `{ ... }` block
@@ -250,6 +255,15 @@ grok Transpiler {
 
   func enumMatchNeedsBinding(arms: [MatchArm]) -> bool
     why: "Returns true if any match arm destructures variant fields, meaning the type switch needs '_m := val.(type)' rather than 'val.(type)'. Prevents Go unused-variable errors for unit-only enum matches."
+
+  func hasNestedVariantBindings(arms: [MatchArm]) -> bool
+    why: "Detects nested PatVariant in variant bindings (e.g. Some(Circle(r))). Triggers arm grouping and nested type switch emission."
+
+  func emitNestedTypeSwitch(outerVP: VariantPattern, innerArms: [MatchArm], matchVar: string, isExprMatch: bool, retType: string)
+    why: "Emits nested switch _m2 := _m.Field.(type) for arms sharing an outer variant with different inner patterns. isExprMatch adds return statements; retType adds fallback zero-value return."
+
+  func emitVariantBindings(vp: VariantPattern, matchVar: string)
+    why: "Emits field extraction from type-switch matched variant. matchVar specifies the Go variable (e.g. '_m', '_m2') for nested match support."
 
   func binaryOpString(op: BinaryOp) -> string
 
