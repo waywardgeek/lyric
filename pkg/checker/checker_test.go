@@ -1213,3 +1213,30 @@ func TestUnionTypeMismatch(t *testing.T) {
 		t.Error("expected error for assigning bool to string | i32")
 	}
 }
+
+func TestUnionMatchTypes(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(val: string | i32) -> string {
+			return match val {
+				string => { "str" }
+				i32 => { "int" }
+			}
+		}
+	}`)
+	if len(c.Errors()) > 0 {
+		t.Errorf("unexpected errors: %v", c.Errors())
+	}
+}
+
+func TestUnionMatchInvalidType(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f(val: string | i32) {
+			match val {
+				bool => { println("oops") }
+			}
+		}
+	}`)
+	if len(c.Errors()) == 0 {
+		t.Error("expected error for matching non-member type 'bool'")
+	}
+}

@@ -753,7 +753,22 @@ func (t *Transpiler) transpileVarDecl(stmt *ast.Stmt) {
 
 	if decl.Value != nil {
 		if decl.Type != nil {
-			t.writef("var %s %s = ", decl.Name, t.goType(decl.Type))
+			goTypeName := t.goType(decl.Type)
+			t.writef("var %s %s = ", decl.Name, goTypeName)
+			// When storing in 'any' (union type), cast numeric literals to their
+			// explicit type so Go's type switch can match them correctly.
+			if goTypeName == "any" && decl.Value.Kind == ast.ExprIntLit {
+				if rt, ok := decl.Value.ResolvedType.(*checker.Type); ok {
+					castType := checkerTypeToGo(rt)
+					if castType != "" && castType != "any" {
+						t.writef("%s(", castType)
+						t.transpileExpr(decl.Value)
+						t.writef(")")
+						t.writef("\n")
+						return
+					}
+				}
+			}
 			t.transpileExpr(decl.Value)
 		} else if decl.Name == "_" {
 			t.writef("_ = ")
@@ -873,9 +888,13 @@ func (t *Transpiler) transpileWhile(stmt *ast.Stmt) {
 func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	matchStmt := stmt.Data.(*ast.MatchStmt)
 	isEnumMatch := t.isEnumMatch(&matchStmt.Value)
+	isUnionMatch := t.isUnionMatch(&matchStmt.Value)
 	t.writeIndent()
-	if isEnumMatch {
-		t.writef("switch _m := ")
+	if isEnumMatch || isUnionMatch {
+		t.writef("switch ")
+		if isEnumMatch {
+			t.writef("_m := ")
+		}
 		t.transpileExpr(&matchStmt.Value)
 		t.writef(".(type) {\n")
 	} else {
@@ -902,6 +921,15 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 			} else {
 				t.writef("case %s:\n", id.Name)
 			}
+		} else if arm.Pattern.Kind == ast.PatIdent && isUnionMatch {
+			// Union type match: emit "case GoType:" using the resolved type
+			if rt, ok := arm.Pattern.ResolvedType.(*checker.Type); ok {
+				goType := checkerTypeToGo(rt)
+				t.writef("case %s:\n", goType)
+			} else {
+				id := arm.Pattern.Data.(*ast.IdentPattern)
+				t.writef("case %s:\n", id.Name)
+			}
 		} else {
 			t.writef("case ")
 			t.transpilePattern(&arm.Pattern)
@@ -919,6 +947,14 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 func (t *Transpiler) isEnumMatch(expr *ast.Expr) bool {
 	if rt, ok := expr.ResolvedType.(*checker.Type); ok {
 		return rt.Kind == checker.TyEnum
+	}
+	return false
+}
+
+// isUnionMatch checks if the match value expression has a union resolved type.
+func (t *Transpiler) isUnionMatch(expr *ast.Expr) bool {
+	if rt, ok := expr.ResolvedType.(*checker.Type); ok {
+		return rt.Kind == checker.TyUnion
 	}
 	return false
 }
@@ -1340,11 +1376,15 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			}
 		}
 		isEnumMatch := t.isEnumMatch(&m.Value)
+		isUnionMatch := t.isUnionMatch(&m.Value)
 		t.writef("func() %s {\n", retType)
 		t.indent++
 		t.writeIndent()
-		if isEnumMatch {
-			t.writef("switch _m := ")
+		if isEnumMatch || isUnionMatch {
+			t.writef("switch ")
+			if isEnumMatch {
+				t.writef("_m := ")
+			}
 			t.transpileExpr(&m.Value)
 			t.writef(".(type) {\n")
 		} else {
@@ -1366,6 +1406,15 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				if goType := t.variantGoType(id.Name); goType != exportName(id.Name) {
 					t.writef("case %s:\n", goType)
 				} else {
+					t.writef("case %s:\n", id.Name)
+				}
+				t.indent++
+			} else if arm.Pattern.Kind == ast.PatIdent && isUnionMatch {
+				if rt, ok := arm.Pattern.ResolvedType.(*checker.Type); ok {
+					goType := checkerTypeToGo(rt)
+					t.writef("case %s:\n", goType)
+				} else {
+					id := arm.Pattern.Data.(*ast.IdentPattern)
 					t.writef("case %s:\n", id.Name)
 				}
 				t.indent++

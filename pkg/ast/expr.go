@@ -283,9 +283,10 @@ const (
 )
 
 type Pattern struct {
-	Kind PatternKind
-	Data any
-	Span Span
+	Kind         PatternKind
+	Data         any
+	Span         Span
+	ResolvedType any // set by checker for union type patterns
 }
 
 type IdentPattern struct {

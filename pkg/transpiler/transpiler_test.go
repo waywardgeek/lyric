@@ -674,3 +674,36 @@ func TestTranspileMapMethods(t *testing.T) {
 		t.Error("expected contains_key IIFE pattern")
 	}
 }
+
+func TestTranspileUnionMatch(t *testing.T) {
+	src := `grok test {
+		func f(val: string | i32) {
+			match val {
+				string => { println("str") }
+				i32 => { println("int") }
+			}
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "val.(type)") {
+		t.Error("expected type switch, got:", out)
+	}
+	if !strings.Contains(out, "case string:") {
+		t.Error("expected case string:, got:", out)
+	}
+	if !strings.Contains(out, "case int32:") {
+		t.Error("expected case int32:, got:", out)
+	}
+}
+
+func TestTranspileUnionVarDecl(t *testing.T) {
+	src := `grok test {
+		func f() {
+			let x: string | i32 = 42
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "int32(42)") {
+		t.Error("expected int32(42) cast for union assignment, got:", out)
+	}
+}

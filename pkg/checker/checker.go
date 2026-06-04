@@ -1250,17 +1250,23 @@ func (c *Checker) checkMapLit(expr *ast.Expr) *Type {
 func (c *Checker) checkMatchExpr(expr *ast.Expr) *Type {
 	m := expr.Data.(*ast.MatchStmt)
 	c.checkExpr(&m.Value)
+	matchType := c.inferExpr(&m.Value)
+	isUnion := matchType.Kind == TyUnion
 	// Infer type from last expression of first arm
 	var resultType *Type
-	for _, arm := range m.Arms {
+	for i := range m.Arms {
 		c.pushScope()
-		c.bindPattern(&arm.Pattern, c.inferExpr(&m.Value))
-		for i := range arm.Body.Stmts {
-			c.checkStmt(&arm.Body.Stmts[i])
+		if isUnion {
+			c.bindUnionPattern(&m.Arms[i].Pattern, matchType)
+		} else {
+			c.bindPattern(&m.Arms[i].Pattern, matchType)
+		}
+		for j := range m.Arms[i].Body.Stmts {
+			c.checkStmt(&m.Arms[i].Body.Stmts[j])
 		}
 		// Use last stmt if it's an expr stmt
-		if len(arm.Body.Stmts) > 0 {
-			last := &arm.Body.Stmts[len(arm.Body.Stmts)-1]
+		if len(m.Arms[i].Body.Stmts) > 0 {
+			last := &m.Arms[i].Body.Stmts[len(m.Arms[i].Body.Stmts)-1]
 			if last.Kind == ast.StmtExpr {
 				es := last.Data.(*ast.ExprStmt)
 				t := c.inferExpr(&es.Expr)
@@ -1425,7 +1431,8 @@ func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 			c.error(stmt.Span, "type mismatch in variable %q: declared %s, got %s", decl.Name, declaredType, inferredType)
 		}
 		// Propagate declared type to the value expression (e.g., int literal 100 becomes i64 not i32)
-		if decl.Value != nil {
+		// Don't propagate union types — the literal keeps its concrete type for correct Go emission.
+		if decl.Value != nil && declaredType.Kind != TyUnion {
 			decl.Value.ResolvedType = declaredType
 		}
 		finalType = declaredType
@@ -1541,11 +1548,52 @@ func (c *Checker) checkWhile(stmt *ast.Stmt) {
 func (c *Checker) checkMatch(stmt *ast.Stmt) {
 	matchStmt := stmt.Data.(*ast.MatchStmt)
 	matchType := c.checkExpr(&matchStmt.Value)
+	isUnion := matchType.Kind == TyUnion
 	for i := range matchStmt.Arms {
 		c.pushScope()
-		c.bindPattern(&matchStmt.Arms[i].Pattern, matchType)
+		if isUnion {
+			c.bindUnionPattern(&matchStmt.Arms[i].Pattern, matchType)
+		} else {
+			c.bindPattern(&matchStmt.Arms[i].Pattern, matchType)
+		}
 		c.checkBlock(&matchStmt.Arms[i].Body)
 		c.popScope()
+	}
+}
+
+// bindUnionPattern handles match arms for union types. PatIdent names are
+// resolved as type references (e.g. "string", "i32") and the implicit _m
+// variable is bound with the narrowed type.
+func (c *Checker) bindUnionPattern(pat *ast.Pattern, matchType *Type) {
+	switch pat.Kind {
+	case ast.PatIdent:
+		id := pat.Data.(*ast.IdentPattern)
+		if id.Name == "_" {
+			return
+		}
+		// Try to resolve as a type name
+		resolved := c.resolveNamedType(id.Name, nil)
+		if resolved.Kind == TyUnknown {
+			c.error(pat.Span, "unknown type '%s' in union match", id.Name)
+			return
+		}
+		// Verify this type is a member of the union
+		found := false
+		for _, v := range matchType.Variants {
+			if v.Equal(resolved) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.error(pat.Span, "type '%s' is not a member of union %s", id.Name, matchType)
+		}
+		// Store the resolved type on the pattern for the transpiler
+		pat.ResolvedType = resolved
+	case ast.PatWildcard:
+		// nothing to bind
+	default:
+		c.bindPattern(pat, matchType)
 	}
 }
 
