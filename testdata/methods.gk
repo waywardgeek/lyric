@@ -41,6 +41,7 @@ grok methods_test {
     println(f"list len: {items.len()}")
     println(f"contains 20: {items.contains(20)}")
     println(f"last: {items.pop()}")
+    println(f"after pop: {items.len()}")
 
     // --- Map methods ---
     let mut scores = map[string]i32{"alice": 95, "bob": 87, "carol": 92}

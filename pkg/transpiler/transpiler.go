@@ -602,11 +602,23 @@ func (t *Transpiler) transpileListMethod(mc *ast.MethodCallExpr) bool {
 		t.transpileExpr(&mc.Args[0])
 		t.writef(")")
 	case "pop":
-		// list.pop() → list[len(list)-1] (caller must also shrink; simplified)
+		// list.pop() → IIFE that returns last element and shrinks the list
+		// func() T { _v := xs[len(xs)-1]; xs = xs[:len(xs)-1]; return _v }()
+		retType := "any"
+		if ct, ok := mc.Receiver.ResolvedType.(*checker.Type); ok && ct != nil && ct.Elem != nil {
+			retType = checkerTypeToGo(ct.Elem)
+		}
+		t.writef("func() %s { _v := ", retType)
 		t.transpileExpr(&mc.Receiver)
 		t.writef("[len(")
 		t.transpileExpr(&mc.Receiver)
-		t.writef(")-1]")
+		t.writef(")-1]; ")
+		t.transpileExpr(&mc.Receiver)
+		t.writef(" = ")
+		t.transpileExpr(&mc.Receiver)
+		t.writef("[:len(")
+		t.transpileExpr(&mc.Receiver)
+		t.writef(")-1]; return _v }()")
 	case "contains":
 		t.autoImports["slices"] = true
 		t.writef("slices.Contains(")
