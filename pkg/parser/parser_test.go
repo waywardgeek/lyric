@@ -489,6 +489,38 @@ func TestParseFuncTypeParams(t *testing.T) {
 	}
 }
 
+func TestParseFnTypeSyntax(t *testing.T) {
+	input := `grok Test {
+  func apply(f: fn(i32) -> string, x: i32) -> string
+  func combine(f: fn(i32, i32) -> i32) -> i32
+}`
+	file, err := ParseString(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	fns := file.Blocks[0].Functions
+	if len(fns) != 2 {
+		t.Fatalf("expected 2 functions, got %d", len(fns))
+	}
+
+	// apply: first param should be fn(i32) -> string
+	fType := fns[0].Params[0].Type
+	if fType.Kind != ast.TypeFunc {
+		t.Fatalf("expected TypeFunc, got %v", fType.Kind)
+	}
+	ft := fType.Data.(ast.FuncType)
+	if len(ft.Params) != 1 {
+		t.Errorf("expected 1 param in fn type, got %d", len(ft.Params))
+	}
+
+	// combine: fn(i32, i32) -> i32
+	fType2 := fns[1].Params[0].Type
+	ft2 := fType2.Data.(ast.FuncType)
+	if len(ft2.Params) != 2 {
+		t.Errorf("expected 2 params in fn type, got %d", len(ft2.Params))
+	}
+}
+
 func TestParseGenericCallSite(t *testing.T) {
 	input := `grok Test {
   func identity<T>(x: T) -> T {

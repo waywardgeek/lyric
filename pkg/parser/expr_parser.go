@@ -952,6 +952,16 @@ func (p *Parser) parseMatchArms() ([]ast.MatchArm, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Optional guard clause: `if <expr>`
+		var guard *ast.Expr
+		if p.peek().Kind == TIf {
+			p.next()
+			g, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			guard = g
+		}
 		if _, err := p.expect(TFatArrow); err != nil {
 			return nil, err
 		}
@@ -959,7 +969,7 @@ func (p *Parser) parseMatchArms() ([]ast.MatchArm, error) {
 		if err != nil {
 			return nil, err
 		}
-		arms = append(arms, ast.MatchArm{Pattern: *pat, Body: *body, Span: body.Span})
+		arms = append(arms, ast.MatchArm{Pattern: *pat, Guard: guard, Body: *body, Span: body.Span})
 		p.skipNewlines()
 	}
 	if _, err := p.expect(TRBrace); err != nil {

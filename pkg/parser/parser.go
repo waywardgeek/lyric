@@ -995,6 +995,39 @@ func (p *Parser) parseBaseType() (*ast.TypeExpr, error) {
 	tok := p.peek()
 
 	switch tok.Kind {
+	case TFunc:
+		// fn(T, U) -> V — function type
+		p.next()
+		if _, err := p.expect(TLParen); err != nil {
+			return nil, err
+		}
+		var params []ast.TypeExpr
+		for p.peek().Kind != TRParen && p.peek().Kind != TEOF {
+			param, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, *param)
+			if p.peek().Kind == TComma {
+				p.next()
+			}
+		}
+		if _, err := p.expect(TRParen); err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(TArrow); err != nil {
+			return nil, err
+		}
+		ret, err := p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.TypeExpr{
+			Kind: ast.TypeFunc,
+			Data: ast.FuncType{Params: params, Return: *ret},
+			Span: ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: ret.Span.End},
+		}, nil
+
 	case TLBracket:
 		// [T] — sequence
 		p.next()

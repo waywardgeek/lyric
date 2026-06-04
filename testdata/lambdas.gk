@@ -2,7 +2,7 @@
 
 grok lambdas {
 
-func apply(x: i32, f: (i32) -> i32) -> i32 {
+func apply(x: i32, f: fn(i32) -> i32) -> i32 {
     return f(x)
 }
 

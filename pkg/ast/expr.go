@@ -266,6 +266,7 @@ type MatchStmt struct {
 
 type MatchArm struct {
 	Pattern Pattern
+	Guard   *Expr // optional: `if <expr>` guard clause
 	Body    Block
 	Span    Span
 }

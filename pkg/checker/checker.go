@@ -1272,6 +1272,10 @@ func (c *Checker) checkMatchExpr(expr *ast.Expr) *Type {
 		} else {
 			c.bindPattern(&m.Arms[i].Pattern, matchType)
 		}
+		// Check guard clause if present
+		if m.Arms[i].Guard != nil {
+			c.checkExpr(m.Arms[i].Guard)
+		}
 		for j := range m.Arms[i].Body.Stmts {
 			c.checkStmt(&m.Arms[i].Body.Stmts[j])
 		}
@@ -1570,6 +1574,9 @@ func (c *Checker) checkMatch(stmt *ast.Stmt) {
 			c.bindUnionPattern(&matchStmt.Arms[i].Pattern, matchType)
 		} else {
 			c.bindPattern(&matchStmt.Arms[i].Pattern, matchType)
+		}
+		if matchStmt.Arms[i].Guard != nil {
+			c.checkExpr(matchStmt.Arms[i].Guard)
 		}
 		c.checkBlock(&matchStmt.Arms[i].Body)
 		c.popScope()

@@ -925,7 +925,19 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 			t.writef("case %s:\n", t.variantGoType(vp.Name))
 			t.indent++
 			t.emitVariantBindings(vp)
-			t.transpileStmts(arm.Body.Stmts)
+			if arm.Guard != nil {
+				t.writeIndent()
+				t.writef("if ")
+				t.transpileExpr(arm.Guard)
+				t.writef(" {\n")
+				t.indent++
+				t.transpileStmts(arm.Body.Stmts)
+				t.indent--
+				t.writeIndent()
+				t.writef("}\n")
+			} else {
+				t.transpileStmts(arm.Body.Stmts)
+			}
 			t.indent--
 			continue
 		} else if arm.Pattern.Kind == ast.PatIdent && isEnumMatch {
@@ -950,7 +962,19 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 			t.writef(":\n")
 		}
 		t.indent++
-		t.transpileStmts(arm.Body.Stmts)
+		if arm.Guard != nil {
+			t.writeIndent()
+			t.writef("if ")
+			t.transpileExpr(arm.Guard)
+			t.writef(" {\n")
+			t.indent++
+			t.transpileStmts(arm.Body.Stmts)
+			t.indent--
+			t.writeIndent()
+			t.writef("}\n")
+		} else {
+			t.transpileStmts(arm.Body.Stmts)
+		}
 		t.indent--
 	}
 	t.writeIndent()
@@ -1454,6 +1478,13 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				t.indent++
 			}
 			// Last statement in arm body is the result — emit as return
+			if arm.Guard != nil {
+				t.writeIndent()
+				t.writef("if ")
+				t.transpileExpr(arm.Guard)
+				t.writef(" {\n")
+				t.indent++
+			}
 			if len(arm.Body.Stmts) > 0 {
 				for i := 0; i < len(arm.Body.Stmts)-1; i++ {
 					t.transpileStmt(&arm.Body.Stmts[i])
@@ -1468,6 +1499,11 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				} else {
 					t.transpileStmt(last)
 				}
+			}
+			if arm.Guard != nil {
+				t.indent--
+				t.writeIndent()
+				t.writef("}\n")
 			}
 			t.indent--
 		}

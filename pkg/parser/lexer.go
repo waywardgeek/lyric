@@ -121,6 +121,7 @@ const (
 var keywords = map[string]TokenKind{
 	"grok":       TGrok,
 	"func":       TFunc,
+	"fn":         TFunc,
 	"class":      TClass,
 	"struct":     TStruct,
 	"enum":       TEnum,
