@@ -59,6 +59,8 @@ grok Checker {
     - nil (TyUnknown) assignable to optional and interface types
     - T assignable to T? (optional wrapping): any value auto-wraps into optional
     - TyVar compatible with anything (constraints deferred to Go for now)
+    - Union types: any member type assignable TO the union; union assignable to
+      target only if ALL variants are assignable to target
   """
 
   doc "Generics": """
@@ -208,6 +210,7 @@ grok Checker {
     TyList TyMap TyTuple TyOptional TyChannel
     TyStruct TyClass TyEnum TyInterface TyFunc
     TyVar       // type variable (for generics)
+    TyUnion     // union type (T | U)
     TyUnknown   // not yet resolved
     TyError     // error sentinel
   }
@@ -224,6 +227,7 @@ grok Checker {
     Return:         Type?          // for TyFunc: return type
     Fields:         [TypeField]    // for TyTuple
     TypeParamNames: [string]       // for TyFunc: generic type parameter names
+    Variants:       [Type?]        // for TyUnion: member types
   }
 
   struct TypeField {

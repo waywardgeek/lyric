@@ -217,6 +217,11 @@ grok Transpiler {
     Uses implicit last-expression return for single-expression lambdas.
   }
 
+  doc "Union Type Emission" {
+    TyUnion types emit as Go 'any'. Variables of union type use 'var x any = val'
+    syntax. Pattern matching on unions would use Go type switches (future).
+  }
+
   func checkerTypeToGo(ct: Type?) -> string
     why: "Converts checker.Type to Go type string. Handles composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T."
 
