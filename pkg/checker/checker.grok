@@ -364,6 +364,12 @@ grok Checker {
   func checkLambda(expr: Expr?) -> Type?
     why: "Type-checks a lambda expression. Pushes new scope, defines params, resolves return type, checks body. Returns TyFunc with proper param/return types — enables type inference to work with lambdas as args."
 
+  func checkTry(expr: Expr?) -> Type?
+    why: "Type-checks postfix ? operator. Validates operand returns (T, error) tuple and enclosing function returns error. Returns T."
+
+  func isErrorType(t: Type?) -> bool
+    why: "Checks if type is error — handles both TyError and TyInterface{Name:'error'} since error is registered as interface."
+
   func IntType(bits: int) -> Type?
   func UintType(bits: int) -> Type?
   func FloatType(bits: int) -> Type?

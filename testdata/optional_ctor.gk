@@ -1,0 +1,20 @@
+// optional_ctor.gk — test optional fields in class constructors auto-wrap
+
+grok optional_ctor {
+
+class User(name: string, email: string?) {
+    func get_name(self) -> string {
+        return self.name
+    }
+}
+
+fn main() {
+    let u1 = User("Alice", "alice@example.com")
+    let u2 = User("Bob", null)
+    println(u1.get_name())
+    if !isnull(u2.email) {
+        println("has email")
+    }
+}
+
+}

@@ -137,6 +137,10 @@ grok Transpiler {
     - Return with optional wrapping: when return type is *T and expr type is T,
       emits IIFE `func() *T { _v := expr; return &_v }()` (Go can't take address
       of rvalues directly).
+    - Try (expr?): error propagation, handled at statement level only (VarDecl
+      and ExprStmt). VarDecl emits `_tryValN, _tryErrN := expr` + early return on
+      error. ExprStmt emits `_, _tryErrN := expr` + check. Uses goTypeZeroValue()
+      and currentReturnAST for zero-value generation in return statements.
 
     Binary operators map directly. Precedence is encoded in the AST structure
     (parser handles it), so no parenthesization logic needed here.
@@ -145,7 +149,7 @@ grok Transpiler {
   doc "Known Limitations": """
     - i128/i256 silently downcast to int64 (data loss)
     - For loops always discard the index variable
-    - fn(T) -> U function type syntax not supported in parser (use T -> U arrow)
+    - Nested ? in arbitrary expression context not supported (only statement-level)
   """
 
   doc "Built-in Function Emission": """
@@ -198,6 +202,8 @@ grok Transpiler {
       why: "Maps unit variant name → enum name. Enables identifier refs to emit ShapeEmpty{} instead of Empty."
     classCtorFields:   map[string][string]
       why: "Maps class name → constructor parameter names. Enables ClassName<T>() calls to emit &ClassName[T]{Field: val} struct literals."
+    classCtorOptional: map[string][bool]
+      why: "Maps class name → which ctor params are optional. When true, non-nil args are auto-wrapped with IIFE: func() *T { _v := expr; return &_v }()."
     autoImports:       map[string]bool
       why: "Auto-detected import requirements. Populated during body transpilation (e.g. 'fmt' for Sprintf, 'cmp' for Ordered), merged with user imports in header. Two-pass: body first (discovers imports), then package+imports."
 

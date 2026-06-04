@@ -31,11 +31,14 @@ type Transpiler struct {
 	variantCtors      map[string]*variantCtorInfo // variant name → constructor info
 	unitVariants      map[string]string           // variant name → enum name (for unit variants)
 	classCtorFields   map[string][]string         // class name → constructor field names
+	classCtorOptional map[string][]bool           // class name → which fields are optional
+	identAlias        map[string]string           // temporary ident substitutions (for guard clause emission)
+	taglessSwitch     bool                        // true when emitting a tagless switch (case conditions are booleans)
 }
 
 // New creates a transpiler targeting the given Go package name.
 func New(pkg string) *Transpiler {
-	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string), classTypeParams: make(map[string][]ast.TypeParam), classCtorFields: make(map[string][]string)}
+	return &Transpiler{pkg: pkg, classes: make(map[string]bool), topFuncs: make(map[string]bool), autoImports: make(map[string]bool), variantCtors: make(map[string]*variantCtorInfo), unitVariants: make(map[string]string), classTypeParams: make(map[string][]ast.TypeParam), classCtorFields: make(map[string][]string), classCtorOptional: make(map[string][]bool)}
 }
 
 func (t *Transpiler) needsImport(pkg string) {
@@ -96,12 +99,15 @@ func (t *Transpiler) transpileBlock(block *ast.GrokBlock) {
 	// Register class names and top-level function names
 	for i := range block.Classes {
 		t.classes[block.Classes[i].Name] = true
-		// Register constructor parameter names for struct literal emission
+		// Register constructor parameter names and optional flags for struct literal emission
 		var ctorFields []string
+		var ctorOptional []bool
 		for _, p := range block.Classes[i].CtorParams {
 			ctorFields = append(ctorFields, p.Name)
+			ctorOptional = append(ctorOptional, p.Type.Kind == ast.TypeOptional)
 		}
 		t.classCtorFields[block.Classes[i].Name] = ctorFields
+		t.classCtorOptional[block.Classes[i].Name] = ctorOptional
 	}
 	for i := range block.Functions {
 		t.topFuncs[block.Functions[i].Name] = true
@@ -1059,9 +1065,24 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 		t.transpileExpr(&matchStmt.Value)
 		t.writef(".(type) {\n")
 	} else {
-		t.writef("switch ")
-		t.transpileExpr(&matchStmt.Value)
-		t.writef(" {\n")
+		// Check if any arm uses ident binding (not literal/wildcard) — needs tagless switch
+		hasIdentBinding := false
+		for _, arm := range matchStmt.Arms {
+			if arm.Pattern.Kind == ast.PatIdent {
+				hasIdentBinding = true
+				break
+			}
+		}
+		if hasIdentBinding {
+			t.writef("switch _m := ")
+			t.transpileExpr(&matchStmt.Value)
+			t.writef("; {\n")
+			t.taglessSwitch = true
+		} else {
+			t.writef("switch ")
+			t.transpileExpr(&matchStmt.Value)
+			t.writef(" {\n")
+		}
 	}
 	for _, arm := range matchStmt.Arms {
 		t.writeIndent()
@@ -1103,13 +1124,39 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 				id := arm.Pattern.Data.(*ast.IdentPattern)
 				t.writef("case %s:\n", id.Name)
 			}
+		} else if arm.Pattern.Kind == ast.PatIdent && t.taglessSwitch {
+			// Ident binding in tagless switch (guard pattern match)
+			id := arm.Pattern.Data.(*ast.IdentPattern)
+			if arm.Guard != nil {
+				t.writef("case ")
+				t.identAlias = map[string]string{id.Name: "_m"}
+				t.transpileExpr(arm.Guard)
+				t.identAlias = nil
+				t.writef(":\n")
+			} else {
+				t.writef("default:\n")
+			}
+			t.indent++
+			if blockRefsIdent(arm.Body, id.Name) {
+				t.writeIndent()
+				t.writef("%s := _m\n", id.Name)
+			}
+			t.transpileStmts(arm.Body.Stmts)
+			t.indent--
+			continue
+		} else if arm.Pattern.Kind == ast.PatLiteral && t.taglessSwitch {
+			// Literal in tagless switch: case _m == literal
+			t.writef("case _m == ")
+			lit := arm.Pattern.Data.(*ast.LiteralPattern)
+			t.transpileExpr(&lit.Expr)
+			t.writef(":\n")
 		} else {
 			t.writef("case ")
 			t.transpilePattern(&arm.Pattern)
 			t.writef(":\n")
 		}
 		t.indent++
-		if arm.Guard != nil {
+		if arm.Guard != nil && !t.taglessSwitch {
 			t.writeIndent()
 			t.writef("if ")
 			t.transpileExpr(arm.Guard)
@@ -1126,6 +1173,7 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	}
 	t.writeIndent()
 	t.writef("}\n")
+	t.taglessSwitch = false
 }
 
 // isEnumMatch checks if the match value expression has an enum resolved type.
@@ -1266,7 +1314,9 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 	case ast.ExprIdent:
 		id := expr.Data.(*ast.IdentExpr)
 		name := id.Name
-		if name == "self" && t.selfName != "" {
+		if alias, ok := t.identAlias[name]; ok {
+			name = alias
+		} else if name == "self" && t.selfName != "" {
 			name = t.selfName
 		} else if enumName, ok := t.unitVariants[name]; ok {
 			// Unit enum variant: emit as struct literal
@@ -1339,6 +1389,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				t.writef("{")
 				// Map positional args to constructor fields
 				if ci, ok := t.classCtorFields[id.Name]; ok {
+					optInfo := t.classCtorOptional[id.Name]
 					for i := range call.Args {
 						if i > 0 {
 							t.writef(", ")
@@ -1348,7 +1399,21 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 							fieldName = ci[i]
 						}
 						t.writef("%s: ", exportName(fieldName))
-						t.transpileExpr(&call.Args[i])
+						// Auto-wrap non-nil values for optional fields
+						isOpt := i < len(optInfo) && optInfo[i]
+						isNil := call.Args[i].Kind == ast.ExprNil
+						if isOpt && !isNil {
+							// Get the Go type of the arg for the IIFE wrapper
+							goType := "any"
+							if ct, ok := call.Args[i].ResolvedType.(*checker.Type); ok {
+								goType = checkerTypeToGo(ct)
+							}
+							t.writef("func() *%s { _v := ", goType)
+							t.transpileExpr(&call.Args[i])
+							t.writef("; return &_v }()")
+						} else {
+							t.transpileExpr(&call.Args[i])
+						}
 					}
 				} else {
 					for i := range call.Args {
@@ -1602,9 +1667,24 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 			t.transpileExpr(&m.Value)
 			t.writef(".(type) {\n")
 		} else {
-			t.writef("switch _m := ")
-			t.transpileExpr(&m.Value)
-			t.writef("; _m {\n")
+			// Check if any arm uses ident binding — needs tagless switch
+			hasIdentBinding := false
+			for _, arm := range m.Arms {
+				if arm.Pattern.Kind == ast.PatIdent {
+					hasIdentBinding = true
+					break
+				}
+			}
+			if hasIdentBinding {
+				t.writef("switch _m := ")
+				t.transpileExpr(&m.Value)
+				t.writef("; {\n")
+				t.taglessSwitch = true
+			} else {
+				t.writef("switch _m := ")
+				t.transpileExpr(&m.Value)
+				t.writef("; _m {\n")
+			}
 		}
 		for _, arm := range m.Arms {
 			t.writeIndent()
@@ -1632,6 +1712,28 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 					t.writef("case %s:\n", id.Name)
 				}
 				t.indent++
+			} else if arm.Pattern.Kind == ast.PatIdent && t.taglessSwitch {
+				id := arm.Pattern.Data.(*ast.IdentPattern)
+				if arm.Guard != nil {
+					t.writef("case ")
+					t.identAlias = map[string]string{id.Name: "_m"}
+					t.transpileExpr(arm.Guard)
+					t.identAlias = nil
+					t.writef(":\n")
+				} else {
+					t.writef("default:\n")
+				}
+				t.indent++
+				if blockRefsIdent(arm.Body, id.Name) {
+					t.writeIndent()
+					t.writef("%s := _m\n", id.Name)
+				}
+			} else if arm.Pattern.Kind == ast.PatLiteral && t.taglessSwitch {
+				t.writef("case _m == ")
+				lit := arm.Pattern.Data.(*ast.LiteralPattern)
+				t.transpileExpr(&lit.Expr)
+				t.writef(":\n")
+				t.indent++
 			} else {
 				t.writef("case ")
 				t.transpilePattern(&arm.Pattern)
@@ -1639,7 +1741,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 				t.indent++
 			}
 			// Last statement in arm body is the result — emit as return
-			if arm.Guard != nil {
+			if arm.Guard != nil && !t.taglessSwitch {
 				t.writeIndent()
 				t.writef("if ")
 				t.transpileExpr(arm.Guard)
@@ -1661,7 +1763,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 					t.transpileStmt(last)
 				}
 			}
-			if arm.Guard != nil {
+			if arm.Guard != nil && !t.taglessSwitch {
 				t.indent--
 				t.writeIndent()
 				t.writef("}\n")
@@ -1696,6 +1798,7 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		t.indent--
 		t.writeIndent()
 		t.writef("}()")
+		t.taglessSwitch = false
 	case ast.ExprCast:
 		cast := expr.Data.(*ast.CastExpr)
 		goType := t.goType(&cast.TargetType)
@@ -2012,3 +2115,104 @@ func exportName(name string) string {
 	}
 	return strings.ToUpper(name[:1]) + name[1:]
 }
+
+// bodyRefsIdent checks if a block body references a given identifier name.
+func bodyRefsIdent(body *ast.Block, name string) bool {
+	if body == nil {
+		return false
+	}
+	for i := range body.Stmts {
+		if stmtRefsIdent(&body.Stmts[i], name) {
+			return true
+		}
+	}
+	return false
+}
+
+func blockRefsIdent(body ast.Block, name string) bool {
+	return bodyRefsIdent(&body, name)
+}
+
+func stmtRefsIdent(stmt *ast.Stmt, name string) bool {
+	switch stmt.Kind {
+	case ast.StmtExpr:
+		return exprRefsIdent(&stmt.Data.(*ast.ExprStmt).Expr, name)
+	case ast.StmtReturn:
+		ret := stmt.Data.(*ast.ReturnStmt)
+		if ret.Value != nil {
+			return exprRefsIdent(ret.Value, name)
+		}
+	case ast.StmtVarDecl:
+		vd := stmt.Data.(*ast.VarDeclStmt)
+		if vd.Value != nil {
+			return exprRefsIdent(vd.Value, name)
+		}
+	case ast.StmtAssign:
+		a := stmt.Data.(*ast.AssignStmt)
+		return exprRefsIdent(&a.Target, name) || exprRefsIdent(&a.Value, name)
+	case ast.StmtIf:
+		ifS := stmt.Data.(*ast.IfStmt)
+		if exprRefsIdent(&ifS.Condition, name) || blockRefsIdent(ifS.Then, name) {
+			return true
+		}
+		for _, elif := range ifS.ElseIfs {
+			if exprRefsIdent(&elif.Condition, name) || blockRefsIdent(elif.Body, name) {
+				return true
+			}
+		}
+		if ifS.Else != nil {
+			return bodyRefsIdent(ifS.Else, name)
+		}
+	case ast.StmtFor:
+		f := stmt.Data.(*ast.ForStmt)
+		return exprRefsIdent(&f.Collection, name) || blockRefsIdent(f.Body, name)
+	case ast.StmtWhile:
+		w := stmt.Data.(*ast.WhileStmt)
+		return exprRefsIdent(&w.Condition, name) || blockRefsIdent(w.Body, name)
+	case ast.StmtBlock:
+		return bodyRefsIdent(stmt.Data.(*ast.Block), name)
+	}
+	return false
+}
+
+func exprRefsIdent(expr *ast.Expr, name string) bool {
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.ExprIdent:
+		return expr.Data.(*ast.IdentExpr).Name == name
+	case ast.ExprBinary:
+		b := expr.Data.(*ast.BinaryExpr)
+		return exprRefsIdent(&b.Left, name) || exprRefsIdent(&b.Right, name)
+	case ast.ExprUnary:
+		return exprRefsIdent(&expr.Data.(*ast.UnaryExpr).Operand, name)
+	case ast.ExprCall:
+		c := expr.Data.(*ast.CallExpr)
+		if exprRefsIdent(&c.Func, name) {
+			return true
+		}
+		for i := range c.Args {
+			if exprRefsIdent(&c.Args[i], name) {
+				return true
+			}
+		}
+	case ast.ExprMethodCall:
+		mc := expr.Data.(*ast.MethodCallExpr)
+		if exprRefsIdent(&mc.Receiver, name) {
+			return true
+		}
+		for i := range mc.Args {
+			if exprRefsIdent(&mc.Args[i], name) {
+				return true
+			}
+		}
+	case ast.ExprFieldAccess:
+		return exprRefsIdent(&expr.Data.(*ast.FieldAccessExpr).Receiver, name)
+	case ast.ExprIndex:
+		idx := expr.Data.(*ast.IndexExpr)
+		return exprRefsIdent(&idx.Receiver, name) || exprRefsIdent(&idx.Index, name)
+	}
+	return false
+}
+

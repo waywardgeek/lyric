@@ -169,7 +169,7 @@ grok AST {
     Unary Binary
     Call MethodCall FieldAccess Index
     ListLit TupleLit MapLit StructLit
-    Lambda Match Cast Unwrap
+    Lambda Match Cast Unwrap Try Slice
   }
 
   struct Expr {
@@ -281,6 +281,11 @@ grok AST {
 
   struct UnwrapExpr {
     why: "expr! — unwrap optional, panic if nil. Rune heritage."
+    Operand: Expr
+  }
+
+  struct TryExpr {
+    why: "expr? — error propagation. Extracts T from (T, error) tuple, returns early on error."
     Operand: Expr
   }
 
