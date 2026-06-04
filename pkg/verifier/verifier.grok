@@ -74,6 +74,12 @@ grok Verifier {
 
     Functions: positional param comparison and return type matching. Multi-return
     in Go maps to tuple returns in Grok, compared element-wise.
+
+    Completeness: after checking declared .grok symbols against Go, the verifier
+    flips the comparison — walks ALL exported Go symbols (types, functions) in the
+    source files and warns about any not documented in the .grok block. This ensures
+    the .grok file captures the full public API surface, not just a subset.
+    Unexported symbols are excluded (they're internal implementation detail).
   """
 
   doc "Severity Levels": """

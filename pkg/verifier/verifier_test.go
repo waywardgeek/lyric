@@ -167,3 +167,82 @@ func TestSnakeToPascal(t *testing.T) {
 		}
 	}
 }
+
+
+func TestCompletenessCheck(t *testing.T) {
+	dir := t.TempDir()
+
+	// Go file with several exported symbols
+	goSrc := `package example
+
+type Widget struct {
+	Name string
+}
+
+type Config struct {
+	Debug bool
+}
+
+type unexported struct {
+	x int
+}
+
+func NewWidget() *Widget { return nil }
+func ParseConfig() *Config { return nil }
+func helper() {}
+`
+	if err := os.WriteFile(filepath.Join(dir, "example.go"), []byte(goSrc), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// .grok only documents Widget — Config and ParseConfig are missing
+	grokSrc := `grok Example {
+  struct Widget {
+    Name: string
+  }
+
+  func NewWidget() -> Widget?
+
+  source: ["example.go"]
+}
+`
+	grokFile := filepath.Join(dir, "example.grok")
+	if err := os.WriteFile(grokFile, []byte(grokSrc), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Verify(grokFile)
+	if err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+
+	var warnings []string
+	for _, f := range result.Findings {
+		if f.Severity == Warning {
+			warnings = append(warnings, f.Message)
+		}
+	}
+
+	// Should warn about Config (exported type) and ParseConfig (exported func)
+	// Should NOT warn about unexported or helper
+	assertWarning := func(substr string) {
+		for _, w := range warnings {
+			if strings.Contains(w, substr) {
+				return
+			}
+		}
+		t.Errorf("expected warning containing %q, got: %v", substr, warnings)
+	}
+	assertNoWarning := func(substr string) {
+		for _, w := range warnings {
+			if strings.Contains(w, substr) {
+				t.Errorf("unexpected warning containing %q: %s", substr, w)
+			}
+		}
+	}
+
+	assertWarning("Config")
+	assertWarning("ParseConfig")
+	assertNoWarning("unexported")
+	assertNoWarning("helper")
+}

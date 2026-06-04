@@ -213,6 +213,82 @@ func verifyBlock(block grokast.GrokBlock, goInfo *goTypeInfo, grokPath string, r
 	for _, f := range block.Functions {
 		verifyFunction(f, goInfo, grokPath, srcStr, result)
 	}
+
+	// Check for exported Go symbols not documented in .grok
+	verifyCompleteness(block, goInfo, grokPath, srcStr, result)
+}
+
+// verifyCompleteness checks that all exported Go symbols in the source files
+// are documented in the .grok block. Reports warnings for missing symbols.
+func verifyCompleteness(block grokast.GrokBlock, goInfo *goTypeInfo, grokPath, goFile string, result *Result) {
+	// Build set of all names declared in .grok
+	grokNames := make(map[string]bool)
+	for _, s := range block.Structs {
+		grokNames[s.Name] = true
+	}
+	for _, c := range block.Classes {
+		grokNames[c.Name] = true
+	}
+	for _, e := range block.Enums {
+		grokNames[e.Name] = true
+	}
+	for _, i := range block.Interfaces {
+		grokNames[i.Name] = true
+	}
+	for _, f := range block.Functions {
+		// Try PascalCase conversion since .grok may use snake_case
+		grokNames[f.Name] = true
+		grokNames[snakeToPascal(f.Name)] = true
+	}
+
+	// Check exported structs (which represent both structs and classes in .grok)
+	var missingTypes []string
+	for name := range goInfo.Structs {
+		if isExported(name) && !grokNames[name] {
+			missingTypes = append(missingTypes, name)
+		}
+	}
+
+	// Check exported interfaces
+	for name := range goInfo.Interfaces {
+		if isExported(name) && !grokNames[name] {
+			missingTypes = append(missingTypes, name)
+		}
+	}
+
+	// Check exported typedefs
+	for name := range goInfo.TypeDefs {
+		if isExported(name) && !grokNames[name] {
+			missingTypes = append(missingTypes, name)
+		}
+	}
+
+	sort.Strings(missingTypes)
+	for _, name := range missingTypes {
+		result.add(Warning, grokPath, goFile, fmt.Sprintf("exported type %s not documented in .grok", name))
+	}
+
+	// Check exported functions (not methods — those are checked per-struct already)
+	var missingFuncs []string
+	for name := range goInfo.Functions {
+		if isExported(name) && !grokNames[name] {
+			missingFuncs = append(missingFuncs, name)
+		}
+	}
+
+	sort.Strings(missingFuncs)
+	for _, name := range missingFuncs {
+		result.add(Warning, grokPath, goFile, fmt.Sprintf("exported function %s not documented in .grok", name))
+	}
+
+}
+
+// isExported returns true if a Go name starts with an uppercase letter.
+func isExported(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	return name[0] >= 'A' && name[0] <= 'Z'
 }
 
 func parseGoDir(dir string) (*goTypeInfo, error) {
