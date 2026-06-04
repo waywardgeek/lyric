@@ -82,6 +82,9 @@ grok Transpiler {
       When IndexVar is present: `for idx, var := range collection`.
     - While: `for condition { ... }`
     - Match: when match value has enum ResolvedType, emits Go type switch
+      (switch _m := val.(type)). When match value has union ResolvedType,
+      emits type switch without binding (switch val.(type)). PatIdent arms
+      use Pattern.ResolvedType → checkerTypeToGo for correct Go type names.
       (`switch _m := val.(type)`) with variant-typed cases and field extraction
       (`r := _m.Radius`). For non-enum matches, emits regular `switch value { ... }`.
       Wildcard → default:. Unit variants in match arms detected via PatIdent.
@@ -217,10 +220,16 @@ grok Transpiler {
     Uses implicit last-expression return for single-expression lambdas.
   }
 
-  doc "Union Type Emission" {
+  doc "Union Type Emission": """
     TyUnion types emit as Go 'any'. Variables of union type use 'var x any = val'
-    syntax. Pattern matching on unions would use Go type switches (future).
-  }
+    syntax. Numeric literals are explicitly cast when assigned to union variables
+    (e.g., 'var x any = int32(42)') to ensure correct type switch matching.
+
+    Match on union types: isUnionMatch detects union-typed match values.
+    Emits Go type switch: 'switch val.(type) { case string: ... case int32: ... }'.
+    Pattern ResolvedType (set by checker's bindUnionPattern) provides the
+    concrete type for Go emission via checkerTypeToGo.
+  """
 
   func checkerTypeToGo(ct: Type?) -> string
     why: "Converts checker.Type to Go type string. Handles composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T."

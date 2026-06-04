@@ -373,9 +373,10 @@ grok AST {
   enum PatternKind { Ident Literal Variant Wildcard Tuple }
 
   struct Pattern {
-    Kind: PatternKind
-    Data: any
-    Span: Span
+    Kind:         PatternKind
+    Data:         any
+    Span:         Span
+    ResolvedType: any  // set by checker for union type patterns
   }
 
   struct IdentPattern   { Name: string }

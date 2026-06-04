@@ -58,9 +58,20 @@ grok Checker {
     - Recursive composite matching: list/map/optional/tuple element types
     - nil (TyUnknown) assignable to optional and interface types
     - T assignable to T? (optional wrapping): any value auto-wraps into optional
-    - TyVar compatible with anything (constraints deferred to Go for now)
+    - TyVar compatible with anything (constraints validated by satisfiesConstraint)
     - Union types: any member type assignable TO the union; union assignable to
       target only if ALL variants are assignable to target
+    - Union declared types NOT propagated to literal ResolvedType (literals keep
+      concrete type for correct Go type switch emission)
+  """
+
+  doc "Union Type Matching": """
+    When a match expression or statement has a union-typed value, the checker
+    uses bindUnionPattern instead of bindPattern. PatIdent names are resolved
+    as type names via resolveNamedType (e.g., "string" → TyString, "i32" →
+    TyInt{32}). The resolved type is validated as a member of the union, and
+    stored in Pattern.ResolvedType for the transpiler to emit correct Go type
+    names (e.g., int32, not i32).
   """
 
   doc "Generics": """
@@ -82,13 +93,23 @@ grok Checker {
        d) Applies substituteType to all formal param types and return type
        e) Checks actual args against substituted (concrete) param types
 
-    3. Binary Operator Passthrough: When either operand of a binary expression
+    3. Constraint Validation: satisfiesConstraint checks that concrete type
+       arguments satisfy their constraints. Called after substitution map is
+       built (both explicit and inferred paths). TypeParamConstraints stored
+       parallel to TypeParamNames on Type. Built-in constraints:
+       - Comparable: numeric, string, bool (→ Go cmp.Ordered)
+       - Equatable/Hashable: numeric, string, bool (→ Go comparable)
+       Unknown constraints pass through to Go compiler.
+
+    4. Binary Operator Passthrough: When either operand of a binary expression
        is TyVar, the checker allows the operation (constraints will be enforced
        by the target language). Returns TypeBool for comparisons/logical ops,
        or the TyVar type for arithmetic/bitwise.
 
-    No type inference at call sites — the caller always provides explicit type
-    arguments. Future: first-arg-wins heuristic may make type args optional.
+    4. Call-Site Type Inference: inferTypeArgs walks parameter and argument types
+       in parallel via matchTypeVars, binding type variable names to concrete
+       types (first match wins). Recursive through composite types. Inferred
+       args stored in CallExpr.InferredTypeArgs for the transpiler.
 
     substituteType is recursive: it walks the type structure replacing TyVar
     nodes that appear in the substitution map with their concrete types. Handles
@@ -226,7 +247,8 @@ grok Checker {
     Params:         [Type?]        // for TyFunc: parameter types
     Return:         Type?          // for TyFunc: return type
     Fields:         [TypeField]    // for TyTuple
-    TypeParamNames: [string]       // for TyFunc: generic type parameter names
+    TypeParamNames:       [string]  // for TyFunc: generic type parameter names
+    TypeParamConstraints: [string]  // for TyFunc: constraints (parallel to TypeParamNames)
     Variants:       [Type?]        // for TyUnion: member types
   }
 
