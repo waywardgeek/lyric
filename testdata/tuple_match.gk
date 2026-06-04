@@ -1,0 +1,20 @@
+grok tuple_match {
+    func main() {
+        let x: i32 = 1
+        let y: i32 = 2
+
+        // Basic literal matching
+        match (x, y) {
+            (1, 2) => { println("one two") }
+            (0, _) => { println("zero something") }
+            (_, _) => { println("other") }
+        }
+
+        // With bindings
+        match (x, y) {
+            (1, b) => { println(b) }
+            (a, 2) => { println(a) }
+            (_, _) => { println("default") }
+        }
+    }
+}

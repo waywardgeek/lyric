@@ -23,6 +23,7 @@ type Transpiler struct {
 	currentReturnType string            // Go return type of current function
 	currentReturnAST  *ast.TypeExpr     // AST return type (for ? operator zero value generation)
 	tryCounter        int               // unique counter for ? operator temp vars
+	tupleVarCounter   int               // unique counter for tuple match temp vars
 	selfName          string            // receiver name to replace "self" with
 	classes           map[string]bool   // tracks which types are classes (pointer receiver methods)
 	topFuncs          map[string]bool   // tracks top-level function names
@@ -1109,6 +1110,13 @@ func (t *Transpiler) transpileWhile(stmt *ast.Stmt) {
 
 func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	matchStmt := stmt.Data.(*ast.MatchStmt)
+
+	// Tuple match: emit if-else chain (Go can't switch on tuples)
+	if matchStmt.Value.Kind == ast.ExprTupleLit {
+		t.transpileTupleMatch(matchStmt)
+		return
+	}
+
 	isEnumMatch := t.isEnumMatch(&matchStmt.Value)
 	isUnionMatch := t.isUnionMatch(&matchStmt.Value)
 	t.writeIndent()
@@ -1288,6 +1296,109 @@ func (t *Transpiler) transpileMatch(stmt *ast.Stmt) {
 	t.writeIndent()
 	t.writef("}\n")
 	t.taglessSwitch = false
+}
+
+// transpileTupleMatch emits an if-else chain for match on tuple values.
+// Go doesn't support switching on tuples, so each arm becomes an if/else-if condition.
+func (t *Transpiler) transpileTupleMatch(matchStmt *ast.MatchStmt) {
+	tupleVal := matchStmt.Value.Data.(*ast.TupleLitExpr)
+
+	// Assign each tuple element to a temp var to avoid re-evaluation
+	varNames := make([]string, len(tupleVal.Elems))
+	for i, elem := range tupleVal.Elems {
+		varNames[i] = fmt.Sprintf("_tv%d_%d", t.tupleVarCounter, i)
+		t.writeIndent()
+		t.writef("%s := ", varNames[i])
+		t.transpileExpr(&elem)
+		t.writef("\n")
+	}
+	t.tupleVarCounter++
+
+	first := true
+	for _, arm := range matchStmt.Arms {
+		t.writeIndent()
+		if arm.Pattern.Kind == ast.PatWildcard || t.isTupleAllWildcard(&arm.Pattern) {
+			// Default/catch-all arm
+			if first {
+				t.writef("{\n")
+			} else {
+				t.writef("} else {\n")
+			}
+		} else if arm.Pattern.Kind == ast.PatTuple {
+			tp := arm.Pattern.Data.(*ast.TuplePattern)
+			if first {
+				t.writef("if ")
+			} else {
+				t.writef("} else if ")
+			}
+			// Build conditions for non-wildcard elements
+			condCount := 0
+			for i, elem := range tp.Elems {
+				if elem.Kind == ast.PatWildcard || elem.Kind == ast.PatIdent {
+					continue
+				}
+				if condCount > 0 {
+					t.writef(" && ")
+				}
+				if elem.Kind == ast.PatLiteral {
+					lit := elem.Data.(*ast.LiteralPattern)
+					t.writef("%s == ", varNames[i])
+					t.transpileExpr(&lit.Expr)
+				}
+				condCount++
+			}
+			if condCount == 0 {
+				t.writef("true")
+			}
+			if arm.Guard != nil {
+				t.writef(" && ")
+				t.transpileExpr(arm.Guard)
+			}
+			t.writef(" {\n")
+		} else {
+			// Single pattern matching entire tuple — unlikely but handle
+			if first {
+				t.writef("{\n")
+			} else {
+				t.writef("} else {\n")
+			}
+		}
+		t.indent++
+		// Emit ident bindings for tuple elements
+		if arm.Pattern.Kind == ast.PatTuple {
+			tp := arm.Pattern.Data.(*ast.TuplePattern)
+			for i, elem := range tp.Elems {
+				if elem.Kind == ast.PatIdent {
+					id := elem.Data.(*ast.IdentPattern)
+					if id.Name != "_" {
+						t.writeIndent()
+						t.writef("%s := %s\n", id.Name, varNames[i])
+					}
+				}
+			}
+		}
+		t.transpileStmts(arm.Body.Stmts)
+		t.indent--
+		first = false
+	}
+	if !first {
+		t.writeIndent()
+		t.writef("}\n")
+	}
+}
+
+// isTupleAllWildcard checks if a tuple pattern has only wildcard elements.
+func (t *Transpiler) isTupleAllWildcard(pat *ast.Pattern) bool {
+	if pat.Kind != ast.PatTuple {
+		return false
+	}
+	tp := pat.Data.(*ast.TuplePattern)
+	for _, elem := range tp.Elems {
+		if elem.Kind != ast.PatWildcard {
+			return false
+		}
+	}
+	return true
 }
 
 // isEnumMatch checks if the match value expression has an enum resolved type.
