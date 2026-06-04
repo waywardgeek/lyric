@@ -133,6 +133,7 @@ grok Grok {
     pkg/verifier/    — Structural comparison engine. Compares .grok declarations
                        against Go source, reports drift with severity levels.
     cmd/grok-compile/ — CLI entry point for .gk → .go compilation.
+    cmd/grok-gen/     — CLI entry point for scaffolding new .grok files.
     cmd/grok-update/  — CLI entry point for .grok Zone 2/3 regeneration.
     cmd/grok-verify/  — CLI entry point for .grok drift detection.
   """
@@ -146,7 +147,7 @@ grok Grok {
     - CI integration: grok-verify as pre-commit hook
   """
 
-  source: ["cmd/grok-verify/main.go", "cmd/grok-compile/main.go", "cmd/grok-update/main.go"]
+  source: ["cmd/grok-verify/main.go", "cmd/grok-compile/main.go", "cmd/grok-update/main.go", "cmd/grok-gen/main.go"]
 }
 // --- index ---
 //
@@ -158,6 +159,8 @@ grok Grok {
 // file: cmd/grok-compile/main.go
 //
 // file: cmd/grok-update/main.go
+//
+// file: cmd/grok-gen/main.go
 
 // --- dependencies ---
 //
