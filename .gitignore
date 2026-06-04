@@ -1,5 +1,5 @@
 # Binaries
-grok-verify
+/grok-verify
 *.exe
 
 # IDE
@@ -12,7 +12,7 @@ grok-verify
 # OS
 .DS_Store
 Thumbs.db
-grok-compile
+/grok-compile
 
 # Generated Go output from .gk compilation
 *.go
@@ -20,3 +20,4 @@ grok-compile
 !cmd/**/*.go
 !pkg/**/*.go
 *.go
+/grok-update
