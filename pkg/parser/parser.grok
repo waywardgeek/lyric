@@ -133,9 +133,10 @@ grok Parser {
   doc "Recursive Type Parsing": """
     parseTypeExpr handles Grok's full recursive type system: sequences [T],
     tuples (T, U), maps map[K]V, channels channel<T>, optionals T?, unions A | B,
-    function types T -> U and (T, U) -> V. Uses a "base type" approach to handle
-    precedence: parse base → check for ? suffix → check for | infix → check for
-    -> infix. When -> follows a tuple, the tuple fields are unwrapped as individual
+    function types T -> U, (T, U) -> V, and fn(T, U) -> V. Uses a "base type"
+    approach to handle precedence: parse base → check for ? suffix → check for
+    | infix → check for -> infix. The fn(...) form is parsed in parseBaseType as
+    a prefix. When -> follows a tuple, the tuple fields are unwrapped as individual
     function params (not a single tuple param).
   """
 

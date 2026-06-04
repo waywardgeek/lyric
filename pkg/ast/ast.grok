@@ -360,6 +360,7 @@ grok AST {
 
   struct MatchArm {
     Pattern: Pattern
+    Guard:   Expr?       // optional guard clause: `if <expr>`
     Body:    Block
     Span:    Span
   }
