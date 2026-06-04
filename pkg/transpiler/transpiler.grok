@@ -93,6 +93,12 @@ grok Transpiler {
     - Cascade: `defer func() { ... }()`
     - Break/Continue: direct Go keywords
     - Block: bare `{ ... }` block
+    - Spawn: `go func() { body }()` — wraps body in anonymous goroutine
+    - Select: `select { case <-ch: ... case ch <- val: ... default: ... }` —
+      detects .receive()/.send() method calls to emit proper Go channel ops.
+      Receive binding: `case val := <-ch`. Default: bare `default:` arm.
+    - Lock: `{ mu.Lock(); defer mu.Unlock(); body }` — scoped block with
+      deferred unlock for exception safety
   """
 
   doc "Expression Transpilation": """

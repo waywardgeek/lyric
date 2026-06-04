@@ -112,6 +112,9 @@ grok Parser {
     - while → parseWhile
     - match → parseMatchStmt (value + arms with patterns)
     - cascade → parseCascade (deferred cleanup block)
+    - spawn → parseSpawn (spawn { body } goroutine)
+    - select → parseSelect (select { case ch.receive()/send/default })
+    - lock → parseLock (lock(mu) { body } scoped mutex)
     - break/continue → direct AST nodes
     - Otherwise → parseExprOrAssign (expression or assignment statement)
 
@@ -123,11 +126,11 @@ grok Parser {
   """
 
   doc ".gk Token Extensions": """
-    The lexer recognizes 15 .gk-specific keywords (let, mut, if, else, for, in,
-    while, match, return, break, continue, cascade, true, false, nil) and 22
-    operator tokens (arithmetic, comparison, logical, bitwise, shift, assignment,
-    compound assignment, fat arrow). These are only meaningful in function body
-    context but are always lexed — the parser determines context.
+    The lexer recognizes .gk-specific keywords (let, mut, if, else, for, in,
+    while, match, return, break, continue, cascade, spawn, select, lock,
+    true, false, nil, null, fn, type) and 22 operator tokens. These are only
+    meaningful in function body context but are always lexed — the parser
+    determines context.
   """
 
   doc "Recursive Type Parsing": """

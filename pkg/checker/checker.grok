@@ -206,6 +206,10 @@ grok Checker {
       with real field types from registry), check each arm body
     - Break/Continue: error if loopDepth == 0
     - Block: push scope, check stmts, pop scope
+    - Spawn: check body block (no special type context)
+    - Select: check each case — validate receive/send channel expressions,
+      bind receive var in case scope, check case bodies
+    - Lock: check mutex expression, check body block
     - Cascade/Expr: check inner expression(s)
   """
 
@@ -238,6 +242,10 @@ grok Checker {
     The transpiler maps these to Go stdlib calls (strings.Contains, slices.Contains,
     etc.) with automatic import insertion. Methods that don't map to Go methods
     (e.g., map.contains_key) use IIFE patterns.
+
+    Channel methods: send(val), receive(), close() — checked via checkChannelMethod,
+    which validates arg types against channel element type. receive() returns the
+    channel's element type. Transpiled via transpileChannelMethod to Go channel ops.
   """
 
   // ---- Type system ----

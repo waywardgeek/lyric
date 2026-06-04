@@ -290,6 +290,7 @@ grok AST {
     VarDecl Assign Return Expr
     If For While Match
     Block Cascade Break Continue
+    Spawn Select Lock
   }
 
   struct Stmt {
@@ -367,6 +368,31 @@ grok AST {
 
   struct CascadeStmt {
     Body: Block
+  }
+
+  struct SpawnStmt {
+    why: "spawn { body } — launches a goroutine. Transpiles to go func() { body }()."
+    Body: Block
+  }
+
+  struct SelectStmt {
+    why: "select { case ... } — multiplexes channel operations. Cases are receive, send, or default."
+    Cases: [SelectCase]
+  }
+
+  struct SelectCase {
+    why: "A single case in a select statement."
+    IsDefault: bool
+    BindVar:   string    // optional: `case val = ch.receive()` binds received value
+    Expr:      Expr?     // nil for default case; ch.receive() or ch.send(val)
+    Body:      Block
+    Span:      Span
+  }
+
+  struct LockStmt {
+    why: "lock(mu) { body } — scoped mutex lock. Transpiles to { mu.Lock(); defer mu.Unlock(); body }."
+    Mutex: Expr
+    Body:  Block
   }
 
   // ---- Patterns (.gk) ----
@@ -528,6 +554,15 @@ grok AST {
     Span:  Span
   }
 
+  // ---- Type Aliases ----
+
+  struct TypeAliasDecl {
+    why: "type Name = OtherType — introduces a named alias for any type expression."
+    Name: string
+    Type: TypeExpr
+    Span: Span
+  }
+
   // ---- Top-level ----
 
   struct GrokBlock {
@@ -542,8 +577,9 @@ grok AST {
     Interfaces: [InterfaceDecl]
     Classes:    [ClassDecl]
     Functions:  [FuncDecl]
-    Relations:  [RelationDecl]
-    Source:     [string]
+    Relations:   [RelationDecl]
+    TypeAliases: [TypeAliasDecl]
+    Source:      [string]
     Fake:       string
     Span:       Span
   }
