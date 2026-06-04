@@ -779,6 +779,8 @@ func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 		return c.checkCast(expr)
 	case ast.ExprUnwrap:
 		return c.checkUnwrap(expr)
+	case ast.ExprTry:
+		return c.checkTry(expr)
 	case ast.ExprLambda:
 		return c.checkLambda(expr)
 	default:
@@ -1376,6 +1378,58 @@ func (c *Checker) checkUnwrap(expr *ast.Expr) *Type {
 		c.error(expr.Span, "cannot unwrap non-optional type %s", operandType)
 	}
 	return TypeUnknown
+}
+
+// isErrorType returns true if the type represents Go's error interface.
+func isErrorType(t *Type) bool {
+	if t.Kind == TyError {
+		return true
+	}
+	if t.Kind == TyInterface && t.Name == "error" {
+		return true
+	}
+	return false
+}
+
+func (c *Checker) checkTry(expr *ast.Expr) *Type {
+	try := expr.Data.(*ast.TryExpr)
+	operandType := c.checkExpr(&try.Operand)
+
+	// Operand must be (T, error) tuple
+	if operandType.Kind != TyTuple || len(operandType.Fields) < 2 {
+		if operandType.Kind != TyUnknown {
+			c.error(expr.Span, "? operator requires (T, error) return type, got %s", operandType)
+		}
+		return TypeUnknown
+	}
+
+	lastField := operandType.Fields[len(operandType.Fields)-1]
+	if !isErrorType(lastField.Type) {
+		c.error(expr.Span, "? operator requires last tuple element to be error, got %s", lastField.Type)
+		return TypeUnknown
+	}
+
+	// Enclosing function must also return (..., error)
+	if c.currentReturn == nil {
+		c.error(expr.Span, "? operator can only be used in functions that return error")
+		return TypeUnknown
+	}
+	if c.currentReturn.Kind == TyTuple {
+		lastRet := c.currentReturn.Fields[len(c.currentReturn.Fields)-1]
+		if !isErrorType(lastRet.Type) {
+			c.error(expr.Span, "? operator can only be used in functions that return (..., error)")
+		}
+	} else if !isErrorType(c.currentReturn) {
+		c.error(expr.Span, "? operator can only be used in functions that return error")
+	}
+
+	// Result type: if single non-error field, return it directly; otherwise tuple of non-error fields
+	nonErrorFields := operandType.Fields[:len(operandType.Fields)-1]
+	if len(nonErrorFields) == 1 {
+		return nonErrorFields[0].Type
+	}
+	// Return tuple of non-error field types
+	return &Type{Kind: TyTuple, Fields: nonErrorFields}
 }
 
 func (c *Checker) checkLambda(expr *ast.Expr) *Type {

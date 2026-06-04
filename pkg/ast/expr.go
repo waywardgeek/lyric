@@ -28,6 +28,7 @@ const (
 	ExprCast                      // <i64>x — type cast
 	ExprUnwrap                    // x! — unwrap optional, panic if nil
 	ExprSlice                     // xs[start:end] — slice expression
+	ExprTry                       // expr? — error propagation, early return on error
 )
 
 // Expr is any expression node.
@@ -177,6 +178,12 @@ type CastExpr struct {
 
 // UnwrapExpr represents expr! — unwrap an optional value, panic if nil.
 type UnwrapExpr struct {
+	Operand Expr
+}
+
+// TryExpr represents expr? — error propagation. The inner expression must return
+// (T, error). If the error is non-nil, early-returns it. Otherwise evaluates to T.
+type TryExpr struct {
 	Operand Expr
 }
 

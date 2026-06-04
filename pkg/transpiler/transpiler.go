@@ -21,6 +21,8 @@ type Transpiler struct {
 	indent            int
 	pkg               string            // Go package name
 	currentReturnType string            // Go return type of current function
+	currentReturnAST  *ast.TypeExpr     // AST return type (for ? operator zero value generation)
+	tryCounter        int               // unique counter for ? operator temp vars
 	selfName          string            // receiver name to replace "self" with
 	classes           map[string]bool   // tracks which types are classes (pointer receiver methods)
 	topFuncs          map[string]bool   // tracks top-level function names
@@ -477,13 +479,17 @@ func (t *Transpiler) transpileFunc(fn *ast.FuncDecl, receiver string) {
 		t.writef(" {\n")
 		t.indent++
 		prevReturn := t.currentReturnType
+		prevReturnAST := t.currentReturnAST
 		if fn.ReturnType != nil {
 			t.currentReturnType = t.goType(fn.ReturnType)
+			t.currentReturnAST = fn.ReturnType
 		} else {
 			t.currentReturnType = ""
+			t.currentReturnAST = nil
 		}
 		t.transpileStmts(fn.Body.Stmts)
 		t.currentReturnType = prevReturn
+		t.currentReturnAST = prevReturnAST
 		t.indent--
 		t.writeIndent()
 		t.writef("}\n")
@@ -734,9 +740,22 @@ func (t *Transpiler) transpileStmt(stmt *ast.Stmt) {
 		t.transpileReturn(stmt)
 	case ast.StmtExpr:
 		es := stmt.Data.(*ast.ExprStmt)
-		t.writeIndent()
-		t.transpileExpr(&es.Expr)
-		t.writef("\n")
+		// Handle ? operator in expression statement: expr? → _, err := expr; if err != nil { return }
+		if es.Expr.Kind == ast.ExprTry {
+			try := es.Expr.Data.(*ast.TryExpr)
+			n := t.tryCounter
+			t.tryCounter++
+			errVar := fmt.Sprintf("_tryErr%d", n)
+			t.writeIndent()
+			t.writef("_, %s := ", errVar)
+			t.transpileExpr(&try.Operand)
+			t.writef("\n")
+			t.emitTryErrCheck(errVar)
+		} else {
+			t.writeIndent()
+			t.transpileExpr(&es.Expr)
+			t.writef("\n")
+		}
 	case ast.StmtIf:
 		t.transpileIf(stmt)
 	case ast.StmtFor:
@@ -844,6 +863,34 @@ func (t *Transpiler) transpileStmt(stmt *ast.Stmt) {
 
 func (t *Transpiler) transpileVarDecl(stmt *ast.Stmt) {
 	decl := stmt.Data.(*ast.VarDeclStmt)
+
+	// Handle ? operator: let x = expr? → temp, err := expr; if err != nil { return ..., err }; x := temp
+	if decl.Value != nil && decl.Value.Kind == ast.ExprTry {
+		try := decl.Value.Data.(*ast.TryExpr)
+		n := t.tryCounter
+		t.tryCounter++
+		valVar := fmt.Sprintf("_tryVal%d", n)
+		errVar := fmt.Sprintf("_tryErr%d", n)
+
+		// Emit: _tryValN, _tryErrN := operand
+		t.writeIndent()
+		t.writef("%s, %s := ", valVar, errVar)
+		t.transpileExpr(&try.Operand)
+		t.writef("\n")
+
+		// Emit: if _tryErrN != nil { return <zeros>, _tryErrN }
+		t.emitTryErrCheck(errVar)
+
+		// Emit: x := _tryValN
+		t.writeIndent()
+		if decl.Name == "_" {
+			t.writef("_ = %s\n", valVar)
+		} else {
+			t.writef("%s := %s\n", decl.Name, valVar)
+		}
+		return
+	}
+
 	t.writeIndent()
 
 	// Tuple destructuring: let (a, b) = expr → a, b := expr
@@ -1652,6 +1699,73 @@ func (t *Transpiler) transpileExpr(expr *ast.Expr) {
 		// Simple form: just dereference with *
 		t.writef("*")
 		t.transpileExpr(&unwrap.Operand)
+	case ast.ExprTry:
+		// ? in nested expression context — should have been handled at statement level
+		// Emit a comment for debugging; this case shouldn't occur in well-formed code
+		try := expr.Data.(*ast.TryExpr)
+		t.writef("/* TODO: nested ? */ ")
+		t.transpileExpr(&try.Operand)
+	}
+}
+
+// emitTryErrCheck emits: if errVar != nil { return <zero values>, errVar }
+// Uses currentReturnAST to generate the correct zero values for non-error return fields.
+func (t *Transpiler) emitTryErrCheck(errVar string) {
+	t.writeIndent()
+	t.writef("if %s != nil {\n", errVar)
+	t.indent++
+	t.writeIndent()
+
+	// Build the return statement with zero values for non-error fields
+	if t.currentReturnAST != nil {
+		t.writef("return ")
+		switch t.currentReturnAST.Kind {
+		case ast.TypeTuple:
+			tuple := t.currentReturnAST.Data.(ast.TupleType)
+			// All fields except the last (error) get zero values
+			for i, field := range tuple.Fields {
+				if i == len(tuple.Fields)-1 {
+					// Last field is error — return the error var
+					t.writef("%s", errVar)
+				} else {
+					t.writef("%s", goTypeZeroValue(t.goType(&field.Type)))
+				}
+				if i < len(tuple.Fields)-1 {
+					t.writef(", ")
+				}
+			}
+		default:
+			// Function returns just `error`
+			t.writef("%s", errVar)
+		}
+		t.writef("\n")
+	} else {
+		t.writef("return %s\n", errVar)
+	}
+
+	t.indent--
+	t.writeIndent()
+	t.writef("}\n")
+}
+
+// goTypeZeroValue returns the Go zero value for a type string.
+func goTypeZeroValue(goType string) string {
+	switch goType {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64":
+		return "0"
+	case "string":
+		return `""`
+	case "bool":
+		return "false"
+	default:
+		if strings.HasPrefix(goType, "*") || strings.HasPrefix(goType, "[]") ||
+			strings.HasPrefix(goType, "map[") || goType == "any" || goType == "error" {
+			return "nil"
+		}
+		// Struct types: use var zero pattern
+		return goType + "{}"
 	}
 }
 

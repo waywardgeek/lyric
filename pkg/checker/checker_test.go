@@ -1394,3 +1394,59 @@ func TestTypeAliasUnion(t *testing.T) {
 	}`)
 	expectNoErrors(t, c)
 }
+
+func TestTryOperatorValid(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		import errors from "errors"
+		func divide(a: i32, b: i32) -> (i32, error) {
+			if b == 0 {
+				return (0, errors.New("div by zero"))
+			}
+			return (a / b, nil)
+		}
+		func compute(x: i32) -> (i32, error) {
+			let result = divide(x, 2)?
+			return (result, nil)
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestTryOperatorNotErrorReturn(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		import errors from "errors"
+		func divide(a: i32, b: i32) -> (i32, error) {
+			return (a / b, nil)
+		}
+		func compute(x: i32) -> i32 {
+			let result = divide(x, 2)?
+			return result
+		}
+	}`)
+	expectErrors(t, c, 1)
+}
+
+func TestTryOperatorNonTupleOperand(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func f() -> (i32, error) {
+			let x: i32 = 42
+			let y = x?
+			return (y, nil)
+		}
+	}`)
+	expectErrors(t, c, 2)
+}
+
+func TestTryOperatorExprStmt(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		import errors from "errors"
+		func side_effect() -> (i32, error) {
+			return (0, nil)
+		}
+		func run() -> (i32, error) {
+			side_effect()?
+			return (1, nil)
+		}
+	}`)
+	expectNoErrors(t, c)
+}

@@ -312,6 +312,14 @@ func (p *Parser) parsePostfixExpr() (*ast.Expr, error) {
 				Data: &ast.UnwrapExpr{Operand: *expr},
 				Span: ast.Span{Start: expr.Span.Start, End: bang.Span.End},
 			}
+		case TQuestion:
+			// Postfix ? — error propagation, early return on error
+			q := p.next()
+			expr = &ast.Expr{
+				Kind: ast.ExprTry,
+				Data: &ast.TryExpr{Operand: *expr},
+				Span: ast.Span{Start: expr.Span.Start, End: q.Span.End},
+			}
 		default:
 			return expr, nil
 		}

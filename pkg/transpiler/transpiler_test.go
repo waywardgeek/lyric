@@ -751,3 +751,51 @@ func TestTranspileUnionVarDecl(t *testing.T) {
 		t.Error("expected int32(42) cast for union assignment, got:", out)
 	}
 }
+
+func TestTranspileTryOperator(t *testing.T) {
+	src := `grok test {
+		import errors from "errors"
+		func divide(a: i32, b: i32) -> (i32, error) {
+			if b == 0 {
+				return (0, errors.New("div by zero"))
+			}
+			return (a / b, nil)
+		}
+		func compute(x: i32) -> (i32, error) {
+			let result = divide(x, 2)?
+			return (result, nil)
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "_tryVal0, _tryErr0 :=") {
+		t.Error("expected try temp vars, got:", out)
+	}
+	if !strings.Contains(out, "if _tryErr0 != nil") {
+		t.Error("expected error check, got:", out)
+	}
+	if !strings.Contains(out, "return 0, _tryErr0") {
+		t.Error("expected zero value return with error, got:", out)
+	}
+	if !strings.Contains(out, "result := _tryVal0") {
+		t.Error("expected result assignment from try val, got:", out)
+	}
+}
+
+func TestTranspileTryExprStmt(t *testing.T) {
+	src := `grok test {
+		func side_effect() -> (i32, error) {
+			return (0, nil)
+		}
+		func run() -> (i32, error) {
+			side_effect()?
+			return (1, nil)
+		}
+	}`
+	out := transpileWithChecker(t, src)
+	if !strings.Contains(out, "_, _tryErr0 :=") {
+		t.Error("expected discarded try val, got:", out)
+	}
+	if !strings.Contains(out, "if _tryErr0 != nil") {
+		t.Error("expected error check, got:", out)
+	}
+}
