@@ -1286,3 +1286,91 @@ func TestConstraintInferred(t *testing.T) {
 		t.Errorf("unexpected errors: %v", c.Errors())
 	}
 }
+
+func TestNullKeyword(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func main() {
+			let x: string? = null
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestNullWithoutTypeAnnotation(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		func main() {
+			let x = null
+		}
+	}`)
+	if len(c.Errors()) == 0 {
+		t.Fatal("expected error for null without type annotation")
+	}
+	found := false
+	for _, e := range c.Errors() {
+		if strings.Contains(e.Error(), "cannot infer type of null") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'cannot infer type of null' error, got: %v", c.Errors())
+	}
+}
+
+func TestEnumMatchExhaustive(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		enum Shape {
+			Circle(radius: f64)
+			Square(side: f64)
+		}
+		func describe(s: Shape) {
+			match s {
+				Circle(r) => { println(r) }
+				Square(s) => { println(s) }
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
+func TestEnumMatchNonExhaustive(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		enum Shape {
+			Circle(radius: f64)
+			Square(side: f64)
+			Triangle(base: f64, height: f64)
+		}
+		func describe(s: Shape) {
+			match s {
+				Circle(r) => { println(r) }
+			}
+		}
+	}`)
+	if len(c.Errors()) == 0 {
+		t.Fatal("expected non-exhaustive match error")
+	}
+	found := false
+	for _, e := range c.Errors() {
+		if strings.Contains(e.Error(), "non-exhaustive match") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'non-exhaustive match' error, got: %v", c.Errors())
+	}
+}
+
+func TestEnumMatchWildcardExhaustive(t *testing.T) {
+	c := parseAndCheck(t, `grok test {
+		enum Shape {
+			Circle(radius: f64)
+			Square(side: f64)
+		}
+		func describe(s: Shape) {
+			match s {
+				Circle(r) => { println(r) }
+				_ => { println("other") }
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}

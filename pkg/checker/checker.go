@@ -1450,6 +1450,10 @@ func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 	} else if declaredType != nil {
 		finalType = declaredType
 	} else if inferredType != nil {
+		// null/nil without type annotation has no type context
+		if decl.Value != nil && decl.Value.Kind == ast.ExprNil {
+			c.error(stmt.Span, "cannot infer type of null without annotation; use 'let x: T? = null'")
+		}
 		finalType = inferredType // type inference!
 	} else {
 		c.error(stmt.Span, "variable %q has no type annotation and no initializer", decl.Name)
@@ -1569,6 +1573,73 @@ func (c *Checker) checkMatch(stmt *ast.Stmt) {
 		}
 		c.checkBlock(&matchStmt.Arms[i].Body)
 		c.popScope()
+	}
+
+	// Exhaustiveness check for enum match
+	if matchType.Kind == TyEnum {
+		enumInfo := c.registry.Lookup(matchType.Name)
+		if enumInfo != nil && len(enumInfo.Variants) > 0 {
+			hasWildcard := false
+			covered := make(map[string]bool)
+			for _, arm := range matchStmt.Arms {
+				switch arm.Pattern.Kind {
+				case ast.PatWildcard:
+					hasWildcard = true
+				case ast.PatIdent:
+					id := arm.Pattern.Data.(*ast.IdentPattern)
+					if id.Name == "_" {
+						hasWildcard = true
+					} else {
+						covered[id.Name] = true
+					}
+				case ast.PatVariant:
+					vp := arm.Pattern.Data.(*ast.VariantPattern)
+					covered[vp.Name] = true
+				}
+			}
+			if !hasWildcard {
+				var missing []string
+				for name := range enumInfo.Variants {
+					if !covered[name] {
+						missing = append(missing, name)
+					}
+				}
+				if len(missing) > 0 {
+					c.error(stmt.Span, "non-exhaustive match on enum %s: missing variant(s) %v", matchType.Name, missing)
+				}
+			}
+		}
+	}
+
+	// Exhaustiveness check for union match
+	if isUnion && len(matchType.Variants) > 0 {
+		hasWildcard := false
+		covered := make(map[string]bool)
+		for _, arm := range matchStmt.Arms {
+			switch arm.Pattern.Kind {
+			case ast.PatWildcard:
+				hasWildcard = true
+			case ast.PatIdent:
+				id := arm.Pattern.Data.(*ast.IdentPattern)
+				if id.Name == "_" {
+					hasWildcard = true
+				} else {
+					covered[id.Name] = true
+				}
+			}
+		}
+		if !hasWildcard {
+			var missing []string
+			for _, v := range matchType.Variants {
+				name := v.String()
+				if !covered[name] {
+					missing = append(missing, name)
+				}
+			}
+			if len(missing) > 0 {
+				c.error(stmt.Span, "non-exhaustive match on union %s: missing type(s) %v", matchType, missing)
+			}
+		}
 	}
 }
 

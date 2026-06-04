@@ -74,6 +74,22 @@ grok Checker {
     names (e.g., int32, not i32).
   """
 
+  doc "Exhaustiveness Checking": """
+    After checking all match arms, checkMatch performs exhaustiveness analysis
+    for enum and union match statements. For enums: collects variant names from
+    PatIdent and PatVariant arms, checks for wildcard (_), and warns if not all
+    variants are covered. For unions: same logic using type names from PatIdent.
+    Wildcard arms suppress the warning. This is a warning, not an error —
+    non-exhaustive matches may be intentional.
+  """
+
+  doc "Null Type Inference": """
+    `let x = null` (or `nil`) without a type annotation produces a checker error:
+    "cannot infer type of null without annotation". The reason: null has no type
+    on its own — it needs context from a declared type (e.g., `let x: T? = null`)
+    or a return type. This prevents Go-side emission of untyped nil variables.
+  """
+
   doc "Generics": """
     Generic functions declare type parameters via <T: Constraint> syntax. The
     generics implementation has three parts:

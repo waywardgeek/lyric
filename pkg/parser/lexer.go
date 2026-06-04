@@ -136,6 +136,7 @@ var keywords = map[string]TokenKind{
 	"true":       TTrue,
 	"false":      TFalse,
 	"nil":        TNil,
+	"null":       TNil,
 	"let":        TLet,
 	"if":         TIf,
 	"else":       TElse,

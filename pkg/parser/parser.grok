@@ -47,6 +47,10 @@ grok Parser {
     TokenKinds, but the parser's expectIdentLike() accepts keyword tokens as
     identifiers when in field/param position. This is essential for self-referential
     .grok files where fields are named "source", "where", "requires", etc.
+
+    `null` is a keyword alias for `nil` — both map to TNil in the lexer,
+    producing the same ExprNil AST node. This avoids confusion for developers
+    coming from other languages.
   """
 
   doc "Lookahead and State Restoration": """
