@@ -21,3 +21,4 @@ Thumbs.db
 !pkg/**/*.go
 /grok-update
 /grok-gen
+/grok
