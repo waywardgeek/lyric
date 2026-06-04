@@ -355,17 +355,8 @@ grok Checker {
   func substituteType(t: Type?, subst: map[string]Type?) -> Type?
     why: "Recursively replaces TyVar nodes in a type tree according to a substitution map. Handles List, Map, Optional, Tuple, Func composite types."
 
-  func inferTypeArgs(fnType: Type?, argTypes: [Type?]) -> map[string]Type??
-    why: "Infers generic type arguments by walking parameter types and argument types in parallel. Returns substitution map or nil if inference fails. Explicit type args take priority when present."
-
   func matchTypeVars(param: Type?, arg: Type?, subst: map[string]Type?)
     why: "Recursively walks a parameter type and argument type in parallel, binding TyVar names to concrete types. Handles List, Map, Optional, Tuple, Func composites."
-
-  func checkLambda(expr: Expr?) -> Type?
-    why: "Type-checks a lambda expression. Pushes new scope, defines params, resolves return type, checks body. Returns TyFunc with proper param/return types — enables type inference to work with lambdas as args."
-
-  func checkTry(expr: Expr?) -> Type?
-    why: "Type-checks postfix ? operator. Validates operand returns (T, error) tuple and enclosing function returns error. Returns T."
 
   func isErrorType(t: Type?) -> bool
     why: "Checks if type is error — handles both TyError and TyInterface{Name:'error'} since error is registered as interface."

@@ -227,17 +227,17 @@ grok Transpiler {
   func grokPrimitiveToGo(name: string) -> string
     why: "Maps Grok primitive type names to Go equivalents."
 
-  doc "Type Inference Emission" {
+  doc "Type Inference Emission": """
     When CallExpr has InferredTypeArgs (set by checker), the transpiler emits
     Go type arguments from these inferred types instead of requiring explicit
     TypeArgs. Both function calls and method calls check InferredTypeArgs as
     fallback when TypeArgs is empty.
-  }
+  """
 
-  doc "Lambda Emission" {
+  doc "Lambda Emission": """
     ExprLambda emits as Go anonymous function: func(params) RetType { body }.
     Uses implicit last-expression return for single-expression lambdas.
-  }
+  """
 
   doc "Union Type Emission": """
     TyUnion types emit as Go 'any'. Variables of union type use 'var x any = val'
@@ -252,18 +252,6 @@ grok Transpiler {
 
   func checkerTypeToGo(ct: Type?) -> string
     why: "Converts checker.Type to Go type string. Handles composites recursively: TyList→[]T, TyMap→map[K]V, TyOptional→*T."
-
-  func enumMatchNeedsBinding(arms: [MatchArm]) -> bool
-    why: "Returns true if any match arm destructures variant fields, meaning the type switch needs '_m := val.(type)' rather than 'val.(type)'. Prevents Go unused-variable errors for unit-only enum matches."
-
-  func hasNestedVariantBindings(arms: [MatchArm]) -> bool
-    why: "Detects nested PatVariant in variant bindings (e.g. Some(Circle(r))). Triggers arm grouping and nested type switch emission."
-
-  func emitNestedTypeSwitch(outerVP: VariantPattern, innerArms: [MatchArm], matchVar: string, isExprMatch: bool, retType: string)
-    why: "Emits nested switch _m2 := _m.Field.(type) for arms sharing an outer variant with different inner patterns. isExprMatch adds return statements; retType adds fallback zero-value return."
-
-  func emitVariantBindings(vp: VariantPattern, matchVar: string)
-    why: "Emits field extraction from type-switch matched variant. matchVar specifies the Go variable (e.g. '_m', '_m2') for nested match support."
 
   func binaryOpString(op: BinaryOp) -> string
 
