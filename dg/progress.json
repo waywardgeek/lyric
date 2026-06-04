@@ -1,6 +1,8 @@
 {
   "initial_expert_pass": {
     ".": true,
+    "cmd/grok-compile": true,
+    "cmd/grok-verify": true,
     "pkg/ast": true,
     "pkg/checker": true,
     "pkg/parser": true,
@@ -10,6 +12,8 @@
   "scout_pass": true,
   "final_expert_pass": {
     ".": true,
+    "cmd/grok-compile": true,
+    "cmd/grok-verify": true,
     "pkg/ast": true,
     "pkg/checker": true,
     "pkg/parser": true,
@@ -20,29 +24,35 @@
     ".": {
       "hello.go": "a5245a55874a5d4a3f15c4a32c3475bcd78f8af7f1a27cc8c8125ff222db8ec2"
     },
+    "cmd/grok-compile": {
+      "main.go": "c990dc998156ae90f741ccadee04262b74cf81f98090412bfa69235f7956851f"
+    },
+    "cmd/grok-verify": {
+      "main.go": "a386bfece72b241e11a404b97c020c412ec2998aed6284d3e7b19637e282a225"
+    },
     "pkg/ast": {
-      "ast.go": "2ee168802bceb0ee339b50074054087a1a6fa97d2d555c47a46bbb4f8d53f7dc",
-      "expr.go": "1fe5f367f5e964efbb7bec24b0a561b0e190fd8e6c863c649913aa74187054fe"
+      "ast.go": "9e191d8a575f41176def93656e0d2a436e2939de66ea3f0ca32729e1eb52b9a9",
+      "expr.go": "557b9a0633052c85eb3e3a0f47a1d979418f3d5ae93182e731e89f1514e8c39c"
     },
     "pkg/checker": {
-      "checker.go": "66a56ba80c720f5ab35462f135c459e48ca332bca969a0c95aab75740d19eca3",
-      "checker_test.go": "f2553a9634a47d0f777566b13d69556d334a20424ca731389ef167cab34cc628"
+      "checker.go": "57b25fab07d0b63ed943c0de08e9d93b2f49e8bf70f033c2709c351190fb650a",
+      "checker_test.go": "ca75f8d1c59ff71b9ff269a7ca3769d15647550f7c000154f8adb8dd3e4af365"
     },
     "pkg/parser": {
-      "expr_parser.go": "a048093be4bb27206e0d7cb39e9858d9bdae59b8da7af7ce6e44515e1d1b39d0",
-      "expr_parser_test.go": "bce4e36a019dffc4d45fa59fe3e66e56203db6c026542c84df7a610162d89d7d",
-      "lexer.go": "0603a7df25f8eb3541226f37416d39c5cf58cad5913c8a028120c0545f506f2c",
+      "expr_parser.go": "dafa084a59fb5ef0b80034ede394535cba5989d756179532e7614d77112b2521",
+      "expr_parser_test.go": "56a550f5a827c97f63b5df603dca2b3f76b015fff167e48bbdb6bc359f850ca7",
+      "lexer.go": "77dad967fa7803d8cd839e4f54e1408bacac6724c275fafaa80ff43cb5a07c5b",
       "lexer_test.go": "410d81f55fe3d9b9cf4880e1fb23df9e7de7c1f34dcb8228fecb65996ca6bf9d",
-      "parser.go": "e4c306a833853c3369efe2fe25766c2b13dfa04fcfbb66c932dab6badd585049",
-      "parser_test.go": "17e034b9d3e06c830381f78e0a6b5f4c303407ecd83fa922ad084bfe94e765ec"
+      "parser.go": "3841cf0273879456ccf096630d0ae10492c6481eb0600b5c47188cd40f7a1b8c",
+      "parser_test.go": "d8ffb559a37fc16276061fdb54e5441b8a4eda59fdf99c4fb6edb4d2943451d3"
     },
     "pkg/transpiler": {
-      "transpiler.go": "11ca1906dd4c622c4f742f481088ffd37ed6d60e3cdcd10b1d2abf14a323931c",
-      "transpiler_test.go": "d1d9b0efa6a97f179962296ce2e1ac6cf56b8e45c110bd1956c803761f246e14"
+      "transpiler.go": "8eceb86477a0ce01e45312133f4daa7455a72338e594c1b57224efffb7e9385b",
+      "transpiler_test.go": "2ada817bf4662394a7cf777bfc4cdb0933be060c526f4f08015af65163fcca37"
     },
     "pkg/verifier": {
-      "verifier.go": "c5751c59a8431eb1516c854f4cce1151f4008348e4b2ef18e683649e9ca9d6f3",
-      "verifier_test.go": "0224225bb7651a0aef4093bd60e739536bf494a835df4dec61a4a4e8f9bed177"
+      "verifier.go": "4914709773eb1828abc40d0581ce5201d23c8f70af26277db1260e4e1a529ed3",
+      "verifier_test.go": "4614493339bb2fa10652d9abf3a2866d16e0bbeffeb23b89d2167cce92c165e0"
     }
   },
   "processed_files": [
@@ -63,6 +73,21 @@
     "[refined] /Users/bill/projects/grok/pkg/ast/design.md",
     "[refined] /Users/bill/projects/grok/pkg/checker/design.md",
     "[refined] /Users/bill/projects/grok/pkg/parser/design.md",
-    "[refined] /Users/bill/projects/grok/pkg/transpiler/design.md"
+    "[refined] /Users/bill/projects/grok/pkg/transpiler/design.md",
+    "[initial] /Users/bill/projects/clean_grok/cmd/grok-compile/design.md",
+    "[initial] /Users/bill/projects/clean_grok/cmd/grok-verify/design.md",
+    "[initial] /Users/bill/projects/clean_grok/pkg/ast/design.md",
+    "[initial] /Users/bill/projects/clean_grok/pkg/checker/design.md",
+    "[initial] /Users/bill/projects/clean_grok/pkg/parser/design.md",
+    "[initial] /Users/bill/projects/clean_grok/pkg/transpiler/design.md",
+    "[initial] /Users/bill/projects/clean_grok/pkg/verifier/design.md",
+    "[synthesis] project-design.md",
+    "[refined] /Users/bill/projects/clean_grok/cmd/grok-compile/design.md",
+    "[refined] /Users/bill/projects/clean_grok/cmd/grok-verify/design.md",
+    "[refined] /Users/bill/projects/clean_grok/pkg/ast/design.md",
+    "[refined] /Users/bill/projects/clean_grok/pkg/checker/design.md",
+    "[refined] /Users/bill/projects/clean_grok/pkg/parser/design.md",
+    "[refined] /Users/bill/projects/clean_grok/pkg/transpiler/design.md",
+    "[refined] /Users/bill/projects/clean_grok/pkg/verifier/design.md"
   ]
 }
