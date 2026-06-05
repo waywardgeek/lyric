@@ -201,8 +201,9 @@ func cmdCompile(args []string) error {
 		files = append(files, parsedFile{file: file, input: input, output: out})
 	}
 
-	// Desugar default implementations and relations before type checking
+	// Desugar: interface fields → getters/setters, relations → field injection + impl blocks, default impls → generic functions
 	for _, pf := range files {
+		ast.DesugarInterfaceFields(pf.file)
 		ast.DesugarRelations(pf.file)
 		ast.DesugarDefaultImpls(pf.file)
 	}

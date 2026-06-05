@@ -54,9 +54,52 @@ func DesugarDefaultImpls(file *File) {
 	}
 }
 
+// DesugarInterfaceFields converts interface field declarations into getter/setter
+// methods on the interface. Must run before DesugarRelations and DesugarDefaultImpls.
+//
+//	field P.first: C?
+//
+// becomes:
+//
+//	func P.first(self) -> C?
+//	func P.set_first(mut self, val: C?)
+func DesugarInterfaceFields(file *File) {
+	for bi := range file.Blocks {
+		block := &file.Blocks[bi]
+		for ii := range block.Interfaces {
+			iface := &block.Interfaces[ii]
+			for _, fd := range iface.Fields {
+				// Getter: func T.name(self) -> Type
+				getter := FuncDecl{
+					Name:         fd.Name,
+					ReceiverType: fd.TypeParam,
+					Params: []Param{
+						{Name: "self", IsSelf: true},
+					},
+					ReturnType: &fd.Type,
+					Span:       fd.Span,
+				}
+				iface.Methods = append(iface.Methods, getter)
+
+				// Setter: func T.set_name(mut self, val: Type)
+				setter := FuncDecl{
+					Name:         "set_" + fd.Name,
+					ReceiverType: fd.TypeParam,
+					Params: []Param{
+						{Name: "self", IsSelf: true, IsMut: true},
+						{Name: "val", Type: fd.Type},
+					},
+					Span: fd.Span,
+				}
+				iface.Methods = append(iface.Methods, setter)
+			}
+		}
+	}
+}
+
 // DesugarRelations processes relation declarations:
 // 1. Injects default fields from the interface into concrete classes (with label prefixing)
-// 2. Generates impl blocks mapping interface fields to concrete class fields
+// 2. Generates impl blocks with field bindings mapping interface getters to concrete fields
 func DesugarRelations(file *File) {
 	for bi := range file.Blocks {
 		block := &file.Blocks[bi]
@@ -79,9 +122,6 @@ func DesugarRelations(file *File) {
 				continue
 			}
 
-			// Build type param -> concrete type mapping from the relation
-			// Interface has type params like <P, C>
-			// Relation maps: Parent -> first type param, Child -> second (if IsMany/exists)
 			if len(iface.TypeParams) < 2 {
 				continue
 			}
@@ -90,6 +130,9 @@ func DesugarRelations(file *File) {
 			typeMap := make(map[string]RelationSide) // type param name -> relation side
 			typeMap[iface.TypeParams[0].Name] = rel.Parent
 			typeMap[iface.TypeParams[1].Name] = rel.Child
+
+			// Collect impl mappings for the auto-generated impl block
+			var mappings []ImplMapping
 
 			// For each interface field, inject into the appropriate concrete class
 			for _, fd := range iface.Fields {
@@ -115,6 +158,46 @@ func DesugarRelations(file *File) {
 					Name: fieldName,
 					Type: fieldType,
 					Span: fd.Span,
+				})
+
+				// Generate field binding for getter: T.name <-> ConcreteClass.prefixed_name
+				mappings = append(mappings, ImplMapping{
+					TypeParam:    fd.TypeParam,
+					MethodName:   fd.Name,
+					Kind:         ImplFieldBind,
+					TargetClass:  side.TypeName,
+					TargetMember: fieldName,
+					Span:         fd.Span,
+				})
+
+				// Generate field binding for setter: T.set_name <-> ConcreteClass.prefixed_name
+				mappings = append(mappings, ImplMapping{
+					TypeParam:    fd.TypeParam,
+					MethodName:   "set_" + fd.Name,
+					Kind:         ImplFieldBind,
+					TargetClass:  side.TypeName,
+					TargetMember: fieldName,
+					Span:         fd.Span,
+				})
+			}
+
+			// Generate impl block with type args from the relation
+			if len(mappings) > 0 {
+				var typeArgs []TypeExpr
+				typeArgs = append(typeArgs, TypeExpr{
+					Kind: TypeNamed,
+					Data: NamedType{Name: rel.Parent.TypeName},
+				})
+				typeArgs = append(typeArgs, TypeExpr{
+					Kind: TypeNamed,
+					Data: NamedType{Name: rel.Child.TypeName},
+				})
+
+				block.ImplBlocks = append(block.ImplBlocks, ImplBlock{
+					InterfaceName: rel.Hint,
+					TypeArgs:      typeArgs,
+					Mappings:      mappings,
+					Span:          rel.Span,
 				})
 			}
 		}

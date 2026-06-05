@@ -177,6 +177,17 @@ func (g *GoBackend) buildVisibilityMap(prog *LProgram) {
 // Type emission
 // ---------------------------------------------------------------------------
 
+// goTypeForIface emits a Go type string for use in interface method signatures.
+// In this context, Optional(TypeVar) collapses to just TypeVar because Go generic
+// constraints will be instantiated with pointer types (classes), so *C would become
+// **file instead of *file.
+func (g *GoBackend) goTypeForIface(t *LType) string {
+	if t != nil && t.Kind == LTyOptional && t.Elem != nil && t.Elem.Kind == LTyTypeVar {
+		return g.goType(t.Elem)
+	}
+	return g.goType(t)
+}
+
 func (g *GoBackend) goType(t *LType) string {
 	if t == nil {
 		return ""
@@ -233,6 +244,10 @@ func (g *GoBackend) goType(t *LType) string {
 		g.autoImport("sync")
 		return "sync.Mutex"
 	case LTyOptional:
+		// Classes are already pointers in Go — *ClassName is sufficient, no **ClassName
+		if t.Elem != nil && t.Elem.Kind == LTyClassHandle {
+			return "*" + g.visName(t.Elem.Name, t.Elem.IsExported)
+		}
 		return "*" + g.goType(t.Elem)
 	case LTyTaggedUnion:
 		return g.visName(t.Name, t.IsExported)
@@ -315,8 +330,9 @@ func (g *GoBackend) emitTypeParamsWithRelational(tps []LTypeParam, relConstraint
 					g.collectTypeVarRefs(m.Params, m.ReturnType, usedTPs)
 				}
 				// Map interface type param names to function type param names
+				// Include self-referencing type params if used in method signatures
 				for j, otherTP := range rc.TypeArgs {
-					if j != i && usedTPs[iface.TypeParams[j].Name] {
+					if usedTPs[iface.TypeParams[j].Name] {
 						otherArgs = append(otherArgs, otherTP)
 					}
 				}
@@ -464,8 +480,23 @@ func (g *GoBackend) emitInterfaceDecl(iface *LInterfaceDecl) {
 			}
 			g.collectTypeVarRefs(m.Params, m.ReturnType, usedTPs)
 		}
-		// Remove self-reference
-		delete(usedTPs, recvTP)
+		// Only remove self-reference if it's not actually used in method params/return types
+		// (e.g. C.prev() -> C? needs C in scope even though C is the receiver type)
+		selfUsedInSignatures := false
+		for _, m := range iface.Methods {
+			if m.ReceiverType != recvTP {
+				continue
+			}
+			sigRefs := map[string]bool{}
+			g.collectTypeVarRefs(m.Params, m.ReturnType, sigRefs)
+			if sigRefs[recvTP] {
+				selfUsedInSignatures = true
+				break
+			}
+		}
+		if !selfUsedInSignatures {
+			delete(usedTPs, recvTP)
+		}
 
 		// Build ordered list of used type params (preserve original order)
 		var otherTPs []LTypeParam
@@ -503,11 +534,11 @@ func (g *GoBackend) emitInterfaceDecl(iface *LInterfaceDecl) {
 				if i > 0 {
 					g.writef(", ")
 				}
-				g.writef("%s %s", p.Name, g.goType(p.Type))
+				g.writef("%s %s", p.Name, g.goTypeForIface(p.Type))
 			}
 			g.writef(")")
 			if m.ReturnType != nil && m.ReturnType.Kind != LTyUnit {
-				g.writef(" %s", g.goType(m.ReturnType))
+				g.writef(" %s", g.goTypeForIface(m.ReturnType))
 			}
 			g.writef("\n")
 		}
@@ -592,7 +623,10 @@ func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 	startIdx := 0
 	if f.Receiver != "" {
 		// Method — emit as (self *ReceiverType[T, ...])
-		startIdx = 1 // skip self param
+		// Skip self param if present (wrapper methods may not have self in Params)
+		if len(f.Params) > 0 && f.Params[0].Name == "self" {
+			startIdx = 1
+		}
 		receiverType := g.visName(f.Receiver, g.nameExported[f.Receiver])
 		if len(f.ReceiverTypeParams) > 0 {
 			var tpNames []string
@@ -1432,8 +1466,16 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 
 	case LExprIsNull:
 		d := e.Data.(*LIsNullData)
-		g.emitValue(&d.Value)
-		g.writef(" == nil")
+		// Type variables can't be compared to nil directly in Go generics;
+		// cast to any first
+		if d.Value.Type != nil && d.Value.Type.Kind == LTyTypeVar {
+			g.writef("any(")
+			g.emitValue(&d.Value)
+			g.writef(") == nil")
+		} else {
+			g.emitValue(&d.Value)
+			g.writef(" == nil")
+		}
 
 	case LExprVariantConstruct:
 		d := e.Data.(*LVariantConstructData)
@@ -1550,8 +1592,10 @@ func (g *GoBackend) emitBuiltin(d *LBuiltinData) {
 		g.writef(")")
 	case "isnull":
 		if len(d.Args) > 0 {
+			// Use any() cast to handle type variables in Go generics
+			g.writef("any(")
 			g.emitValue(&d.Args[0])
-			g.writef(" == nil")
+			g.writef(") == nil")
 		}
 	case "channel_receive":
 		if len(d.Args) > 0 {

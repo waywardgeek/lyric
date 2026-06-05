@@ -18,7 +18,7 @@ forge Interfaces {
     }
   }
 
-  // DoublyLinked with default fields for parent/child pointers
+  // DoublyLinked with default fields and a default append method
   interface DoublyLinked<P, C> {
     func P.children(self) -> [C]
     func C.label(self) -> string
@@ -29,6 +29,17 @@ forge Interfaces {
     field C.prev: C?
     field C.next: C?
     field C.parent: P?
+
+    // Default method: append child to parent's linked list
+    pub func dll_append(parent: P, child: C) {
+      let old_last = parent.last()
+      parent.set_last(child)
+      child.set_prev(old_last)
+      child.set_parent(parent)
+      if isnull(old_last) {
+        parent.set_first(child)
+      }
+    }
   }
 
   // Classes use DIFFERENT method names than the interface
@@ -62,9 +73,7 @@ forge Interfaces {
 
   class File(title: string) {}
 
-  // This relation injects DoublyLinked default fields into Folder and File:
-  // Folder gets: files_first: File?, files_last: File?
-  // File gets: from_prev: File?, from_next: File?, from_parent: Folder?
+  // This relation injects DoublyLinked default fields into Folder and File
   relation DoublyLinked Folder:files owns [File:from]
 
   impl DoublyLinked<Folder, File> {
@@ -91,12 +100,15 @@ forge Interfaces {
     let num = count_children<Folder, File>(dir)
     println(num)
 
-    // Verify injected fields exist by checking they're nil (default)
-    if isnull(dir.files_first) {
-      println("first is null")
+    // Test default append method
+    let dir2 = Folder("empty", [])
+    let f3 = File("new.txt")
+    dll_append<Folder, File>(dir2, f3)
+    if !isnull(dir2.files_first) {
+      println("append works")
     }
-    if isnull(f1.from_parent) {
-      println("parent is null")
+    if !isnull(f3.from_parent) {
+      println("parent set")
     }
   }
 }

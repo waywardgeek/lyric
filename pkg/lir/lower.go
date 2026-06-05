@@ -689,7 +689,8 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 		}
 		if mapping.Kind == ast.ImplFieldBind {
 			// Field binding: P.children <-> Folder.items
-			// Generates a getter: func (self *Folder) Children() []*File { return self.Items }
+			// For getters: func (self *Folder) Children() []*File { return self.Items }
+			// For setters: func (self *Folder) Set_children(val []*File) { self.Items = val }
 			var ifaceMethod *LInterfaceMethod
 			for i := range iface.Methods {
 				if iface.Methods[i].ReceiverType == mapping.TypeParam && iface.Methods[i].Name == mapping.MethodName {
@@ -706,30 +707,51 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 				continue
 			}
 
-			retType := l.substImplType(ifaceMethod.ReturnType, typeArgMap)
-
-			// Getter body: return self.field
-			var body []LStmt
-			fieldAccess := LExpr{
-				Kind: LExprClassGet,
-				Data: &LClassGetData{
+			isSetter := len(ifaceMethod.Params) > 0
+			if isSetter {
+				// Setter body: self.field = val
+				valType := l.substImplType(ifaceMethod.Params[0].Type, typeArgMap)
+				var body []LStmt
+				body = append(body, LStmt{Kind: LStmtClassSet, Data: &LClassSet{
 					Handle: LValue{Kind: LValVar, Name: "self", Type: &LType{Kind: LTyClassHandle, Name: className}},
 					Class:  className,
 					Field:  mapping.TargetMember,
-				},
-				Type: retType,
-			}
-			body = append(body, LStmt{Kind: LStmtTempDef, Data: &LTempDef{ID: 0, Expr: fieldAccess}})
-			body = append(body, LStmt{Kind: LStmtReturn, Data: &LReturn{Values: []LValue{{Kind: LValTemp, TempID: 0, Type: retType}}}})
+					Value:  LValue{Kind: LValVar, Name: "val", Type: valType},
+				}})
 
-			wrappers = append(wrappers, LFuncDecl{
-				Name:       ifaceMethod.Name,
-				Receiver:   className,
-				Params:     nil, // getter has no params
-				ReturnType: retType,
-				Body:       body,
-				IsExported: true,
-			})
+				wrappers = append(wrappers, LFuncDecl{
+					Name:       ifaceMethod.Name,
+					Receiver:   className,
+					Params:     []LParam{{Name: "val", Type: valType}},
+					ReturnType: nil,
+					Body:       body,
+					IsExported: true,
+				})
+			} else {
+				// Getter body: return self.field
+				retType := l.substImplType(ifaceMethod.ReturnType, typeArgMap)
+				var body []LStmt
+				fieldAccess := LExpr{
+					Kind: LExprClassGet,
+					Data: &LClassGetData{
+						Handle: LValue{Kind: LValVar, Name: "self", Type: &LType{Kind: LTyClassHandle, Name: className}},
+						Class:  className,
+						Field:  mapping.TargetMember,
+					},
+					Type: retType,
+				}
+				body = append(body, LStmt{Kind: LStmtTempDef, Data: &LTempDef{ID: 0, Expr: fieldAccess}})
+				body = append(body, LStmt{Kind: LStmtReturn, Data: &LReturn{Values: []LValue{{Kind: LValTemp, TempID: 0, Type: retType}}}})
+
+				wrappers = append(wrappers, LFuncDecl{
+					Name:       ifaceMethod.Name,
+					Receiver:   className,
+					Params:     nil, // getter has no params
+					ReturnType: retType,
+					Body:       body,
+					IsExported: true,
+				})
+			}
 		}
 		// TODO: ImplInline ({body})
 	}
