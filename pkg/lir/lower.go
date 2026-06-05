@@ -9,6 +9,17 @@ import (
 	"github.com/waywardgeek/grok/pkg/checker"
 )
 
+// dataAs extracts a value from an any-typed Data field, handling both pointer and value storage.
+func dataAs[T any](data any) *T {
+	switch v := data.(type) {
+	case *T:
+		return v
+	case T:
+		return &v
+	}
+	panic(fmt.Sprintf("dataAs: unexpected type %T", data))
+}
+
 // Lowerer converts a type-checked AST into LIR.
 type Lowerer struct {
 	nextTemp int
@@ -167,19 +178,19 @@ func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType {
 	}
 	switch te.Kind {
 	case ast.TypeNamed:
-		nt := te.Data.(*ast.NamedType)
+		nt := dataAs[ast.NamedType](te.Data)
 		return l.lowerNamedType(nt)
 	case ast.TypeOptional:
-		ot := te.Data.(*ast.OptionalType)
+		ot := dataAs[ast.OptionalType](te.Data)
 		return &LType{Kind: LTyOptional, Elem: l.lowerTypeExpr(&ot.Inner)}
 	case ast.TypeSequence:
-		st := te.Data.(*ast.SequenceType)
+		st := dataAs[ast.SequenceType](te.Data)
 		return &LType{Kind: LTySlice, Elem: l.lowerTypeExpr(&st.Elem)}
 	case ast.TypeMap:
-		mt := te.Data.(*ast.MapType)
+		mt := dataAs[ast.MapType](te.Data)
 		return &LType{Kind: LTyMap, Key: l.lowerTypeExpr(&mt.Key), Elem: l.lowerTypeExpr(&mt.Value)}
 	case ast.TypeTuple:
-		tt := te.Data.(*ast.TupleType)
+		tt := dataAs[ast.TupleType](te.Data)
 		var fields []LField
 		for i, f := range tt.Fields {
 			name := f.Name
@@ -194,14 +205,14 @@ func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType {
 		}
 		return &LType{Kind: LTyTuple, Fields: fields}
 	case ast.TypeFunc:
-		ft := te.Data.(*ast.FuncType)
+		ft := dataAs[ast.FuncType](te.Data)
 		var params []*LType
 		for _, p := range ft.Params {
 			params = append(params, l.lowerTypeExpr(&p))
 		}
 		return &LType{Kind: LTyFuncPtr, Params: params, Return: l.lowerTypeExpr(&ft.Return)}
 	case ast.TypeChannel:
-		ct := te.Data.(*ast.ChannelType)
+		ct := dataAs[ast.ChannelType](te.Data)
 		return &LType{Kind: LTyChannel, Elem: l.lowerTypeExpr(&ct.Elem)}
 	case ast.TypeLock:
 		return &LType{Kind: LTyMutex}
@@ -484,15 +495,15 @@ func (l *Lowerer) lowerStmt(stmt *ast.Stmt) {
 	case ast.StmtContinue:
 		l.emit(LStmt{Kind: LStmtContinue})
 	case ast.StmtCascade:
-		cs := stmt.Data.(*ast.CascadeStmt)
+		cs := dataAs[ast.CascadeStmt](stmt.Data)
 		l.emit(LStmt{Kind: LStmtDefer, Data: &LDefer{Body: l.lowerBlock(&cs.Body)}})
 	case ast.StmtSpawn:
-		ss := stmt.Data.(*ast.SpawnStmt)
+		ss := dataAs[ast.SpawnStmt](stmt.Data)
 		l.emit(LStmt{Kind: LStmtSpawn, Data: &LSpawn{Body: l.lowerBlock(&ss.Body)}})
 	case ast.StmtSelect:
 		l.lowerSelectStmt(stmt)
 	case ast.StmtLock:
-		ls := stmt.Data.(*ast.LockStmt)
+		ls := dataAs[ast.LockStmt](stmt.Data)
 		mutexVal := l.lowerExpr(&ls.Mutex)
 		l.emit(LStmt{Kind: LStmtLock, Data: &LLock{
 			Mutex: mutexVal,
@@ -502,7 +513,7 @@ func (l *Lowerer) lowerStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt) {
-	vd := stmt.Data.(*ast.VarDeclStmt)
+	vd := dataAs[ast.VarDeclStmt](stmt.Data)
 
 	// Tuple destructuring: let (a, b) = expr
 	if len(vd.Names) > 0 && vd.Value != nil {
@@ -559,12 +570,12 @@ func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
-	as := stmt.Data.(*ast.AssignStmt)
+	as := dataAs[ast.AssignStmt](stmt.Data)
 	val := l.lowerExpr(&as.Value)
 
 	// Handle field assignment: target.field = value
 	if as.Target.Kind == ast.ExprFieldAccess {
-		fa := as.Target.Data.(*ast.FieldAccessExpr)
+		fa := dataAs[ast.FieldAccessExpr](as.Target.Data)
 		recv := l.lowerExpr(&fa.Receiver)
 		// Check if receiver is a class (use ClassSet) or struct (use StructSet)
 		if recv.Type != nil && recv.Type.Kind == LTyClassHandle {
@@ -586,7 +597,7 @@ func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
 
 	// Handle index assignment: collection[index] = value
 	if as.Target.Kind == ast.ExprIndex {
-		idx := as.Target.Data.(*ast.IndexExpr)
+		idx := dataAs[ast.IndexExpr](as.Target.Data)
 		coll := l.lowerExpr(&idx.Receiver)
 		index := l.lowerExpr(&idx.Index)
 		l.emit(LStmt{Kind: LStmtIndexSet, Data: &LIndexSet{
@@ -599,7 +610,7 @@ func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
 
 	// Simple variable assignment
 	if as.Target.Kind == ast.ExprIdent {
-		ident := as.Target.Data.(*ast.IdentExpr)
+		ident := dataAs[ast.IdentExpr](as.Target.Data)
 		l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
 			Target: ident.Name,
 			Value:  val,
@@ -615,12 +626,12 @@ func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt) {
-	rs := stmt.Data.(*ast.ReturnStmt)
+	rs := dataAs[ast.ReturnStmt](stmt.Data)
 	var values []LValue
 	if rs.Value != nil {
 		// Handle tuple literal returns as multiple values
 		if rs.Value.Kind == ast.ExprTupleLit {
-			tl := rs.Value.Data.(*ast.TupleLitExpr)
+			tl := dataAs[ast.TupleLitExpr](rs.Value.Data)
 			for _, elem := range tl.Elems {
 				values = append(values, l.lowerExpr(&elem))
 			}
@@ -632,7 +643,7 @@ func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt) {
-	es := stmt.Data.(*ast.ExprStmt)
+	es := dataAs[ast.ExprStmt](stmt.Data)
 	val := l.lowerExpr(&es.Expr)
 	// Emit as a TempDef that is immediately discarded
 	if val.Kind == LValTemp {
@@ -641,7 +652,7 @@ func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt) {
-	is := stmt.Data.(*ast.IfStmt)
+	is := dataAs[ast.IfStmt](stmt.Data)
 	cond := l.lowerExpr(&is.Condition)
 	then := l.lowerBlock(&is.Then)
 
@@ -681,7 +692,7 @@ func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LSt
 }
 
 func (l *Lowerer) lowerForStmt(stmt *ast.Stmt) {
-	fs := stmt.Data.(*ast.ForStmt)
+	fs := dataAs[ast.ForStmt](stmt.Data)
 	coll := l.lowerExpr(&fs.Collection)
 
 	// Infer element type from collection
@@ -709,7 +720,7 @@ func (l *Lowerer) lowerForStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt) {
-	ws := stmt.Data.(*ast.WhileStmt)
+	ws := dataAs[ast.WhileStmt](stmt.Data)
 
 	// Build the condition block: flatten the condition expression,
 	// then the last temp is the condition value.
@@ -727,7 +738,7 @@ func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt) {
 }
 
 func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt) {
-	ms := stmt.Data.(*ast.MatchStmt)
+	ms := dataAs[ast.MatchStmt](stmt.Data)
 	matchVal := l.lowerExpr(&ms.Value)
 
 	// Check if this is an enum match
@@ -773,7 +784,7 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		return LSwitchCase{Tag: -1, Body: body}
 
 	case ast.PatIdent:
-		ip := arm.Pattern.Data.(*ast.IdentPattern)
+		ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
 		// Check if this is a unit variant
 		if en, ok := l.unitVariants[ip.Name]; ok && en == enumName {
 			tag := l.findVariantTag(enumName, ip.Name)
@@ -785,7 +796,7 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		return LSwitchCase{Tag: -1, Binding: ip.Name, Body: body}
 
 	case ast.PatVariant:
-		vp := arm.Pattern.Data.(*ast.VariantPattern)
+		vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
 		tag := l.findVariantTag(enumName, vp.Name)
 
 		// Extract variant data fields into bindings
@@ -795,7 +806,7 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		if info, ok := l.variantCtors[vp.Name]; ok {
 			for i, binding := range vp.Bindings {
 				if binding.Kind == ast.PatIdent {
-					bp := binding.Data.(*ast.IdentPattern)
+					bp := dataAs[ast.IdentPattern](binding.Data)
 					fieldName := ""
 					if i < len(info.fieldNames) {
 						fieldName = info.fieldNames[i]
@@ -865,7 +876,7 @@ func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
 		}
 
 		if arm.Pattern.Kind == ast.PatLiteral {
-			lp := arm.Pattern.Data.(*ast.LiteralPattern)
+			lp := dataAs[ast.LiteralPattern](arm.Pattern.Data)
 			litVal := l.lowerExpr(&lp.Expr)
 			cmpTemp := l.emitTemp(LExpr{
 				Kind: LExprBinOp,
@@ -895,7 +906,7 @@ func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
 
 		// Ident pattern as catch-all
 		if arm.Pattern.Kind == ast.PatIdent {
-			ip := arm.Pattern.Data.(*ast.IdentPattern)
+			ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
 			body := l.lowerBlock(&arm.Body)
 			// Bind the match value to the name, then execute body
 			allStmts := []LStmt{{Kind: LStmtVarDecl, Data: &LVarDecl{
@@ -924,12 +935,12 @@ func (l *Lowerer) findVariantTag(enumName, variantName string) int {
 }
 
 func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt) {
-	bs := stmt.Data.(*ast.Block)
+	bs := dataAs[ast.Block](stmt.Data)
 	l.emit(LStmt{Kind: LStmtBlock, Data: &LBlock{Stmts: l.lowerBlock(bs)}})
 }
 
 func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt) {
-	ss := stmt.Data.(*ast.SelectStmt)
+	ss := dataAs[ast.SelectStmt](stmt.Data)
 	var cases []LSelectCase
 	for _, c := range ss.Cases {
 		sc := l.lowerSelectCase(&c)
@@ -948,7 +959,7 @@ func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase {
 
 	// Determine if this is a send or receive by inspecting the expression
 	if c.Expr != nil && c.Expr.Kind == ast.ExprMethodCall {
-		mc := c.Expr.Data.(*ast.MethodCallExpr)
+		mc := dataAs[ast.MethodCallExpr](c.Expr.Data)
 		ch := l.lowerExpr(&mc.Receiver)
 		if mc.Method == "send" && len(mc.Args) > 0 {
 			val := l.lowerExpr(&mc.Args[0])
@@ -1063,7 +1074,7 @@ func (l *Lowerer) exprType(expr *ast.Expr) *LType {
 // --- Individual expression lowering ---
 
 func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue {
-	ie := expr.Data.(*ast.IdentExpr)
+	ie := dataAs[ast.IdentExpr](expr.Data)
 
 	// Check if it's a unit variant
 	if enumName, ok := l.unitVariants[ie.Name]; ok {
@@ -1083,7 +1094,7 @@ func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue {
-	il := expr.Data.(*ast.IntLitExpr)
+	il := dataAs[ast.IntLitExpr](expr.Data)
 	val, _ := strconv.ParseInt(il.Value, 0, 64)
 	typ := l.exprType(expr)
 	if typ.Kind == LTyAny {
@@ -1093,7 +1104,7 @@ func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue {
-	fl := expr.Data.(*ast.FloatLitExpr)
+	fl := dataAs[ast.FloatLitExpr](expr.Data)
 	val, _ := strconv.ParseFloat(fl.Value, 64)
 	typ := l.exprType(expr)
 	if typ.Kind == LTyAny {
@@ -1103,17 +1114,17 @@ func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue {
-	sl := expr.Data.(*ast.StringLitExpr)
+	sl := dataAs[ast.StringLitExpr](expr.Data)
 	return LValue{Kind: LValLitString, StrVal: sl.Value, Type: &LType{Kind: LTyString}}
 }
 
 func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue {
-	bl := expr.Data.(*ast.BoolLitExpr)
+	bl := dataAs[ast.BoolLitExpr](expr.Data)
 	return LValue{Kind: LValLitBool, BoolVal: bl.Value, Type: &LType{Kind: LTyBool}}
 }
 
 func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue {
-	be := expr.Data.(*ast.BinaryExpr)
+	be := dataAs[ast.BinaryExpr](expr.Data)
 	left := l.lowerExpr(&be.Left)
 	right := l.lowerExpr(&be.Right)
 
@@ -1178,7 +1189,7 @@ func mapBinaryOp(op ast.BinaryOp) LBinOpKind {
 }
 
 func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue {
-	ue := expr.Data.(*ast.UnaryExpr)
+	ue := dataAs[ast.UnaryExpr](expr.Data)
 	operand := l.lowerExpr(&ue.Operand)
 
 	var op LUnOpKind
@@ -1202,7 +1213,7 @@ func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
-	ce := expr.Data.(*ast.CallExpr)
+	ce := dataAs[ast.CallExpr](expr.Data)
 
 	// Lower arguments
 	var args []LValue
@@ -1213,11 +1224,11 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 	// Get function name
 	var funcName string
 	if ce.Func.Kind == ast.ExprIdent {
-		funcName = ce.Func.Data.(*ast.IdentExpr).Name
+		funcName = dataAs[ast.IdentExpr](ce.Func.Data).Name
 	} else if ce.Func.Kind == ast.ExprFieldAccess {
-		fa := ce.Func.Data.(*ast.FieldAccessExpr)
+		fa := dataAs[ast.FieldAccessExpr](ce.Func.Data)
 		if fa.Receiver.Kind == ast.ExprIdent {
-			funcName = fa.Receiver.Data.(*ast.IdentExpr).Name + "." + fa.Field
+			funcName = dataAs[ast.IdentExpr](fa.Receiver.Data).Name + "." + fa.Field
 		}
 	}
 
@@ -1275,7 +1286,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
-	mc := expr.Data.(*ast.MethodCallExpr)
+	mc := dataAs[ast.MethodCallExpr](expr.Data)
 	recv := l.lowerExpr(&mc.Receiver)
 
 	var args []LValue
@@ -1359,7 +1370,7 @@ func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, 
 }
 
 func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {
-	fa := expr.Data.(*ast.FieldAccessExpr)
+	fa := dataAs[ast.FieldAccessExpr](expr.Data)
 	recv := l.lowerExpr(&fa.Receiver)
 	resultType := l.exprType(expr)
 
@@ -1379,7 +1390,7 @@ func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue {
-	ie := expr.Data.(*ast.IndexExpr)
+	ie := dataAs[ast.IndexExpr](expr.Data)
 	coll := l.lowerExpr(&ie.Receiver)
 	idx := l.lowerExpr(&ie.Index)
 
@@ -1391,7 +1402,7 @@ func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue {
-	se := expr.Data.(*ast.SliceExpr)
+	se := dataAs[ast.SliceExpr](expr.Data)
 	coll := l.lowerExpr(&se.Receiver)
 
 	var low, high *LValue
@@ -1412,7 +1423,7 @@ func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue {
-	ll := expr.Data.(*ast.ListLitExpr)
+	ll := dataAs[ast.ListLitExpr](expr.Data)
 	var fields []LFieldInit
 	for i, elem := range ll.Elems {
 		val := l.lowerExpr(&elem)
@@ -1428,7 +1439,7 @@ func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue {
-	ml := expr.Data.(*ast.MapLitExpr)
+	ml := dataAs[ast.MapLitExpr](expr.Data)
 	// Maps need a different approach — emit as make + index_set
 	mapType := l.exprType(expr)
 	mapVal := l.emitTemp(LExpr{
@@ -1451,7 +1462,7 @@ func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue {
-	tl := expr.Data.(*ast.TupleLitExpr)
+	tl := dataAs[ast.TupleLitExpr](expr.Data)
 	var fields []LFieldInit
 	for i, elem := range tl.Elems {
 		val := l.lowerExpr(&elem)
@@ -1466,7 +1477,7 @@ func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue {
-	sl := expr.Data.(*ast.StructLitExpr)
+	sl := dataAs[ast.StructLitExpr](expr.Data)
 	var fields []LFieldInit
 	for _, f := range sl.Fields {
 		val := l.lowerExpr(&f.Value)
@@ -1486,13 +1497,13 @@ func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue {
-	si := expr.Data.(*ast.StringInterpExpr)
+	si := dataAs[ast.StringInterpExpr](expr.Data)
 	var parts []LFormatPart
 	for i, part := range si.Parts {
 		if i%2 == 0 {
 			// String literal part
 			if part.Kind == ast.ExprStringLit {
-				sl := part.Data.(*ast.StringLitExpr)
+				sl := dataAs[ast.StringLitExpr](part.Data)
 				parts = append(parts, LFormatPart{IsLiteral: true, Text: sl.Value})
 			}
 		} else {
@@ -1525,7 +1536,7 @@ func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerCast(expr *ast.Expr) LValue {
-	ce := expr.Data.(*ast.CastExpr)
+	ce := dataAs[ast.CastExpr](expr.Data)
 	operand := l.lowerExpr(&ce.Operand)
 	targetType := l.lowerTypeExpr(&ce.TargetType)
 
@@ -1537,7 +1548,7 @@ func (l *Lowerer) lowerCast(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue {
-	ue := expr.Data.(*ast.UnwrapExpr)
+	ue := dataAs[ast.UnwrapExpr](expr.Data)
 	operand := l.lowerExpr(&ue.Operand)
 
 	resultType := l.exprType(expr)
@@ -1549,7 +1560,7 @@ func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue {
 }
 
 func (l *Lowerer) lowerTry(expr *ast.Expr) LValue {
-	te := expr.Data.(*ast.TryExpr)
+	te := dataAs[ast.TryExpr](expr.Data)
 	operand := l.lowerExpr(&te.Operand)
 
 	// Extract value and error
