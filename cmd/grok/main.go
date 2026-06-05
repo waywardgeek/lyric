@@ -29,7 +29,7 @@ Commands:
   update   <file.grok> [...]          Regenerate function index and dependencies
   gen      <package-dir>              Scaffold a new .grok file from Go source
   fmt      <file.grok> [...]          Format .grok files
-  compile  <file.gk> [...] [-o out] [--lir]   Compile .gk files to Go
+  compile  <file.gk> [...] [-o out] [--lir] [--mono]   Compile .gk files to Go
 `
 
 func main() {
@@ -142,6 +142,7 @@ func cmdCompile(args []string) error {
 	pkg := "main"
 	modPath := ""
 	useLIR := false
+	useMono := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -162,6 +163,9 @@ func cmdCompile(args []string) error {
 			}
 		case "--lir":
 			useLIR = true
+		case "--mono":
+			useMono = true
+			useLIR = true // mono requires LIR pipeline
 		default:
 			inputs = append(inputs, args[i])
 		}
@@ -212,6 +216,9 @@ func cmdCompile(args []string) error {
 			prog := lowerer.Lower(pf.file)
 			prog.Package = pkg
 			lir.Optimize(prog)
+			if useMono {
+				lir.Monomorphize(prog)
+			}
 			goSrc = lir.EmitGo(prog)
 		} else {
 			tr := transpiler.New(pkg)
