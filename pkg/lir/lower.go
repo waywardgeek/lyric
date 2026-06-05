@@ -1012,24 +1012,29 @@ func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo) {
 	}
 
 	if isEnum {
-		// Emit a tag extraction + switch
-		tagTemp := l.emitTemp(LExpr{
-			Kind: LExprVariantTag,
-			Type: &LType{Kind: LTyI32, Bits: 32},
-			Data: &LVariantTagData{Value: matchVal},
-		})
+		// Check for nested enum patterns (e.g., Some(Circle(r)))
+		if l.hasNestedVariantPatterns(ms) {
+			l.emitNestedEnumMatch(ms, matchVal, enumName, result)
+		} else {
+			// Simple enum match — one arm per variant
+			tagTemp := l.emitTemp(LExpr{
+				Kind: LExprVariantTag,
+				Type: &LType{Kind: LTyI32, Bits: 32},
+				Data: &LVariantTagData{Value: matchVal},
+			})
 
-		var cases []LSwitchCase
-		for _, arm := range ms.Arms {
-			sc := l.lowerMatchArm(&arm, matchVal, enumName, result)
-			cases = append(cases, sc)
+			var cases []LSwitchCase
+			for _, arm := range ms.Arms {
+				sc := l.lowerMatchArm(&arm, matchVal, enumName, result)
+				cases = append(cases, sc)
+			}
+
+			l.emit(LStmt{Kind: LStmtSwitch, Data: &LSwitch{
+				Tag:      tagTemp,
+				Cases:    cases,
+				EnumName: enumName,
+			}})
 		}
-
-		l.emit(LStmt{Kind: LStmtSwitch, Data: &LSwitch{
-			Tag:      tagTemp,
-			Cases:    cases,
-			EnumName: enumName,
-		}})
 	} else if l.isUnionMatch(matchVal, ms) {
 		// Union type match: emit type switch
 		l.emitUnionTypeSwitch(ms, matchVal, result)
@@ -1143,6 +1148,231 @@ func (l *Lowerer) lowerArmBody(block *ast.Block, result *matchResultInfo) []LStm
 	body := l.stmts
 	l.stmts = saved
 	return body
+}
+
+// hasNestedVariantPatterns checks if any arm in an enum match has a binding
+// that is itself a PatVariant (e.g., Some(Circle(r))).
+func (l *Lowerer) hasNestedVariantPatterns(ms *ast.MatchStmt) bool {
+	for _, arm := range ms.Arms {
+		if arm.Pattern.Kind == ast.PatVariant {
+			vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
+			for _, b := range vp.Bindings {
+				if b.Kind == ast.PatVariant {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// emitNestedEnumMatch handles match expressions where arms have nested variant
+// patterns like Some(Circle(r)), Some(Rect(w, h)). Groups arms by outer variant
+// and emits nested type switches for the inner enum values.
+func (l *Lowerer) emitNestedEnumMatch(ms *ast.MatchStmt, matchVal LValue, enumName string, result *matchResultInfo) {
+	tagTemp := l.emitTemp(LExpr{
+		Kind: LExprVariantTag,
+		Type: &LType{Kind: LTyI32, Bits: 32},
+		Data: &LVariantTagData{Value: matchVal},
+	})
+
+	// Group arms by outer variant name (or "" for wildcard/ident)
+	type armGroup struct {
+		outerName string
+		arms      []ast.MatchArm
+	}
+	var groups []armGroup
+	groupIdx := map[string]int{}
+
+	for _, arm := range ms.Arms {
+		key := ""
+		if arm.Pattern.Kind == ast.PatVariant {
+			vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
+			key = vp.Name
+		} else if arm.Pattern.Kind == ast.PatIdent {
+			ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
+			if _, ok := l.unitVariants[ip.Name]; ok {
+				key = ip.Name
+			}
+		}
+
+		if idx, ok := groupIdx[key]; ok {
+			groups[idx].arms = append(groups[idx].arms, arm)
+		} else {
+			groupIdx[key] = len(groups)
+			groups = append(groups, armGroup{outerName: key, arms: []ast.MatchArm{arm}})
+		}
+	}
+
+	var cases []LSwitchCase
+	for _, g := range groups {
+		if len(g.arms) == 1 && !l.armHasNestedVariant(&g.arms[0]) {
+			// Simple arm — no nesting, use normal lowering
+			sc := l.lowerMatchArm(&g.arms[0], matchVal, enumName, result)
+			cases = append(cases, sc)
+			continue
+		}
+
+		// Multiple arms for same outer variant, or nested variant patterns.
+		// Emit one case with a nested type switch on the inner value.
+		outerVP := dataAs[ast.VariantPattern](g.arms[0].Pattern.Data)
+		tag := l.findVariantTag(enumName, outerVP.Name)
+
+		// Extract the inner value (the first field of the outer variant)
+		innerFieldName := ""
+		var innerFieldType *LType
+		if info, ok := l.variantCtors[outerVP.Name]; ok && len(info.fieldNames) > 0 {
+			innerFieldName = info.fieldNames[0]
+		}
+		if variants, ok := l.enumVariants[enumName]; ok {
+			for _, v := range variants {
+				if v.Name == outerVP.Name && len(v.Fields) > 0 {
+					innerFieldType = v.Fields[0].Type
+				}
+			}
+		}
+		if innerFieldType == nil {
+			innerFieldType = &LType{Kind: LTyAny}
+		}
+
+		saved := l.stmts
+		l.stmts = nil
+
+		// Extract inner value from outer variant
+		innerVal := l.emitTemp(LExpr{
+			Kind: LExprVariantData,
+			Type: innerFieldType,
+			Data: &LVariantDataData{
+				Value:   matchVal,
+				Enum:    enumName,
+				Variant: outerVP.Name,
+				Field:   innerFieldName,
+			},
+		})
+
+		// Determine inner enum name from the first nested variant
+		innerEnumName := ""
+		for _, arm := range g.arms {
+			if arm.Pattern.Kind == ast.PatVariant {
+				vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
+				for _, b := range vp.Bindings {
+					if b.Kind == ast.PatVariant {
+						innerVP := dataAs[ast.VariantPattern](b.Data)
+						if info, ok := l.variantCtors[innerVP.Name]; ok {
+							innerEnumName = info.enumName
+						}
+					}
+				}
+			}
+			if innerEnumName != "" {
+				break
+			}
+		}
+
+		// Emit nested tag extraction + switch
+		innerTagTemp := l.emitTemp(LExpr{
+			Kind: LExprVariantTag,
+			Type: &LType{Kind: LTyI32, Bits: 32},
+			Data: &LVariantTagData{Value: innerVal},
+		})
+
+		var innerCases []LSwitchCase
+		for _, arm := range g.arms {
+			vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
+			if len(vp.Bindings) == 1 && vp.Bindings[0].Kind == ast.PatVariant {
+				// Nested variant: e.g., Some(Circle(r))
+				innerVP := dataAs[ast.VariantPattern](vp.Bindings[0].Data)
+				innerTag := l.findVariantTag(innerEnumName, innerVP.Name)
+
+				savedInner := l.stmts
+				l.stmts = nil
+
+				// Extract fields from inner variant
+				if info, ok := l.variantCtors[innerVP.Name]; ok {
+					for i, binding := range innerVP.Bindings {
+						if binding.Kind == ast.PatIdent {
+							bp := dataAs[ast.IdentPattern](binding.Data)
+							fieldName := ""
+							if i < len(info.fieldNames) {
+								fieldName = info.fieldNames[i]
+							}
+							var fieldType *LType
+							if variants, ok := l.enumVariants[innerEnumName]; ok {
+								for _, v := range variants {
+									if v.Name == innerVP.Name && i < len(v.Fields) {
+										fieldType = v.Fields[i].Type
+									}
+								}
+							}
+							if fieldType == nil {
+								fieldType = &LType{Kind: LTyAny}
+							}
+
+							extractTemp := l.emitTemp(LExpr{
+								Kind: LExprVariantData,
+								Type: fieldType,
+								Data: &LVariantDataData{
+									Value:   innerVal,
+									Enum:    innerEnumName,
+									Variant: innerVP.Name,
+									Field:   fieldName,
+								},
+							})
+							l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+								Name: bp.Name,
+								Type: fieldType,
+								Init: &extractTemp,
+							}})
+						}
+					}
+				}
+
+				bindingStmts := l.stmts
+				l.stmts = savedInner
+
+				bodyStmts := l.lowerArmBody(&arm.Body, result)
+				innerCases = append(innerCases, LSwitchCase{
+					Tag:  innerTag,
+					Body: append(bindingStmts, bodyStmts...),
+				})
+			} else {
+				// Non-nested binding within group — shouldn't happen in well-formed code
+				sc := l.lowerMatchArm(&arm, matchVal, enumName, result)
+				sc.Tag = -1 // default within inner switch
+				innerCases = append(innerCases, sc)
+			}
+		}
+
+		l.emit(LStmt{Kind: LStmtSwitch, Data: &LSwitch{
+			Tag:      innerTagTemp,
+			Cases:    innerCases,
+			EnumName: innerEnumName,
+		}})
+
+		bodyStmts := l.stmts
+		l.stmts = saved
+
+		cases = append(cases, LSwitchCase{Tag: tag, Body: bodyStmts})
+	}
+
+	l.emit(LStmt{Kind: LStmtSwitch, Data: &LSwitch{
+		Tag:      tagTemp,
+		Cases:    cases,
+		EnumName: enumName,
+	}})
+}
+
+// armHasNestedVariant checks if a single arm has nested variant patterns.
+func (l *Lowerer) armHasNestedVariant(arm *ast.MatchArm) bool {
+	if arm.Pattern.Kind == ast.PatVariant {
+		vp := dataAs[ast.VariantPattern](arm.Pattern.Data)
+		for _, b := range vp.Bindings {
+			if b.Kind == ast.PatVariant {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string, result *matchResultInfo) LSwitchCase {
