@@ -579,6 +579,11 @@ type LProgram struct {
 	Functions  []LFuncDecl
 	Globals    []LVarDecl
 	TypeDefs   []LTypeDef // type aliases
+
+	// ClassRenames maps generic class names to their monomorphized names
+	// (e.g., "Stack" → "Stack_i32"). Populated by Monomorphize().
+	// Used by C backend to resolve unmangled type references.
+	ClassRenames map[string]string
 }
 
 // LImport is a single import declaration.

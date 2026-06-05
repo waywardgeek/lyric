@@ -9,21 +9,44 @@ import (
 // The program MUST be monomorphized before calling this — C has no generics.
 func EmitC(prog *LProgram) string {
 	g := &cGen{
-		prog:       prog,
-		indent:     0,
-		tempUsed:   map[int]bool{},
-		sliceTypes: map[string]string{},
+		prog:        prog,
+		indent:      0,
+		tempUsed:    map[int]bool{},
+		tempTypes:   map[int]*LType{},
+		varTypes:    map[string]*LType{},
+		sliceTypes:  map[string]string{},
+		optTypes:    map[string]string{},
+		resultTypes: map[string]string{},
+		lambdaID:    0,
+		lambdas:     nil,
 	}
 	return g.generate()
 }
 
 type cGen struct {
-	prog       *LProgram
-	buf        strings.Builder
-	indent     int
-	tempUsed   map[int]bool
-	sliceTypes map[string]string // cType(elem) → typedef name
-	sliceCount int
+	prog        *LProgram
+	buf         strings.Builder
+	indent      int
+	tempUsed    map[int]bool
+	tempTypes   map[int]*LType    // resolved types for temps
+	varTypes    map[string]*LType // resolved types for variables (overrides type-var types)
+	sliceTypes  map[string]string // cType(elem) → typedef name
+	optTypes    map[string]string // cType(elem) → typedef name
+	resultTypes map[string]string // cType(elem) → typedef name
+	sliceCount  int
+	optCount    int
+	resultCount int
+	lambdaID    int
+	lambdas     []cLambda
+	currentFunc *LFuncDecl // tracks current function for return type info
+}
+
+type cLambda struct {
+	name       string
+	retType    string
+	params     string
+	body       []LStmt
+	returnType *LType
 }
 
 // ---------------------------------------------------------------------------
@@ -37,19 +60,14 @@ func (g *cGen) generate() string {
 	g.line("#include <stdint.h>")
 	g.line("#include <stdbool.h>")
 	g.line("#include <string.h>")
+	g.line("#include <stdarg.h>")
+	g.line(`#include "grok_runtime.h"`)
 	g.line("")
 
-	// Pre-scan to collect all slice types used in the program
-	g.collectSliceTypes()
-	// Emit slice type typedefs
-	for elemType, name := range g.sliceTypes {
-		g.linef("typedef struct { %s* data; int32_t len; int32_t cap; } %s;", elemType, name)
-	}
-	if len(g.sliceTypes) > 0 {
-		g.line("")
-	}
+	// Pre-scan to collect all composite types used in the program
+	g.collectCompositeTypes()
 
-	// Forward-declare structs, classes, and enums
+	// Forward-declare structs, classes, and enums BEFORE composite types
 	for _, s := range g.prog.Structs {
 		g.linef("typedef struct %s %s;", g.structName(s.Name, s.IsExported), g.structName(s.Name, s.IsExported))
 	}
@@ -63,6 +81,25 @@ func (g *cGen) generate() string {
 		g.line("")
 	}
 
+	// Emit slice/optional/result type typedefs via runtime macros
+	for elemType, name := range g.sliceTypes {
+		g.linef("GROK_SLICE_DEF(%s, %s)", elemType, name)
+	}
+	for elemType, name := range g.optTypes {
+		g.linef("GROK_OPT_DEF(%s, %s)", elemType, name)
+	}
+	for elemType, name := range g.resultTypes {
+		g.linef("GROK_RESULT_DEF(%s, %s)", elemType, name)
+	}
+	if len(g.sliceTypes)+len(g.optTypes)+len(g.resultTypes) > 0 {
+		g.line("")
+	}
+
+	// Emit enum definitions first (other types may reference them)
+	for _, e := range g.prog.Enums {
+		g.emitEnumDecl(&e)
+	}
+
 	// Emit struct definitions
 	for _, s := range g.prog.Structs {
 		g.emitStructDecl(&s)
@@ -73,9 +110,10 @@ func (g *cGen) generate() string {
 		g.emitClassDecl(&c)
 	}
 
-	// Emit enum definitions (tagged unions)
-	for _, e := range g.prog.Enums {
-		g.emitEnumDecl(&e)
+	// Emit interface definitions as opaque void*
+	for _, iface := range g.prog.Interfaces {
+		g.linef("typedef void* %s; /* interface */", g.structName(iface.Name, iface.IsExported))
+		g.line("")
 	}
 
 	// Emit type aliases
@@ -84,10 +122,10 @@ func (g *cGen) generate() string {
 		g.line("")
 	}
 
-	// Forward-declare all functions
+	// Forward-declare all functions (including methods)
 	for _, f := range g.prog.Functions {
-		if f.Name == "main" {
-			continue // main has special signature
+		if g.funcName(&f) == "main" {
+			continue
 		}
 		g.emitFuncForwardDecl(&f)
 	}
@@ -111,6 +149,9 @@ func (g *cGen) emitStructDecl(s *LStructDecl) {
 	name := g.structName(s.Name, s.IsExported)
 	g.linef("struct %s {", name)
 	g.indent++
+	if len(s.Fields) == 0 {
+		g.line("int _empty; /* C requires at least one field */")
+	}
 	for _, f := range s.Fields {
 		g.linef("%s;", g.cFieldDecl(f.Type, f.Name))
 	}
@@ -123,6 +164,9 @@ func (g *cGen) emitClassDecl(c *LClassDecl) {
 	name := g.structName(c.Name, c.IsExported)
 	g.linef("struct %s {", name)
 	g.indent++
+	if len(c.Fields) == 0 {
+		g.line("int _empty;")
+	}
 	for _, f := range c.Fields {
 		g.linef("%s;", g.cFieldDecl(f.Type, f.Name))
 	}
@@ -186,7 +230,7 @@ func (g *cGen) emitEnumDecl(e *LEnumDecl) {
 func (g *cGen) emitFuncForwardDecl(f *LFuncDecl) {
 	name := g.funcName(f)
 	if name == "main" {
-		return // main doesn't need a forward declaration
+		return
 	}
 	retType := g.cReturnType(f.ReturnType)
 	params := g.cParamList(f)
@@ -194,12 +238,12 @@ func (g *cGen) emitFuncForwardDecl(f *LFuncDecl) {
 }
 
 func (g *cGen) emitFuncDecl(f *LFuncDecl) {
+	g.currentFunc = f
 	retType := g.cReturnType(f.ReturnType)
 	params := g.cParamList(f)
 	name := g.funcName(f)
 
 	if name == "main" {
-		// C main returns int
 		g.linef("int main(void) {")
 	} else {
 		g.linef("%s %s(%s) {", retType, name, params)
@@ -218,11 +262,10 @@ func (g *cGen) funcName(f *LFuncDecl) string {
 	if f.Receiver != "" {
 		return f.Receiver + "_" + f.Name
 	}
-	// In C, exported "Main" is the entry point "main"
 	if f.Name == "Main" {
 		return "main"
 	}
-	return f.Name
+	return cSafeName(f.Name)
 }
 
 func (g *cGen) cParamList(f *LFuncDecl) string {
@@ -257,22 +300,37 @@ func (g *cGen) emitStmt(s *LStmt) {
 	switch s.Kind {
 	case LStmtTempDef:
 		d := s.Data.(*LTempDef)
-		ty := g.exprType(&d.Expr)
+		ty := g.inferExprType(&d.Expr)
+		g.tempTypes[d.ID] = ty
 		g.linef("%s _t%d = %s;", g.cType(ty), d.ID, g.emitExprStr(&d.Expr))
 
 	case LStmtVarDecl:
 		d := s.Data.(*LVarDecl)
 		if d.Name == "_" {
-			// Discard variable — just evaluate the init for side effects
 			if d.Init != nil {
 				g.linef("(void)%s;", g.emitValue(d.Init))
 			}
 			return
 		}
+		varType := d.Type
+		// If type contains type vars (from generic code), try to use init value's resolved type
+		if d.Init != nil && g.containsTypeVar(varType) {
+			if d.Init.Kind == LValTemp {
+				if resolved, ok := g.tempTypes[d.Init.TempID]; ok {
+					varType = resolved
+				}
+			} else if !g.containsTypeVar(d.Init.Type) && d.Init.Type != nil {
+				varType = d.Init.Type
+			}
+		}
+		// Store resolved type for later lookups (e.g., unwrap)
+		if varType != d.Type {
+			g.varTypes[d.Name] = varType
+		}
 		if d.Init != nil {
-			g.linef("%s %s = %s;", g.cType(d.Type), d.Name, g.emitValue(d.Init))
+			g.linef("%s %s = %s;", g.cType(varType), d.Name, g.emitValue(d.Init))
 		} else {
-			g.linef("%s %s = %s;", g.cType(d.Type), d.Name, g.zeroValue(d.Type))
+			g.linef("%s %s = %s;", g.cType(varType), d.Name, g.zeroValue(varType))
 		}
 
 	case LStmtAssign:
@@ -289,17 +347,51 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtIndexSet:
 		d := s.Data.(*LIndexSet)
-		// For now, assume array-like indexing
-		g.linef("%s.data[%s] = %s;", g.emitValue(&d.Collection), g.emitValue(&d.Index), g.emitValue(&d.Value))
+		if d.Collection.Type != nil && d.Collection.Type.Kind == LTyMap {
+			g.linef("/* map set not implemented */")
+		} else {
+			g.linef("%s.data[%s] = %s;", g.emitValue(&d.Collection), g.emitValue(&d.Index), g.emitValue(&d.Value))
+		}
 
 	case LStmtReturn:
 		d := s.Data.(*LReturn)
 		if len(d.Values) == 0 {
 			g.line("return;")
 		} else if len(d.Values) == 1 {
-			g.linef("return %s;", g.emitValue(&d.Values[0]))
+			val := g.emitValue(&d.Values[0])
+			// Check if function returns ErrorResult — wrap plain values
+			if g.currentFunc != nil && g.currentFunc.ReturnType != nil && g.currentFunc.ReturnType.Kind == LTyErrorResult {
+				resultName := g.resultTypeName(g.currentFunc.ReturnType.Elem)
+				// If the value is already a result (from MakeResult expr), don't double-wrap
+				if d.Values[0].Type != nil && d.Values[0].Type.Kind == LTyErrorResult {
+					g.linef("return %s;", val)
+				} else {
+					g.linef("return grok_ok(%s, %s);", val, resultName)
+				}
+			} else if g.currentFunc != nil && g.currentFunc.ReturnType != nil && g.currentFunc.ReturnType.Kind == LTyOptional {
+				optName := g.optTypeName(g.currentFunc.ReturnType.Elem)
+				if d.Values[0].Kind == LValLitNull {
+					g.linef("return grok_none(%s);", optName)
+				} else if d.Values[0].Type != nil && d.Values[0].Type.Kind == LTyOptional {
+					g.linef("return %s;", val)
+				} else {
+					g.linef("return grok_some(%s, %s);", val, optName)
+				}
+			} else {
+				g.linef("return %s;", val)
+			}
+		} else if len(d.Values) == 2 && g.currentFunc != nil && g.currentFunc.ReturnType != nil && g.currentFunc.ReturnType.Kind == LTyErrorResult {
+			// (value, error) pair return
+			resultName := g.resultTypeName(g.currentFunc.ReturnType.Elem)
+			errVal := g.emitValue(&d.Values[1])
+			valStr := g.emitValue(&d.Values[0])
+			// If error is not nil/null, it's an error return
+			if d.Values[1].Kind == LValLitNull || d.Values[1].Kind == LValLitString && d.Values[1].StrVal == "" {
+				g.linef("return grok_ok(%s, %s);", valStr, resultName)
+			} else {
+				g.linef("return grok_err(%s, %s);", errVal, resultName)
+			}
 		} else {
-			// Multiple returns need a result struct (TODO)
 			g.linef("return %s;", g.emitValue(&d.Values[0]))
 		}
 
@@ -351,8 +443,13 @@ func (g *cGen) emitStmt(s *LStmt) {
 			g.linef("case %d: {", c.Tag)
 			g.indent++
 			if c.Binding != "" && d.EnumName != "" {
-				// Extract variant data
-				g.linef("/* binding: %s */", c.Binding)
+				enumName := g.structName(d.EnumName, false)
+				variant := c.Binding
+				variantLower := strings.ToLower(variant)
+				// Extract variant data and bind to name
+				g.linef("%s_%s_Data %s = %s.data.%s;",
+					enumName, variant, c.Binding,
+					g.emitValue(&d.Tag), variantLower)
 			}
 			g.emitStmts(c.Body)
 			g.line("break;")
@@ -363,21 +460,7 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtTypeSwitch:
 		d := s.Data.(*LTypeSwitch)
-		// Emit as if-else chain on enum tag
-		g.linef("switch (%s.tag) {", g.emitValue(&d.Value))
-		for _, c := range d.Cases {
-			if c.Type != nil {
-				g.linef("case /* %s */: {", g.cType(c.Type))
-			} else {
-				g.line("default: {")
-			}
-			g.indent++
-			g.emitStmts(c.Body)
-			g.line("break;")
-			g.indent--
-			g.line("}")
-		}
-		g.line("}")
+		g.emitTypeSwitch(d)
 
 	case LStmtBlock:
 		d := s.Data.(*LBlock)
@@ -389,20 +472,14 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtSideEffect:
 		d := s.Data.(*LSideEffect)
-		g.linef("%s;", g.emitExprStr(&d.Expr))
+		expr := g.emitSideEffect(&d.Expr)
+		if expr != "" {
+			g.linef("%s;", expr)
+		}
 
 	case LStmtMultiAssign:
 		d := s.Data.(*LMultiAssign)
-		// Multi-assign: typically (val, err) = expr
-		// Emit as a struct assignment
-		exprStr := g.emitExprStr(&d.Expr)
-		if len(d.Names) == 2 {
-			tmpName := fmt.Sprintf("_multi_%d", g.nextTemp())
-			g.linef("typeof(%s) %s = %s;", exprStr, tmpName, exprStr)
-			// TODO: proper multi-value handling
-		} else {
-			g.linef("/* multi-assign: %s = %s */", strings.Join(d.Names, ", "), exprStr)
-		}
+		g.emitMultiAssign(d)
 
 	case LStmtSend:
 		d := s.Data.(*LSend)
@@ -421,10 +498,9 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtLock:
 		d := s.Data.(*LLock)
-		g.line("/* lock: */")
+		g.linef("/* lock(%s) */", g.emitValue(&d.Mutex))
 		g.line("{")
 		g.indent++
-		_ = d.Mutex
 		g.emitStmts(d.Body)
 		g.indent--
 		g.line("}")
@@ -441,6 +517,156 @@ func (g *cGen) emitStmt(s *LStmt) {
 	}
 }
 
+// emitTypeSwitch handles enum-based type switches, resolving tag constants
+func (g *cGen) emitTypeSwitch(d *LTypeSwitch) {
+	val := g.emitValue(&d.Value)
+	g.linef("switch (%s.tag) {", val)
+	for _, c := range d.Cases {
+		if c.Type != nil {
+			// Resolve the tag constant from the enum name + variant type name
+			tagConst := g.resolveTagConstant(d, c.Type)
+			if tagConst != "" {
+				g.linef("case %s: {", tagConst)
+			} else {
+				g.linef("case /* %s */0: {", g.cType(c.Type))
+			}
+		} else {
+			g.line("default: {")
+		}
+		g.indent++
+		g.emitStmts(c.Body)
+		g.line("break;")
+		g.indent--
+		g.line("}")
+	}
+	g.line("}")
+}
+
+// resolveTagConstant finds the tag constant for a variant type in a type switch.
+func (g *cGen) resolveTagConstant(d *LTypeSwitch, caseType *LType) string {
+	// The value being switched on should be a tagged union
+	valType := d.Value.Type
+	if valType == nil {
+		return ""
+	}
+	enumName := g.structName(valType.Name, valType.IsExported)
+
+	// For tagged unions, the case type's name is the variant name
+	variantName := ""
+	if caseType != nil && caseType.Name != "" {
+		// The case type name might be "EnumName_Variant_Data" or just "Variant"
+		variantName = caseType.Name
+		// Strip the enum prefix if present
+		prefix := enumName + "_"
+		if strings.HasPrefix(variantName, prefix) {
+			variantName = strings.TrimPrefix(variantName, prefix)
+			variantName = strings.TrimSuffix(variantName, "_Data")
+		}
+	}
+
+	if variantName == "" {
+		return ""
+	}
+
+	// Look up in program enums to verify
+	for _, e := range g.prog.Enums {
+		eName := g.structName(e.Name, e.IsExported)
+		if eName == enumName {
+			for _, v := range e.Variants {
+				if v.Name == variantName {
+					return fmt.Sprintf("%s_%s", enumName, v.Name)
+				}
+			}
+		}
+	}
+	// Fallback: construct it
+	return fmt.Sprintf("%s_%s", enumName, variantName)
+}
+
+// emitSideEffect handles side-effect expressions (append, method calls, etc.)
+// Returns the expression string, or "" if it was handled via multi-line emission.
+func (g *cGen) emitSideEffect(e *LExpr) string {
+	// Special case: append as side effect needs to reassign to the slice
+	if e.Kind == LExprBuiltin {
+		d := e.Data.(*LBuiltinData)
+		if (d.Name == "append" || d.Name == "slice_push") && len(d.Args) >= 2 {
+			sliceArg := g.emitValue(&d.Args[0])
+			elemArg := g.emitValue(&d.Args[1])
+			sliceType := g.sliceTypeNameFromValue(&d.Args[0])
+			// grok_push is a macro that takes a pointer to the slice
+			g.linef("grok_push(&%s, %s, %s);", sliceArg, elemArg, sliceType)
+			return ""
+		}
+	}
+	return g.emitExprStr(e)
+}
+
+func (g *cGen) sliceTypeNameFromValue(v *LValue) string {
+	if v.Type != nil && v.Type.Kind == LTySlice {
+		return g.sliceTypeName(v.Type.Elem)
+	}
+	return "/* unknown slice type */"
+}
+
+// emitMultiAssign handles (val, err) = expr patterns
+func (g *cGen) emitMultiAssign(d *LMultiAssign) {
+	exprStr := g.emitExprStr(&d.Expr)
+	// Detect error result pattern: 2 names, second is error type
+	isErrorResult := d.Expr.Type != nil && d.Expr.Type.Kind == LTyErrorResult
+	// Also detect when MultiAssign types indicate (T, error) pattern
+	if !isErrorResult && len(d.Types) == 2 && d.Types[1] != nil && (d.Types[1].Kind == LTyError || d.Types[1].Kind == LTyString) {
+		isErrorResult = true
+	}
+	// Also check if the call is to a function that returns ErrorResult
+	if !isErrorResult && d.Expr.Kind == LExprCall {
+		cd := d.Expr.Data.(*LCallData)
+		for _, fn := range g.prog.Functions {
+			if g.funcName(&fn) == cd.Func && fn.ReturnType != nil && fn.ReturnType.Kind == LTyErrorResult {
+				isErrorResult = true
+				break
+			}
+		}
+	}
+	if len(d.Names) == 2 && isErrorResult {
+		// Error result destructuring
+		var elemType *LType
+		if len(d.Types) > 0 {
+			elemType = d.Types[0]
+		}
+		if d.Expr.Type != nil && d.Expr.Type.Elem != nil {
+			elemType = d.Expr.Type.Elem
+		}
+		if elemType == nil {
+			elemType = &LType{Kind: LTyI32}
+		}
+		resultType := g.resultTypeName(elemType)
+		tmpName := fmt.Sprintf("_multi_%d", g.nextTemp())
+		g.linef("%s %s = %s;", resultType, tmpName, exprStr)
+		if d.Names[0] != "_" {
+			valType := g.cType(elemType)
+			g.linef("%s %s = %s.value;", valType, d.Names[0], tmpName)
+		}
+		if d.Names[1] != "_" {
+			g.linef("const char* %s = %s.error;", d.Names[1], tmpName)
+		}
+	} else if len(d.Names) == 2 && d.Expr.Type != nil && d.Expr.Type.Kind == LTyTuple {
+		tmpName := fmt.Sprintf("_multi_%d", g.nextTemp())
+		tupleType := g.cType(d.Expr.Type)
+		g.linef("%s %s = %s;", tupleType, tmpName, exprStr)
+		for i, name := range d.Names {
+			if name != "_" {
+				fieldType := "int"
+				if i < len(d.Expr.Type.Fields) {
+					fieldType = g.cType(d.Expr.Type.Fields[i].Type)
+				}
+				g.linef("%s %s = %s._%d;", fieldType, name, tmpName, i)
+			}
+		}
+	} else {
+		g.linef("/* multi-assign: %s = %s */", strings.Join(d.Names, ", "), exprStr)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Expression emission (returns string)
 // ---------------------------------------------------------------------------
@@ -449,7 +675,7 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 	switch e.Kind {
 	case LExprCall:
 		d := e.Data.(*LCallData)
-		name := d.Func
+		name := cSafeName(d.Func)
 		// Map known stdlib functions
 		if name == "fmt.Println" || name == "Println" || name == "println" {
 			return g.emitPrintln(d.Args)
@@ -460,6 +686,21 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		if name == "fmt.Sprintf" || name == "Sprintf" {
 			return g.emitSprintf(d.Args)
 		}
+		if name == "fmt.Errorf" || name == "errors.New" {
+			if len(d.Args) > 0 {
+				return g.emitValue(&d.Args[0])
+			}
+			return `"error"`
+		}
+		// strconv functions
+		if name == "strconv.Itoa" && len(d.Args) > 0 {
+			return fmt.Sprintf("grok_sprintf(\"%%d\", %s)", g.emitValue(&d.Args[0]))
+		}
+		if name == "strconv.Atoi" && len(d.Args) > 0 {
+			resultType := g.resultTypeName(&LType{Kind: LTyI32})
+			return fmt.Sprintf("({ int _v = atoi(%s); %s _r = grok_ok(_v, %s); _r; })",
+				g.emitValue(&d.Args[0]), resultType, resultType)
+		}
 		args := g.emitArgs(d.Args)
 		return fmt.Sprintf("%s(%s)", name, args)
 
@@ -467,7 +708,13 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		d := e.Data.(*LMethodCallData)
 		recv := g.emitValue(&d.Receiver)
 		args := g.emitArgs(d.Args)
-		methodName := d.Receiver.Type.Name + "_" + d.Method
+		className := d.Receiver.Type.Name
+		if g.prog.ClassRenames != nil {
+			if renamed, ok := g.prog.ClassRenames[className]; ok {
+				className = renamed
+			}
+		}
+		methodName := className + "_" + d.Method
 		if args != "" {
 			return fmt.Sprintf("%s(%s, %s)", methodName, recv, args)
 		}
@@ -485,6 +732,19 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 
 	case LExprStructLit:
 		d := e.Data.(*LStructLitData)
+		// Check if this is actually a slice literal (lowerer emits struct lit for slice)
+		if e.Type != nil && e.Type.Kind == LTySlice {
+			sliceType := g.sliceTypeName(e.Type.Elem)
+			elemType := g.cType(e.Type.Elem)
+			if len(d.Fields) == 0 {
+				return fmt.Sprintf("grok_slice_empty(%s)", sliceType)
+			}
+			var elems []string
+			for _, f := range d.Fields {
+				elems = append(elems, g.emitValue(&f.Value))
+			}
+			return fmt.Sprintf("grok_slice_lit(%s, %s, %s)", sliceType, elemType, strings.Join(elems, ", "))
+		}
 		var fieldInits []string
 		for _, f := range d.Fields {
 			fieldInits = append(fieldInits, fmt.Sprintf(".%s = %s", f.Name, g.emitValue(&f.Value)))
@@ -532,28 +792,33 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 
 	case LExprIndexGet:
 		d := e.Data.(*LIndexGetData)
-		return fmt.Sprintf("%s.data[%s]", g.emitValue(&d.Collection), g.emitValue(&d.Index))
+		coll := g.emitValue(&d.Collection)
+		idx := g.emitValue(&d.Index)
+		// String indexing returns a char
+		if d.Collection.Type != nil && d.Collection.Type.Kind == LTyString {
+			return fmt.Sprintf("%s[%s]", coll, idx)
+		}
+		return fmt.Sprintf("%s.data[%s]", coll, idx)
 
 	case LExprSlice:
 		d := e.Data.(*LSliceData)
-		// Simplified: just reference the collection
 		return g.emitValue(&d.Collection)
 
 	case LExprWrapOptional:
 		d := e.Data.(*LWrapOptionalData)
-		// TODO: proper optional wrapping
-		return g.emitValue(&d.Value)
+		optName := g.optTypeNameFromExpr(e)
+		return fmt.Sprintf("grok_some(%s, %s)", g.emitValue(&d.Value), optName)
 
 	case LExprUnwrapOptional:
 		d := e.Data.(*LUnwrapOptionalData)
-		return g.emitValue(&d.Value)
+		return fmt.Sprintf("grok_unwrap(%s)", g.emitValue(&d.Value))
 
 	case LExprIsNull:
 		d := e.Data.(*LIsNullData)
 		if d.Value.Type != nil && d.Value.Type.Kind == LTyClassHandle {
 			return fmt.Sprintf("(%s == NULL)", g.emitValue(&d.Value))
 		}
-		return fmt.Sprintf("(!%s_has)", g.emitValue(&d.Value))
+		return fmt.Sprintf("grok_isnull(%s)", g.emitValue(&d.Value))
 
 	case LExprVariantConstruct:
 		d := e.Data.(*LVariantConstructData)
@@ -570,7 +835,6 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 			fieldInits = append(fieldInits, g.emitValue(&f))
 		}
 		variantLower := strings.ToLower(d.Variant)
-		// Build the variant data init
 		dataInit := strings.Join(fieldInits, ", ")
 		return fmt.Sprintf("(%s){.tag = %s_%s, .data.%s = {%s}}",
 			structName, structName, d.Variant, variantLower, dataInit)
@@ -588,7 +852,8 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		return fmt.Sprintf("%s.data.%s", g.emitValue(&d.Value), variantLower)
 
 	case LExprFuncLit:
-		return "/* function literal: not supported in C */"
+		d := e.Data.(*LFuncLitData)
+		return g.emitFuncLit(d, e.Type)
 
 	case LExprFormat:
 		d := e.Data.(*LFormatData)
@@ -604,16 +869,22 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 
 	case LExprMakeResult:
 		d := e.Data.(*LMakeResultData)
-		return fmt.Sprintf("/* make_result(%s, %s) */", g.emitValue(&d.Value), g.emitValue(&d.Err))
+		resultName := g.resultTypeNameFromExpr(e)
+		// If there's an error value, it's an error result; otherwise ok
+		if d.Err.Kind == LValLitNull || (d.Err.Kind == LValLitString && d.Err.StrVal == "") {
+			return fmt.Sprintf("grok_ok(%s, %s)", g.emitValue(&d.Value), resultName)
+		}
+		return fmt.Sprintf("grok_err(%s, %s)", g.emitValue(&d.Err), resultName)
 
 	case LExprMakeSlice:
-		return "/* make_slice */"
+		sliceType := g.sliceTypeNameFromType(e.Type)
+		return fmt.Sprintf("grok_slice_empty(%s)", sliceType)
 
 	case LExprMakeMap:
-		return "/* make_map */"
+		return "NULL /* make_map: not supported in C backend */"
 
 	case LExprMakeChannel:
-		return "/* make_channel: not supported in C */"
+		return "NULL /* make_channel: not supported in C backend */"
 
 	case LExprFuncRef:
 		d := e.Data.(*LFuncRefData)
@@ -626,6 +897,43 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 	default:
 		return fmt.Sprintf("/* unknown expr kind %d */", e.Kind)
 	}
+}
+
+// emitFuncLit emits a function literal (lambda).
+// In C, we emit it as a local static function-like construct using GCC statement expressions.
+func (g *cGen) emitFuncLit(d *LFuncLitData, typ *LType) string {
+	// For simple lambdas without captures, we can use GCC nested functions
+	// or a simpler approach: just inline the body if it's a single expression
+	// For now, emit as a GCC statement expression for the body
+	var params []string
+	for _, p := range d.Params {
+		params = append(params, g.cFieldDecl(p.Type, p.Name))
+	}
+	retType := "void"
+	if typ != nil && typ.Kind == LTyFuncPtr && typ.Return != nil {
+		retType = g.cType(typ.Return)
+	} else if d.ReturnType != nil {
+		retType = g.cType(d.ReturnType)
+	}
+
+	// Use GCC nested function extension
+	g.lambdaID++
+	lambdaName := fmt.Sprintf("_lambda_%d", g.lambdaID)
+	paramStr := strings.Join(params, ", ")
+	if paramStr == "" {
+		paramStr = "void"
+	}
+
+	// Emit inline nested function using GCC extension
+	var bodyBuf strings.Builder
+	oldBuf := g.buf
+	g.buf = bodyBuf
+	g.emitStmts(d.Body)
+	bodyStr := g.buf.String()
+	g.buf = oldBuf
+
+	return fmt.Sprintf("({ %s %s(%s) { %s } %s; })",
+		retType, lambdaName, paramStr, bodyStr, lambdaName)
 }
 
 // ---------------------------------------------------------------------------
@@ -666,27 +974,102 @@ func (g *cGen) emitValue(v *LValue) string {
 
 func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 	switch d.Name {
-	case "len":
+	case "len", "string_len":
 		if len(d.Args) > 0 && d.Args[0].Type != nil && d.Args[0].Type.Kind == LTyString {
 			return fmt.Sprintf("((int32_t)strlen(%s))", g.emitValue(&d.Args[0]))
 		}
 		return fmt.Sprintf("%s.len", g.emitValue(&d.Args[0]))
+
+	case "slice_len":
+		if len(d.Args) > 0 {
+			return fmt.Sprintf("%s.len", g.emitValue(&d.Args[0]))
+		}
+		return "0"
+
 	case "append", "slice_push":
 		if len(d.Args) >= 2 {
-			return fmt.Sprintf("/* append(%s, %s) */", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+			sliceArg := g.emitValue(&d.Args[0])
+			elemArg := g.emitValue(&d.Args[1])
+			sliceType := g.sliceTypeNameFromValue(&d.Args[0])
+			return fmt.Sprintf("({ grok_push(&%s, %s, %s); %s; })",
+				sliceArg, elemArg, sliceType, sliceArg)
 		}
-		return "/* append */"
-	case "has_prefix":
+		return "/* append: missing args */"
+
+	case "pop", "slice_pop":
+		if len(d.Args) > 0 {
+			return fmt.Sprintf("grok_pop(&%s)", g.emitValue(&d.Args[0]))
+		}
+		return "/* pop: missing args */"
+
+	case "isnull":
+		if len(d.Args) > 0 {
+			if d.Args[0].Type != nil && d.Args[0].Type.Kind == LTyClassHandle {
+				return fmt.Sprintf("(%s == NULL)", g.emitValue(&d.Args[0]))
+			}
+			return fmt.Sprintf("grok_isnull(%s)", g.emitValue(&d.Args[0]))
+		}
+		return "false"
+
+	case "has_prefix", "str_has_prefix", "string_has_prefix":
 		if len(d.Args) >= 2 {
-			return fmt.Sprintf("(strncmp(%s, %s, strlen(%s)) == 0)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]), g.emitValue(&d.Args[1]))
+			return fmt.Sprintf("grok_str_has_prefix(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
 		}
-	case "has_suffix":
+	case "has_suffix", "str_has_suffix", "string_has_suffix":
 		if len(d.Args) >= 2 {
-			s := g.emitValue(&d.Args[0])
-			sfx := g.emitValue(&d.Args[1])
-			return fmt.Sprintf("(strlen(%s) >= strlen(%s) && strcmp(%s + strlen(%s) - strlen(%s), %s) == 0)",
-				s, sfx, s, s, sfx, sfx)
+			return fmt.Sprintf("grok_str_has_suffix(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
 		}
+	case "contains", "str_contains", "string_contains", "slice_contains":
+		if len(d.Args) >= 2 {
+			if d.Args[0].Type != nil && d.Args[0].Type.Kind == LTyString {
+				return fmt.Sprintf("grok_str_contains(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+			}
+			return fmt.Sprintf("grok_contains(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+		}
+	case "index_of", "str_index_of", "string_index_of":
+		if len(d.Args) >= 2 {
+			return fmt.Sprintf("grok_str_index_of(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+		}
+	case "replace", "str_replace", "string_replace":
+		if len(d.Args) >= 3 {
+			return fmt.Sprintf("grok_str_replace(%s, %s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]), g.emitValue(&d.Args[2]))
+		}
+	case "join", "str_join", "slice_join":
+		if len(d.Args) >= 2 {
+			sep := g.emitValue(&d.Args[0])
+			slice := g.emitValue(&d.Args[1])
+			return fmt.Sprintf("grok_str_join(%s, %s.data, %s.len)", sep, slice, slice)
+		}
+	case "repeat", "str_repeat", "string_repeat":
+		if len(d.Args) >= 2 {
+			return fmt.Sprintf("grok_str_repeat(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+		}
+	case "string_to_upper":
+		if len(d.Args) > 0 {
+			return g.emitValue(&d.Args[0]) + " /* string_to_upper not implemented */"
+		}
+	case "string_to_lower":
+		if len(d.Args) > 0 {
+			return g.emitValue(&d.Args[0]) + " /* string_to_lower not implemented */"
+		}
+	case "string_split":
+		sliceType := g.sliceTypeName(&LType{Kind: LTyString})
+		return fmt.Sprintf("grok_slice_empty(%s) /* string_split not implemented */", sliceType)
+	case "string_trim":
+		if len(d.Args) > 0 {
+			return g.emitValue(&d.Args[0]) + " /* string_trim not implemented */"
+		}
+	case "map_len":
+		return "0 /* map_len: maps not supported */"
+	case "map_contains_key":
+		return "false /* map_contains_key: maps not supported */"
+	case "contains_key":
+		return "false /* contains_key: maps not supported */"
+	case "keys", "map_keys":
+		return "({}) /* keys: maps not supported */"
+	case "values", "map_values":
+		return "({}) /* values: maps not supported */"
+
 	case "println", "Println":
 		return g.emitPrintln(d.Args)
 	}
@@ -705,10 +1088,10 @@ func (g *cGen) emitPrintln(args []LValue) string {
 	var fmtParts []string
 	var argParts []string
 	for _, a := range args {
-		spec := g.printfSpec(&a)
+		spec, argExpr := g.printfSpecAndArg(&a)
 		fmtParts = append(fmtParts, spec)
-		if spec != `\n` {
-			argParts = append(argParts, g.emitValue(&a))
+		if argExpr != "" {
+			argParts = append(argParts, argExpr)
 		}
 	}
 	fmtStr := strings.Join(fmtParts, " ") + `\n`
@@ -722,7 +1105,6 @@ func (g *cGen) emitPrintf(args []LValue) string {
 	if len(args) == 0 {
 		return `printf("")`
 	}
-	// First arg is format string
 	rest := make([]string, 0, len(args)-1)
 	for _, a := range args[1:] {
 		rest = append(rest, g.emitValue(&a))
@@ -734,53 +1116,66 @@ func (g *cGen) emitPrintf(args []LValue) string {
 }
 
 func (g *cGen) emitSprintf(args []LValue) string {
-	return fmt.Sprintf("/* sprintf not supported yet */")
+	if len(args) == 0 {
+		return `""`
+	}
+	// First arg is format string
+	fmtStr := g.emitValue(&args[0])
+	if len(args) == 1 {
+		return fmtStr
+	}
+	rest := make([]string, 0, len(args)-1)
+	for _, a := range args[1:] {
+		rest = append(rest, g.emitValue(&a))
+	}
+	return fmt.Sprintf("grok_sprintf(%s, %s)", fmtStr, strings.Join(rest, ", "))
 }
 
 func (g *cGen) emitFormat(d *LFormatData) string {
-	// f-string → snprintf or inline
 	var fmtParts []string
 	var argParts []string
 	for _, p := range d.Parts {
 		if p.IsLiteral {
 			fmtParts = append(fmtParts, escapeC(p.Text))
 		} else {
-			spec := g.printfSpec(&p.Value)
+			spec, argExpr := g.printfSpecAndArg(&p.Value)
 			fmtParts = append(fmtParts, spec)
-			argParts = append(argParts, g.emitValue(&p.Value))
+			if argExpr != "" {
+				argParts = append(argParts, argExpr)
+			}
 		}
 	}
-	// Return a static buffer sprintf (simplified)
 	fmtStr := strings.Join(fmtParts, "")
 	if len(argParts) == 0 {
 		return fmt.Sprintf(`"%s"`, fmtStr)
 	}
-	// Use a GCC statement expression with a static buffer
-	return fmt.Sprintf(`({ static char _buf[256]; snprintf(_buf, 256, "%s", %s); _buf; })`,
+	return fmt.Sprintf(`grok_sprintf("%s", %s)`,
 		fmtStr, strings.Join(argParts, ", "))
 }
 
-func (g *cGen) printfSpec(v *LValue) string {
+// printfSpecAndArg returns the format specifier and the argument expression.
+// For bools, the argument is wrapped in grok_bool_str().
+func (g *cGen) printfSpecAndArg(v *LValue) (string, string) {
 	if v.Type == nil {
-		return "%d"
+		return "%d", g.emitValue(v)
 	}
 	switch v.Type.Kind {
 	case LTyI8, LTyI16, LTyI32, LTyPlatformInt:
-		return "%d"
+		return "%d", g.emitValue(v)
 	case LTyI64:
-		return "%lld"
+		return "%lld", g.emitValue(v)
 	case LTyU8, LTyU16, LTyU32, LTyPlatformUint:
-		return "%u"
+		return "%u", g.emitValue(v)
 	case LTyU64:
-		return "%llu"
+		return "%llu", g.emitValue(v)
 	case LTyF32, LTyF64:
-		return "%g"
+		return "%g", g.emitValue(v)
 	case LTyBool:
-		return "%s"
+		return "%s", fmt.Sprintf("grok_bool_str(%s)", g.emitValue(v))
 	case LTyString:
-		return "%s"
+		return "%s", g.emitValue(v)
 	default:
-		return "%d"
+		return "%d", g.emitValue(v)
 	}
 }
 
@@ -832,19 +1227,24 @@ func (g *cGen) cType(t *LType) string {
 	case LTySlice:
 		return g.sliceTypeName(t.Elem)
 	case LTyMap:
-		return fmt.Sprintf("/* map<%s,%s> */void*", g.cType(t.Key), g.cType(t.Elem))
+		return "void* /* map */"
 	case LTyStruct:
 		return g.structName(t.Name, t.IsExported)
 	case LTyClassHandle:
-		return g.structName(t.Name, t.IsExported) + "*"
+		name := t.Name
+		if g.prog.ClassRenames != nil {
+			if renamed, ok := g.prog.ClassRenames[name]; ok {
+				name = renamed
+			}
+		}
+		return g.structName(name, t.IsExported) + "*"
 	case LTyOptional:
-		return g.cType(t.Elem) // Simplified: just the inner type
+		return g.optTypeName(t.Elem)
 	case LTyTaggedUnion:
 		return g.structName(t.Name, t.IsExported)
 	case LTyChannel:
-		return "/* channel */ void*"
+		return "void* /* channel */"
 	case LTyFuncPtr:
-		// Function pointer
 		ret := g.cReturnType(t.Return)
 		var params []string
 		for _, p := range t.Params {
@@ -857,19 +1257,19 @@ func (g *cGen) cType(t *LType) string {
 	case LTyUnit:
 		return "void"
 	case LTyError:
-		return "int /* error */"
+		return "const char*"
 	case LTyErrorResult:
-		return fmt.Sprintf("struct { %s value; int error; }", g.cType(t.Elem))
+		return g.resultTypeName(t.Elem)
 	case LTyTuple:
 		var fields []string
 		for i, f := range t.Fields {
 			fields = append(fields, fmt.Sprintf("%s _%d", g.cType(f.Type), i))
 		}
-		return fmt.Sprintf("struct { %s }", strings.Join(fields, "; "))
+		return fmt.Sprintf("struct { %s; }", strings.Join(fields, "; "))
 	case LTyMutex:
-		return "/* mutex */ int"
+		return "int /* mutex */"
 	case LTyTypeVar:
-		return fmt.Sprintf("/* typevar %s */ void*", t.Name)
+		return fmt.Sprintf("void* /* typevar %s */", t.Name)
 	case LTyAny:
 		return "void*"
 	default:
@@ -878,7 +1278,6 @@ func (g *cGen) cType(t *LType) string {
 }
 
 func (g *cGen) cFieldDecl(t *LType, name string) string {
-	// Handle function pointer types which need the name embedded
 	if t != nil && t.Kind == LTyFuncPtr {
 		ret := g.cReturnType(t.Return)
 		var params []string
@@ -894,34 +1293,102 @@ func (g *cGen) cFieldDecl(t *LType, name string) string {
 }
 
 // ---------------------------------------------------------------------------
-// Name helpers
+// Composite type name helpers
 // ---------------------------------------------------------------------------
 
 func (g *cGen) structName(name string, exported bool) string {
 	return name
 }
 
-// sliceTypeName returns a named typedef for a slice of the given element type.
 func (g *cGen) sliceTypeName(elem *LType) string {
 	key := g.cType(elem)
 	if name, ok := g.sliceTypes[key]; ok {
 		return name
 	}
-	g.sliceCount++
 	name := fmt.Sprintf("GrokSlice_%s", sanitizeCTypeName(key))
 	g.sliceTypes[key] = name
 	return name
 }
 
-// collectSliceTypes walks all types in the program to pre-register slice types.
-func (g *cGen) collectSliceTypes() {
+func (g *cGen) sliceTypeNameFromType(t *LType) string {
+	if t != nil && t.Kind == LTySlice {
+		return g.sliceTypeName(t.Elem)
+	}
+	return "/* unknown slice type */"
+}
+
+func (g *cGen) optTypeName(elem *LType) string {
+	if elem == nil {
+		return "GrokOpt_void"
+	}
+	key := g.cType(elem)
+	if name, ok := g.optTypes[key]; ok {
+		return name
+	}
+	name := fmt.Sprintf("GrokOpt_%s", sanitizeCTypeName(key))
+	g.optTypes[key] = name
+	return name
+}
+
+func (g *cGen) optTypeNameFromExpr(e *LExpr) string {
+	if e.Type != nil && e.Type.Kind == LTyOptional {
+		return g.optTypeName(e.Type.Elem)
+	}
+	// Fallback: try to get from the wrapped value
+	if e.Kind == LExprWrapOptional {
+		d := e.Data.(*LWrapOptionalData)
+		if d.Value.Type != nil {
+			return g.optTypeName(d.Value.Type)
+		}
+	}
+	return "GrokOpt_void"
+}
+
+func (g *cGen) resultTypeName(elem *LType) string {
+	if elem == nil {
+		return "GrokResult_void"
+	}
+	key := g.cType(elem)
+	if name, ok := g.resultTypes[key]; ok {
+		return name
+	}
+	name := fmt.Sprintf("GrokResult_%s", sanitizeCTypeName(key))
+	g.resultTypes[key] = name
+	return name
+}
+
+func (g *cGen) resultTypeNameFromExpr(e *LExpr) string {
+	if e.Type != nil && e.Type.Kind == LTyErrorResult && e.Type.Elem != nil {
+		return g.resultTypeName(e.Type.Elem)
+	}
+	return "GrokResult_void"
+}
+
+// collectCompositeTypes walks all types to pre-register slices, optionals, and results.
+func (g *cGen) collectCompositeTypes() {
+	var containsTypeVar func(t *LType) bool
+	containsTypeVar = func(t *LType) bool {
+		if t == nil {
+			return false
+		}
+		if t.Kind == LTyTypeVar {
+			return true
+		}
+		return containsTypeVar(t.Elem) || containsTypeVar(t.Key) || containsTypeVar(t.Return)
+	}
+
 	var walkType func(t *LType)
 	walkType = func(t *LType) {
-		if t == nil {
+		if t == nil || containsTypeVar(t) {
 			return
 		}
-		if t.Kind == LTySlice {
+		switch t.Kind {
+		case LTySlice:
 			g.sliceTypeName(t.Elem)
+		case LTyOptional:
+			g.optTypeName(t.Elem)
+		case LTyErrorResult:
+			g.resultTypeName(t.Elem)
 		}
 		walkType(t.Elem)
 		walkType(t.Key)
@@ -933,11 +1400,106 @@ func (g *cGen) collectSliceTypes() {
 			walkType(f.Type)
 		}
 	}
-	for _, f := range g.prog.Functions {
+
+	walkFuncTypes := func(f *LFuncDecl) {
 		walkType(f.ReturnType)
 		for _, p := range f.Params {
 			walkType(p.Type)
 		}
+		// Also walk the body for any types used in expressions
+		var walkStmts func(stmts []LStmt)
+		var walkExpr func(e *LExpr)
+		var walkVal func(v *LValue)
+
+		walkVal = func(v *LValue) {
+			if v != nil {
+				walkType(v.Type)
+			}
+		}
+
+		walkExpr = func(e *LExpr) {
+			if e == nil {
+				return
+			}
+			walkType(e.Type)
+			switch e.Kind {
+			case LExprCall:
+				d := e.Data.(*LCallData)
+				for i := range d.Args {
+					walkVal(&d.Args[i])
+				}
+			case LExprBuiltin:
+				d := e.Data.(*LBuiltinData)
+				for i := range d.Args {
+					walkVal(&d.Args[i])
+				}
+			case LExprMakeSlice:
+				// No data — type info is on e.Type
+			case LExprMakeResult:
+				d := e.Data.(*LMakeResultData)
+				walkVal(&d.Value)
+				walkVal(&d.Err)
+			case LExprWrapOptional:
+				d := e.Data.(*LWrapOptionalData)
+				walkVal(&d.Value)
+			}
+		}
+
+		walkStmts = func(stmts []LStmt) {
+			for i := range stmts {
+				s := &stmts[i]
+				switch s.Kind {
+				case LStmtTempDef:
+					d := s.Data.(*LTempDef)
+					walkExpr(&d.Expr)
+				case LStmtVarDecl:
+					d := s.Data.(*LVarDecl)
+					walkType(d.Type)
+					walkVal(d.Init)
+				case LStmtSideEffect:
+					d := s.Data.(*LSideEffect)
+					walkExpr(&d.Expr)
+				case LStmtMultiAssign:
+					d := s.Data.(*LMultiAssign)
+					walkExpr(&d.Expr)
+				case LStmtIf:
+					d := s.Data.(*LIf)
+					walkStmts(d.Then)
+					walkStmts(d.Else)
+				case LStmtWhile:
+					d := s.Data.(*LWhile)
+					walkStmts(d.CondBlock)
+					walkStmts(d.Body)
+				case LStmtFor:
+					d := s.Data.(*LFor)
+					walkType(d.VarType)
+					walkStmts(d.Body)
+				case LStmtSwitch:
+					d := s.Data.(*LSwitch)
+					for _, c := range d.Cases {
+						walkStmts(c.Body)
+					}
+				case LStmtTypeSwitch:
+					d := s.Data.(*LTypeSwitch)
+					for _, c := range d.Cases {
+						walkStmts(c.Body)
+					}
+				case LStmtBlock:
+					d := s.Data.(*LBlock)
+					walkStmts(d.Stmts)
+				case LStmtReturn:
+					d := s.Data.(*LReturn)
+					for i := range d.Values {
+						walkVal(&d.Values[i])
+					}
+				}
+			}
+		}
+		walkStmts(f.Body)
+	}
+
+	for i := range g.prog.Functions {
+		walkFuncTypes(&g.prog.Functions[i])
 	}
 	for _, s := range g.prog.Structs {
 		for _, f := range s.Fields {
@@ -949,10 +1511,17 @@ func (g *cGen) collectSliceTypes() {
 			walkType(f.Type)
 		}
 	}
+	for _, e := range g.prog.Enums {
+		for _, v := range e.Variants {
+			for _, f := range v.Fields {
+				walkType(f.Type)
+			}
+		}
+	}
 }
 
 func sanitizeCTypeName(s string) string {
-	r := strings.NewReplacer(" ", "_", "*", "ptr", "[", "", "]", "", "(", "", ")", "", ",", "_")
+	r := strings.NewReplacer(" ", "_", "*", "ptr", "[", "", "]", "", "(", "", ")", "", ",", "_", "/", "_")
 	return r.Replace(s)
 }
 
@@ -977,6 +1546,10 @@ func (g *cGen) zeroValue(t *LType) string {
 		return `""`
 	case LTyClassHandle:
 		return "NULL"
+	case LTyOptional:
+		return fmt.Sprintf("grok_none(%s)", g.optTypeName(t.Elem))
+	case LTySlice:
+		return fmt.Sprintf("grok_slice_empty(%s)", g.sliceTypeName(t.Elem))
 	case LTyStruct, LTyTaggedUnion:
 		return "{0}"
 	default:
@@ -998,11 +1571,172 @@ func (g *cGen) linef(format string, args ...interface{}) {
 	g.line(fmt.Sprintf(format, args...))
 }
 
+// resolveFieldType looks up a field type from program declarations.
+func (g *cGen) resolveFieldType(ownerType *LType, field string) *LType {
+	name := ownerType.Name
+	for _, s := range g.prog.Structs {
+		if s.Name == name {
+			for _, f := range s.Fields {
+				if f.Name == field {
+					return f.Type
+				}
+			}
+		}
+	}
+	for _, c := range g.prog.Classes {
+		if c.Name == name {
+			for _, f := range c.Fields {
+				if f.Name == field {
+					return f.Type
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (g *cGen) exprType(e *LExpr) *LType {
 	if e == nil || e.Type == nil {
 		return &LType{Kind: LTyI32}
 	}
 	return e.Type
+}
+
+func (g *cGen) containsTypeVar(t *LType) bool {
+	if t == nil {
+		return false
+	}
+	if t.Kind == LTyTypeVar {
+		return true
+	}
+	return g.containsTypeVar(t.Elem) || g.containsTypeVar(t.Key) || g.containsTypeVar(t.Return)
+}
+
+// inferExprType returns the best C type for an expression, resolving LTyAny
+// for well-known builtins where the lowerer lost type information.
+func (g *cGen) inferExprType(e *LExpr) *LType {
+	t := g.exprType(e)
+	if t.Kind != LTyAny && !g.containsTypeVar(t) {
+		return t
+	}
+	// Try to infer from function call return type
+	if e.Kind == LExprCall {
+		d := e.Data.(*LCallData)
+		for _, fn := range g.prog.Functions {
+			if fn.Name == d.Func || (fn.IsExported && fn.Name == cSafeName(d.Func)) {
+				if fn.ReturnType != nil && fn.ReturnType.Kind != LTyAny {
+					return fn.ReturnType
+				}
+				break
+			}
+		}
+	}
+	// Try to infer from method call return type
+	if e.Kind == LExprMethodCall {
+		d := e.Data.(*LMethodCallData)
+		recvType := d.Receiver.Type
+		if recvType != nil {
+			typeName := recvType.Name
+			// Apply class renames for monomorphized classes
+			if g.prog.ClassRenames != nil {
+				if renamed, ok := g.prog.ClassRenames[typeName]; ok {
+					typeName = renamed
+				}
+			}
+			if typeName != "" {
+				for _, fn := range g.prog.Functions {
+					if fn.Receiver == typeName && fn.Name == d.Method {
+						if fn.ReturnType != nil && fn.ReturnType.Kind != LTyAny {
+							return fn.ReturnType
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+	// Try to infer from unwrap (returns optional's inner type)
+	if e.Kind == LExprUnwrapOptional {
+		d := e.Data.(*LUnwrapOptionalData)
+		argType := d.Value.Type
+		// Check resolved var types first
+		if d.Value.Kind == LValVar {
+			if resolved, ok := g.varTypes[d.Value.Name]; ok {
+				argType = resolved
+			}
+		} else if d.Value.Kind == LValTemp {
+			if resolved, ok := g.tempTypes[d.Value.TempID]; ok {
+				argType = resolved
+			}
+		}
+		if argType != nil && argType.Kind == LTyOptional && argType.Elem != nil {
+			return argType.Elem
+		}
+	}
+	if e.Kind == LExprBuiltin {
+		d := e.Data.(*LBuiltinData)
+		if d.Name == "unwrap" && len(d.Args) > 0 {
+			argType := d.Args[0].Type
+			if argType != nil && argType.Kind == LTyOptional && argType.Elem != nil {
+				return argType.Elem
+			}
+		}
+	}
+	// Try to infer from class/struct field access
+	if e.Kind == LExprClassGet {
+		d := e.Data.(*LClassGetData)
+		if d.Handle.Type != nil {
+			fieldType := g.resolveFieldType(d.Handle.Type, d.Field)
+			if fieldType != nil {
+				return fieldType
+			}
+		}
+	}
+	if e.Kind == LExprStructField {
+		d := e.Data.(*LStructFieldData)
+		if d.Receiver.Type != nil {
+			fieldType := g.resolveFieldType(d.Receiver.Type, d.Field)
+			if fieldType != nil {
+				return fieldType
+			}
+		}
+	}
+	// Try to infer from builtin name
+	if e.Kind == LExprBuiltin {		d := e.Data.(*LBuiltinData)
+		switch d.Name {
+		case "len", "string_len", "slice_len", "map_len":
+			return &LType{Kind: LTyPlatformInt}
+		case "isnull", "contains", "string_contains", "slice_contains",
+			"has_prefix", "string_has_prefix", "has_suffix", "string_has_suffix",
+			"contains_key", "map_contains_key":
+			return &LType{Kind: LTyBool}
+		case "index_of", "string_index_of":
+			return &LType{Kind: LTyI32}
+		case "replace", "string_replace", "repeat", "string_repeat",
+			"join", "str_join", "slice_join", "string_trim",
+			"string_to_upper", "string_to_lower":
+			return &LType{Kind: LTyString}
+		case "pop", "slice_pop":
+			if len(d.Args) > 0 && d.Args[0].Type != nil && d.Args[0].Type.Kind == LTySlice {
+				return d.Args[0].Type.Elem
+			}
+		case "push", "append", "slice_push", "slice_append":
+			if len(d.Args) > 0 && d.Args[0].Type != nil && d.Args[0].Type.Kind == LTySlice {
+				return d.Args[0].Type
+			}
+		case "keys", "map_keys":
+			if len(d.Args) > 0 && d.Args[0].Type != nil && d.Args[0].Type.Kind == LTyMap {
+				return &LType{Kind: LTySlice, Elem: d.Args[0].Type.Key}
+			}
+		case "values", "map_values":
+			if len(d.Args) > 0 && d.Args[0].Type != nil && d.Args[0].Type.Kind == LTyMap {
+				return &LType{Kind: LTySlice, Elem: d.Args[0].Type.Elem}
+			}
+		case "string_split":
+			return &LType{Kind: LTySlice, Elem: &LType{Kind: LTyString}}
+		}
+	}
+	return t
 }
 
 func (g *cGen) nextTemp() int {
@@ -1011,8 +1745,24 @@ func (g *cGen) nextTemp() int {
 	return id
 }
 
-func escapeC(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
+var cReservedWords = map[string]bool{
+	"auto": true, "break": true, "case": true, "char": true, "const": true,
+	"continue": true, "default": true, "do": true, "double": true, "else": true,
+	"enum": true, "extern": true, "float": true, "for": true, "goto": true,
+	"if": true, "inline": true, "int": true, "long": true, "register": true,
+	"restrict": true, "return": true, "short": true, "signed": true, "sizeof": true,
+	"static": true, "struct": true, "switch": true, "typedef": true, "union": true,
+	"unsigned": true, "void": true, "volatile": true, "while": true,
+}
+
+func cSafeName(name string) string {
+	if cReservedWords[name] {
+		return name + "_"
+	}
+	return name
+}
+
+func escapeC(s string) string {	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "\"", "\\\"")
 	s = strings.ReplaceAll(s, "\n", "\\n")
 	s = strings.ReplaceAll(s, "\t", "\\t")

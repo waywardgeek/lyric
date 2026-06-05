@@ -13,9 +13,11 @@ import (
 // The Go backend can skip this pass since Go has native generics.
 func Monomorphize(prog *LProgram) {
 	m := &monoPass{
+		prog:            prog,
 		funcInstances:   map[string]map[string][]*LType{},
 		classInstances:  map[string]map[string][]*LType{},
 		structInstances: map[string]map[string][]*LType{},
+		classRenames:    map[string]string{},
 		funcByName:      map[string]*LFuncDecl{},
 		classByName:     map[string]*LClassDecl{},
 		structByName:    map[string]*LStructDecl{},
@@ -82,6 +84,7 @@ func Monomorphize(prog *LProgram) {
 				subst[tp.Name] = types[i]
 			}
 			mangledName := mangleName(orig.Name, types)
+			m.classRenames[orig.Name] = mangledName
 			spec := m.specializeClass(orig, subst, mangledName)
 			newClasses = append(newClasses, spec)
 
@@ -129,14 +132,22 @@ func Monomorphize(prog *LProgram) {
 	for i := range prog.Functions {
 		m.rewriteStmts(prog.Functions[i].Body)
 	}
+
+	// Export rename map for C backend
+	prog.ClassRenames = m.classRenames
 }
 
 // monoPass holds state for the monomorphization pass.
 type monoPass struct {
+	prog *LProgram // reference to the program being monomorphized
+
 	// Collected instantiations: name → map of type-key → actual []*LType
 	funcInstances   map[string]map[string][]*LType
 	classInstances  map[string]map[string][]*LType
 	structInstances map[string]map[string][]*LType
+
+	// Map from generic class/struct name → mangled name (when only one instantiation)
+	classRenames map[string]string
 
 	// Indexes into the original program
 	funcByName     map[string]*LFuncDecl
@@ -374,60 +385,60 @@ func (m *monoPass) rewriteStmt(s *LStmt) {
 	case LStmtTempDef:
 		d := s.Data.(*LTempDef)
 		m.rewriteExpr(&d.Expr)
-		d.Expr.Type = substTypeRemoveVars(d.Expr.Type)
+		d.Expr.Type = m.substTypeRemoveVars(d.Expr.Type)
 	case LStmtVarDecl:
 		d := s.Data.(*LVarDecl)
-		d.Type = substTypeRemoveVars(d.Type)
+		d.Type = m.substTypeRemoveVars(d.Type)
 		if d.Init != nil {
-			d.Init.Type = substTypeRemoveVars(d.Init.Type)
+			d.Init.Type = m.substTypeRemoveVars(d.Init.Type)
 		}
 	case LStmtAssign:
 		d := s.Data.(*LAssign)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LStmtStructSet:
 		d := s.Data.(*LStructSet)
-		d.Receiver.Type = substTypeRemoveVars(d.Receiver.Type)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Receiver.Type = m.substTypeRemoveVars(d.Receiver.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LStmtClassSet:
 		d := s.Data.(*LClassSet)
-		d.Handle.Type = substTypeRemoveVars(d.Handle.Type)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Handle.Type = m.substTypeRemoveVars(d.Handle.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LStmtIndexSet:
 		d := s.Data.(*LIndexSet)
-		d.Collection.Type = substTypeRemoveVars(d.Collection.Type)
-		d.Index.Type = substTypeRemoveVars(d.Index.Type)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Collection.Type = m.substTypeRemoveVars(d.Collection.Type)
+		d.Index.Type = m.substTypeRemoveVars(d.Index.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LStmtReturn:
 		d := s.Data.(*LReturn)
 		for i := range d.Values {
-			d.Values[i].Type = substTypeRemoveVars(d.Values[i].Type)
+			d.Values[i].Type = m.substTypeRemoveVars(d.Values[i].Type)
 		}
 	case LStmtIf:
 		d := s.Data.(*LIf)
-		d.Cond.Type = substTypeRemoveVars(d.Cond.Type)
+		d.Cond.Type = m.substTypeRemoveVars(d.Cond.Type)
 		m.rewriteStmts(d.Then)
 		m.rewriteStmts(d.Else)
 	case LStmtWhile:
 		d := s.Data.(*LWhile)
 		m.rewriteStmts(d.CondBlock)
-		d.CondVar.Type = substTypeRemoveVars(d.CondVar.Type)
+		d.CondVar.Type = m.substTypeRemoveVars(d.CondVar.Type)
 		m.rewriteStmts(d.Body)
 	case LStmtFor:
 		d := s.Data.(*LFor)
-		d.VarType = substTypeRemoveVars(d.VarType)
-		d.Collection.Type = substTypeRemoveVars(d.Collection.Type)
+		d.VarType = m.substTypeRemoveVars(d.VarType)
+		d.Collection.Type = m.substTypeRemoveVars(d.Collection.Type)
 		m.rewriteStmts(d.Body)
 	case LStmtSwitch:
 		d := s.Data.(*LSwitch)
-		d.Tag.Type = substTypeRemoveVars(d.Tag.Type)
+		d.Tag.Type = m.substTypeRemoveVars(d.Tag.Type)
 		for i := range d.Cases {
 			m.rewriteStmts(d.Cases[i].Body)
 		}
 	case LStmtTypeSwitch:
 		d := s.Data.(*LTypeSwitch)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 		for i := range d.Cases {
-			d.Cases[i].Type = substTypeRemoveVars(d.Cases[i].Type)
+			d.Cases[i].Type = m.substTypeRemoveVars(d.Cases[i].Type)
 			m.rewriteStmts(d.Cases[i].Body)
 		}
 	case LStmtBlock:
@@ -440,7 +451,7 @@ func (m *monoPass) rewriteStmt(s *LStmt) {
 		d := s.Data.(*LMultiAssign)
 		m.rewriteExpr(&d.Expr)
 		for i := range d.Types {
-			d.Types[i] = substTypeRemoveVars(d.Types[i])
+			d.Types[i] = m.substTypeRemoveVars(d.Types[i])
 		}
 	case LStmtSpawn:
 		d := s.Data.(*LSpawn)
@@ -448,8 +459,8 @@ func (m *monoPass) rewriteStmt(s *LStmt) {
 	case LStmtSelect:
 		d := s.Data.(*LSelect)
 		for i := range d.Cases {
-			d.Cases[i].Channel.Type = substTypeRemoveVars(d.Cases[i].Channel.Type)
-			d.Cases[i].Value.Type = substTypeRemoveVars(d.Cases[i].Value.Type)
+			d.Cases[i].Channel.Type = m.substTypeRemoveVars(d.Cases[i].Channel.Type)
+			d.Cases[i].Value.Type = m.substTypeRemoveVars(d.Cases[i].Value.Type)
 			m.rewriteStmts(d.Cases[i].Body)
 		}
 	case LStmtDefer:
@@ -460,8 +471,8 @@ func (m *monoPass) rewriteStmt(s *LStmt) {
 		m.rewriteStmts(d.Body)
 	case LStmtSend:
 		d := s.Data.(*LSend)
-		d.Channel.Type = substTypeRemoveVars(d.Channel.Type)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Channel.Type = m.substTypeRemoveVars(d.Channel.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	}
 }
 
@@ -469,7 +480,7 @@ func (m *monoPass) rewriteExpr(e *LExpr) {
 	if e == nil {
 		return
 	}
-	e.Type = substTypeRemoveVars(e.Type)
+	e.Type = m.substTypeRemoveVars(e.Type)
 	switch e.Kind {
 	case LExprCall:
 		d := e.Data.(*LCallData)
@@ -478,11 +489,11 @@ func (m *monoPass) rewriteExpr(e *LExpr) {
 			d.TypeArgs = nil
 		}
 		for i := range d.Args {
-			d.Args[i].Type = substTypeRemoveVars(d.Args[i].Type)
+			d.Args[i].Type = m.substTypeRemoveVars(d.Args[i].Type)
 		}
 	case LExprMethodCall:
 		d := e.Data.(*LMethodCallData)
-		d.Receiver.Type = substTypeRemoveVars(d.Receiver.Type)
+		d.Receiver.Type = m.substTypeRemoveVars(d.Receiver.Type)
 		// If receiver is a generic class, rewrite receiver type name
 		if d.Receiver.Type != nil && d.Receiver.Type.Kind == LTyClassHandle {
 			if _, ok := m.classInstances[d.Receiver.Type.Name]; ok {
@@ -496,9 +507,22 @@ func (m *monoPass) rewriteExpr(e *LExpr) {
 					d.TypeArgs = nil
 				}
 			}
+			// Update expression type from specialized function's return type
+			recvName := d.Receiver.Type.Name
+			if renamed, ok := m.classRenames[recvName]; ok {
+				recvName = renamed
+			}
+			for _, fn := range m.prog.Functions {
+				if fn.Receiver == recvName && fn.Name == d.Method {
+					if fn.ReturnType != nil {
+						e.Type = fn.ReturnType
+					}
+					break
+				}
+			}
 		}
 		for i := range d.Args {
-			d.Args[i].Type = substTypeRemoveVars(d.Args[i].Type)
+			d.Args[i].Type = m.substTypeRemoveVars(d.Args[i].Type)
 		}
 	case LExprClassAlloc:
 		d := e.Data.(*LClassAllocData)
@@ -513,100 +537,100 @@ func (m *monoPass) rewriteExpr(e *LExpr) {
 			d.TypeArgs = nil
 		}
 		for i := range d.Fields {
-			d.Fields[i].Value.Type = substTypeRemoveVars(d.Fields[i].Value.Type)
+			d.Fields[i].Value.Type = m.substTypeRemoveVars(d.Fields[i].Value.Type)
 		}
 	case LExprBinOp:
 		d := e.Data.(*LBinOpData)
-		d.Left.Type = substTypeRemoveVars(d.Left.Type)
-		d.Right.Type = substTypeRemoveVars(d.Right.Type)
+		d.Left.Type = m.substTypeRemoveVars(d.Left.Type)
+		d.Right.Type = m.substTypeRemoveVars(d.Right.Type)
 	case LExprUnOp:
 		d := e.Data.(*LUnOpData)
-		d.Operand.Type = substTypeRemoveVars(d.Operand.Type)
+		d.Operand.Type = m.substTypeRemoveVars(d.Operand.Type)
 	case LExprCast:
 		d := e.Data.(*LCastData)
-		d.Target = substTypeRemoveVars(d.Target)
-		d.Operand.Type = substTypeRemoveVars(d.Operand.Type)
+		d.Target = m.substTypeRemoveVars(d.Target)
+		d.Operand.Type = m.substTypeRemoveVars(d.Operand.Type)
 	case LExprBuiltin:
 		d := e.Data.(*LBuiltinData)
 		for i := range d.Args {
-			d.Args[i].Type = substTypeRemoveVars(d.Args[i].Type)
+			d.Args[i].Type = m.substTypeRemoveVars(d.Args[i].Type)
 		}
 	case LExprFuncLit:
 		d := e.Data.(*LFuncLitData)
-		d.ReturnType = substTypeRemoveVars(d.ReturnType)
+		d.ReturnType = m.substTypeRemoveVars(d.ReturnType)
 		for i := range d.Params {
-			d.Params[i].Type = substTypeRemoveVars(d.Params[i].Type)
+			d.Params[i].Type = m.substTypeRemoveVars(d.Params[i].Type)
 		}
 		m.rewriteStmts(d.Body)
 	case LExprWrapOptional:
 		d := e.Data.(*LWrapOptionalData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprVariantConstruct:
 		d := e.Data.(*LVariantConstructData)
 		for i := range d.Fields {
-			d.Fields[i].Type = substTypeRemoveVars(d.Fields[i].Type)
+			d.Fields[i].Type = m.substTypeRemoveVars(d.Fields[i].Type)
 		}
 	case LExprVariantData:
 		d := e.Data.(*LVariantDataData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprVariantTag:
 		d := e.Data.(*LVariantTagData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprSlice:
 		d := e.Data.(*LSliceData)
-		d.Collection.Type = substTypeRemoveVars(d.Collection.Type)
+		d.Collection.Type = m.substTypeRemoveVars(d.Collection.Type)
 	case LExprStructLit:
 		d := e.Data.(*LStructLitData)
 		for i := range d.Fields {
-			d.Fields[i].Value.Type = substTypeRemoveVars(d.Fields[i].Value.Type)
+			d.Fields[i].Value.Type = m.substTypeRemoveVars(d.Fields[i].Value.Type)
 		}
 	case LExprStructField:
 		d := e.Data.(*LStructFieldData)
-		d.Receiver.Type = substTypeRemoveVars(d.Receiver.Type)
+		d.Receiver.Type = m.substTypeRemoveVars(d.Receiver.Type)
 	case LExprClassGet:
 		d := e.Data.(*LClassGetData)
-		d.Handle.Type = substTypeRemoveVars(d.Handle.Type)
+		d.Handle.Type = m.substTypeRemoveVars(d.Handle.Type)
 	case LExprIndexGet:
 		d := e.Data.(*LIndexGetData)
-		d.Collection.Type = substTypeRemoveVars(d.Collection.Type)
-		d.Index.Type = substTypeRemoveVars(d.Index.Type)
+		d.Collection.Type = m.substTypeRemoveVars(d.Collection.Type)
+		d.Index.Type = m.substTypeRemoveVars(d.Index.Type)
 	case LExprExtractValue:
 		d := e.Data.(*LExtractValueData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprExtractError:
 		d := e.Data.(*LExtractErrorData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprMakeResult:
 		d := e.Data.(*LMakeResultData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
-		d.Err.Type = substTypeRemoveVars(d.Err.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
+		d.Err.Type = m.substTypeRemoveVars(d.Err.Type)
 	case LExprIsNull:
 		d := e.Data.(*LIsNullData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprUnwrapOptional:
 		d := e.Data.(*LUnwrapOptionalData)
-		d.Value.Type = substTypeRemoveVars(d.Value.Type)
+		d.Value.Type = m.substTypeRemoveVars(d.Value.Type)
 	case LExprMakeSlice:
 		// no LValues to rewrite
 	case LExprMakeMap:
 		// no LValues to rewrite
 	case LExprMakeChannel:
 		d := e.Data.(*LMakeChannelData)
-		d.ElemType = substTypeRemoveVars(d.ElemType)
+		d.ElemType = m.substTypeRemoveVars(d.ElemType)
 	case LExprFormat:
 		d := e.Data.(*LFormatData)
 		for i := range d.Parts {
 			if !d.Parts[i].IsLiteral {
-				d.Parts[i].Value.Type = substTypeRemoveVars(d.Parts[i].Value.Type)
+				d.Parts[i].Value.Type = m.substTypeRemoveVars(d.Parts[i].Value.Type)
 			}
 		}
 	case LExprEnvGet:
 		d := e.Data.(*LEnvGetData)
-		d.Env.Type = substTypeRemoveVars(d.Env.Type)
+		d.Env.Type = m.substTypeRemoveVars(d.Env.Type)
 	case LExprFuncRef:
 		d := e.Data.(*LFuncRefData)
 		if d.Env != nil {
-			d.Env.Type = substTypeRemoveVars(d.Env.Type)
+			d.Env.Type = m.substTypeRemoveVars(d.Env.Type)
 		}
 	}
 }
@@ -665,9 +689,12 @@ func substType(t *LType, subst map[string]*LType) *LType {
 
 // substTypeRemoveVars is used in the rewrite phase. After monomorphization,
 // any remaining type vars should already be gone. This is a safety net.
-func substTypeRemoveVars(t *LType) *LType {
+func (m *monoPass) substTypeRemoveVars(t *LType) *LType {
 	return t
 }
+
+
+
 
 // ---------------------------------------------------------------------------
 // Helpers: cloning statements with type substitution

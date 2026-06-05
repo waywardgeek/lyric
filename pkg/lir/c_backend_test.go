@@ -83,8 +83,9 @@ func TestCBackendCompilesScan(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			runtimeDir := filepath.Join("..", "..", "runtime")
 			binary := filepath.Join(tmpDir, "out")
-			cmd := exec.Command("cc", "-o", binary, "-std=c11", "-Wall", "-Wno-unused-variable", "-Wno-unused-value", cFile)
+			cmd := exec.Command("cc", "-o", binary, "-std=gnu11", "-Wall", "-Wno-unused-variable", "-Wno-unused-value", "-I", runtimeDir, cFile)
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				failed++
@@ -153,8 +154,9 @@ func compileCAndRun(t *testing.T, cSrc, name string) string {
 		t.Fatalf("write failed: %v", err)
 	}
 
+	runtimeDir := filepath.Join("..", "..", "runtime")
 	binary := filepath.Join(tmpDir, "out")
-	cmd := exec.Command("cc", "-o", binary, "-std=c11", "-Wall", "-Wno-unused-variable", cFile)
+	cmd := exec.Command("cc", "-o", binary, "-std=gnu11", "-Wall", "-Wno-unused-variable", "-I", runtimeDir, cFile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("C source:\n%s", cSrc)
