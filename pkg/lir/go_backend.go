@@ -686,6 +686,10 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 		// Use typed declaration for temps with specific numeric types
 		if td.Expr.Type != nil && g.needsTypedDecl(td.Expr.Type) && isSimpleExpr(&td.Expr) {
 			g.writef("var %s %s = ", g.tempName(td.ID), g.goType(td.Expr.Type))
+		} else if g.exprIsNil(&td.Expr) {
+			// nil can't appear in := context; use var declaration
+			g.writef("var %s %s\n", g.tempName(td.ID), g.goType(td.Expr.Type))
+			break
 		} else {
 			g.writef("%s := ", g.tempName(td.ID))
 		}
@@ -1322,15 +1326,19 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 		d := e.Data.(*LStructLitData)
 		typeName := g.goType(e.Type)
 		if e.Type != nil && e.Type.Kind == LTySlice {
-			// List literal
-			g.writef("%s{", typeName)
-			for i, f := range d.Fields {
-				if i > 0 {
-					g.writef(", ")
+			// List literal — empty slice with unknown elem type → nil
+			if len(d.Fields) == 0 && e.Type.Elem != nil && e.Type.Elem.Kind == LTyAny {
+				g.writef("nil")
+			} else {
+				g.writef("%s{", typeName)
+				for i, f := range d.Fields {
+					if i > 0 {
+						g.writef(", ")
+					}
+					g.emitValue(&f.Value)
 				}
-				g.emitValue(&f.Value)
+				g.writef("}")
 			}
-			g.writef("}")
 		} else if e.Type != nil && e.Type.Kind == LTyClassHandle {
 			// Class struct literal — emit with & (pointer)
 			name := g.visName(e.Type.Name, e.Type.IsExported)
@@ -1526,9 +1534,9 @@ func (g *GoBackend) emitBuiltin(d *LBuiltinData) {
 		g.emitArgs(d.Args)
 		g.writef(")")
 	case "len":
-		g.writef("int32(len(")
+		g.writef("len(")
 		g.emitArgs(d.Args)
-		g.writef("))")
+		g.writef(")")
 	case "append":
 		g.writef("append(")
 		g.emitArgs(d.Args)
@@ -1800,6 +1808,17 @@ func (g *GoBackend) needsTypedDecl(t *LType) bool {
 		return true // Go would infer int/uint
 	case LTyF32:
 		return true // Go would infer float64
+	}
+	return false
+}
+
+// exprIsNil returns true if the expression would emit bare "nil" (e.g. empty slice with unknown elem).
+func (g *GoBackend) exprIsNil(e *LExpr) bool {
+	if e.Kind == LExprStructLit && e.Type != nil && e.Type.Kind == LTySlice {
+		d := e.Data.(*LStructLitData)
+		if len(d.Fields) == 0 && e.Type.Elem != nil && e.Type.Elem.Kind == LTyAny {
+			return true
+		}
 	}
 	return false
 }

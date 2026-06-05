@@ -51,6 +51,9 @@ type Lowerer struct {
 
 	// Class type params (for method receiver emission)
 	classTypeParams map[string][]LTypeParam // class name → type params
+
+	// Variable types for assignment coercion
+	varTypes map[string]*LType // variable name → declared type
 }
 
 type variantCtorInfo struct {
@@ -70,6 +73,7 @@ func NewLowerer() *Lowerer {
 		importAliases:   make(map[string]string),
 		exported:        make(map[string]bool),
 		classTypeParams: make(map[string][]LTypeParam),
+		varTypes:        make(map[string]*LType),
 	}
 }
 
@@ -215,6 +219,11 @@ func (l *Lowerer) registerTypes(block *ast.GrokBlock) {
 			}
 		}
 		l.enumVariants[e.Name] = variants
+	}
+
+	// Pre-register all class names so cross-references resolve to LTyClassHandle
+	for _, cls := range block.Classes {
+		l.classFields[cls.Name] = nil
 	}
 
 	for _, cls := range block.Classes {
@@ -787,6 +796,7 @@ func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt) {
 		varType = &LType{Kind: LTyAny}
 	}
 
+	l.varTypes[vd.Name] = varType
 	l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
 		Name:    vd.Name,
 		Type:    varType,
@@ -837,6 +847,16 @@ func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
 	// Simple variable assignment
 	if as.Target.Kind == ast.ExprIdent {
 		ident := dataAs[ast.IdentExpr](as.Target.Data)
+		// Auto-cast numeric value when target type differs
+		if targetType, ok := l.varTypes[ident.Name]; ok && targetType != nil && val.Type != nil &&
+			isNumericKind(targetType.Kind) && isNumericKind(val.Type.Kind) &&
+			targetType.Kind != val.Type.Kind {
+			val = l.emitTemp(LExpr{
+				Kind: LExprCast,
+				Type: targetType,
+				Data: &LCastData{Operand: val, Target: targetType},
+			})
+		}
 		l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
 			Target: ident.Name,
 			Value:  val,
@@ -874,6 +894,16 @@ func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt) {
 						})
 					}
 				}
+			}
+			// Auto-cast numeric return value when type mismatches
+			if l.currentReturnType != nil && val.Type != nil &&
+				isNumericKind(l.currentReturnType.Kind) && isNumericKind(val.Type.Kind) &&
+				l.currentReturnType.Kind != val.Type.Kind {
+				val = l.emitTemp(LExpr{
+					Kind: LExprCast,
+					Type: l.currentReturnType,
+					Data: &LCastData{Operand: val, Target: l.currentReturnType},
+				})
 			}
 			values = append(values, val)
 		}
@@ -1963,8 +1993,11 @@ func (l *Lowerer) coerceNumericBinary(left, right LValue, resultType *LType) (LV
 	if left.Type.Kind == right.Type.Kind {
 		return left, right
 	}
-	// Cast the operand that doesn't match the result type
+	// For comparisons (result is bool), coerce to the wider operand type, not bool
 	target := resultType
+	if resultType.Kind == LTyBool {
+		target = l.widerNumericType(left.Type, right.Type)
+	}
 	if left.Type.Kind != target.Kind {
 		left = l.emitTemp(LExpr{
 			Kind: LExprCast,
@@ -1989,6 +2022,33 @@ func isNumericKind(k LTypeKind) bool {
 		return true
 	}
 	return false
+}
+
+// widerNumericType returns the wider of two numeric types for coercion.
+// Platform int/uint dominate fixed-width types.
+func (l *Lowerer) widerNumericType(a, b *LType) *LType {
+	if a.Kind == b.Kind {
+		return a
+	}
+	// Platform int dominates
+	if a.Kind == LTyPlatformInt || a.Kind == LTyPlatformUint {
+		return a
+	}
+	if b.Kind == LTyPlatformInt || b.Kind == LTyPlatformUint {
+		return b
+	}
+	// Float dominates int
+	if a.Kind == LTyF64 || a.Kind == LTyF32 {
+		return a
+	}
+	if b.Kind == LTyF64 || b.Kind == LTyF32 {
+		return b
+	}
+	// Wider bits wins
+	if a.Bits >= b.Bits {
+		return a
+	}
+	return b
 }
 
 func mapBinaryOp(op ast.BinaryOp) LBinOpKind {
@@ -2149,6 +2209,24 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 			}
 			// Auto-wrap non-optional arg when field is optional
 			val := arg
+			// Propagate field type to untyped slice args (e.g. empty list literals)
+			if i < len(allFields) && allFields[i].Type != nil && allFields[i].Type.Kind == LTySlice &&
+				val.Type != nil && val.Type.Kind == LTySlice &&
+				(val.Type.Elem == nil || val.Type.Elem.Kind == LTyAny) {
+				val.Type = allFields[i].Type
+				// Also update the underlying temp's expression type so the Go backend emits correct type
+				if val.Kind == LValTemp {
+					for si := len(l.stmts) - 1; si >= 0; si-- {
+						if l.stmts[si].Kind == LStmtTempDef {
+							td := l.stmts[si].Data.(*LTempDef)
+							if td.ID == val.TempID {
+								td.Expr.Type = allFields[i].Type
+								break
+							}
+						}
+					}
+				}
+			}
 			if i < len(allFields) && allFields[i].Type != nil && allFields[i].Type.Kind == LTyOptional {
 				if val.Type == nil || val.Type.Kind != LTyOptional {
 					if val.Kind != LValLitNull {
