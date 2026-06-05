@@ -773,6 +773,81 @@ func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt) {
 
 func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt) {
 	ms := dataAs[ast.MatchStmt](stmt.Data)
+	l.emitMatch(ms, nil)
+}
+
+func (l *Lowerer) lowerMatchExpr(expr *ast.Expr) LValue {
+	ms := dataAs[ast.MatchStmt](expr.Data)
+	resultType := l.exprType(expr)
+
+	// Declare result variable
+	resultName := fmt.Sprintf("_matchResult%d", l.nextTemp)
+	l.nextTemp++
+	l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+		Name: resultName,
+		Type: resultType,
+	}})
+
+	l.emitMatch(ms, &matchResultInfo{name: resultName, typ: resultType})
+
+	return LValue{Kind: LValVar, Name: resultName, Type: resultType}
+}
+
+type matchResultInfo struct {
+	name string
+	typ  *LType
+}
+
+func (l *Lowerer) lowerLambda(expr *ast.Expr) LValue {
+	lam := dataAs[ast.LambdaExpr](expr.Data)
+
+	var params []LParam
+	for _, p := range lam.Params {
+		params = append(params, LParam{Name: p.Name, Type: l.lowerTypeExpr(&p.Type)})
+	}
+
+	var retType *LType
+	if lam.ReturnType != nil {
+		retType = l.lowerTypeExpr(lam.ReturnType)
+	}
+
+	// Lower the body in an isolated scope
+	var body []LStmt
+	if lam.Body != nil {
+		saved := l.stmts
+		l.stmts = nil
+		for i, s := range lam.Body.Stmts {
+			// If there's a return type and the last statement is an expression,
+			// emit it as a return
+			if retType != nil && i == len(lam.Body.Stmts)-1 && s.Kind == ast.StmtExpr {
+				es := dataAs[ast.ExprStmt](s.Data)
+				val := l.lowerExpr(&es.Expr)
+				l.emit(LStmt{Kind: LStmtReturn, Data: &LReturn{Values: []LValue{val}}})
+			} else {
+				l.lowerStmt(&s)
+			}
+		}
+		body = l.stmts
+		l.stmts = saved
+	}
+
+	// Build the function type
+	var paramTypes []*LType
+	for _, p := range params {
+		paramTypes = append(paramTypes, p.Type)
+	}
+	funcType := &LType{Kind: LTyFuncPtr, Params: paramTypes, Return: retType}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprFuncLit,
+		Type: funcType,
+		Data: &LFuncLitData{Params: params, ReturnType: retType, Body: body},
+	})
+}
+
+// emitMatch lowers a match statement/expression. If result is non-nil, each arm's
+// last expression is assigned to the result variable (match-as-expression).
+func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo) {
 	matchVal := l.lowerExpr(&ms.Value)
 
 	// Check if this is an enum match
@@ -793,7 +868,7 @@ func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt) {
 
 		var cases []LSwitchCase
 		for _, arm := range ms.Arms {
-			sc := l.lowerMatchArm(&arm, matchVal, enumName)
+			sc := l.lowerMatchArm(&arm, matchVal, enumName, result)
 			cases = append(cases, sc)
 		}
 
@@ -804,14 +879,47 @@ func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt) {
 		}})
 	} else {
 		// Non-enum match: emit if-else chain
-		l.lowerMatchAsIfElse(ms, matchVal)
+		l.lowerMatchAsIfElse(ms, matchVal, result)
 	}
 }
 
-func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string) LSwitchCase {
+// lowerArmBody lowers a match arm body. If result is non-nil (match-as-expression),
+// the last expression in the body is assigned to the result variable.
+func (l *Lowerer) lowerArmBody(block *ast.Block, result *matchResultInfo) []LStmt {
+	if result == nil || len(block.Stmts) == 0 {
+		return l.lowerBlock(block)
+	}
+
+	// Lower all statements except the last
+	saved := l.stmts
+	l.stmts = nil
+	for i := 0; i < len(block.Stmts)-1; i++ {
+		l.lowerStmt(&block.Stmts[i])
+	}
+
+	// Lower the last statement as an expression and assign to result
+	lastStmt := &block.Stmts[len(block.Stmts)-1]
+	if lastStmt.Kind == ast.StmtExpr {
+		es := dataAs[ast.ExprStmt](lastStmt.Data)
+		val := l.lowerExpr(&es.Expr)
+		l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
+			Target: result.name,
+			Value:  val,
+		}})
+	} else {
+		// Non-expression last statement — lower normally
+		l.lowerStmt(lastStmt)
+	}
+
+	body := l.stmts
+	l.stmts = saved
+	return body
+}
+
+func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string, result *matchResultInfo) LSwitchCase {
 	switch arm.Pattern.Kind {
 	case ast.PatWildcard:
-		body := l.lowerBlock(&arm.Body)
+		body := l.lowerArmBody(&arm.Body, result)
 		if arm.Guard != nil {
 			guardVal := l.lowerExpr(arm.Guard)
 			body = []LStmt{{Kind: LStmtIf, Data: &LIf{Cond: guardVal, Then: body}}}
@@ -823,11 +931,11 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		// Check if this is a unit variant
 		if en, ok := l.unitVariants[ip.Name]; ok && en == enumName {
 			tag := l.findVariantTag(enumName, ip.Name)
-			body := l.lowerBlock(&arm.Body)
+			body := l.lowerArmBody(&arm.Body, result)
 			return LSwitchCase{Tag: tag, Body: body}
 		}
 		// Otherwise it's a binding — default case that binds the value
-		body := l.lowerBlock(&arm.Body)
+		body := l.lowerArmBody(&arm.Body, result)
 		return LSwitchCase{Tag: -1, Binding: ip.Name, Body: body}
 
 	case ast.PatVariant:
@@ -880,7 +988,7 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		bindingStmts := l.stmts
 		l.stmts = saved
 
-		bodyStmts := l.lowerBlock(&arm.Body)
+		bodyStmts := l.lowerArmBody(&arm.Body, result)
 		allStmts := append(bindingStmts, bodyStmts...)
 
 		if arm.Guard != nil {
@@ -892,19 +1000,19 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 
 	case ast.PatLiteral:
 		// Literal patterns in enum match — shouldn't happen, fallback to default
-		body := l.lowerBlock(&arm.Body)
+		body := l.lowerArmBody(&arm.Body, result)
 		return LSwitchCase{Tag: -1, Body: body}
 	}
 
-	return LSwitchCase{Tag: -1, Body: l.lowerBlock(&arm.Body)}
+	return LSwitchCase{Tag: -1, Body: l.lowerArmBody(&arm.Body, result)}
 }
 
-func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
+func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo) {
 	// For non-enum matches, emit an if-else chain comparing matchVal to each pattern
 	for i, arm := range ms.Arms {
 		if arm.Pattern.Kind == ast.PatWildcard {
 			// Default — just emit the body
-			body := l.lowerBlock(&arm.Body)
+			body := l.lowerArmBody(&arm.Body, result)
 			for _, s := range body {
 				l.emit(s)
 			}
@@ -919,7 +1027,7 @@ func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
 				Type: &LType{Kind: LTyBool},
 				Data: &LBinOpData{Op: LBinEq, Left: matchVal, Right: litVal},
 			})
-			body := l.lowerBlock(&arm.Body)
+			body := l.lowerArmBody(&arm.Body, result)
 
 			var elseStmts []LStmt
 			if i < len(ms.Arms)-1 {
@@ -927,7 +1035,7 @@ func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
 				saved := l.stmts
 				l.stmts = nil
 				remaining := &ast.MatchStmt{Value: ms.Value, Arms: ms.Arms[i+1:]}
-				l.lowerMatchAsIfElse(remaining, matchVal)
+				l.lowerMatchAsIfElse(remaining, matchVal, result)
 				elseStmts = l.stmts
 				l.stmts = saved
 			}
@@ -943,7 +1051,7 @@ func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
 		// Ident pattern as catch-all
 		if arm.Pattern.Kind == ast.PatIdent {
 			ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
-			body := l.lowerBlock(&arm.Body)
+			body := l.lowerArmBody(&arm.Body, result)
 			// Bind the match value to the name, then execute body
 			allStmts := []LStmt{{Kind: LStmtVarDecl, Data: &LVarDecl{
 				Name: ip.Name,
@@ -1074,11 +1182,9 @@ func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue {
 	case ast.ExprTry:
 		return l.lowerTry(expr)
 	case ast.ExprLambda:
-		// Phase 4: closures. For now, emit as function reference placeholder.
-		return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyFuncPtr}}
+		return l.lowerLambda(expr)
 	case ast.ExprMatch:
-		// Phase 3: match-as-expression. For now, placeholder.
-		return LValue{Kind: LValLitNull, Type: l.exprType(expr)}
+		return l.lowerMatchExpr(expr)
 	}
 	return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
 }

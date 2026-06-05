@@ -159,6 +159,7 @@ const (
 	// Environment / closures
 	LExprEnvGet
 	LExprFuncRef
+	LExprFuncLit // inline function literal (lambda/closure)
 
 	// Format
 	LExprFormat
@@ -326,6 +327,12 @@ type LFormatPart struct {
 
 type LFormatData struct {
 	Parts []LFormatPart
+}
+
+type LFuncLitData struct {
+	Params     []LParam
+	ReturnType *LType
+	Body       []LStmt
 }
 
 // ---------------------------------------------------------------------------

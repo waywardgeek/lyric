@@ -824,6 +824,26 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 		d := e.Data.(*LFuncRefData)
 		g.writef("%s", d.Name)
 
+	case LExprFuncLit:
+		d := e.Data.(*LFuncLitData)
+		g.writef("func(")
+		for i, p := range d.Params {
+			if i > 0 {
+				g.writef(", ")
+			}
+			g.writef("%s %s", p.Name, g.goType(p.Type))
+		}
+		g.writef(")")
+		if d.ReturnType != nil {
+			g.writef(" %s", g.goType(d.ReturnType))
+		}
+		g.writef(" {\n")
+		g.indent++
+		g.emitStmts(d.Body)
+		g.indent--
+		g.writeIndent()
+		g.writef("}")
+
 	case LExprFormat:
 		d := e.Data.(*LFormatData)
 		g.autoImport("fmt")
