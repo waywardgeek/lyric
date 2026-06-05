@@ -1411,7 +1411,7 @@ func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo) {
 
 // isUnionMatch checks if this is a union type match (match on any with type patterns).
 func (l *Lowerer) isUnionMatch(matchVal LValue, ms *ast.MatchStmt) bool {
-	if matchVal.Type == nil || matchVal.Type.Kind != LTyAny {
+	if matchVal.Type == nil || (matchVal.Type.Kind != LTyAny && matchVal.Type.Kind != LTyUnion) {
 		return false
 	}
 	for _, arm := range ms.Arms {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -94,7 +95,11 @@ func TestMonomorphizeOutputMatches(t *testing.T) {
 			normalOut := compileAndRun(t, normalSrc, pkgName, "normal")
 			monoOut := compileAndRun(t, monoSrc, pkgName, "mono")
 
-			if normalOut != monoOut {
+			// Strip pointer addresses (0x...) which vary between runs
+			stripPtrs := func(s string) string {
+				return regexp.MustCompile(`0x[0-9a-f]+`).ReplaceAllString(s, "PTR")
+			}
+			if stripPtrs(normalOut) != stripPtrs(monoOut) {
 				t.Errorf("output mismatch:\n--- normal ---\n%s\n--- mono ---\n%s", normalOut, monoOut)
 			}
 		})

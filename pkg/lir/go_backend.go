@@ -753,10 +753,10 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 				// Use typed declaration for literals when the Go type differs from inference
 				g.writef("var %s %s = ", vd.Name, g.goType(vd.Type))
 				g.emitValue(vd.Init)
-			} else if vd.Type != nil && vd.Type.Kind == LTyTaggedUnion {
-				// Interface type (enum) — must use typed declaration to avoid concrete type
+			} else if vd.Type != nil && (vd.Type.Kind == LTyTaggedUnion || vd.Type.Kind == LTyUnion) {
+				// Interface/union type — must use typed declaration to avoid concrete type
 				g.writef("var %s %s = ", vd.Name, g.goType(vd.Type))
-				g.emitValue(vd.Init)
+				g.emitUnionWrappedValue(vd.Init)
 			} else {
 				g.writef("%s := ", vd.Name)
 				g.emitValue(vd.Init)
@@ -1849,6 +1849,35 @@ func (g *GoBackend) emitValue(v *LValue) {
 	case LValLitNull:
 		g.writef("nil")
 	}
+}
+
+// emitUnionWrappedValue emits a value with an explicit type cast when the value
+// is a literal being stored into an any-typed union variable. Without the cast,
+// Go infers default types (int, float64) which don't match type switch cases
+// (int32, float32, etc.).
+func (g *GoBackend) emitUnionWrappedValue(v *LValue) {
+	if v.Type != nil && (v.Kind == LValLitInt || v.Kind == LValLitUint || v.Kind == LValLitFloat || v.Kind == LValLitBool) {
+		goT := g.goType(v.Type)
+		// Only wrap if the Go type differs from Go's default inference
+		needsWrap := false
+		switch v.Kind {
+		case LValLitInt:
+			needsWrap = goT != "int"
+		case LValLitUint:
+			needsWrap = goT != "uint"
+		case LValLitFloat:
+			needsWrap = goT != "float64"
+		case LValLitBool:
+			needsWrap = false // bool is always bool
+		}
+		if needsWrap {
+			g.writef("%s(", goT)
+			g.emitValue(v)
+			g.writef(")")
+			return
+		}
+	}
+	g.emitValue(v)
 }
 
 // ---------------------------------------------------------------------------
