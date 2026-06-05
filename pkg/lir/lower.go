@@ -122,7 +122,15 @@ func (l *Lowerer) Lower(file *ast.File) *LProgram {
 		}
 
 		// Lower classes
-		for _, cls := range block.Classes {
+		// Pre-register class names so lowerTypeExpr can identify class types
+	// even when a class references another class declared later in the same block.
+	for _, cls := range block.Classes {
+		if _, exists := l.classFields[cls.Name]; !exists {
+			l.classFields[cls.Name] = nil // placeholder — populated below
+		}
+	}
+
+	for _, cls := range block.Classes {
 			prog.Classes = append(prog.Classes, l.lowerClassDecl(&cls))
 		}
 

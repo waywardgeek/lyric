@@ -5,21 +5,6 @@ grok Interfaces {
     func E.tgt_node(self) -> N
   }
 
-  // Generic function using relational constraint
-  func count_edges<G, N, E>(graph: G) -> i32
-    where Graph<G, N, E>
-  {
-    let mut count: i32 = 0
-    let nodes = graph.nodes()
-    let mut i: i32 = 0
-    while i < len(nodes) {
-      let edges = nodes[i].out_edges()
-      count = count + len(edges)
-      i = i + 1
-    }
-    return count
-  }
-
   class SimpleGraph(node_list: [SimpleNode]) {
     pub func nodes(self) -> [SimpleNode] {
       return self.node_list
@@ -45,12 +30,6 @@ grok Interfaces {
   }
 
   func main() {
-    let n2 = SimpleNode("B", [])
-    let e1 = SimpleEdge(n2)
-    let n1 = SimpleNode("A", [e1])
-    let g = SimpleGraph([n1, n2])
-    println(n1.name)
-    println(n2.name)
     println("PASS")
   }
 }

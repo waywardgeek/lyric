@@ -494,7 +494,8 @@ func (g *GoBackend) emitInterfaceDecl(iface *LInterfaceDecl) {
 			if m.ReceiverType != recvTP {
 				continue
 			}
-			methodName := g.visName(m.Name, iface.IsExported)
+			// Multi-class interface methods must be exported to match pub class methods
+			methodName := g.visName(m.Name, true)
 			g.writef("\t%s(", methodName)
 			for i, p := range m.Params {
 				if i > 0 {
