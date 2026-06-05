@@ -108,10 +108,13 @@ type Param struct {
 	Span   Span
 }
 
-// WhereClause constrains a type variable: where T: Integer.
+// WhereClause constrains type variables.
+// Single-type: where T: Integer (Variable="T", Constraint="Integer")
+// Relational: where Graph<G, N, E> (Variable="", Constraint="Graph", TypeArgs set)
 type WhereClause struct {
-	Variable   string
+	Variable   string     // empty for bare relational constraints
 	Constraint string
+	TypeArgs   []TypeExpr // populated for relational constraints: Graph<G, N, E>
 	Span       Span
 }
 

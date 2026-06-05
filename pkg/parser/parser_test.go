@@ -212,6 +212,34 @@ func TestParseImplBlockNamedLabel(t *testing.T) {
 	}
 }
 
+func TestParseBareRelationalConstraint(t *testing.T) {
+	input := `grok Test {
+  func min_cut<G, N, E>(graph: G) -> i32
+    where Graph<G, N, E>, E: Weighted
+  {
+    return 0
+  }
+}`
+	file, err := ParseString(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	fn := file.Blocks[0].Functions[0]
+	if len(fn.Where) != 2 {
+		t.Fatalf("expected 2 where clauses, got %d", len(fn.Where))
+	}
+	// Bare relational: Graph<G, N, E>
+	wc0 := fn.Where[0]
+	if wc0.Variable != "" || wc0.Constraint != "Graph" || len(wc0.TypeArgs) != 3 {
+		t.Errorf("where[0]: expected bare Graph<G,N,E>, got Variable=%q Constraint=%q TypeArgs=%d", wc0.Variable, wc0.Constraint, len(wc0.TypeArgs))
+	}
+	// Single-type: E: Weighted
+	wc1 := fn.Where[1]
+	if wc1.Variable != "E" || wc1.Constraint != "Weighted" || len(wc1.TypeArgs) != 0 {
+		t.Errorf("where[1]: expected E: Weighted, got Variable=%q Constraint=%q TypeArgs=%d", wc1.Variable, wc1.Constraint, len(wc1.TypeArgs))
+	}
+}
+
 func TestParseClass(t *testing.T) {
 	input := `grok Test {
   class HttpClient(base_url: string, timeout: u32) {

@@ -527,8 +527,10 @@ grok AST {
   }
 
   struct WhereClause {
+    why: "Single-type: where T: Integer (Variable='T', Constraint='Integer'). Relational: where Graph<G, N, E> (Variable='', TypeArgs set)."
     Variable: string
     Constraint: string
+    TypeArgs: [TypeExpr]
     Span: Span
   }
 

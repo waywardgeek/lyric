@@ -971,10 +971,37 @@ func (p *Parser) parseFunc() (*ast.FuncDecl, error) {
 
 func (p *Parser) parseWhereClause() (*ast.WhereClause, error) {
 	start := p.peek().Span.Start
-	variable, err := p.expect(TIdent)
+	name, err := p.expect(TIdent)
 	if err != nil {
 		return nil, err
 	}
+
+	// Bare relational constraint: Graph<G, N, E>
+	if p.peek().Kind == TLt {
+		p.next() // consume '<'
+		var typeArgs []ast.TypeExpr
+		for p.peek().Kind != TGt && p.peek().Kind != TEOF {
+			te, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			typeArgs = append(typeArgs, *te)
+			if p.peek().Kind == TComma {
+				p.next()
+			}
+		}
+		end, err := p.expect(TGt)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.WhereClause{
+			Constraint: name.Text,
+			TypeArgs:   typeArgs,
+			Span:       ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: end.Span.End},
+		}, nil
+	}
+
+	// Single-type constraint: T: Integer
 	if _, err := p.expect(TColon); err != nil {
 		return nil, err
 	}
@@ -983,7 +1010,7 @@ func (p *Parser) parseWhereClause() (*ast.WhereClause, error) {
 		return nil, err
 	}
 	return &ast.WhereClause{
-		Variable:   variable.Text,
+		Variable:   name.Text,
 		Constraint: constraint.Text,
 		Span:       ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: constraint.Span.End},
 	}, nil
