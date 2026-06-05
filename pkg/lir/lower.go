@@ -1,0 +1,1596 @@
+package lir
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/waywardgeek/grok/pkg/ast"
+	"github.com/waywardgeek/grok/pkg/checker"
+)
+
+// Lowerer converts a type-checked AST into LIR.
+type Lowerer struct {
+	nextTemp int
+	stmts    []LStmt // current statement accumulator
+
+	// Checker state for type resolution
+	registry *checker.Registry
+
+	// Current function context
+	currentReturnType *LType
+
+	// Enum variant info (populated during registration)
+	variantCtors map[string]*variantCtorInfo // variant name → ctor info
+	unitVariants map[string]string           // variant name → enum name
+	enumVariants map[string][]LVariant       // enum name → variants
+
+	// Class info
+	classCtorFields map[string][]string // class name → ctor field names
+	classFields     map[string][]LField // class name → all fields
+}
+
+type variantCtorInfo struct {
+	enumName   string
+	fieldNames []string
+	tag        int
+}
+
+// NewLowerer creates a new AST→LIR lowering pass.
+func NewLowerer() *Lowerer {
+	return &Lowerer{
+		variantCtors:    make(map[string]*variantCtorInfo),
+		unitVariants:    make(map[string]string),
+		enumVariants:    make(map[string][]LVariant),
+		classCtorFields: make(map[string][]string),
+		classFields:     make(map[string][]LField),
+	}
+}
+
+// Lower converts an entire AST file to an LIR program.
+func (l *Lowerer) Lower(file *ast.File) *LProgram {
+	prog := &LProgram{}
+
+	for _, block := range file.Blocks {
+		// First pass: register types
+		l.registerTypes(&block)
+
+		// Set package name from first block
+		if prog.Package == "" {
+			prog.Package = block.Name
+		}
+
+		// Lower imports
+		for _, imp := range block.Imports {
+			prog.Imports = append(prog.Imports, LImport{
+				Alias: imp.Alias,
+				Path:  imp.Path,
+			})
+		}
+
+		// Lower type aliases
+		for _, ta := range block.TypeAliases {
+			prog.TypeDefs = append(prog.TypeDefs, LTypeDef{
+				Name:       ta.Name,
+				Type:       l.lowerTypeExpr(&ta.Type),
+				IsExported: ta.IsPublic,
+			})
+		}
+
+		// Lower structs
+		for _, s := range block.Structs {
+			prog.Structs = append(prog.Structs, l.lowerStructDecl(&s))
+		}
+
+		// Lower enums
+		for _, e := range block.Enums {
+			prog.Enums = append(prog.Enums, l.lowerEnumDecl(&e))
+		}
+
+		// Lower classes
+		for _, cls := range block.Classes {
+			prog.Classes = append(prog.Classes, l.lowerClassDecl(&cls))
+		}
+
+		// Lower functions (including class methods)
+		for _, fn := range block.Functions {
+			prog.Functions = append(prog.Functions, l.lowerFuncDecl(&fn, ""))
+		}
+		for _, cls := range block.Classes {
+			for _, m := range cls.Methods {
+				prog.Functions = append(prog.Functions, l.lowerFuncDecl(&m, cls.Name))
+			}
+		}
+	}
+
+	return prog
+}
+
+// registerTypes populates variant/class lookup tables before lowering.
+func (l *Lowerer) registerTypes(block *ast.GrokBlock) {
+	for _, e := range block.Enums {
+		var variants []LVariant
+		for i, v := range e.Variants {
+			var fields []LField
+			for _, f := range v.Fields {
+				fields = append(fields, LField{
+					Name: f.Name,
+					Type: l.lowerTypeExpr(&f.Type),
+				})
+			}
+			lv := LVariant{Name: v.Name, Tag: i, Fields: fields}
+			variants = append(variants, lv)
+
+			if len(v.Fields) > 0 {
+				var fieldNames []string
+				for _, f := range v.Fields {
+					name := f.Name
+					if name == "" {
+						name = fmt.Sprintf("V%d", len(fieldNames))
+					}
+					fieldNames = append(fieldNames, name)
+				}
+				l.variantCtors[v.Name] = &variantCtorInfo{
+					enumName:   e.Name,
+					fieldNames: fieldNames,
+					tag:        i,
+				}
+			} else {
+				l.unitVariants[v.Name] = e.Name
+			}
+		}
+		l.enumVariants[e.Name] = variants
+	}
+
+	for _, cls := range block.Classes {
+		var fieldNames []string
+		var fields []LField
+		for _, p := range cls.CtorParams {
+			fieldNames = append(fieldNames, p.Name)
+			fields = append(fields, LField{Name: p.Name, Type: l.lowerTypeExpr(&p.Type)})
+		}
+		for _, f := range cls.Fields {
+			fields = append(fields, LField{Name: f.Name, Type: l.lowerTypeExpr(&f.Type)})
+		}
+		l.classCtorFields[cls.Name] = fieldNames
+		l.classFields[cls.Name] = fields
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Type lowering
+// ---------------------------------------------------------------------------
+
+func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType {
+	if te == nil {
+		return &LType{Kind: LTyUnit}
+	}
+	switch te.Kind {
+	case ast.TypeNamed:
+		nt := te.Data.(*ast.NamedType)
+		return l.lowerNamedType(nt)
+	case ast.TypeOptional:
+		ot := te.Data.(*ast.OptionalType)
+		return &LType{Kind: LTyOptional, Elem: l.lowerTypeExpr(&ot.Inner)}
+	case ast.TypeSequence:
+		st := te.Data.(*ast.SequenceType)
+		return &LType{Kind: LTySlice, Elem: l.lowerTypeExpr(&st.Elem)}
+	case ast.TypeMap:
+		mt := te.Data.(*ast.MapType)
+		return &LType{Kind: LTyMap, Key: l.lowerTypeExpr(&mt.Key), Elem: l.lowerTypeExpr(&mt.Value)}
+	case ast.TypeTuple:
+		tt := te.Data.(*ast.TupleType)
+		var fields []LField
+		for i, f := range tt.Fields {
+			name := f.Name
+			if name == "" {
+				name = fmt.Sprintf("_%d", i)
+			}
+			fields = append(fields, LField{Name: name, Type: l.lowerTypeExpr(&f.Type)})
+		}
+		// Special case: (T, error) → ErrorResult
+		if len(fields) == 2 && fields[1].Type.Kind == LTyError {
+			return &LType{Kind: LTyErrorResult, Elem: fields[0].Type}
+		}
+		return &LType{Kind: LTyTuple, Fields: fields}
+	case ast.TypeFunc:
+		ft := te.Data.(*ast.FuncType)
+		var params []*LType
+		for _, p := range ft.Params {
+			params = append(params, l.lowerTypeExpr(&p))
+		}
+		return &LType{Kind: LTyFuncPtr, Params: params, Return: l.lowerTypeExpr(&ft.Return)}
+	case ast.TypeChannel:
+		ct := te.Data.(*ast.ChannelType)
+		return &LType{Kind: LTyChannel, Elem: l.lowerTypeExpr(&ct.Elem)}
+	case ast.TypeLock:
+		return &LType{Kind: LTyMutex}
+	case ast.TypeUnit:
+		return &LType{Kind: LTyUnit}
+	case ast.TypeUnion:
+		// Union types lower to any — backends handle via type switch
+		return &LType{Kind: LTyAny}
+	}
+	return &LType{Kind: LTyUnit}
+}
+
+func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType {
+	switch nt.Name {
+	case "i8":
+		return &LType{Kind: LTyI8, Bits: 8}
+	case "i16":
+		return &LType{Kind: LTyI16, Bits: 16}
+	case "i32":
+		return &LType{Kind: LTyI32, Bits: 32}
+	case "i64":
+		return &LType{Kind: LTyI64, Bits: 64}
+	case "u8":
+		return &LType{Kind: LTyU8, Bits: 8}
+	case "u16":
+		return &LType{Kind: LTyU16, Bits: 16}
+	case "u32":
+		return &LType{Kind: LTyU32, Bits: 32}
+	case "u64":
+		return &LType{Kind: LTyU64, Bits: 64}
+	case "f32":
+		return &LType{Kind: LTyF32, Bits: 32}
+	case "f64":
+		return &LType{Kind: LTyF64, Bits: 64}
+	case "bool":
+		return &LType{Kind: LTyBool}
+	case "string":
+		return &LType{Kind: LTyString}
+	case "int":
+		return &LType{Kind: LTyPlatformInt, Bits: -1}
+	case "uint":
+		return &LType{Kind: LTyPlatformUint, Bits: -1}
+	case "error":
+		return &LType{Kind: LTyError}
+	case "any":
+		return &LType{Kind: LTyAny}
+	}
+	// User-defined type — check if it's an enum
+	if _, ok := l.enumVariants[nt.Name]; ok {
+		return &LType{Kind: LTyTaggedUnion, Name: nt.Name}
+	}
+	// Check if it's a class
+	if _, ok := l.classFields[nt.Name]; ok {
+		return &LType{Kind: LTyClassHandle, Name: nt.Name}
+	}
+	// Default to struct
+	return &LType{Kind: LTyStruct, Name: nt.Name}
+}
+
+// lowerCheckerType converts a checker.Type to an LType.
+func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType {
+	if ct == nil {
+		return &LType{Kind: LTyUnit}
+	}
+	switch ct.Kind {
+	case checker.TyInt:
+		if ct.Bits == -1 {
+			return &LType{Kind: LTyPlatformInt, Bits: -1}
+		}
+		return lirIntType(ct.Bits)
+	case checker.TyUint:
+		if ct.Bits == -1 {
+			return &LType{Kind: LTyPlatformUint, Bits: -1}
+		}
+		return lirUintType(ct.Bits)
+	case checker.TyFloat:
+		if ct.Bits == 32 {
+			return &LType{Kind: LTyF32, Bits: 32}
+		}
+		return &LType{Kind: LTyF64, Bits: 64}
+	case checker.TyBool:
+		return &LType{Kind: LTyBool}
+	case checker.TyString:
+		return &LType{Kind: LTyString}
+	case checker.TyUnit:
+		return &LType{Kind: LTyUnit}
+	case checker.TyList:
+		return &LType{Kind: LTySlice, Elem: l.lowerCheckerType(ct.Elem)}
+	case checker.TyMap:
+		return &LType{Kind: LTyMap, Key: l.lowerCheckerType(ct.Key), Elem: l.lowerCheckerType(ct.Val)}
+	case checker.TyOptional:
+		return &LType{Kind: LTyOptional, Elem: l.lowerCheckerType(ct.Elem)}
+	case checker.TyChannel:
+		return &LType{Kind: LTyChannel, Elem: l.lowerCheckerType(ct.Elem)}
+	case checker.TyStruct:
+		return &LType{Kind: LTyStruct, Name: ct.Name}
+	case checker.TyClass:
+		return &LType{Kind: LTyClassHandle, Name: ct.Name}
+	case checker.TyEnum:
+		return &LType{Kind: LTyTaggedUnion, Name: ct.Name}
+	case checker.TyInterface:
+		return &LType{Kind: LTyAny, Name: ct.Name}
+	case checker.TyFunc:
+		var params []*LType
+		for _, p := range ct.Params {
+			params = append(params, l.lowerCheckerType(p))
+		}
+		return &LType{Kind: LTyFuncPtr, Params: params, Return: l.lowerCheckerType(ct.Return)}
+	case checker.TyTuple:
+		var fields []LField
+		for i, f := range ct.Fields {
+			name := f.Name
+			if name == "" {
+				name = fmt.Sprintf("_%d", i)
+			}
+			fields = append(fields, LField{Name: name, Type: l.lowerCheckerType(f.Type)})
+		}
+		if len(fields) == 2 && fields[1].Type.Kind == LTyError {
+			return &LType{Kind: LTyErrorResult, Elem: fields[0].Type}
+		}
+		return &LType{Kind: LTyTuple, Fields: fields}
+	case checker.TyError:
+		return &LType{Kind: LTyError}
+	case checker.TyUnion:
+		return &LType{Kind: LTyAny}
+	case checker.TyUnknown:
+		return &LType{Kind: LTyAny}
+	}
+	return &LType{Kind: LTyUnit}
+}
+
+func lirIntType(bits int) *LType {
+	switch bits {
+	case 8:
+		return &LType{Kind: LTyI8, Bits: 8}
+	case 16:
+		return &LType{Kind: LTyI16, Bits: 16}
+	case 32:
+		return &LType{Kind: LTyI32, Bits: 32}
+	case 64:
+		return &LType{Kind: LTyI64, Bits: 64}
+	}
+	return &LType{Kind: LTyI32, Bits: 32}
+}
+
+func lirUintType(bits int) *LType {
+	switch bits {
+	case 8:
+		return &LType{Kind: LTyU8, Bits: 8}
+	case 16:
+		return &LType{Kind: LTyU16, Bits: 16}
+	case 32:
+		return &LType{Kind: LTyU32, Bits: 32}
+	case 64:
+		return &LType{Kind: LTyU64, Bits: 64}
+	}
+	return &LType{Kind: LTyU32, Bits: 32}
+}
+
+// ---------------------------------------------------------------------------
+// Declaration lowering
+// ---------------------------------------------------------------------------
+
+func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl {
+	var fields []LField
+	for _, f := range s.Fields {
+		fields = append(fields, LField{Name: f.Name, Type: l.lowerTypeExpr(&f.Type)})
+	}
+	return LStructDecl{Name: s.Name, Fields: fields, IsExported: s.IsPublic}
+}
+
+func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl {
+	variants := l.enumVariants[e.Name]
+	return LEnumDecl{Name: e.Name, Variants: variants, IsExported: e.IsPublic}
+}
+
+func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl {
+	fields := l.classFields[cls.Name]
+	guardedBy := make(map[string]string)
+	for _, f := range cls.Fields {
+		if f.GuardedBy != "" {
+			guardedBy[f.Name] = f.GuardedBy
+		}
+	}
+	return LClassDecl{
+		Name:       cls.Name,
+		Fields:     fields,
+		GuardedBy:  guardedBy,
+		IsExported: cls.IsPublic,
+	}
+}
+
+func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
+	var params []LParam
+	for _, p := range fn.Params {
+		if p.IsSelf {
+			continue
+		}
+		params = append(params, LParam{
+			Name: p.Name,
+			Type: l.lowerTypeExpr(&p.Type),
+		})
+	}
+
+	var retType *LType
+	if fn.ReturnType != nil {
+		retType = l.lowerTypeExpr(fn.ReturnType)
+	} else {
+		retType = &LType{Kind: LTyUnit}
+	}
+
+	// If this is a method, prepend self parameter
+	if receiver != "" {
+		selfType := l.lowerNamedType(&ast.NamedType{Name: receiver})
+		selfParam := LParam{Name: "self", Type: selfType}
+		params = append([]LParam{selfParam}, params...)
+	}
+
+	l.currentReturnType = retType
+	var body []LStmt
+	if fn.Body != nil {
+		body = l.lowerBlock(fn.Body)
+	}
+	l.currentReturnType = nil
+
+	return LFuncDecl{
+		Name:       fn.Name,
+		Params:     params,
+		ReturnType: retType,
+		Body:       body,
+		IsExported: fn.IsPublic,
+		Receiver:   receiver,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Statement lowering
+// ---------------------------------------------------------------------------
+
+func (l *Lowerer) lowerBlock(block *ast.Block) []LStmt {
+	if block == nil {
+		return nil
+	}
+	saved := l.stmts
+	l.stmts = nil
+	for _, stmt := range block.Stmts {
+		l.lowerStmt(&stmt)
+	}
+	result := l.stmts
+	l.stmts = saved
+	return result
+}
+
+func (l *Lowerer) emit(stmt LStmt) {
+	l.stmts = append(l.stmts, stmt)
+}
+
+func (l *Lowerer) lowerStmt(stmt *ast.Stmt) {
+	switch stmt.Kind {
+	case ast.StmtVarDecl:
+		l.lowerVarDeclStmt(stmt)
+	case ast.StmtAssign:
+		l.lowerAssignStmt(stmt)
+	case ast.StmtReturn:
+		l.lowerReturnStmt(stmt)
+	case ast.StmtExpr:
+		l.lowerExprStmt(stmt)
+	case ast.StmtIf:
+		l.lowerIfStmt(stmt)
+	case ast.StmtFor:
+		l.lowerForStmt(stmt)
+	case ast.StmtWhile:
+		l.lowerWhileStmt(stmt)
+	case ast.StmtMatch:
+		l.lowerMatchStmt(stmt)
+	case ast.StmtBlock:
+		l.lowerBlockStmt(stmt)
+	case ast.StmtBreak:
+		l.emit(LStmt{Kind: LStmtBreak})
+	case ast.StmtContinue:
+		l.emit(LStmt{Kind: LStmtContinue})
+	case ast.StmtCascade:
+		cs := stmt.Data.(*ast.CascadeStmt)
+		l.emit(LStmt{Kind: LStmtDefer, Data: &LDefer{Body: l.lowerBlock(&cs.Body)}})
+	case ast.StmtSpawn:
+		ss := stmt.Data.(*ast.SpawnStmt)
+		l.emit(LStmt{Kind: LStmtSpawn, Data: &LSpawn{Body: l.lowerBlock(&ss.Body)}})
+	case ast.StmtSelect:
+		l.lowerSelectStmt(stmt)
+	case ast.StmtLock:
+		ls := stmt.Data.(*ast.LockStmt)
+		mutexVal := l.lowerExpr(&ls.Mutex)
+		l.emit(LStmt{Kind: LStmtLock, Data: &LLock{
+			Mutex: mutexVal,
+			Body:  l.lowerBlock(&ls.Body),
+		}})
+	}
+}
+
+func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt) {
+	vd := stmt.Data.(*ast.VarDeclStmt)
+
+	// Tuple destructuring: let (a, b) = expr
+	if len(vd.Names) > 0 && vd.Value != nil {
+		val := l.lowerExpr(vd.Value)
+		// If the value is a temp referencing an ErrorResult or Tuple, extract fields
+		for i, name := range vd.Names {
+			// We emit the tuple value and destructure via extract
+			var extractType *LType
+			if val.Type != nil && val.Type.Kind == LTyTuple && i < len(val.Type.Fields) {
+				extractType = val.Type.Fields[i].Type
+			} else if val.Type != nil && val.Type.Kind == LTyErrorResult {
+				if i == 0 {
+					extractType = val.Type.Elem
+				} else {
+					extractType = &LType{Kind: LTyError}
+				}
+			} else {
+				extractType = &LType{Kind: LTyAny}
+			}
+			l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+				Name:    name,
+				Type:    extractType,
+				Init:    &val, // simplified: backend handles multi-return
+				Mutable: vd.IsMut,
+			}})
+		}
+		return
+	}
+
+	var varType *LType
+	if vd.Type != nil {
+		varType = l.lowerTypeExpr(vd.Type)
+	}
+
+	var init *LValue
+	if vd.Value != nil {
+		v := l.lowerExpr(vd.Value)
+		init = &v
+		if varType == nil {
+			varType = v.Type
+		}
+	}
+
+	if varType == nil {
+		varType = &LType{Kind: LTyAny}
+	}
+
+	l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+		Name:    vd.Name,
+		Type:    varType,
+		Init:    init,
+		Mutable: vd.IsMut,
+	}})
+}
+
+func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
+	as := stmt.Data.(*ast.AssignStmt)
+	val := l.lowerExpr(&as.Value)
+
+	// Handle field assignment: target.field = value
+	if as.Target.Kind == ast.ExprFieldAccess {
+		fa := as.Target.Data.(*ast.FieldAccessExpr)
+		recv := l.lowerExpr(&fa.Receiver)
+		// Check if receiver is a class (use ClassSet) or struct (use StructSet)
+		if recv.Type != nil && recv.Type.Kind == LTyClassHandle {
+			l.emit(LStmt{Kind: LStmtClassSet, Data: &LClassSet{
+				Handle: recv,
+				Class:  recv.Type.Name,
+				Field:  fa.Field,
+				Value:  val,
+			}})
+			return
+		}
+		l.emit(LStmt{Kind: LStmtStructSet, Data: &LStructSet{
+			Receiver: recv,
+			Field:    fa.Field,
+			Value:    val,
+		}})
+		return
+	}
+
+	// Handle index assignment: collection[index] = value
+	if as.Target.Kind == ast.ExprIndex {
+		idx := as.Target.Data.(*ast.IndexExpr)
+		coll := l.lowerExpr(&idx.Receiver)
+		index := l.lowerExpr(&idx.Index)
+		l.emit(LStmt{Kind: LStmtIndexSet, Data: &LIndexSet{
+			Collection: coll,
+			Index:      index,
+			Value:      val,
+		}})
+		return
+	}
+
+	// Simple variable assignment
+	if as.Target.Kind == ast.ExprIdent {
+		ident := as.Target.Data.(*ast.IdentExpr)
+		l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
+			Target: ident.Name,
+			Value:  val,
+		}})
+		return
+	}
+
+	// Fallback: emit as variable assignment with stringified target
+	l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
+		Target: "???",
+		Value:  val,
+	}})
+}
+
+func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt) {
+	rs := stmt.Data.(*ast.ReturnStmt)
+	var values []LValue
+	if rs.Value != nil {
+		// Handle tuple literal returns as multiple values
+		if rs.Value.Kind == ast.ExprTupleLit {
+			tl := rs.Value.Data.(*ast.TupleLitExpr)
+			for _, elem := range tl.Elems {
+				values = append(values, l.lowerExpr(&elem))
+			}
+		} else {
+			values = append(values, l.lowerExpr(rs.Value))
+		}
+	}
+	l.emit(LStmt{Kind: LStmtReturn, Data: &LReturn{Values: values}})
+}
+
+func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt) {
+	es := stmt.Data.(*ast.ExprStmt)
+	val := l.lowerExpr(&es.Expr)
+	// Emit as a TempDef that is immediately discarded
+	if val.Kind == LValTemp {
+		l.emit(LStmt{Kind: LStmtExpr, Data: &LExprStmt{TempID: val.TempID}})
+	}
+}
+
+func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt) {
+	is := stmt.Data.(*ast.IfStmt)
+	cond := l.lowerExpr(&is.Condition)
+	then := l.lowerBlock(&is.Then)
+
+	var elseStmts []LStmt
+	if len(is.ElseIfs) > 0 {
+		// Chain else-ifs: each becomes a nested if in the else branch
+		elseStmts = l.lowerElseIfs(is.ElseIfs, is.Else)
+	} else if is.Else != nil {
+		elseStmts = l.lowerBlock(is.Else)
+	}
+
+	l.emit(LStmt{Kind: LStmtIf, Data: &LIf{
+		Cond: cond,
+		Then: then,
+		Else: elseStmts,
+	}})
+}
+
+func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LStmt {
+	if len(elseIfs) == 0 {
+		if finalElse != nil {
+			return l.lowerBlock(finalElse)
+		}
+		return nil
+	}
+	ei := &elseIfs[0]
+	cond := l.lowerExprInto(&ei.Condition)
+
+	then := l.lowerBlock(&ei.Body)
+	elseStmts := l.lowerElseIfs(elseIfs[1:], finalElse)
+
+	return []LStmt{{Kind: LStmtIf, Data: &LIf{
+		Cond: cond,
+		Then: then,
+		Else: elseStmts,
+	}}}
+}
+
+func (l *Lowerer) lowerForStmt(stmt *ast.Stmt) {
+	fs := stmt.Data.(*ast.ForStmt)
+	coll := l.lowerExpr(&fs.Collection)
+
+	// Infer element type from collection
+	var varType *LType
+	if coll.Type != nil {
+		if coll.Type.Kind == LTySlice {
+			varType = coll.Type.Elem
+		} else if coll.Type.Kind == LTyMap {
+			varType = coll.Type.Key
+		} else if coll.Type.Kind == LTyString {
+			varType = &LType{Kind: LTyU8, Bits: 8}
+		}
+	}
+	if varType == nil {
+		varType = &LType{Kind: LTyAny}
+	}
+
+	l.emit(LStmt{Kind: LStmtFor, Data: &LFor{
+		Var:        fs.Var,
+		VarType:    varType,
+		IndexVar:   fs.IndexVar,
+		Collection: coll,
+		Body:       l.lowerBlock(&fs.Body),
+	}})
+}
+
+func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt) {
+	ws := stmt.Data.(*ast.WhileStmt)
+
+	// Build the condition block: flatten the condition expression,
+	// then the last temp is the condition value.
+	saved := l.stmts
+	l.stmts = nil
+	condVal := l.lowerExpr(&ws.Condition)
+	condBlock := l.stmts
+	l.stmts = saved
+
+	l.emit(LStmt{Kind: LStmtWhile, Data: &LWhile{
+		CondBlock: condBlock,
+		CondVar:   condVal,
+		Body:      l.lowerBlock(&ws.Body),
+	}})
+}
+
+func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt) {
+	ms := stmt.Data.(*ast.MatchStmt)
+	matchVal := l.lowerExpr(&ms.Value)
+
+	// Check if this is an enum match
+	isEnum := false
+	var enumName string
+	if matchVal.Type != nil && matchVal.Type.Kind == LTyTaggedUnion {
+		isEnum = true
+		enumName = matchVal.Type.Name
+	}
+
+	if isEnum {
+		// Emit a tag extraction + switch
+		tagTemp := l.emitTemp(LExpr{
+			Kind: LExprVariantTag,
+			Type: &LType{Kind: LTyI32, Bits: 32},
+			Data: &LVariantTagData{Value: matchVal},
+		})
+
+		var cases []LSwitchCase
+		for _, arm := range ms.Arms {
+			sc := l.lowerMatchArm(&arm, matchVal, enumName)
+			cases = append(cases, sc)
+		}
+
+		l.emit(LStmt{Kind: LStmtSwitch, Data: &LSwitch{
+			Tag:   tagTemp,
+			Cases: cases,
+		}})
+	} else {
+		// Non-enum match: emit if-else chain
+		l.lowerMatchAsIfElse(ms, matchVal)
+	}
+}
+
+func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string) LSwitchCase {
+	switch arm.Pattern.Kind {
+	case ast.PatWildcard:
+		body := l.lowerBlock(&arm.Body)
+		if arm.Guard != nil {
+			guardVal := l.lowerExpr(arm.Guard)
+			body = []LStmt{{Kind: LStmtIf, Data: &LIf{Cond: guardVal, Then: body}}}
+		}
+		return LSwitchCase{Tag: -1, Body: body}
+
+	case ast.PatIdent:
+		ip := arm.Pattern.Data.(*ast.IdentPattern)
+		// Check if this is a unit variant
+		if en, ok := l.unitVariants[ip.Name]; ok && en == enumName {
+			tag := l.findVariantTag(enumName, ip.Name)
+			body := l.lowerBlock(&arm.Body)
+			return LSwitchCase{Tag: tag, Body: body}
+		}
+		// Otherwise it's a binding — default case that binds the value
+		body := l.lowerBlock(&arm.Body)
+		return LSwitchCase{Tag: -1, Binding: ip.Name, Body: body}
+
+	case ast.PatVariant:
+		vp := arm.Pattern.Data.(*ast.VariantPattern)
+		tag := l.findVariantTag(enumName, vp.Name)
+
+		// Extract variant data fields into bindings
+		saved := l.stmts
+		l.stmts = nil
+
+		if info, ok := l.variantCtors[vp.Name]; ok {
+			for i, binding := range vp.Bindings {
+				if binding.Kind == ast.PatIdent {
+					bp := binding.Data.(*ast.IdentPattern)
+					fieldName := ""
+					if i < len(info.fieldNames) {
+						fieldName = info.fieldNames[i]
+					}
+					var fieldType *LType
+					if variants, ok := l.enumVariants[enumName]; ok {
+						for _, v := range variants {
+							if v.Name == vp.Name && i < len(v.Fields) {
+								fieldType = v.Fields[i].Type
+							}
+						}
+					}
+					if fieldType == nil {
+						fieldType = &LType{Kind: LTyAny}
+					}
+
+					extractTemp := l.emitTemp(LExpr{
+						Kind: LExprVariantData,
+						Type: fieldType,
+						Data: &LVariantDataData{
+							Value:   matchVal,
+							Variant: vp.Name,
+							Field:   fieldName,
+						},
+					})
+					l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+						Name: bp.Name,
+						Type: fieldType,
+						Init: &extractTemp,
+					}})
+				}
+			}
+		}
+
+		bindingStmts := l.stmts
+		l.stmts = saved
+
+		bodyStmts := l.lowerBlock(&arm.Body)
+		allStmts := append(bindingStmts, bodyStmts...)
+
+		if arm.Guard != nil {
+			guardVal := l.lowerExpr(arm.Guard)
+			allStmts = []LStmt{{Kind: LStmtIf, Data: &LIf{Cond: guardVal, Then: allStmts}}}
+		}
+
+		return LSwitchCase{Tag: tag, Body: allStmts}
+
+	case ast.PatLiteral:
+		// Literal patterns in enum match — shouldn't happen, fallback to default
+		body := l.lowerBlock(&arm.Body)
+		return LSwitchCase{Tag: -1, Body: body}
+	}
+
+	return LSwitchCase{Tag: -1, Body: l.lowerBlock(&arm.Body)}
+}
+
+func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue) {
+	// For non-enum matches, emit an if-else chain comparing matchVal to each pattern
+	for i, arm := range ms.Arms {
+		if arm.Pattern.Kind == ast.PatWildcard {
+			// Default — just emit the body
+			body := l.lowerBlock(&arm.Body)
+			for _, s := range body {
+				l.emit(s)
+			}
+			return
+		}
+
+		if arm.Pattern.Kind == ast.PatLiteral {
+			lp := arm.Pattern.Data.(*ast.LiteralPattern)
+			litVal := l.lowerExpr(&lp.Expr)
+			cmpTemp := l.emitTemp(LExpr{
+				Kind: LExprBinOp,
+				Type: &LType{Kind: LTyBool},
+				Data: &LBinOpData{Op: LBinEq, Left: matchVal, Right: litVal},
+			})
+			body := l.lowerBlock(&arm.Body)
+
+			var elseStmts []LStmt
+			if i < len(ms.Arms)-1 {
+				// Remaining arms become else
+				saved := l.stmts
+				l.stmts = nil
+				remaining := &ast.MatchStmt{Value: ms.Value, Arms: ms.Arms[i+1:]}
+				l.lowerMatchAsIfElse(remaining, matchVal)
+				elseStmts = l.stmts
+				l.stmts = saved
+			}
+
+			l.emit(LStmt{Kind: LStmtIf, Data: &LIf{
+				Cond: cmpTemp,
+				Then: body,
+				Else: elseStmts,
+			}})
+			return
+		}
+
+		// Ident pattern as catch-all
+		if arm.Pattern.Kind == ast.PatIdent {
+			ip := arm.Pattern.Data.(*ast.IdentPattern)
+			body := l.lowerBlock(&arm.Body)
+			// Bind the match value to the name, then execute body
+			allStmts := []LStmt{{Kind: LStmtVarDecl, Data: &LVarDecl{
+				Name: ip.Name,
+				Type: matchVal.Type,
+				Init: &matchVal,
+			}}}
+			allStmts = append(allStmts, body...)
+			for _, s := range allStmts {
+				l.emit(s)
+			}
+			return
+		}
+	}
+}
+
+func (l *Lowerer) findVariantTag(enumName, variantName string) int {
+	if variants, ok := l.enumVariants[enumName]; ok {
+		for _, v := range variants {
+			if v.Name == variantName {
+				return v.Tag
+			}
+		}
+	}
+	return -1
+}
+
+func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt) {
+	bs := stmt.Data.(*ast.Block)
+	l.emit(LStmt{Kind: LStmtBlock, Data: &LBlock{Stmts: l.lowerBlock(bs)}})
+}
+
+func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt) {
+	ss := stmt.Data.(*ast.SelectStmt)
+	var cases []LSelectCase
+	for _, c := range ss.Cases {
+		sc := l.lowerSelectCase(&c)
+		cases = append(cases, sc)
+	}
+	l.emit(LStmt{Kind: LStmtSelect, Data: &LSelect{Cases: cases}})
+}
+
+func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase {
+	if c.IsDefault {
+		return LSelectCase{
+			Kind: LSelectDefault,
+			Body: l.lowerBlock(&c.Body),
+		}
+	}
+
+	// Determine if this is a send or receive by inspecting the expression
+	if c.Expr != nil && c.Expr.Kind == ast.ExprMethodCall {
+		mc := c.Expr.Data.(*ast.MethodCallExpr)
+		ch := l.lowerExpr(&mc.Receiver)
+		if mc.Method == "send" && len(mc.Args) > 0 {
+			val := l.lowerExpr(&mc.Args[0])
+			return LSelectCase{
+				Kind:    LSelectSend,
+				Channel: ch,
+				Value:   val,
+				Body:    l.lowerBlock(&c.Body),
+			}
+		}
+		if mc.Method == "receive" {
+			return LSelectCase{
+				Kind:    LSelectRecv,
+				Channel: ch,
+				Binding: c.BindVar,
+				Body:    l.lowerBlock(&c.Body),
+			}
+		}
+	}
+	// Fallback
+	return LSelectCase{Kind: LSelectDefault, Body: l.lowerBlock(&c.Body)}
+}
+
+// ---------------------------------------------------------------------------
+// Expression lowering — flattens all expressions into temps
+// ---------------------------------------------------------------------------
+
+// lowerExpr flattens an AST expression into a sequence of TempDefs and returns
+// the final LValue referencing the result.
+func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue {
+	if expr == nil {
+		return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
+	}
+
+	switch expr.Kind {
+	case ast.ExprIdent:
+		return l.lowerIdent(expr)
+	case ast.ExprIntLit:
+		return l.lowerIntLit(expr)
+	case ast.ExprFloatLit:
+		return l.lowerFloatLit(expr)
+	case ast.ExprStringLit:
+		return l.lowerStringLit(expr)
+	case ast.ExprBoolLit:
+		return l.lowerBoolLit(expr)
+	case ast.ExprNil:
+		return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyAny}}
+	case ast.ExprBinary:
+		return l.lowerBinary(expr)
+	case ast.ExprUnary:
+		return l.lowerUnary(expr)
+	case ast.ExprCall:
+		return l.lowerCall(expr)
+	case ast.ExprMethodCall:
+		return l.lowerMethodCall(expr)
+	case ast.ExprFieldAccess:
+		return l.lowerFieldAccess(expr)
+	case ast.ExprIndex:
+		return l.lowerIndex(expr)
+	case ast.ExprSlice:
+		return l.lowerSliceExpr(expr)
+	case ast.ExprListLit:
+		return l.lowerListLit(expr)
+	case ast.ExprMapLit:
+		return l.lowerMapLit(expr)
+	case ast.ExprTupleLit:
+		return l.lowerTupleLit(expr)
+	case ast.ExprStructLit:
+		return l.lowerStructLit(expr)
+	case ast.ExprStringInterp:
+		return l.lowerStringInterp(expr)
+	case ast.ExprCast:
+		return l.lowerCast(expr)
+	case ast.ExprUnwrap:
+		return l.lowerUnwrap(expr)
+	case ast.ExprTry:
+		return l.lowerTry(expr)
+	case ast.ExprLambda:
+		// Phase 4: closures. For now, emit as function reference placeholder.
+		return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyFuncPtr}}
+	case ast.ExprMatch:
+		// Phase 3: match-as-expression. For now, placeholder.
+		return LValue{Kind: LValLitNull, Type: l.exprType(expr)}
+	}
+	return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
+}
+
+// lowerExprInto is like lowerExpr but used in contexts where we need the
+// expression flattened into the current statement list (e.g., else-if conditions).
+func (l *Lowerer) lowerExprInto(expr *ast.Expr) LValue {
+	return l.lowerExpr(expr)
+}
+
+// emitTemp creates a new temporary and emits a TempDef statement.
+func (l *Lowerer) emitTemp(expr LExpr) LValue {
+	id := l.nextTemp
+	l.nextTemp++
+	l.emit(LStmt{Kind: LStmtTempDef, Data: &LTempDef{ID: id, Expr: expr}})
+	return LValue{Kind: LValTemp, TempID: id, Type: expr.Type}
+}
+
+// exprType extracts the checker-annotated type from an AST expression.
+func (l *Lowerer) exprType(expr *ast.Expr) *LType {
+	if expr.ResolvedType != nil {
+		if ct, ok := expr.ResolvedType.(*checker.Type); ok {
+			return l.lowerCheckerType(ct)
+		}
+	}
+	return &LType{Kind: LTyAny}
+}
+
+// --- Individual expression lowering ---
+
+func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue {
+	ie := expr.Data.(*ast.IdentExpr)
+
+	// Check if it's a unit variant
+	if enumName, ok := l.unitVariants[ie.Name]; ok {
+		tag := l.findVariantTag(enumName, ie.Name)
+		return l.emitTemp(LExpr{
+			Kind: LExprVariantConstruct,
+			Type: &LType{Kind: LTyTaggedUnion, Name: enumName},
+			Data: &LVariantConstructData{
+				Enum:    enumName,
+				Variant: ie.Name,
+				Tag:     tag,
+			},
+		})
+	}
+
+	return LValue{Kind: LValVar, Name: ie.Name, Type: l.exprType(expr)}
+}
+
+func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue {
+	il := expr.Data.(*ast.IntLitExpr)
+	val, _ := strconv.ParseInt(il.Value, 0, 64)
+	typ := l.exprType(expr)
+	if typ.Kind == LTyAny {
+		typ = &LType{Kind: LTyI32, Bits: 32}
+	}
+	return LValue{Kind: LValLitInt, IntVal: val, Type: typ}
+}
+
+func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue {
+	fl := expr.Data.(*ast.FloatLitExpr)
+	val, _ := strconv.ParseFloat(fl.Value, 64)
+	typ := l.exprType(expr)
+	if typ.Kind == LTyAny {
+		typ = &LType{Kind: LTyF64, Bits: 64}
+	}
+	return LValue{Kind: LValLitFloat, FloatVal: val, Type: typ}
+}
+
+func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue {
+	sl := expr.Data.(*ast.StringLitExpr)
+	return LValue{Kind: LValLitString, StrVal: sl.Value, Type: &LType{Kind: LTyString}}
+}
+
+func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue {
+	bl := expr.Data.(*ast.BoolLitExpr)
+	return LValue{Kind: LValLitBool, BoolVal: bl.Value, Type: &LType{Kind: LTyBool}}
+}
+
+func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue {
+	be := expr.Data.(*ast.BinaryExpr)
+	left := l.lowerExpr(&be.Left)
+	right := l.lowerExpr(&be.Right)
+
+	op := mapBinaryOp(be.Op)
+	resultType := l.exprType(expr)
+	if resultType.Kind == LTyAny {
+		// Infer: comparison → bool, arithmetic → left type
+		if op >= LBinEq && op <= LBinGe || op == LBinAnd || op == LBinOr {
+			resultType = &LType{Kind: LTyBool}
+		} else {
+			resultType = left.Type
+		}
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprBinOp,
+		Type: resultType,
+		Data: &LBinOpData{Op: op, Left: left, Right: right},
+	})
+}
+
+func mapBinaryOp(op ast.BinaryOp) LBinOpKind {
+	switch op {
+	case ast.OpAdd:
+		return LBinAdd
+	case ast.OpSub:
+		return LBinSub
+	case ast.OpMul:
+		return LBinMul
+	case ast.OpDiv:
+		return LBinDiv
+	case ast.OpMod:
+		return LBinMod
+	case ast.OpEq:
+		return LBinEq
+	case ast.OpNeq:
+		return LBinNe
+	case ast.OpLt:
+		return LBinLt
+	case ast.OpLe:
+		return LBinLe
+	case ast.OpGt:
+		return LBinGt
+	case ast.OpGe:
+		return LBinGe
+	case ast.OpAnd:
+		return LBinAnd
+	case ast.OpOr:
+		return LBinOr
+	case ast.OpBitAnd:
+		return LBinBitAnd
+	case ast.OpBitOr:
+		return LBinBitOr
+	case ast.OpBitXor:
+		return LBinBitXor
+	case ast.OpShl:
+		return LBinShl
+	case ast.OpShr:
+		return LBinShr
+	}
+	return LBinAdd
+}
+
+func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue {
+	ue := expr.Data.(*ast.UnaryExpr)
+	operand := l.lowerExpr(&ue.Operand)
+
+	var op LUnOpKind
+	switch ue.Op {
+	case ast.OpNeg:
+		op = LUnNeg
+	case ast.OpNot:
+		op = LUnNot
+	}
+
+	resultType := l.exprType(expr)
+	if resultType.Kind == LTyAny {
+		resultType = operand.Type
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprUnOp,
+		Type: resultType,
+		Data: &LUnOpData{Op: op, Operand: operand},
+	})
+}
+
+func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
+	ce := expr.Data.(*ast.CallExpr)
+
+	// Lower arguments
+	var args []LValue
+	for _, arg := range ce.Args {
+		args = append(args, l.lowerExpr(&arg))
+	}
+
+	// Get function name
+	var funcName string
+	if ce.Func.Kind == ast.ExprIdent {
+		funcName = ce.Func.Data.(*ast.IdentExpr).Name
+	} else if ce.Func.Kind == ast.ExprFieldAccess {
+		fa := ce.Func.Data.(*ast.FieldAccessExpr)
+		if fa.Receiver.Kind == ast.ExprIdent {
+			funcName = fa.Receiver.Data.(*ast.IdentExpr).Name + "." + fa.Field
+		}
+	}
+
+	// Check for built-in functions
+	switch funcName {
+	case "println", "print", "len", "append", "isnull":
+		return l.emitTemp(LExpr{
+			Kind: LExprBuiltin,
+			Type: l.exprType(expr),
+			Data: &LBuiltinData{Name: funcName, Args: args},
+		})
+	}
+
+	// Check if it's a variant constructor
+	if info, ok := l.variantCtors[funcName]; ok {
+		var fieldVals []LValue
+		fieldVals = append(fieldVals, args...)
+		return l.emitTemp(LExpr{
+			Kind: LExprVariantConstruct,
+			Type: &LType{Kind: LTyTaggedUnion, Name: info.enumName},
+			Data: &LVariantConstructData{
+				Enum:    info.enumName,
+				Variant: funcName,
+				Tag:     info.tag,
+				Fields:  fieldVals,
+			},
+		})
+	}
+
+	// Check if it's a class constructor
+	if _, ok := l.classCtorFields[funcName]; ok {
+		// Build struct literal from args using ctor field names
+		var fieldInits []LFieldInit
+		ctorFields := l.classCtorFields[funcName]
+		for i, arg := range args {
+			name := ""
+			if i < len(ctorFields) {
+				name = ctorFields[i]
+			}
+			fieldInits = append(fieldInits, LFieldInit{Name: name, Value: arg})
+		}
+		return l.emitTemp(LExpr{
+			Kind: LExprClassAlloc,
+			Type: &LType{Kind: LTyClassHandle, Name: funcName},
+			Data: &LClassAllocData{Class: funcName},
+		})
+	}
+
+	// Regular function call
+	return l.emitTemp(LExpr{
+		Kind: LExprCall,
+		Type: l.exprType(expr),
+		Data: &LCallData{Func: funcName, Args: args},
+	})
+}
+
+func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
+	mc := expr.Data.(*ast.MethodCallExpr)
+	recv := l.lowerExpr(&mc.Receiver)
+
+	var args []LValue
+	for _, arg := range mc.Args {
+		args = append(args, l.lowerExpr(&arg))
+	}
+
+	resultType := l.exprType(expr)
+
+	// Check for built-in methods on primitives (string, list, map)
+	if recv.Type != nil {
+		switch recv.Type.Kind {
+		case LTyString:
+			return l.lowerBuiltinMethod(recv, mc.Method, args, resultType)
+		case LTySlice:
+			return l.lowerBuiltinMethod(recv, mc.Method, args, resultType)
+		case LTyMap:
+			return l.lowerBuiltinMethod(recv, mc.Method, args, resultType)
+		case LTyChannel:
+			return l.lowerChannelMethod(recv, mc.Method, args, resultType)
+		}
+	}
+
+	// Regular method call: emit as function call with receiver as first arg
+	allArgs := append([]LValue{recv}, args...)
+	// Method name: ReceiverType_method or just method
+	var funcName string
+	if recv.Type != nil && recv.Type.Name != "" {
+		funcName = recv.Type.Name + "_" + mc.Method
+	} else {
+		funcName = mc.Method
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprCall,
+		Type: resultType,
+		Data: &LCallData{Func: funcName, Args: allArgs},
+	})
+}
+
+func (l *Lowerer) lowerBuiltinMethod(recv LValue, method string, args []LValue, resultType *LType) LValue {
+	builtinName := ""
+	switch recv.Type.Kind {
+	case LTyString:
+		builtinName = "string_" + method
+	case LTySlice:
+		builtinName = "slice_" + method
+	case LTyMap:
+		builtinName = "map_" + method
+	}
+
+	allArgs := append([]LValue{recv}, args...)
+	return l.emitTemp(LExpr{
+		Kind: LExprBuiltin,
+		Type: resultType,
+		Data: &LBuiltinData{Name: builtinName, Args: allArgs},
+	})
+}
+
+func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, resultType *LType) LValue {
+	switch method {
+	case "send":
+		if len(args) > 0 {
+			l.emit(LStmt{Kind: LStmtSend, Data: &LSend{Channel: recv, Value: args[0]}})
+			return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
+		}
+	case "receive":
+		return l.emitTemp(LExpr{
+			Kind: LExprBuiltin,
+			Type: resultType,
+			Data: &LBuiltinData{Name: "channel_receive", Args: []LValue{recv}},
+		})
+	case "close":
+		return l.emitTemp(LExpr{
+			Kind: LExprBuiltin,
+			Type: &LType{Kind: LTyUnit},
+			Data: &LBuiltinData{Name: "channel_close", Args: []LValue{recv}},
+		})
+	}
+	return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
+}
+
+func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {
+	fa := expr.Data.(*ast.FieldAccessExpr)
+	recv := l.lowerExpr(&fa.Receiver)
+	resultType := l.exprType(expr)
+
+	if recv.Type != nil && recv.Type.Kind == LTyClassHandle {
+		return l.emitTemp(LExpr{
+			Kind: LExprClassGet,
+			Type: resultType,
+			Data: &LClassGetData{Handle: recv, Class: recv.Type.Name, Field: fa.Field},
+		})
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprStructField,
+		Type: resultType,
+		Data: &LStructFieldData{Receiver: recv, Field: fa.Field},
+	})
+}
+
+func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue {
+	ie := expr.Data.(*ast.IndexExpr)
+	coll := l.lowerExpr(&ie.Receiver)
+	idx := l.lowerExpr(&ie.Index)
+
+	return l.emitTemp(LExpr{
+		Kind: LExprIndexGet,
+		Type: l.exprType(expr),
+		Data: &LIndexGetData{Collection: coll, Index: idx},
+	})
+}
+
+func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue {
+	se := expr.Data.(*ast.SliceExpr)
+	coll := l.lowerExpr(&se.Receiver)
+
+	var low, high *LValue
+	if se.Low != nil {
+		v := l.lowerExpr(se.Low)
+		low = &v
+	}
+	if se.High != nil {
+		v := l.lowerExpr(se.High)
+		high = &v
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprSlice,
+		Type: l.exprType(expr),
+		Data: &LSliceData{Collection: coll, Low: low, High: high},
+	})
+}
+
+func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue {
+	ll := expr.Data.(*ast.ListLitExpr)
+	var fields []LFieldInit
+	for i, elem := range ll.Elems {
+		val := l.lowerExpr(&elem)
+		fields = append(fields, LFieldInit{Name: fmt.Sprintf("_%d", i), Value: val})
+	}
+
+	resultType := l.exprType(expr)
+	return l.emitTemp(LExpr{
+		Kind: LExprStructLit, // Reuse struct lit for list construction
+		Type: resultType,
+		Data: &LStructLitData{Fields: fields},
+	})
+}
+
+func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue {
+	ml := expr.Data.(*ast.MapLitExpr)
+	// Maps need a different approach — emit as make + index_set
+	mapType := l.exprType(expr)
+	mapVal := l.emitTemp(LExpr{
+		Kind: LExprMakeMap,
+		Type: mapType,
+		Data: nil,
+	})
+
+	for _, entry := range ml.Entries {
+		key := l.lowerExpr(&entry.Key)
+		val := l.lowerExpr(&entry.Value)
+		l.emit(LStmt{Kind: LStmtIndexSet, Data: &LIndexSet{
+			Collection: mapVal,
+			Index:      key,
+			Value:      val,
+		}})
+	}
+
+	return mapVal
+}
+
+func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue {
+	tl := expr.Data.(*ast.TupleLitExpr)
+	var fields []LFieldInit
+	for i, elem := range tl.Elems {
+		val := l.lowerExpr(&elem)
+		fields = append(fields, LFieldInit{Name: fmt.Sprintf("_%d", i), Value: val})
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprStructLit,
+		Type: l.exprType(expr),
+		Data: &LStructLitData{Fields: fields},
+	})
+}
+
+func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue {
+	sl := expr.Data.(*ast.StructLitExpr)
+	var fields []LFieldInit
+	for _, f := range sl.Fields {
+		val := l.lowerExpr(&f.Value)
+		fields = append(fields, LFieldInit{Name: f.Name, Value: val})
+	}
+
+	resultType := l.exprType(expr)
+	if resultType.Kind == LTyAny {
+		resultType = &LType{Kind: LTyStruct, Name: sl.TypeName}
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprStructLit,
+		Type: resultType,
+		Data: &LStructLitData{Fields: fields},
+	})
+}
+
+func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue {
+	si := expr.Data.(*ast.StringInterpExpr)
+	var parts []LFormatPart
+	for i, part := range si.Parts {
+		if i%2 == 0 {
+			// String literal part
+			if part.Kind == ast.ExprStringLit {
+				sl := part.Data.(*ast.StringLitExpr)
+				parts = append(parts, LFormatPart{IsLiteral: true, Text: sl.Value})
+			}
+		} else {
+			// Expression part
+			val := l.lowerExpr(&part)
+			format := "%v"
+			if val.Type != nil {
+				switch val.Type.Kind {
+				case LTyI8, LTyI16, LTyI32, LTyI64, LTyPlatformInt:
+					format = "%d"
+				case LTyU8, LTyU16, LTyU32, LTyU64, LTyPlatformUint:
+					format = "%d"
+				case LTyF32, LTyF64:
+					format = "%f"
+				case LTyString:
+					format = "%s"
+				case LTyBool:
+					format = "%t"
+				}
+			}
+			parts = append(parts, LFormatPart{IsLiteral: false, Value: val, Format: format})
+		}
+	}
+
+	return l.emitTemp(LExpr{
+		Kind: LExprFormat,
+		Type: &LType{Kind: LTyString},
+		Data: &LFormatData{Parts: parts},
+	})
+}
+
+func (l *Lowerer) lowerCast(expr *ast.Expr) LValue {
+	ce := expr.Data.(*ast.CastExpr)
+	operand := l.lowerExpr(&ce.Operand)
+	targetType := l.lowerTypeExpr(&ce.TargetType)
+
+	return l.emitTemp(LExpr{
+		Kind: LExprCast,
+		Type: targetType,
+		Data: &LCastData{Target: targetType, Operand: operand},
+	})
+}
+
+func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue {
+	ue := expr.Data.(*ast.UnwrapExpr)
+	operand := l.lowerExpr(&ue.Operand)
+
+	resultType := l.exprType(expr)
+	return l.emitTemp(LExpr{
+		Kind: LExprUnwrapOptional,
+		Type: resultType,
+		Data: &LUnwrapOptionalData{Value: operand},
+	})
+}
+
+func (l *Lowerer) lowerTry(expr *ast.Expr) LValue {
+	te := expr.Data.(*ast.TryExpr)
+	operand := l.lowerExpr(&te.Operand)
+
+	// Extract value and error
+	errTemp := l.emitTemp(LExpr{
+		Kind: LExprExtractError,
+		Type: &LType{Kind: LTyError},
+		Data: &LExtractErrorData{Value: operand},
+	})
+
+	// Check error and return early
+	nullVal := LValue{Kind: LValLitNull, Type: &LType{Kind: LTyAny}}
+	isNotNull := l.emitTemp(LExpr{
+		Kind: LExprBinOp,
+		Type: &LType{Kind: LTyBool},
+		Data: &LBinOpData{Op: LBinNe, Left: errTemp, Right: nullVal},
+	})
+
+	// Build early return with zero value + error
+	var returnValues []LValue
+	if l.currentReturnType != nil && l.currentReturnType.Kind == LTyErrorResult {
+		returnValues = []LValue{
+			{Kind: LValLitNull, Type: l.currentReturnType.Elem},
+			errTemp,
+		}
+	} else {
+		returnValues = []LValue{errTemp}
+	}
+
+	l.emit(LStmt{Kind: LStmtIf, Data: &LIf{
+		Cond: isNotNull,
+		Then: []LStmt{{Kind: LStmtReturn, Data: &LReturn{Values: returnValues}}},
+	}})
+
+	// Extract the value
+	resultType := l.exprType(expr)
+	return l.emitTemp(LExpr{
+		Kind: LExprExtractValue,
+		Type: resultType,
+		Data: &LExtractValueData{Value: operand},
+	})
+}
+
+// Ensure strings import is used (for strings.Contains etc. in method lowering)
+var _ = strings.Contains
