@@ -45,6 +45,12 @@ type Lowerer struct {
 
 	// Import tracking — alias → path (e.g. "fmt" → "fmt", "errors" → "errors")
 	importAliases map[string]string
+
+	// Type parameters in scope for the current generic function/class
+	typeParamsInScope map[string]bool
+
+	// Class type params (for method receiver emission)
+	classTypeParams map[string][]LTypeParam // class name → type params
 }
 
 type variantCtorInfo struct {
@@ -62,7 +68,8 @@ func NewLowerer() *Lowerer {
 		classCtorFields: make(map[string][]string),
 		classFields:     make(map[string][]LField),
 		importAliases:   make(map[string]string),
-		exported:   make(map[string]bool),
+		exported:        make(map[string]bool),
+		classTypeParams: make(map[string][]LTypeParam),
 	}
 }
 
@@ -129,9 +136,17 @@ func (l *Lowerer) Lower(file *ast.File) *LProgram {
 			prog.Functions = append(prog.Functions, l.lowerFuncDecl(&fn, ""))
 		}
 		for _, cls := range block.Classes {
+			// Set class type params in scope for method lowering
+			if len(cls.TypeParams) > 0 {
+				l.typeParamsInScope = make(map[string]bool)
+				for _, tp := range cls.TypeParams {
+					l.typeParamsInScope[tp.Name] = true
+				}
+			}
 			for _, m := range cls.Methods {
 				prog.Functions = append(prog.Functions, l.lowerFuncDecl(&m, cls.Name))
 			}
+			l.typeParamsInScope = nil
 		}
 	}
 
@@ -195,6 +210,21 @@ func (l *Lowerer) registerTypes(block *ast.GrokBlock) {
 	}
 
 	for _, cls := range block.Classes {
+		// Register class type params
+		if len(cls.TypeParams) > 0 {
+			var tps []LTypeParam
+			for _, tp := range cls.TypeParams {
+				tps = append(tps, LTypeParam{Name: tp.Name, Constraint: tp.Constraint})
+			}
+			l.classTypeParams[cls.Name] = tps
+		}
+		// Set type params in scope for field type resolution
+		if len(cls.TypeParams) > 0 {
+			l.typeParamsInScope = make(map[string]bool)
+			for _, tp := range cls.TypeParams {
+				l.typeParamsInScope[tp.Name] = true
+			}
+		}
 		var fieldNames []string
 		var fields []LField
 		for _, p := range cls.CtorParams {
@@ -206,6 +236,7 @@ func (l *Lowerer) registerTypes(block *ast.GrokBlock) {
 		}
 		l.classCtorFields[cls.Name] = fieldNames
 		l.classFields[cls.Name] = fields
+		l.typeParamsInScope = nil
 	}
 
 	// Register function and method visibility
@@ -319,6 +350,10 @@ func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType {
 	if _, ok := l.classFields[nt.Name]; ok {
 		return &LType{Kind: LTyClassHandle, Name: nt.Name, IsExported: l.exported[nt.Name]}
 	}
+	// Check if it's a type parameter in scope
+	if l.typeParamsInScope[nt.Name] {
+		return &LType{Kind: LTyTypeVar, Name: nt.Name}
+	}
 	// Default to struct
 	return &LType{Kind: LTyStruct, Name: nt.Name, IsExported: l.exported[nt.Name]}
 }
@@ -387,6 +422,8 @@ func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType {
 		return &LType{Kind: LTyTuple, Fields: fields}
 	case checker.TyError:
 		return &LType{Kind: LTyError}
+	case checker.TyVar:
+		return &LType{Kind: LTyTypeVar, Name: ct.Name}
 	case checker.TyUnion:
 		return &LType{Kind: LTyAny}
 	case checker.TyUnknown:
@@ -428,11 +465,26 @@ func lirUintType(bits int) *LType {
 // ---------------------------------------------------------------------------
 
 func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl {
+	// Set up type parameters scope
+	var typeParams []LTypeParam
+	savedTypeParams := l.typeParamsInScope
+	if len(s.TypeParams) > 0 {
+		l.typeParamsInScope = make(map[string]bool)
+		for k, v := range savedTypeParams {
+			l.typeParamsInScope[k] = v
+		}
+		for _, tp := range s.TypeParams {
+			typeParams = append(typeParams, LTypeParam{Name: tp.Name, Constraint: tp.Constraint})
+			l.typeParamsInScope[tp.Name] = true
+		}
+	}
+
 	var fields []LField
 	for _, f := range s.Fields {
 		fields = append(fields, LField{Name: f.Name, Type: l.lowerTypeExpr(&f.Type)})
 	}
-	return LStructDecl{Name: s.Name, Fields: fields, IsExported: s.IsPublic}
+	l.typeParamsInScope = savedTypeParams
+	return LStructDecl{Name: s.Name, Fields: fields, TypeParams: typeParams, IsExported: s.IsPublic}
 }
 
 func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl {
@@ -470,6 +522,20 @@ func (l *Lowerer) lowerInterfaceDecl(iface *ast.InterfaceDecl) LInterfaceDecl {
 }
 
 func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl {
+	// Set up type parameters scope
+	var typeParams []LTypeParam
+	savedTypeParams := l.typeParamsInScope
+	if len(cls.TypeParams) > 0 {
+		l.typeParamsInScope = make(map[string]bool)
+		for k, v := range savedTypeParams {
+			l.typeParamsInScope[k] = v
+		}
+		for _, tp := range cls.TypeParams {
+			typeParams = append(typeParams, LTypeParam{Name: tp.Name, Constraint: tp.Constraint})
+			l.typeParamsInScope[tp.Name] = true
+		}
+	}
+
 	fields := l.classFields[cls.Name]
 	guardedBy := make(map[string]string)
 	for _, f := range cls.Fields {
@@ -477,15 +543,40 @@ func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl {
 			guardedBy[f.Name] = f.GuardedBy
 		}
 	}
-	return LClassDecl{
+	result := LClassDecl{
 		Name:       cls.Name,
 		Fields:     fields,
+		TypeParams: typeParams,
 		GuardedBy:  guardedBy,
 		IsExported: cls.IsPublic,
 	}
+	l.typeParamsInScope = savedTypeParams
+	return result
 }
 
 func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
+	// Set up type parameters scope
+	var typeParams []LTypeParam
+	savedTypeParams := l.typeParamsInScope
+	if len(fn.TypeParams) > 0 {
+		l.typeParamsInScope = make(map[string]bool)
+		for k, v := range savedTypeParams {
+			l.typeParamsInScope[k] = v
+		}
+		for _, tp := range fn.TypeParams {
+			typeParams = append(typeParams, LTypeParam{Name: tp.Name, Constraint: tp.Constraint})
+			l.typeParamsInScope[tp.Name] = true
+		}
+		// Merge where clause constraints
+		for _, wc := range fn.Where {
+			for i := range typeParams {
+				if typeParams[i].Name == wc.Variable && typeParams[i].Constraint == "" {
+					typeParams[i].Constraint = wc.Constraint
+				}
+			}
+		}
+	}
+
 	var params []LParam
 	for _, p := range fn.Params {
 		if p.IsSelf {
@@ -517,14 +608,17 @@ func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
 		body = l.lowerBlock(fn.Body)
 	}
 	l.currentReturnType = nil
+	l.typeParamsInScope = savedTypeParams
 
 	return LFuncDecl{
-		Name:       fn.Name,
-		Params:     params,
-		ReturnType: retType,
-		Body:       body,
-		IsExported: fn.IsPublic,
-		Receiver:   receiver,
+		Name:               fn.Name,
+		TypeParams:         typeParams,
+		Params:             params,
+		ReturnType:         retType,
+		Body:               body,
+		IsExported:         fn.IsPublic,
+		Receiver:           receiver,
+		ReceiverTypeParams: l.classTypeParams[receiver],
 	}
 }
 
@@ -1652,6 +1746,9 @@ func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue {
 func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 	ce := dataAs[ast.CallExpr](expr.Data)
 
+	// Extract type arguments (explicit or inferred)
+	typeArgs := l.extractTypeArgs(ce)
+
 	// Lower arguments
 	var args []LValue
 	for _, arg := range ce.Args {
@@ -1704,7 +1801,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 			return l.emitTemp(LExpr{
 				Kind: LExprCall,
 				Type: l.exprType(expr),
-				Data: &LCallData{Func: funcName, Args: args, IsExported: true},
+				Data: &LCallData{Func: funcName, Args: args, TypeArgs: typeArgs, IsExported: true},
 			})
 		}
 	}
@@ -1754,7 +1851,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 		return l.emitTemp(LExpr{
 			Kind: LExprClassAlloc,
 			Type: &LType{Kind: LTyClassHandle, Name: funcName, IsExported: l.exported[funcName]},
-			Data: &LClassAllocData{Class: funcName, Fields: fieldInits},
+			Data: &LClassAllocData{Class: funcName, Fields: fieldInits, TypeArgs: typeArgs},
 		})
 	}
 
@@ -1762,12 +1859,41 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 	return l.emitTemp(LExpr{
 		Kind: LExprCall,
 		Type: l.exprType(expr),
-		Data: &LCallData{Func: funcName, Args: args, IsExported: l.exported[funcName]},
+		Data: &LCallData{Func: funcName, Args: args, TypeArgs: typeArgs, IsExported: l.exported[funcName]},
 	})
+}
+
+// extractTypeArgs gets type arguments from a CallExpr, either explicit or inferred by the checker.
+func (l *Lowerer) extractTypeArgs(ce *ast.CallExpr) []*LType {
+	if len(ce.TypeArgs) > 0 {
+		// Explicit type arguments: f<i32>(x)
+		var typeArgs []*LType
+		for _, ta := range ce.TypeArgs {
+			typeArgs = append(typeArgs, l.lowerTypeExpr(&ta))
+		}
+		return typeArgs
+	}
+	if len(ce.InferredTypeArgs) > 0 {
+		// Inferred by checker: stored as []*checker.Type via any
+		var typeArgs []*LType
+		for _, ta := range ce.InferredTypeArgs {
+			if ct, ok := ta.(*checker.Type); ok {
+				typeArgs = append(typeArgs, l.lowerCheckerType(ct))
+			}
+		}
+		return typeArgs
+	}
+	return nil
 }
 
 func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
 	mc := dataAs[ast.MethodCallExpr](expr.Data)
+
+	// Extract explicit type arguments
+	var typeArgs []*LType
+	for _, ta := range mc.TypeArgs {
+		typeArgs = append(typeArgs, l.lowerTypeExpr(&ta))
+	}
 
 	// Check if receiver is an import package (e.g., fmt.Println, errors.New)
 	if mc.Receiver.Kind == ast.ExprIdent {
@@ -1782,7 +1908,7 @@ func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
 			return l.emitTemp(LExpr{
 				Kind: LExprCall,
 				Type: l.exprType(expr),
-				Data: &LCallData{Func: funcName, Args: args, IsExported: true},
+				Data: &LCallData{Func: funcName, Args: args, TypeArgs: typeArgs, IsExported: true},
 			})
 		}
 	}
@@ -1818,6 +1944,7 @@ func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
 			Receiver:   recv,
 			Method:     mc.Method,
 			Args:       args,
+			TypeArgs:   typeArgs,
 			IsExported: l.exported[mc.Method],
 		},
 	})

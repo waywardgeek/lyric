@@ -250,6 +250,8 @@ func (g *GoBackend) goType(t *LType) string {
 			return g.visName(t.Name, t.IsExported) // interface name
 		}
 		return "any"
+	case LTyTypeVar:
+		return t.Name // type parameter, e.g. "T"
 	}
 	return "any"
 }
@@ -257,6 +259,53 @@ func (g *GoBackend) goType(t *LType) string {
 func (g *GoBackend) autoImport(path string) {
 	if _, ok := g.imports[path]; !ok {
 		g.imports[path] = ""
+	}
+}
+
+// emitTypeParams writes Go type parameter list [T any, U cmp.Ordered] if non-empty.
+func (g *GoBackend) emitTypeParams(tps []LTypeParam) {
+	if len(tps) == 0 {
+		return
+	}
+	g.writef("[")
+	for i, tp := range tps {
+		if i > 0 {
+			g.writef(", ")
+		}
+		g.writef("%s %s", tp.Name, g.goConstraint(tp.Constraint))
+	}
+	g.writef("]")
+}
+
+// emitTypeArgs writes Go type argument list [int32, string] if non-empty.
+func (g *GoBackend) emitTypeArgs(tas []*LType) {
+	if len(tas) == 0 {
+		return
+	}
+	g.writef("[")
+	for i, ta := range tas {
+		if i > 0 {
+			g.writef(", ")
+		}
+		g.writef("%s", g.goType(ta))
+	}
+	g.writef("]")
+}
+
+// goConstraint maps a Grok constraint name to a Go constraint.
+func (g *GoBackend) goConstraint(c string) string {
+	switch c {
+	case "":
+		return "any"
+	case "Comparable":
+		g.autoImport("cmp")
+		return "cmp.Ordered"
+	case "Equatable":
+		return "comparable"
+	case "Hashable":
+		return "comparable"
+	default:
+		return c // user-defined constraint (interface name)
 	}
 }
 
@@ -271,7 +320,9 @@ func (g *GoBackend) emitTypeDef(td *LTypeDef) {
 
 func (g *GoBackend) emitStructDecl(s *LStructDecl) {
 	name := g.visName(s.Name, s.IsExported)
-	g.writef("type %s struct {\n", name)
+	g.writef("type %s", name)
+	g.emitTypeParams(s.TypeParams)
+	g.writef(" struct {\n")
 	for _, f := range s.Fields {
 		g.writef("\t%s %s\n", exportedFieldName(f.Name), g.goType(f.Type))
 	}
@@ -331,7 +382,9 @@ func (g *GoBackend) emitInterfaceDecl(iface *LInterfaceDecl) {
 
 func (g *GoBackend) emitClassDecl(c *LClassDecl) {
 	name := g.visName(c.Name, c.IsExported)
-	g.writef("type %s struct {\n", name)
+	g.writef("type %s", name)
+	g.emitTypeParams(c.TypeParams)
+	g.writef(" struct {\n")
 	for _, f := range c.Fields {
 		g.writef("\t%s %s\n", exportedFieldName(f.Name), g.goType(f.Type))
 	}
@@ -345,12 +398,22 @@ func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 	var params []string
 	startIdx := 0
 	if f.Receiver != "" {
-		// Method — emit as (self *ReceiverType)
+		// Method — emit as (self *ReceiverType[T, ...])
 		startIdx = 1 // skip self param
 		receiverType := g.visName(f.Receiver, g.nameExported[f.Receiver])
-		g.writef("func (self *%s) %s(", receiverType, name)
+		if len(f.ReceiverTypeParams) > 0 {
+			var tpNames []string
+			for _, tp := range f.ReceiverTypeParams {
+				tpNames = append(tpNames, tp.Name)
+			}
+			g.writef("func (self *%s[%s]) %s(", receiverType, strings.Join(tpNames, ", "), name)
+		} else {
+			g.writef("func (self *%s) %s(", receiverType, name)
+		}
 	} else {
-		g.writef("func %s(", name)
+		g.writef("func %s", name)
+		g.emitTypeParams(f.TypeParams)
+		g.writef("(")
 	}
 
 	for i := startIdx; i < len(f.Params); i++ {
@@ -976,10 +1039,12 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 		if idx := strings.IndexByte(d.Func, '.'); idx >= 0 {
 			pkg := d.Func[:idx]
 			fn := d.Func[idx+1:]
-			g.writef("%s.%s(", pkg, g.visName(fn, true))
+			g.writef("%s.%s", pkg, g.visName(fn, true))
 		} else {
-			g.writef("%s(", g.visName(d.Func, d.IsExported))
+			g.writef("%s", g.visName(d.Func, d.IsExported))
 		}
+		g.emitTypeArgs(d.TypeArgs)
+		g.writef("(")
 		for i, arg := range d.Args {
 			if i > 0 {
 				g.writef(", ")
@@ -991,7 +1056,9 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 	case LExprMethodCall:
 		d := e.Data.(*LMethodCallData)
 		g.emitValue(&d.Receiver)
-		g.writef(".%s(", g.visName(d.Method, d.IsExported))
+		g.writef(".%s", g.visName(d.Method, d.IsExported))
+		g.emitTypeArgs(d.TypeArgs)
+		g.writef("(")
 		for i, arg := range d.Args {
 			if i > 0 {
 				g.writef(", ")
@@ -1047,10 +1114,19 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 		if e.Type != nil {
 			className = g.visName(d.Class, e.Type.IsExported)
 		}
+		// Build type arg suffix for generic classes
+		typeArgSuffix := ""
+		if len(d.TypeArgs) > 0 {
+			var parts []string
+			for _, ta := range d.TypeArgs {
+				parts = append(parts, g.goType(ta))
+			}
+			typeArgSuffix = "[" + strings.Join(parts, ", ") + "]"
+		}
 		if len(d.Fields) == 0 {
-			g.writef("&%s{}", className)
+			g.writef("&%s%s{}", className, typeArgSuffix)
 		} else {
-			g.writef("&%s{", className)
+			g.writef("&%s%s{", className, typeArgSuffix)
 			for i, f := range d.Fields {
 				if i > 0 {
 					g.writef(", ")

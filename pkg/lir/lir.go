@@ -6,7 +6,7 @@
 // Design principles:
 //   - Structured control flow (if/while/for/switch), NOT basic blocks
 //   - Flat expressions — no nesting, every subexpression gets a named temporary
-//   - Fully monomorphized — no type variables
+//   - Type variables preserved for Go backend (LTyTypeVar); future C backend would monomorphize
 //   - All sugar resolved — no ?, no match-as-expression, no f-strings, no method syntax on primitives
 package lir
 
@@ -14,7 +14,8 @@ package lir
 // Types
 // ---------------------------------------------------------------------------
 
-// LType represents a concrete type in the LIR. No type variables, no unresolved types.
+// LType represents a type in the LIR. For the Go backend, type variables are preserved
+// as LTyTypeVar; a future C backend would monomorphize them away before reaching here.
 type LType struct {
 	Kind       LTypeKind
 	Name       string     // for Struct, ClassHandle, TaggedUnion
@@ -59,6 +60,7 @@ const (
 	LTyFuncPtr                      // function pointer (for lowered lambdas)
 	LTyErrorResult                  // {value T, err error} — lowered (T, error) tuple
 	LTyAny                          // interface{} / any
+	LTyTypeVar                      // type variable (generic type parameter, e.g. T)
 )
 
 // LField is a named field within a struct, tuple, or variant.
@@ -240,6 +242,7 @@ type LSliceData struct {
 type LCallData struct {
 	Func       string
 	Args       []LValue
+	TypeArgs   []*LType // generic type arguments (e.g. identity[int32](...))
 	IsExported bool
 }
 
@@ -247,6 +250,7 @@ type LMethodCallData struct {
 	Receiver   LValue
 	Method     string
 	Args       []LValue
+	TypeArgs   []*LType // generic type arguments
 	IsExported bool
 }
 
@@ -265,8 +269,9 @@ type LFieldInit struct {
 }
 
 type LClassAllocData struct {
-	Class  string
-	Fields []LFieldInit // constructor field initializations
+	Class    string
+	Fields   []LFieldInit // constructor field initializations
+	TypeArgs []*LType     // generic type arguments
 }
 
 type LMakeChannelData struct {
@@ -597,10 +602,17 @@ type LInterfaceMethod struct {
 	ReturnType *LType
 }
 
+// LTypeParam is a type parameter on a generic declaration.
+type LTypeParam struct {
+	Name       string // e.g. "T"
+	Constraint string // e.g. "Comparable", "" if unconstrained
+}
+
 // LStructDecl: a value-type struct.
 type LStructDecl struct {
 	Name       string
 	Fields     []LField
+	TypeParams []LTypeParam
 	IsExported bool
 }
 
@@ -608,6 +620,7 @@ type LStructDecl struct {
 type LClassDecl struct {
 	Name      string
 	Fields    []LField
+	TypeParams []LTypeParam
 	GuardedBy map[string]string // field → lock name
 	HasFinal  bool
 	IsExported bool
@@ -622,12 +635,14 @@ type LEnumDecl struct {
 
 // LFuncDecl: a function or method.
 type LFuncDecl struct {
-	Name       string
-	Params     []LParam
-	ReturnType *LType
-	Body       []LStmt
-	IsExported bool
-	Receiver   string // non-empty for methods: the receiver type name
+	Name               string
+	TypeParams         []LTypeParam
+	Params             []LParam
+	ReturnType         *LType
+	Body               []LStmt
+	IsExported         bool
+	Receiver           string       // non-empty for methods: the receiver type name
+	ReceiverTypeParams []LTypeParam // type params on the receiver (for generic class methods)
 }
 
 // LParam: a function parameter.
