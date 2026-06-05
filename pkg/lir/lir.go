@@ -597,6 +597,7 @@ type LImport struct {
 // LInterfaceDecl: a Go-style interface.
 type LInterfaceDecl struct {
 	Name       string
+	TypeParams []LTypeParam      // for multi-class interfaces
 	Methods    []LInterfaceMethod
 	Embeds     []string // names of embedded interfaces
 	IsExported bool
@@ -604,9 +605,10 @@ type LInterfaceDecl struct {
 
 // LInterfaceMethod: a method signature in an interface.
 type LInterfaceMethod struct {
-	Name       string
-	Params     []LParam // excludes self
-	ReturnType *LType
+	Name         string
+	ReceiverType string // non-empty for multi-class interface methods
+	Params       []LParam // excludes self
+	ReturnType   *LType
 }
 
 // LTypeParam is a type parameter on a generic declaration.
@@ -640,16 +642,23 @@ type LEnumDecl struct {
 	IsExported bool
 }
 
+// LRelationalConstraint represents a multi-class constraint like where Graph<G, N, E>.
+type LRelationalConstraint struct {
+	InterfaceName string   // "Graph"
+	TypeArgs      []string // ["G", "N", "E"] — the type param names
+}
+
 // LFuncDecl: a function or method.
 type LFuncDecl struct {
-	Name               string
-	TypeParams         []LTypeParam
-	Params             []LParam
-	ReturnType         *LType
-	Body               []LStmt
-	IsExported         bool
-	Receiver           string       // non-empty for methods: the receiver type name
-	ReceiverTypeParams []LTypeParam // type params on the receiver (for generic class methods)
+	Name                  string
+	TypeParams            []LTypeParam
+	Params                []LParam
+	ReturnType            *LType
+	Body                  []LStmt
+	IsExported            bool
+	Receiver              string       // non-empty for methods: the receiver type name
+	ReceiverTypeParams    []LTypeParam // type params on the receiver (for generic class methods)
+	RelationalConstraints []LRelationalConstraint // from where Graph<G, N, E>
 }
 
 // LParam: a function parameter.

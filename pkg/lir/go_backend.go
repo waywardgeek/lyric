@@ -12,6 +12,7 @@ type GoBackend struct {
 	buf     strings.Builder
 	indent  int
 	imports map[string]string // path → alias (empty = no alias)
+	prog    *LProgram         // reference to the program being emitted
 
 	// For method receivers
 	currentReceiver string
@@ -64,6 +65,7 @@ func EmitGo(prog *LProgram) string {
 		enumVariants:    make(map[string][]LVariant),
 		nameExported:    make(map[string]bool),
 		suppressedTemps: make(map[int]bool),
+		prog:            prog,
 	}
 	return g.emit(prog)
 }
@@ -266,15 +268,83 @@ func (g *GoBackend) autoImport(path string) {
 
 // emitTypeParams writes Go type parameter list [T any, U cmp.Ordered] if non-empty.
 func (g *GoBackend) emitTypeParams(tps []LTypeParam) {
+	g.emitTypeParamsWithRelational(tps, nil, nil)
+}
+
+// emitFuncTypeParams writes Go type parameter list with relational constraint support.
+func (g *GoBackend) emitFuncTypeParams(f *LFuncDecl) {
+	g.emitTypeParamsWithRelational(f.TypeParams, f.RelationalConstraints, nil)
+}
+
+// emitTypeParamsWithRelational writes type params, using split interface names for
+// relational constraints. e.g., where Graph<G, N, E> → G GraphG[N, E], N GraphN[E], E GraphE[N]
+func (g *GoBackend) emitTypeParamsWithRelational(tps []LTypeParam, relConstraints []LRelationalConstraint, prog *LProgram) {
 	if len(tps) == 0 {
 		return
 	}
+
+	// Build a map from type param name → Go constraint string
+	// from relational constraints (e.g., where Graph<G, N, E>)
+	relConstraintMap := make(map[string]string) // type param → constraint like "GraphG[N, E]"
+	for _, rc := range relConstraints {
+		// Find the corresponding interface in the program to analyze method signatures
+		var iface *LInterfaceDecl
+		if g.prog != nil {
+			for i := range g.prog.Interfaces {
+				if g.prog.Interfaces[i].Name == rc.InterfaceName {
+					iface = &g.prog.Interfaces[i]
+					break
+				}
+			}
+		}
+
+		for i, argName := range rc.TypeArgs {
+			isExported := g.nameExported[rc.InterfaceName]
+			splitName := g.visName(rc.InterfaceName+argName, isExported)
+
+			// Determine which other type args are actually used in this receiver's methods
+			var otherArgs []string
+			if iface != nil {
+				usedTPs := map[string]bool{}
+				for _, m := range iface.Methods {
+					if m.ReceiverType != iface.TypeParams[i].Name {
+						continue
+					}
+					g.collectTypeVarRefs(m.Params, m.ReturnType, usedTPs)
+				}
+				// Map interface type param names to function type param names
+				for j, otherTP := range rc.TypeArgs {
+					if j != i && usedTPs[iface.TypeParams[j].Name] {
+						otherArgs = append(otherArgs, otherTP)
+					}
+				}
+			} else {
+				// Fallback: include all other type args
+				for j, otherArg := range rc.TypeArgs {
+					if j != i {
+						otherArgs = append(otherArgs, otherArg)
+					}
+				}
+			}
+
+			constraint := splitName
+			if len(otherArgs) > 0 {
+				constraint += "[" + strings.Join(otherArgs, ", ") + "]"
+			}
+			relConstraintMap[argName] = constraint
+		}
+	}
+
 	g.writef("[")
 	for i, tp := range tps {
 		if i > 0 {
 			g.writef(", ")
 		}
-		g.writef("%s %s", tp.Name, g.goConstraint(tp.Constraint))
+		if relC, ok := relConstraintMap[tp.Name]; ok {
+			g.writef("%s %s", tp.Name, relC)
+		} else {
+			g.writef("%s %s", tp.Name, g.goConstraint(tp.Constraint))
+		}
 	}
 	g.writef("]")
 }
@@ -353,6 +423,124 @@ func (g *GoBackend) emitEnumDecl(e *LEnumDecl) {
 }
 
 func (g *GoBackend) emitInterfaceDecl(iface *LInterfaceDecl) {
+	// Check if this is a multi-class interface (has typed methods)
+	isMultiClass := false
+	for _, m := range iface.Methods {
+		if m.ReceiverType != "" {
+			isMultiClass = true
+			break
+		}
+	}
+
+	if !isMultiClass {
+		// Traditional single-class interface
+		g.emitSingleInterface(iface)
+		return
+	}
+
+	// Multi-class interface: emit one Go interface per unique ReceiverType
+	// Collect unique receiver types in order
+	seen := map[string]bool{}
+	var receiverTypes []string
+	for _, m := range iface.Methods {
+		if m.ReceiverType != "" && !seen[m.ReceiverType] {
+			seen[m.ReceiverType] = true
+			receiverTypes = append(receiverTypes, m.ReceiverType)
+		}
+	}
+
+	// For each receiver type, emit an interface with methods for that type param.
+	// Only include type params that actually appear in method signatures.
+	for _, recvTP := range receiverTypes {
+		subName := g.visName(iface.Name+recvTP, iface.IsExported)
+
+		// Collect which other type params are referenced in this receiver's methods
+		usedTPs := map[string]bool{}
+		for _, m := range iface.Methods {
+			if m.ReceiverType != recvTP {
+				continue
+			}
+			g.collectTypeVarRefs(m.Params, m.ReturnType, usedTPs)
+		}
+		// Remove self-reference
+		delete(usedTPs, recvTP)
+
+		// Build ordered list of used type params (preserve original order)
+		var otherTPs []LTypeParam
+		for _, tp := range iface.TypeParams {
+			if usedTPs[tp.Name] {
+				otherTPs = append(otherTPs, tp)
+			}
+		}
+
+		g.writef("type %s", subName)
+		if len(otherTPs) > 0 {
+			g.writef("[")
+			for i, tp := range otherTPs {
+				if i > 0 {
+					g.writef(", ")
+				}
+				constraint := "any"
+				if tp.Constraint != "" {
+					constraint = g.goConstraint(tp.Constraint)
+				}
+				g.writef("%s %s", tp.Name, constraint)
+			}
+			g.writef("]")
+		}
+		g.writef(" interface {\n")
+
+		for _, m := range iface.Methods {
+			if m.ReceiverType != recvTP {
+				continue
+			}
+			methodName := g.visName(m.Name, iface.IsExported)
+			g.writef("\t%s(", methodName)
+			for i, p := range m.Params {
+				if i > 0 {
+					g.writef(", ")
+				}
+				g.writef("%s %s", p.Name, g.goType(p.Type))
+			}
+			g.writef(")")
+			if m.ReturnType != nil && m.ReturnType.Kind != LTyUnit {
+				g.writef(" %s", g.goType(m.ReturnType))
+			}
+			g.writef("\n")
+		}
+		g.writef("}\n\n")
+	}
+
+	// Also emit free functions (no ReceiverType) as standalone functions
+	// These will be emitted by the function lowering, not as interface methods
+}
+
+// collectTypeVarRefs finds all type variable names referenced in method params and return type.
+func (g *GoBackend) collectTypeVarRefs(params []LParam, retType *LType, out map[string]bool) {
+	for _, p := range params {
+		g.collectTypeVarRefsFromType(p.Type, out)
+	}
+	if retType != nil {
+		g.collectTypeVarRefsFromType(retType, out)
+	}
+}
+
+func (g *GoBackend) collectTypeVarRefsFromType(t *LType, out map[string]bool) {
+	if t == nil {
+		return
+	}
+	if t.Kind == LTyTypeVar {
+		out[t.Name] = true
+	}
+	g.collectTypeVarRefsFromType(t.Elem, out)
+	g.collectTypeVarRefsFromType(t.Key, out)
+	g.collectTypeVarRefsFromType(t.Return, out)
+	for _, p := range t.Params {
+		g.collectTypeVarRefsFromType(p, out)
+	}
+}
+
+func (g *GoBackend) emitSingleInterface(iface *LInterfaceDecl) {
 	name := g.visName(iface.Name, iface.IsExported)
 	g.writef("type %s interface {\n", name)
 	for _, embed := range iface.Embeds {
@@ -414,7 +602,7 @@ func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 		}
 	} else {
 		g.writef("func %s", name)
-		g.emitTypeParams(f.TypeParams)
+		g.emitFuncTypeParams(f)
 		g.writef("(")
 	}
 

@@ -498,6 +498,20 @@ func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl {
 }
 
 func (l *Lowerer) lowerInterfaceDecl(iface *ast.InterfaceDecl) LInterfaceDecl {
+	// Set up type parameters scope for resolving method types
+	savedTypeParams := l.typeParamsInScope
+	var typeParams []LTypeParam
+	if len(iface.TypeParams) > 0 {
+		l.typeParamsInScope = make(map[string]bool)
+		for k, v := range savedTypeParams {
+			l.typeParamsInScope[k] = v
+		}
+		for _, tp := range iface.TypeParams {
+			typeParams = append(typeParams, LTypeParam{Name: tp.Name, Constraint: tp.Constraint})
+			l.typeParamsInScope[tp.Name] = true
+		}
+	}
+
 	var methods []LInterfaceMethod
 	for _, m := range iface.Methods {
 		var params []LParam
@@ -513,13 +527,16 @@ func (l *Lowerer) lowerInterfaceDecl(iface *ast.InterfaceDecl) LInterfaceDecl {
 			retType = l.lowerTypeExpr(m.ReturnType)
 		}
 		methods = append(methods, LInterfaceMethod{
-			Name:       m.Name,
-			Params:     params,
-			ReturnType: retType,
+			Name:         m.Name,
+			ReceiverType: m.ReceiverType,
+			Params:       params,
+			ReturnType:   retType,
 		})
 	}
+	l.typeParamsInScope = savedTypeParams
 	return LInterfaceDecl{
 		Name:       iface.Name,
+		TypeParams: typeParams,
 		Methods:    methods,
 		Embeds:     iface.Implements,
 		IsExported: iface.IsPublic,
@@ -562,6 +579,7 @@ func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl {
 func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
 	// Set up type parameters scope
 	var typeParams []LTypeParam
+	var relConstraints []LRelationalConstraint
 	savedTypeParams := l.typeParamsInScope
 	if len(fn.TypeParams) > 0 {
 		l.typeParamsInScope = make(map[string]bool)
@@ -574,10 +592,26 @@ func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
 		}
 		// Merge where clause constraints
 		for _, wc := range fn.Where {
-			for i := range typeParams {
-				if typeParams[i].Name == wc.Variable && typeParams[i].Constraint == "" {
-					typeParams[i].Constraint = wc.Constraint
+			if wc.Variable != "" {
+				// Single-type constraint: where T: Integer
+				for i := range typeParams {
+					if typeParams[i].Name == wc.Variable && typeParams[i].Constraint == "" {
+						typeParams[i].Constraint = wc.Constraint
+					}
 				}
+			} else if len(wc.TypeArgs) > 0 {
+				// Relational constraint: where Graph<G, N, E>
+				var argNames []string
+				for _, ta := range wc.TypeArgs {
+					if ta.Kind == ast.TypeNamed {
+						nt := ta.Data.(ast.NamedType)
+						argNames = append(argNames, nt.Name)
+					}
+				}
+				relConstraints = append(relConstraints, LRelationalConstraint{
+					InterfaceName: wc.Constraint,
+					TypeArgs:      argNames,
+				})
 			}
 		}
 	}
@@ -616,14 +650,15 @@ func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl {
 	l.typeParamsInScope = savedTypeParams
 
 	return LFuncDecl{
-		Name:               fn.Name,
-		TypeParams:         typeParams,
-		Params:             params,
-		ReturnType:         retType,
-		Body:               body,
-		IsExported:         fn.IsPublic,
-		Receiver:           receiver,
-		ReceiverTypeParams: l.classTypeParams[receiver],
+		Name:                  fn.Name,
+		TypeParams:            typeParams,
+		Params:                params,
+		ReturnType:            retType,
+		Body:                  body,
+		IsExported:            fn.IsPublic,
+		Receiver:              receiver,
+		ReceiverTypeParams:    l.classTypeParams[receiver],
+		RelationalConstraints: relConstraints,
 	}
 }
 
