@@ -22,16 +22,48 @@ type GoBackend struct {
 	typeSwitchVar string
 
 	// Visibility tracking (populated from declarations)
-	nameExported map[string]bool // type/func/method name → is exported
+	nameExported   map[string]bool // type/func/method name → is exported
+	suppressedTemps map[int]bool   // temps consumed by field-writeback patterns
+}
+
+// scanFieldWritebacks pre-scans statements to find temps that will be consumed
+// by field-writeback patterns (append on class/struct fields). These temps are
+// suppressed during emission since the backend re-accesses the field directly.
+func (g *GoBackend) scanFieldWritebacks(stmts []LStmt) {
+	// First pass: collect temp definitions
+	tempDefs := make(map[int]*LTempDef)
+	for _, s := range stmts {
+		if s.Kind == LStmtTempDef {
+			td := s.Data.(*LTempDef)
+			tempDefs[td.ID] = td
+		}
+	}
+	// Second pass: find SideEffect(append(temp, ...)) where temp is a field access
+	for _, s := range stmts {
+		if s.Kind == LStmtSideEffect {
+			se := s.Data.(*LSideEffect)
+			if se.Expr.Kind == LExprBuiltin {
+				d := se.Expr.Data.(*LBuiltinData)
+				if (d.Name == "append" || d.Name == "slice_push") && len(d.Args) > 0 && d.Args[0].Kind == LValTemp {
+					if td, ok := tempDefs[d.Args[0].TempID]; ok {
+						if td.Expr.Kind == LExprStructField || td.Expr.Kind == LExprClassGet {
+							g.suppressedTemps[d.Args[0].TempID] = true
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // EmitGo converts an LIR program to Go source code.
 func EmitGo(prog *LProgram) string {
 	g := &GoBackend{
-		imports:      make(map[string]string),
-		tempDefs:     make(map[int]*LTempDef),
-		enumVariants: make(map[string][]LVariant),
-		nameExported: make(map[string]bool),
+		imports:         make(map[string]string),
+		tempDefs:        make(map[int]*LTempDef),
+		enumVariants:    make(map[string][]LVariant),
+		nameExported:    make(map[string]bool),
+		suppressedTemps: make(map[int]bool),
 	}
 	return g.emit(prog)
 }
@@ -339,6 +371,7 @@ func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 
 	g.writef(" {\n")
 	g.indent++
+	g.scanFieldWritebacks(f.Body)
 	g.emitStmts(f.Body)
 	g.indent--
 	g.writef("}\n\n")
@@ -363,6 +396,10 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 		if td.Expr.Kind == LExprVariantTag {
 			break
 		}
+		// Suppress temps consumed by field-writeback patterns
+		if g.suppressedTemps[td.ID] {
+			break
+		}
 		g.writeIndent()
 		// Use typed declaration for temps with specific numeric types
 		if td.Expr.Type != nil && g.needsTypedDecl(td.Expr.Type) && isSimpleExpr(&td.Expr) {
@@ -382,6 +419,10 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 				g.emitValue(vd.Init)
 			} else if vd.Type != nil && (vd.Init.Kind == LValLitInt || vd.Init.Kind == LValLitUint || vd.Init.Kind == LValLitFloat) && g.needsTypedDecl(vd.Type) {
 				// Use typed declaration for literals when the Go type differs from inference
+				g.writef("var %s %s = ", vd.Name, g.goType(vd.Type))
+				g.emitValue(vd.Init)
+			} else if vd.Type != nil && vd.Type.Kind == LTyTaggedUnion {
+				// Interface type (enum) — must use typed declaration to avoid concrete type
 				g.writef("var %s %s = ", vd.Name, g.goType(vd.Type))
 				g.emitValue(vd.Init)
 			} else {
@@ -551,6 +592,26 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 		g.writeIndent()
 		g.writef("}\n")
 
+	case LStmtTypeSwitch:
+		ts := s.Data.(*LTypeSwitch)
+		g.writeIndent()
+		g.writef("switch ")
+		g.emitValue(&ts.Value)
+		g.writef(".(type) {\n")
+		for _, c := range ts.Cases {
+			g.writeIndent()
+			if c.Type == nil {
+				g.writef("default:\n")
+			} else {
+				g.writef("case %s:\n", g.goType(c.Type))
+			}
+			g.indent++
+			g.emitStmts(c.Body)
+			g.indent--
+		}
+		g.writeIndent()
+		g.writef("}\n")
+
 	case LStmtBlock:
 		b := s.Data.(*LBlock)
 		g.writeIndent()
@@ -666,12 +727,46 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 		// Special case: append/push must reassign to the slice variable
 		if se.Expr.Kind == LExprBuiltin {
 			d := se.Expr.Data.(*LBuiltinData)
-			if (d.Name == "append" || d.Name == "slice_push") && len(d.Args) > 0 && d.Args[0].Kind == LValVar {
-				g.writeIndent()
-				g.writef("%s = ", d.Args[0].Name)
-				g.emitExpr(&se.Expr)
-				g.writef("\n")
-				break
+			if (d.Name == "append" || d.Name == "slice_push") && len(d.Args) > 0 {
+				// Direct variable reference
+				if d.Args[0].Kind == LValVar {
+					g.writeIndent()
+					g.writef("%s = ", d.Args[0].Name)
+					g.emitExpr(&se.Expr)
+					g.writef("\n")
+					break
+				}
+				// Temp referencing a field access: trace back to emit field writeback
+				if d.Args[0].Kind == LValTemp {
+					if td, ok := g.tempDefs[d.Args[0].TempID]; ok {
+						var obj *LValue
+						var field string
+						switch td.Expr.Kind {
+						case LExprStructField:
+							sf := td.Expr.Data.(*LStructFieldData)
+							obj = &sf.Receiver
+							field = sf.Field
+						case LExprClassGet:
+							cg := td.Expr.Data.(*LClassGetData)
+							obj = &cg.Handle
+							field = cg.Field
+						}
+						if obj != nil {
+							g.writeIndent()
+							g.emitValue(obj)
+							g.writef(".%s = ", exportedFieldName(field))
+							g.writef("append(")
+							g.emitValue(obj)
+							g.writef(".%s", exportedFieldName(field))
+							for _, a := range d.Args[1:] {
+								g.writef(", ")
+								g.emitValue(&a)
+							}
+							g.writef(")\n")
+							break
+						}
+					}
+				}
 			}
 		}
 		g.writeIndent()

@@ -14,4 +14,8 @@ grok typealias {
         let maybe: MaybeInt = 10
         println(maybe)
     }
+
+    func main() {
+        test_aliases()
+    }
 }

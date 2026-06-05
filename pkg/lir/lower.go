@@ -936,9 +936,85 @@ func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo) {
 			Cases:    cases,
 			EnumName: enumName,
 		}})
+	} else if l.isUnionMatch(matchVal, ms) {
+		// Union type match: emit type switch
+		l.emitUnionTypeSwitch(ms, matchVal, result)
 	} else {
 		// Non-enum match: emit if-else chain
 		l.lowerMatchAsIfElse(ms, matchVal, result)
+	}
+}
+
+// isUnionMatch checks if this is a union type match (match on any with type patterns).
+func (l *Lowerer) isUnionMatch(matchVal LValue, ms *ast.MatchStmt) bool {
+	if matchVal.Type == nil || matchVal.Type.Kind != LTyAny {
+		return false
+	}
+	for _, arm := range ms.Arms {
+		if arm.Pattern.ResolvedType != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// emitUnionTypeSwitch emits a type switch for union type matching.
+func (l *Lowerer) emitUnionTypeSwitch(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo) {
+	var cases []LTypeSwitchCase
+	for _, arm := range ms.Arms {
+		if arm.Pattern.Kind == ast.PatWildcard {
+			// Default case
+			body := l.lowerArmBody(&arm.Body, result)
+			cases = append(cases, LTypeSwitchCase{
+				Type: nil, // nil = default
+				Body: body,
+			})
+			continue
+		}
+		if arm.Pattern.Kind == ast.PatIdent {
+			// Type pattern — resolve the type from ResolvedType
+			var caseType *LType
+			if rt, ok := arm.Pattern.ResolvedType.(*checker.Type); ok {
+				caseType = l.lowerCheckerType(rt)
+			} else {
+				// Fallback: use pattern name as-is
+				ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
+				caseType = l.grokNameToLType(ip.Name)
+			}
+			body := l.lowerArmBody(&arm.Body, result)
+			cases = append(cases, LTypeSwitchCase{
+				Type: caseType,
+				Body: body,
+			})
+		}
+	}
+	l.emit(LStmt{Kind: LStmtTypeSwitch, Data: &LTypeSwitch{
+		Value: matchVal,
+		Cases: cases,
+	}})
+}
+
+// grokNameToLType converts a Grok type name to an LType (fallback for union patterns).
+func (l *Lowerer) grokNameToLType(name string) *LType {
+	switch name {
+	case "string":
+		return &LType{Kind: LTyString}
+	case "bool":
+		return &LType{Kind: LTyBool}
+	case "i8":
+		return &LType{Kind: LTyI8, Bits: 8}
+	case "i16":
+		return &LType{Kind: LTyI16, Bits: 16}
+	case "i32":
+		return &LType{Kind: LTyI32, Bits: 32}
+	case "i64":
+		return &LType{Kind: LTyI64, Bits: 64}
+	case "f32":
+		return &LType{Kind: LTyF32}
+	case "f64":
+		return &LType{Kind: LTyF64}
+	default:
+		return &LType{Kind: LTyAny}
 	}
 }
 

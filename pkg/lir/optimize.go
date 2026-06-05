@@ -246,6 +246,11 @@ func optimizeNestedStmtsStructural(s *LStmt, returnType *LType) {
 		for j := range d.Cases {
 			d.Cases[j].Body = optimizeStmtsStructural(d.Cases[j].Body, returnType)
 		}
+	case LStmtTypeSwitch:
+		d := s.Data.(*LTypeSwitch)
+		for j := range d.Cases {
+			d.Cases[j].Body = optimizeStmtsStructural(d.Cases[j].Body, returnType)
+		}
 	case LStmtBlock:
 		d := s.Data.(*LBlock)
 		d.Stmts = optimizeStmtsStructural(d.Stmts, returnType)
@@ -297,6 +302,11 @@ func blankUnusedMultiAssignNames(stmts []LStmt, usedTemps map[int]bool, usedVars
 			for j := range d.Cases {
 				blankUnusedMultiAssignNames(d.Cases[j].Body, usedTemps, usedVars)
 			}
+		case LStmtTypeSwitch:
+			d := stmts[i].Data.(*LTypeSwitch)
+			for j := range d.Cases {
+				blankUnusedMultiAssignNames(d.Cases[j].Body, usedTemps, usedVars)
+			}
 		case LStmtBlock:
 			d := stmts[i].Data.(*LBlock)
 			blankUnusedMultiAssignNames(d.Stmts, usedTemps, usedVars)
@@ -336,6 +346,11 @@ func eliminateUnusedTempsRecursive(stmts []LStmt, usedTemps map[int]bool, usedVa
 			d.Body = eliminateUnusedTempsRecursive(d.Body, usedTemps, usedVars)
 		case LStmtSwitch:
 			d := stmts[i].Data.(*LSwitch)
+			for j := range d.Cases {
+				d.Cases[j].Body = eliminateUnusedTempsRecursive(d.Cases[j].Body, usedTemps, usedVars)
+			}
+		case LStmtTypeSwitch:
+			d := stmts[i].Data.(*LTypeSwitch)
 			for j := range d.Cases {
 				d.Cases[j].Body = eliminateUnusedTempsRecursive(d.Cases[j].Body, usedTemps, usedVars)
 			}
@@ -659,6 +674,12 @@ func collectUsedTempsInStmt(s *LStmt, used map[int]bool) {
 		for _, c := range d.Cases {
 			collectUsedTemps(c.Body, used)
 		}
+	case LStmtTypeSwitch:
+		d := s.Data.(*LTypeSwitch)
+		collectUsedTempsInValue(&d.Value, used)
+		for _, c := range d.Cases {
+			collectUsedTemps(c.Body, used)
+		}
 	case LStmtReturn:
 		r := s.Data.(*LReturn)
 		for _, v := range r.Values {
@@ -869,6 +890,12 @@ func collectUsedVarNamesInStmt(s *LStmt, used map[string]bool) {
 	case LStmtSwitch:
 		d := s.Data.(*LSwitch)
 		collectUsedVarNamesInValue(&d.Tag, used)
+		for _, c := range d.Cases {
+			collectUsedVarNames(c.Body, used)
+		}
+	case LStmtTypeSwitch:
+		d := s.Data.(*LTypeSwitch)
+		collectUsedVarNamesInValue(&d.Value, used)
 		for _, c := range d.Cases {
 			collectUsedVarNames(c.Body, used)
 		}

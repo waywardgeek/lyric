@@ -388,6 +388,7 @@ const (
 	// Optimization-introduced statement kinds
 	LStmtSideEffect  // bare expression statement (no assignment)
 	LStmtMultiAssign  // a, b := expr (multi-return destructuring)
+	LStmtTypeSwitch   // switch v := val.(type) { case T: ... }
 )
 
 // --- Statement data types ---
@@ -470,6 +471,19 @@ type LSwitch struct {
 type LSwitchCase struct {
 	Tag     int    // integer tag value (-1 for default)
 	Binding string // variable name bound to variant data (empty if none)
+	Body    []LStmt
+}
+
+// LTypeSwitch: switch v := val.(type) { case T: ... } for union type matching.
+type LTypeSwitch struct {
+	Value   LValue          // the value being switched on
+	Cases   []LTypeSwitchCase
+}
+
+// LTypeSwitchCase: a single case in a type switch.
+type LTypeSwitchCase struct {
+	Type    *LType  // the type to match (nil for default)
+	Binding string  // variable name bound to the typed value (empty if none)
 	Body    []LStmt
 }
 
