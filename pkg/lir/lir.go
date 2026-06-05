@@ -62,6 +62,7 @@ const (
 	LTyErrorResult                  // {value T, err error} — lowered (T, error) tuple
 	LTyAny                          // interface{} / any
 	LTyTypeVar                      // type variable (generic type parameter, e.g. T)
+	LTyUnion                        // ad-hoc union (string | i32 | bool); Members stored in Fields
 )
 
 // LField is a named field within a struct, tuple, or variant.

@@ -333,8 +333,16 @@ func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType {
 	case ast.TypeUnit:
 		return &LType{Kind: LTyUnit}
 	case ast.TypeUnion:
-		// Union types lower to any — backends handle via type switch
-		return &LType{Kind: LTyAny}
+		// Preserve union member types for C backend
+		ut := dataAs[ast.UnionType](te.Data)
+		var members []LField
+		for i, m := range ut.Variants {
+			members = append(members, LField{
+				Name: fmt.Sprintf("m%d", i),
+				Type: l.lowerTypeExpr(&m),
+			})
+		}
+		return &LType{Kind: LTyUnion, Fields: members}
 	}
 	return &LType{Kind: LTyUnit}
 }
@@ -459,7 +467,15 @@ func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType {
 	case checker.TyVar:
 		return &LType{Kind: LTyTypeVar, Name: ct.Name}
 	case checker.TyUnion:
-		return &LType{Kind: LTyAny}
+		// Preserve member types for C backend tagged union support
+		var members []LField
+		for i, v := range ct.Variants {
+			members = append(members, LField{
+				Name: fmt.Sprintf("m%d", i),
+				Type: l.lowerCheckerType(v),
+			})
+		}
+		return &LType{Kind: LTyUnion, Fields: members}
 	case checker.TyUnknown:
 		return &LType{Kind: LTyAny}
 	}

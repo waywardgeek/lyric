@@ -254,6 +254,8 @@ func (g *GoBackend) goType(t *LType) string {
 			return g.visName(t.Name, t.IsExported) // interface name
 		}
 		return "any"
+	case LTyUnion:
+		return "any" // ad-hoc unions use Go's any with type switches
 	case LTyTypeVar:
 		return t.Name // type parameter, e.g. "T"
 	}

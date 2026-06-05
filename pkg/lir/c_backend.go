@@ -284,6 +284,13 @@ func (g *cGen) funcName(f *LFuncDecl) string {
 
 func (g *cGen) cParamList(f *LFuncDecl) string {
 	var parts []string
+	// For methods, ensure self is the first parameter.
+	// Direct methods already have self in Params; impl wrappers don't.
+	hasSelf := len(f.Params) > 0 && f.Params[0].Name == "self"
+	if f.Receiver != "" && !hasSelf {
+		selfType := &LType{Kind: LTyClassHandle, Name: f.Receiver}
+		parts = append(parts, g.cFieldDecl(selfType, "self"))
+	}
 	for _, p := range f.Params {
 		parts = append(parts, g.cFieldDecl(p.Type, p.Name))
 	}
@@ -344,7 +351,12 @@ func (g *cGen) emitStmt(s *LStmt) {
 			g.varTypes[d.Name] = varType
 		}
 		if d.Init != nil {
-			g.linef("%s = %s;", g.cFieldDecl(varType, name), g.emitValue(d.Init))
+			initStr := g.emitValue(d.Init)
+			// Wrap in union constructor if target is GrokUnion and source isn't
+			if varType != nil && varType.Kind == LTyUnion && d.Init.Type != nil && d.Init.Type.Kind != LTyUnion {
+				initStr = g.cWrapUnion(initStr, d.Init.Type)
+			}
+			g.linef("%s = %s;", g.cFieldDecl(varType, name), initStr)
 		} else {
 			g.linef("%s = %s;", g.cFieldDecl(varType, name), g.zeroValue(varType))
 		}
@@ -533,13 +545,33 @@ func (g *cGen) emitStmt(s *LStmt) {
 	}
 }
 
-// emitTypeSwitch handles enum-based type switches, resolving tag constants
+// emitTypeSwitch handles type switches for both enum tagged unions and ad-hoc unions.
 func (g *cGen) emitTypeSwitch(d *LTypeSwitch) {
 	val := g.emitValue(&d.Value)
+
+	// Check if this is an ad-hoc union (LTyUnion) type switch
+	if d.Value.Type != nil && d.Value.Type.Kind == LTyUnion {
+		g.linef("switch (%s.tag) {", val)
+		for _, c := range d.Cases {
+			if c.Type != nil {
+				tag := g.unionTagForType(c.Type)
+				g.linef("case %s: {", tag)
+			} else {
+				g.line("default: {")
+			}
+			g.indent++
+			g.emitStmts(c.Body)
+			g.line("break;")
+			g.indent--
+			g.line("}")
+		}
+		g.line("}")
+		return
+	}
+
 	g.linef("switch (%s.tag) {", val)
 	for _, c := range d.Cases {
 		if c.Type != nil {
-			// Resolve the tag constant from the enum name + variant type name
 			tagConst := g.resolveTagConstant(d, c.Type)
 			if tagConst != "" {
 				g.linef("case %s: {", tagConst)
@@ -597,6 +629,49 @@ func (g *cGen) resolveTagConstant(d *LTypeSwitch, caseType *LType) string {
 	}
 	// Fallback: construct it
 	return fmt.Sprintf("%s_%s", enumName, variantName)
+}
+
+// unionTagForType returns the GROK_UNION_TAG_* constant for a given LType.
+func (g *cGen) unionTagForType(t *LType) string {
+	switch t.Kind {
+	case LTyI8, LTyI16, LTyI32, LTyU8, LTyU16, LTyU32, LTyPlatformInt:
+		return "GROK_UNION_TAG_I32"
+	case LTyI64, LTyU64, LTyPlatformUint:
+		return "GROK_UNION_TAG_I64"
+	case LTyF32:
+		return "GROK_UNION_TAG_F32"
+	case LTyF64:
+		return "GROK_UNION_TAG_F64"
+	case LTyBool:
+		return "GROK_UNION_TAG_BOOL"
+	case LTyString:
+		return "GROK_UNION_TAG_STRING"
+	default:
+		return "GROK_UNION_TAG_PTR"
+	}
+}
+
+// cWrapUnion wraps a C expression string in a grok_union_* constructor based on source type.
+func (g *cGen) cWrapUnion(expr string, srcType *LType) string {
+	if srcType == nil {
+		return fmt.Sprintf("grok_union_ptr((void*)(%s))", expr)
+	}
+	switch srcType.Kind {
+	case LTyI8, LTyI16, LTyI32, LTyU8, LTyU16, LTyU32, LTyPlatformInt:
+		return fmt.Sprintf("grok_union_i32((int32_t)(%s))", expr)
+	case LTyI64, LTyU64, LTyPlatformUint:
+		return fmt.Sprintf("grok_union_i64((int64_t)(%s))", expr)
+	case LTyF32:
+		return fmt.Sprintf("grok_union_f32(%s)", expr)
+	case LTyF64:
+		return fmt.Sprintf("grok_union_f64(%s)", expr)
+	case LTyBool:
+		return fmt.Sprintf("grok_union_bool(%s)", expr)
+	case LTyString:
+		return fmt.Sprintf("grok_union_string(%s)", expr)
+	default:
+		return fmt.Sprintf("grok_union_ptr((void*)(%s))", expr)
+	}
 }
 
 // emitSideEffect handles side-effect expressions (append, method calls, etc.)
@@ -1287,6 +1362,8 @@ func (g *cGen) cType(t *LType) string {
 		return g.optTypeName(t.Elem)
 	case LTyTaggedUnion:
 		return g.structName(t.Name, t.IsExported)
+	case LTyGenerator:
+		return "void* /* generator unsupported in C */"
 	case LTyChannel:
 		return "void* /* channel */"
 	case LTyFuncPtr:
@@ -1317,6 +1394,8 @@ func (g *cGen) cType(t *LType) string {
 		return fmt.Sprintf("void* /* typevar %s */", t.Name)
 	case LTyAny:
 		return "void*"
+	case LTyUnion:
+		return "GrokUnion"
 	default:
 		return fmt.Sprintf("/* unknown type %d */", t.Kind)
 	}

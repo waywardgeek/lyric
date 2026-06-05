@@ -202,4 +202,38 @@ static inline const char* grok_bool_str(bool b) {
     return b ? "true" : "false";
 }
 
+/* -------------------------------------------------------------------------
+ * Tagged Unions (for ad-hoc union types like string | i32 | bool)
+ * -------------------------------------------------------------------------
+ * Tag constants identify which member is active.
+ */
+#define GROK_UNION_TAG_I32    0
+#define GROK_UNION_TAG_I64    1
+#define GROK_UNION_TAG_F32    2
+#define GROK_UNION_TAG_F64    3
+#define GROK_UNION_TAG_BOOL   4
+#define GROK_UNION_TAG_STRING 5
+#define GROK_UNION_TAG_PTR    6
+
+typedef struct {
+    int tag;
+    union {
+        int32_t  as_i32;
+        int64_t  as_i64;
+        float    as_f32;
+        double   as_f64;
+        bool     as_bool;
+        const char* as_string;
+        void*    as_ptr;
+    } data;
+} GrokUnion;
+
+static inline GrokUnion grok_union_i32(int32_t v)       { return (GrokUnion){GROK_UNION_TAG_I32, {.as_i32 = v}}; }
+static inline GrokUnion grok_union_i64(int64_t v)       { return (GrokUnion){GROK_UNION_TAG_I64, {.as_i64 = v}}; }
+static inline GrokUnion grok_union_f32(float v)         { return (GrokUnion){GROK_UNION_TAG_F32, {.as_f32 = v}}; }
+static inline GrokUnion grok_union_f64(double v)        { return (GrokUnion){GROK_UNION_TAG_F64, {.as_f64 = v}}; }
+static inline GrokUnion grok_union_bool(bool v)         { return (GrokUnion){GROK_UNION_TAG_BOOL, {.as_bool = v}}; }
+static inline GrokUnion grok_union_string(const char* v){ return (GrokUnion){GROK_UNION_TAG_STRING, {.as_string = v}}; }
+static inline GrokUnion grok_union_ptr(void* v)         { return (GrokUnion){GROK_UNION_TAG_PTR, {.as_ptr = v}}; }
+
 #endif /* GROK_RUNTIME_H */
