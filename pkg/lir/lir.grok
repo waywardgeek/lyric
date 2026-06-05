@@ -42,6 +42,7 @@ grok Lir {
     Return: LType?
     Variants: [LVariant]
     Bits: int
+    IsExported: bool
   }
 
   struct LField {
@@ -166,6 +167,7 @@ grok Lir {
     Value: LValue
     Variant: string
     Field: string
+    Enum: string
   }
 
   struct LExtractValueData {
@@ -266,6 +268,7 @@ grok Lir {
   struct LSwitch {
     Tag: LValue
     Cases: [LSwitchCase]
+    EnumName: string
   }
 
   struct LSwitchCase {
@@ -403,127 +406,130 @@ grok Lir {
 //
 // file: lower.go
 //
+// dataAs extracts a value from an any-typed Data field, handling both pointer and value storage.
+// func dataAs[T any](data any) *T    :13
+//
 // NewLowerer creates a new AST→LIR lowering pass.
-// func NewLowerer() *Lowerer    :40
+// func NewLowerer() *Lowerer    :54
 //
 // Lower converts an entire AST file to an LIR program.
-// func (l *Lowerer) Lower(file *ast.File) *LProgram    :51
+// func (l *Lowerer) Lower(file *ast.File) *LProgram    :66
 //
 // registerTypes populates variant/class lookup tables before lowering.
-// func (l *Lowerer) registerTypes(block *ast.GrokBlock)    :110
+// func (l *Lowerer) registerTypes(block *ast.GrokBlock)    :125
 //
-// func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType    :164
+// func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType    :199
 //
-// func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType    :217
+// func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType    :252
 //
 // lowerCheckerType converts a checker.Type to an LType.
-// func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType    :265
+// func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType    :300
 //
-// func lirIntType(bits int) *LType    :336
+// func lirIntType(bits int) *LType    :371
 //
-// func lirUintType(bits int) *LType    :350
+// func lirUintType(bits int) *LType    :385
 //
-// func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl    :368
+// func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl    :403
 //
-// func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl    :376
+// func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl    :411
 //
-// func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl    :381
+// func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl    :416
 //
-// func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl    :397
+// func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl    :432
 //
-// func (l *Lowerer) lowerBlock(block *ast.Block) []LStmt    :444
+// func (l *Lowerer) lowerBlock(block *ast.Block) []LStmt    :479
 //
-// func (l *Lowerer) emit(stmt LStmt)    :458
+// func (l *Lowerer) emit(stmt LStmt)    :493
 //
-// func (l *Lowerer) lowerStmt(stmt *ast.Stmt)    :462
+// func (l *Lowerer) lowerStmt(stmt *ast.Stmt)    :497
 //
-// func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt)    :504
+// func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt)    :539
 //
-// func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt)    :561
+// func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt)    :596
 //
-// func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt)    :617
+// func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt)    :652
 //
-// func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt)    :634
+// func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt)    :669
 //
-// func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt)    :643
+// func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt)    :678
 //
-// func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LStmt    :663
+// func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LStmt    :698
 //
-// func (l *Lowerer) lowerForStmt(stmt *ast.Stmt)    :683
+// func (l *Lowerer) lowerForStmt(stmt *ast.Stmt)    :718
 //
-// func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt)    :711
+// func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt)    :746
 //
-// func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt)    :729
+// func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt)    :764
 //
-// func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string) LSwitchCase    :765
+// func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string) LSwitchCase    :801
 //
-// func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue)    :855
+// func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue)    :892
 //
-// func (l *Lowerer) findVariantTag(enumName, variantName string) int    :915
+// func (l *Lowerer) findVariantTag(enumName, variantName string) int    :952
 //
-// func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt)    :926
+// func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt)    :963
 //
-// func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt)    :931
+// func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt)    :968
 //
-// func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase    :941
+// func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase    :978
 //
 // lowerExpr flattens an AST expression into a sequence of TempDefs and returns
-// func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue    :981
+// func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue    :1018
 //
 // lowerExprInto is like lowerExpr but used in contexts where we need the
-// func (l *Lowerer) lowerExprInto(expr *ast.Expr) LValue    :1041
+// func (l *Lowerer) lowerExprInto(expr *ast.Expr) LValue    :1078
 //
 // emitTemp creates a new temporary and emits a TempDef statement.
-// func (l *Lowerer) emitTemp(expr LExpr) LValue    :1046
+// func (l *Lowerer) emitTemp(expr LExpr) LValue    :1083
 //
 // exprType extracts the checker-annotated type from an AST expression.
-// func (l *Lowerer) exprType(expr *ast.Expr) *LType    :1054
+// func (l *Lowerer) exprType(expr *ast.Expr) *LType    :1091
 //
-// func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue    :1065
+// func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue    :1102
 //
-// func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue    :1085
+// func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue    :1122
 //
-// func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue    :1095
+// func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue    :1132
 //
-// func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue    :1105
+// func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue    :1142
 //
-// func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue    :1110
+// func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue    :1147
 //
-// func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue    :1115
+// func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue    :1152
 //
-// func mapBinaryOp(op ast.BinaryOp) LBinOpKind    :1138
+// func mapBinaryOp(op ast.BinaryOp) LBinOpKind    :1175
 //
-// func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue    :1180
+// func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue    :1217
 //
-// func (l *Lowerer) lowerCall(expr *ast.Expr) LValue    :1204
+// func (l *Lowerer) lowerCall(expr *ast.Expr) LValue    :1241
 //
-// func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue    :1277
+// func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue    :1314
 //
-// func (l *Lowerer) lowerBuiltinMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :1319
+// func (l *Lowerer) lowerBuiltinMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :1356
 //
-// func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :1338
+// func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :1375
 //
-// func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue    :1361
+// func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue    :1398
 //
-// func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue    :1381
+// func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue    :1418
 //
-// func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue    :1393
+// func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue    :1430
 //
-// func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue    :1414
+// func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue    :1451
 //
-// func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue    :1430
+// func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue    :1467
 //
-// func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue    :1453
+// func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue    :1490
 //
-// func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue    :1468
+// func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue    :1505
 //
-// func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue    :1488
+// func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue    :1525
 //
-// func (l *Lowerer) lowerCast(expr *ast.Expr) LValue    :1527
+// func (l *Lowerer) lowerCast(expr *ast.Expr) LValue    :1564
 //
-// func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue    :1539
+// func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue    :1576
 //
-// func (l *Lowerer) lowerTry(expr *ast.Expr) LValue    :1551
+// func (l *Lowerer) lowerTry(expr *ast.Expr) LValue    :1588
 
 // --- dependencies ---
 //

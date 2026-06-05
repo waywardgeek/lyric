@@ -15,12 +15,22 @@ type GoBackend struct {
 
 	// For method receivers
 	currentReceiver string
+
+	// Enum type switch support: maps tag temp IDs to their VariantTag data,
+	// and stores enum variant info for tag→variant-name resolution.
+	tempDefs      map[int]*LTempDef  // temp ID → definition (for detecting variant tag temps)
+	enumVariants  map[string][]LVariant // enum name → variants
+	enumExported  map[string]bool       // enum name → is exported
+	typeSwitchVar string             // within a type switch case, the bound variable name
 }
 
 // EmitGo converts an LIR program to Go source code.
 func EmitGo(prog *LProgram) string {
 	g := &GoBackend{
-		imports: make(map[string]string),
+		imports:       make(map[string]string),
+		tempDefs:      make(map[int]*LTempDef),
+		enumVariants:  make(map[string][]LVariant),
+		enumExported:  make(map[string]bool),
 	}
 	return g.emit(prog)
 }
@@ -131,9 +141,9 @@ func (g *GoBackend) goType(t *LType) string {
 	case LTyPlatformUint:
 		return "uint"
 	case LTyStruct:
-		return t.Name
+		return g.visName(t.Name, t.IsExported)
 	case LTyClassHandle:
-		return "*" + t.Name
+		return "*" + g.visName(t.Name, t.IsExported)
 	case LTyTuple:
 		// Go doesn't have tuples — this case shouldn't appear in emitted code
 		return "any"
@@ -149,7 +159,7 @@ func (g *GoBackend) goType(t *LType) string {
 	case LTyOptional:
 		return "*" + g.goType(t.Elem)
 	case LTyTaggedUnion:
-		return t.Name
+		return g.visName(t.Name, t.IsExported)
 	case LTyFuncPtr:
 		var params []string
 		for _, p := range t.Params {
@@ -165,7 +175,7 @@ func (g *GoBackend) goType(t *LType) string {
 		return g.goType(t.Elem)
 	case LTyAny:
 		if t.Name != "" {
-			return t.Name // interface name
+			return g.visName(t.Name, t.IsExported) // interface name
 		}
 		return "any"
 	}
@@ -198,6 +208,8 @@ func (g *GoBackend) emitStructDecl(s *LStructDecl) {
 
 func (g *GoBackend) emitEnumDecl(e *LEnumDecl) {
 	name := g.visName(e.Name, e.IsExported)
+	g.enumVariants[e.Name] = e.Variants
+	g.enumExported[e.Name] = e.IsExported
 
 	// Interface type
 	g.writef("type %s interface {\n", name)
@@ -277,6 +289,11 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 	switch s.Kind {
 	case LStmtTempDef:
 		td := s.Data.(*LTempDef)
+		g.tempDefs[td.ID] = td
+		// Suppress emission of VariantTag temps — consumed by type switch
+		if td.Expr.Kind == LExprVariantTag {
+			break
+		}
 		g.writeIndent()
 		g.writef("%s := ", g.tempName(td.ID))
 		g.emitExpr(&td.Expr)
@@ -420,6 +437,14 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 
 	case LStmtSwitch:
 		sw := s.Data.(*LSwitch)
+		// Enum type switch
+		if sw.EnumName != "" {
+			if td, ok := g.tempDefs[sw.Tag.TempID]; ok && td.Expr.Kind == LExprVariantTag {
+				vtd := td.Expr.Data.(*LVariantTagData)
+				g.emitEnumTypeSwitch(sw, &vtd.Value)
+				break
+			}
+		}
 		g.writeIndent()
 		g.writef("switch ")
 		g.emitValue(&sw.Tag)
@@ -548,6 +573,69 @@ func (g *GoBackend) emitStmt(s *LStmt) {
 		g.writeIndent()
 		g.writef("}\n")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Enum type switch emission
+// ---------------------------------------------------------------------------
+
+// emitEnumTypeSwitch emits a Go type switch for an enum match.
+// Input: LSwitch with integer tags + EnumName, and the match value.
+// Output: switch _v := matchVal.(type) { case VariantName: ... }
+func (g *GoBackend) emitEnumTypeSwitch(sw *LSwitch, matchVal *LValue) {
+	variants, _ := g.enumVariants[sw.EnumName]
+	exported := g.enumExported[sw.EnumName]
+
+	g.writeIndent()
+	g.writef("switch _v := ")
+	g.emitValue(matchVal)
+	g.writef(".(type) {\n")
+
+	for _, c := range sw.Cases {
+		g.writeIndent()
+		if c.Tag == -1 {
+			if c.Binding != "" {
+				// default with binding: bind the value
+				g.writef("default:\n")
+				g.indent++
+				g.writeIndent()
+				g.writef("%s := ", c.Binding)
+				g.emitValue(matchVal)
+				g.writef("\n")
+				g.emitStmtsRewritingVariantData(c.Body, sw.EnumName)
+				g.indent--
+			} else {
+				g.writef("default:\n")
+				g.indent++
+				g.emitStmtsRewritingVariantData(c.Body, sw.EnumName)
+				g.indent--
+			}
+		} else {
+			// Look up variant name by tag index
+			variantName := ""
+			if c.Tag >= 0 && c.Tag < len(variants) {
+				variantName = g.visName(variants[c.Tag].Name, exported)
+			} else {
+				variantName = fmt.Sprintf("/* unknown tag %d */", c.Tag)
+			}
+			g.writef("case %s:\n", variantName)
+			g.indent++
+			g.emitStmtsRewritingVariantData(c.Body, sw.EnumName)
+			g.indent--
+		}
+	}
+
+	g.writeIndent()
+	g.writef("}\n")
+}
+
+// emitStmtsRewritingVariantData emits statements, rewriting LExprVariantData
+// type assertions to use the type switch bound variable `_v` with a direct field access.
+func (g *GoBackend) emitStmtsRewritingVariantData(stmts []LStmt, enumName string) {
+	saved := g.typeSwitchVar
+	g.typeSwitchVar = "_v"
+	g.emitStmts(stmts)
+	g.typeSwitchVar = saved
 }
 
 // ---------------------------------------------------------------------------
@@ -683,10 +771,12 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 
 	case LExprVariantConstruct:
 		d := e.Data.(*LVariantConstructData)
+		exported := e.Type != nil && e.Type.IsExported
+		vName := g.visName(d.Variant, exported)
 		if len(d.Fields) == 0 {
-			g.writef("%s{}", d.Variant)
+			g.writef("%s{}", vName)
 		} else {
-			g.writef("%s{", d.Variant)
+			g.writef("%s{", vName)
 			for i, f := range d.Fields {
 				if i > 0 {
 					g.writef(", ")
@@ -702,8 +792,14 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 
 	case LExprVariantData:
 		d := e.Data.(*LVariantDataData)
-		g.emitValue(&d.Value)
-		g.writef(".(%s).%s", d.Variant, exportedFieldName(d.Field))
+		if g.typeSwitchVar != "" {
+			// Inside a type switch — _v is already the concrete variant type
+			g.writef("%s.%s", g.typeSwitchVar, exportedFieldName(d.Field))
+		} else {
+			exported := g.enumExported[d.Enum]
+			g.emitValue(&d.Value)
+			g.writef(".(%s).%s", g.visName(d.Variant, exported), exportedFieldName(d.Field))
+		}
 
 	case LExprExtractValue:
 		// First element of multi-return — handled by caller context

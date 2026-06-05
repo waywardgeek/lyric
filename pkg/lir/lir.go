@@ -16,15 +16,16 @@ package lir
 
 // LType represents a concrete type in the LIR. No type variables, no unresolved types.
 type LType struct {
-	Kind     LTypeKind
-	Name     string     // for Struct, ClassHandle, TaggedUnion
-	Elem     *LType     // for Slice, Optional, Channel
-	Key      *LType     // for Map
-	Fields   []LField   // for Struct, Tuple, TaggedUnion variants
-	Params   []*LType   // for FuncPtr
-	Return   *LType     // for FuncPtr
-	Variants []LVariant // for TaggedUnion
-	Bits     int        // for integer/float types (8,16,32,64; -1 for platform int/uint)
+	Kind       LTypeKind
+	Name       string     // for Struct, ClassHandle, TaggedUnion
+	Elem       *LType     // for Slice, Optional, Channel
+	Key        *LType     // for Map
+	Fields     []LField   // for Struct, Tuple, TaggedUnion variants
+	Params     []*LType   // for FuncPtr
+	Return     *LType     // for FuncPtr
+	Variants   []LVariant // for TaggedUnion
+	Bits       int        // for integer/float types (8,16,32,64; -1 for platform int/uint)
+	IsExported bool       // for named types: controls Go visibility (upper/lower case)
 }
 
 type LTypeKind int
@@ -287,6 +288,7 @@ type LVariantTagData struct {
 
 type LVariantDataData struct {
 	Value   LValue
+	Enum    string // enum name
 	Variant string
 	Field   string
 }
@@ -436,9 +438,11 @@ type LFor struct {
 }
 
 // LSwitch: switch tag { case 0: ... case 1: ... }
+// EnumName is set when this switch was lowered from an enum match statement.
 type LSwitch struct {
-	Tag   LValue
-	Cases []LSwitchCase
+	Tag      LValue
+	Cases    []LSwitchCase
+	EnumName string // non-empty for enum type switches
 }
 
 // LSwitchCase: a single case in a switch.
