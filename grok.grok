@@ -177,6 +177,7 @@ grok Grok {
 //
 // pkg/ast
 // pkg/checker
+// pkg/lir
 // pkg/parser
 // pkg/transpiler
 // pkg/verifier
