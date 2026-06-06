@@ -42,13 +42,14 @@ struct Point {
 
 - Copied by value. No methods. No generics.
 - Direct field access: `p.x`.
+- Fields can have defaults: `width: i32 = 800`.
 - **Avoid** putting strings, slices, or class refs in structs — they make copies expensive.
 
 ## Classes (Heap-Allocated, By Reference)
 
 ```forge
-class Counter(count: i32) {
-    // Additional fields (not in constructor), zero-initialized
+class Counter {
+    count: i32
     items: [string]
 
     func increment(self) {
@@ -60,18 +61,39 @@ class Counter(count: i32) {
     }
 }
 
-// Construction
-let c = Counter(0)
+// Struct-literal construction
+let c = Counter { count: 10 }
 c.increment()
 ```
 
-- Constructor params in parens — supplied at creation.
-- Body fields (after `{`) zero-initialized.
+- Fields declared in body. Unset fields zero-initialized.
+- Fields can have defaults: `count: i32 = 0`.
+- `pub` prefix for public fields: `pub name: string`.
+- Construction uses struct-literal syntax: `ClassName { field: value }`.
 - `self` for receiver. Direct field access: `self.count`.
-- Fields are private. Use methods for public access.
-- Generic: `class Pair<T>(first: T, second: T) {}`
-- `pub` for public visibility.
+- Generic: `class Pair<T> { first: T  second: T }`
 - `.destroy()` — deterministic destruction (from relation destructors).
+
+### Explicit Constructors
+
+```forge
+class HttpClient {
+    url: string
+    timeout: u32 = 30
+    pool: ConnectionPool?
+
+    func HttpClient(self, base_url: string, timeout: u32) {
+        self.url = base_url
+        self.timeout = timeout
+        self.pool = ConnectionPool { base_url: base_url }
+    }
+}
+
+// Call syntax when explicit constructor exists
+let client = HttpClient("http://api.com", 60)
+```
+
+Without an explicit constructor, only struct-literal syntax is allowed.
 
 ## Enums
 
@@ -248,8 +270,12 @@ relation [Hint] Parent[:parent_label] owns|refs [Child[:child_label]]
 ### ArrayList — dynamic array ownership
 
 ```forge
-class Team(name: string) {}
-class Player(name: string) {}
+class Team {
+    name: string
+}
+class Player {
+    name: string
+}
 
 relation ArrayList Team:roster owns [Player:team]
 
@@ -283,8 +309,11 @@ Same fields as OwningList but parent destruction only unlinks, doesn't destroy c
 ### HashedList — hash table ownership
 
 ```forge
-class Entry(key: u64, value: i32) {
-  pub func hash_key(self) -> u64 { return self.key }
+class Entry {
+    key: u64
+    value: i32
+
+    pub func hash_key(self) -> u64 { return self.key }
 }
 
 relation HashedList Registry:reg owns [Entry:entry]
@@ -313,9 +342,9 @@ Child must implement `hash_key(self) -> u64`. Functions: `hash_insert`, `hash_lo
 
 ## Stdlib Classes
 
-- **`Sym(name, hash)`** — interned symbol. Create via `sym("name")`. `get_name() -> string`, `get_hash() -> u64`.
-- **`Error(msg)`** — for `(T, error)` returns. `message() -> string`.
-- **`StringBuilder(buf)`** — `write(s)`, `write_byte(b)`, `to_string()`, `len()`. Create via `new_string_builder()`.
+- **`Sym`** — interned symbol. Create via `sym("name")`. `get_name() -> string`, `get_hash() -> u64`.
+- **`Error`** — for `(T, error)` returns. `message() -> string`. Create via `Error { msg: "..." }`.
+- **`StringBuilder`** — `write(s)`, `write_byte(b)`, `to_string()`, `len()`. Create via `new_string_builder()`.
 
 ## Concurrency (Go backend only)
 
@@ -339,7 +368,7 @@ lock(mutex) { ... }
 ## Design Annotations
 
 ```forge
-class Foo() {
+class Foo {
   why: "Explanation of design intent"
 }
 
