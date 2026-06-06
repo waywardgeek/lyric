@@ -121,6 +121,22 @@ func TestCBackendRuns(t *testing.T) {
 			t.Logf("C source:\n%s", cSrc)
 		}
 	})
+
+	t.Run("generators.fg", func(t *testing.T) {
+		path := filepath.Join(testdataDir, "generators.fg")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Skipf("can't read: %v", err)
+		}
+
+		cSrc := cPipeline(t, string(data), "generators")
+		output := compileCAndRun(t, cSrc, "generators")
+		expected := "count:\n0\n1\n2\n3\n4\nfib:\n0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n"
+		if output != expected {
+			t.Errorf("expected %q, got %q", expected, output)
+			t.Logf("C source:\n%s", cSrc)
+		}
+	})
 }
 
 func cPipeline(t *testing.T, source, pkgName string) string {

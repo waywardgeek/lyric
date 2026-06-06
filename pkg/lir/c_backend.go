@@ -39,6 +39,11 @@ type cGen struct {
 	lambdaID    int
 	lambdas     []cLambda
 	currentFunc *LFuncDecl // tracks current function for return type info
+
+	// Generator state machine support
+	inGenerator  bool   // true when emitting a generator's next function
+	genStructName string // name of the current generator's state struct type
+	genYieldCount int    // counter for yield state labels
 }
 
 type cLambda struct {
@@ -107,6 +112,14 @@ func (g *cGen) generate() string {
 	// Emit class definitions (heap-allocated structs)
 	for _, c := range g.prog.Classes {
 		g.emitClassDecl(&c)
+	}
+
+	// Emit generator state struct typedefs
+	for i := range g.prog.Functions {
+		f := &g.prog.Functions[i]
+		if g.isGeneratorFunc(f) {
+			g.emitGeneratorStructDecl(f)
+		}
 	}
 
 	// Emit interface definitions as opaque void*
@@ -246,6 +259,10 @@ func (g *cGen) emitFuncForwardDecl(f *LFuncDecl) {
 	if name == "main" {
 		return
 	}
+	if g.isGeneratorFunc(f) {
+		g.emitGeneratorForwardDecls(f)
+		return
+	}
 	retType := g.cReturnType(f.ReturnType)
 	params := g.cParamList(f)
 	g.linef("%s %s(%s);", retType, name, params)
@@ -253,6 +270,10 @@ func (g *cGen) emitFuncForwardDecl(f *LFuncDecl) {
 
 func (g *cGen) emitFuncDecl(f *LFuncDecl) {
 	g.currentFunc = f
+	if g.isGeneratorFunc(f) {
+		g.emitGeneratorFuncDecl(f)
+		return
+	}
 	retType := g.cReturnType(f.ReturnType)
 	params := g.cParamList(f)
 	name := g.funcName(f)
@@ -308,6 +329,232 @@ func (g *cGen) cReturnType(t *LType) string {
 }
 
 // ---------------------------------------------------------------------------
+// Generator state machine support
+// ---------------------------------------------------------------------------
+
+// isGeneratorFunc returns true if the function is a generator (returns gen T).
+func (g *cGen) isGeneratorFunc(f *LFuncDecl) bool {
+	return f.ReturnType != nil && f.ReturnType.Kind == LTyGenerator
+}
+
+// genFuncBaseName returns the base name for generator struct/functions.
+func (g *cGen) genFuncBaseName(f *LFuncDecl) string {
+	name := g.funcName(f)
+	return name
+}
+
+// collectGenVars recursively scans statements for LStmtVarDecl and returns them.
+func (g *cGen) collectGenVars(stmts []LStmt) []LVarDecl {
+	var vars []LVarDecl
+	for i := range stmts {
+		s := &stmts[i]
+		switch s.Kind {
+		case LStmtVarDecl:
+			d := s.Data.(*LVarDecl)
+			vars = append(vars, *d)
+		case LStmtWhile:
+			d := s.Data.(*LWhile)
+			vars = append(vars, g.collectGenVars(d.Body)...)
+		case LStmtIf:
+			d := s.Data.(*LIf)
+			vars = append(vars, g.collectGenVars(d.Then)...)
+			vars = append(vars, g.collectGenVars(d.Else)...)
+		case LStmtFor:
+			d := s.Data.(*LFor)
+			vars = append(vars, g.collectGenVars(d.Body)...)
+		case LStmtBlock:
+			d := s.Data.(*LBlock)
+			vars = append(vars, g.collectGenVars(d.Stmts)...)
+		}
+	}
+	return vars
+}
+
+// countYields counts the number of LStmtYield in a statement tree.
+func (g *cGen) countYields(stmts []LStmt) int {
+	count := 0
+	for i := range stmts {
+		s := &stmts[i]
+		switch s.Kind {
+		case LStmtYield:
+			count++
+		case LStmtWhile:
+			d := s.Data.(*LWhile)
+			count += g.countYields(d.Body)
+		case LStmtIf:
+			d := s.Data.(*LIf)
+			count += g.countYields(d.Then)
+			count += g.countYields(d.Else)
+		case LStmtFor:
+			d := s.Data.(*LFor)
+			count += g.countYields(d.Body)
+		case LStmtBlock:
+			d := s.Data.(*LBlock)
+			count += g.countYields(d.Stmts)
+		}
+	}
+	return count
+}
+
+// emitGeneratorStructDecl emits the typedef for a generator's state struct.
+func (g *cGen) emitGeneratorStructDecl(f *LFuncDecl) {
+	baseName := g.genFuncBaseName(f)
+	structName := baseName + "_gen_t"
+	elemType := g.cType(f.ReturnType.Elem)
+
+	g.linef("typedef struct %s {", structName)
+	g.indent++
+	g.linef("int _state;")
+	g.linef("%s _value;", elemType)
+	// Params
+	for _, p := range f.Params {
+		g.linef("%s %s;", g.cType(p.Type), cSafeName(p.Name))
+	}
+	// Local variables
+	vars := g.collectGenVars(f.Body)
+	seen := map[string]bool{}
+	for _, v := range vars {
+		if !seen[v.Name] {
+			seen[v.Name] = true
+			g.linef("%s %s;", g.cType(v.Type), cSafeName(v.Name))
+		}
+	}
+	g.indent--
+	g.linef("} %s;", structName)
+	g.line("")
+}
+
+// emitGeneratorForwardDecls emits forward declarations for generator init and next functions.
+func (g *cGen) emitGeneratorForwardDecls(f *LFuncDecl) {
+	baseName := g.genFuncBaseName(f)
+	structName := baseName + "_gen_t"
+
+	// Init function: takes same params as original, returns struct pointer
+	params := g.cParamList(f)
+	g.linef("%s* %s_init(%s);", structName, baseName, params)
+	g.linef("bool %s_next(%s* _gen);", baseName, structName)
+}
+
+// emitGeneratorFuncDecl emits init + next functions for a generator.
+func (g *cGen) emitGeneratorFuncDecl(f *LFuncDecl) {
+	baseName := g.genFuncBaseName(f)
+	structName := baseName + "_gen_t"
+	params := g.cParamList(f)
+
+	// --- Init function ---
+	g.linef("%s* %s_init(%s) {", structName, baseName, params)
+	g.indent++
+	g.linef("%s* _gen = (%s*)malloc(sizeof(%s));", structName, structName, structName)
+	g.linef("_gen->_state = 0;")
+	// Copy params into struct
+	for _, p := range f.Params {
+		name := cSafeName(p.Name)
+		g.linef("_gen->%s = %s;", name, name)
+	}
+	// Initialize local variables — only those with literal init values.
+	// Vars initialized from temps (computed expressions) will be assigned
+	// during body execution in the next() function.
+	vars := g.collectGenVars(f.Body)
+	seen := map[string]bool{}
+	for _, v := range vars {
+		if !seen[v.Name] {
+			seen[v.Name] = true
+			if v.Init != nil && v.Init.Kind != LValTemp {
+				g.linef("_gen->%s = %s;", cSafeName(v.Name), g.emitValue(v.Init))
+			} else if v.Init == nil {
+				g.linef("_gen->%s = 0;", cSafeName(v.Name))
+			}
+			// Skip vars with temp inits — they'll be set in next()
+		}
+	}
+	g.linef("return _gen;")
+	g.indent--
+	g.line("}")
+	g.line("")
+
+	// --- Next function ---
+	g.linef("bool %s_next(%s* _gen) {", baseName, structName)
+	g.indent++
+
+	// State dispatch: switch on _gen->_state with gotos into the body
+	nYields := g.countYields(f.Body)
+	g.linef("switch (_gen->_state) {")
+	g.linef("case 0: goto _gen_s0;")
+	for i := 1; i <= nYields; i++ {
+		g.linef("case %d: goto _gen_s%d;", i, i)
+	}
+	g.linef("default: return false;")
+	g.linef("}")
+
+	// Emit body with generator mode active
+	g.inGenerator = true
+	g.genStructName = structName
+	g.genYieldCount = 0
+	g.linef("_gen_s0:;") // entry point label
+
+	// Emit body — skip VarDecls (already initialized in init)
+	g.emitGenStmts(f.Body)
+
+	g.linef("return false;") // generator exhausted
+	g.inGenerator = false
+	g.indent--
+	g.line("}")
+	g.line("")
+}
+
+// emitGenStmts emits statements for generator body, rewriting vars to _gen-> access.
+func (g *cGen) emitGenStmts(stmts []LStmt) {
+	for i := range stmts {
+		g.emitStmt(&stmts[i])
+	}
+}
+
+// resolveGenBaseName traces a collection LValue back to the generator function name.
+// The collection is typically a temp whose expression is a function call returning gen T.
+func (g *cGen) resolveGenBaseName(v *LValue) string {
+	if v.Kind == LValTemp {
+		// Look through the current function's body for the temp definition
+		return g.findGenFuncNameInStmts(g.currentFunc.Body, v.TempID)
+	}
+	return "unknown_gen"
+}
+
+// findGenFuncNameInStmts searches statements for a TempDef with the given ID
+// that is a function call, returning the function name.
+func (g *cGen) findGenFuncNameInStmts(stmts []LStmt, tempID int) string {
+	for i := range stmts {
+		s := &stmts[i]
+		if s.Kind == LStmtTempDef {
+			d := s.Data.(*LTempDef)
+			if d.ID == tempID {
+				return g.extractFuncNameFromExpr(&d.Expr)
+			}
+		}
+	}
+	return "unknown_gen"
+}
+
+// extractFuncNameFromExpr gets the function name from a call expression.
+func (g *cGen) extractFuncNameFromExpr(e *LExpr) string {
+	if e.Kind == LExprCall {
+		d := e.Data.(*LCallData)
+		return cSafeName(d.Func)
+	}
+	return "unknown_gen"
+}
+
+// isGenFuncByName checks if a function name corresponds to a generator function.
+func (g *cGen) isGenFuncByName(name string) bool {
+	for i := range g.prog.Functions {
+		f := &g.prog.Functions[i]
+		if g.funcName(f) == name && g.isGeneratorFunc(f) {
+			return true
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
 // Statement emission
 // ---------------------------------------------------------------------------
 
@@ -335,6 +582,16 @@ func (g *cGen) emitStmt(s *LStmt) {
 			return
 		}
 		name := cSafeName(d.Name)
+
+		// In generator mode, vars live in the state struct — emit assignment, not declaration
+		if g.inGenerator {
+			g.varTypes[d.Name] = d.Type
+			if d.Init != nil {
+				g.linef("_gen->%s = %s;", name, g.emitValue(d.Init))
+			}
+			return
+		}
+
 		varType := d.Type
 		// If type contains type vars (from generic code), try to use init value's resolved type
 		if d.Init != nil && (varType == nil || g.containsTypeVar(varType) || varType.Kind == LTyAny) {
@@ -378,7 +635,11 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtAssign:
 		d := s.Data.(*LAssign)
-		g.linef("%s = %s;", cSafeName(d.Target), g.emitValue(&d.Value))
+		target := cSafeName(d.Target)
+		if g.inGenerator {
+			target = "_gen->" + target
+		}
+		g.linef("%s = %s;", target, g.emitValue(&d.Value))
 
 	case LStmtStructSet:
 		d := s.Data.(*LStructSet)
@@ -398,6 +659,10 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtReturn:
 		d := s.Data.(*LReturn)
+		if g.inGenerator {
+			g.line("return false;")
+			return
+		}
 		if len(d.Values) == 0 {
 			g.line("return;")
 		} else if len(d.Values) == 1 {
@@ -474,6 +739,29 @@ func (g *cGen) emitStmt(s *LStmt) {
 	case LStmtFor:
 		d := s.Data.(*LFor)
 		collStr := g.emitValue(&d.Collection)
+
+		// Generator iteration: init + loop calling next
+		if d.Collection.Type != nil && d.Collection.Type.Kind == LTyGenerator {
+			// The collection is a call to a generator function.
+			// collStr is e.g. "count_up_init(5)" — but actually the lowerer
+			// emits it as a function call expression that returns gen T.
+			// We need to figure out the generator function name from the call.
+			// The collection value should be a temp whose expr is a function call.
+			genBaseName := g.resolveGenBaseName(&d.Collection)
+			structName := genBaseName + "_gen_t"
+			iterVar := fmt.Sprintf("_gen_iter_%d", g.lambdaID)
+			g.lambdaID++
+			g.linef("%s* %s = %s;", structName, iterVar, collStr)
+			g.linef("while (%s_next(%s)) {", genBaseName, iterVar)
+			g.indent++
+			g.linef("%s %s = %s->_value;", g.cType(d.VarType), d.Var, iterVar)
+			g.emitStmts(d.Body)
+			g.indent--
+			g.line("}")
+			g.linef("free(%s);", iterVar)
+			break
+		}
+
 		if d.IndexVar != "" {
 			g.linef("for (int32_t %s = 0; %s < %s.len; %s++) {", d.IndexVar, d.IndexVar, collStr, d.IndexVar)
 			g.indent++
@@ -566,6 +854,15 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtContinue:
 		g.line("continue;")
+
+	case LStmtYield:
+		val := s.Data.(LValue)
+		g.genYieldCount++
+		stateNum := g.genYieldCount
+		g.linef("_gen->_value = %s;", g.emitValue(&val))
+		g.linef("_gen->_state = %d;", stateNum)
+		g.linef("return true;")
+		g.linef("_gen_s%d:;", stateNum)
 	}
 }
 
@@ -849,6 +1146,10 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 				g.emitValue(&d.Args[0]), resultType, resultType)
 		}
 		args := g.emitArgs(d.Args)
+		// If calling a generator function, redirect to its _init function
+		if g.isGenFuncByName(name) {
+			return fmt.Sprintf("%s_init(%s)", name, args)
+		}
 		return fmt.Sprintf("%s(%s)", name, args)
 
 	case LExprMethodCall:
@@ -1183,7 +1484,11 @@ func (g *cGen) emitFuncLit(d *LFuncLitData, typ *LType) string {
 func (g *cGen) emitValue(v *LValue) string {
 	switch v.Kind {
 	case LValVar:
-		return cSafeName(v.Name)
+		name := cSafeName(v.Name)
+		if g.inGenerator {
+			return "_gen->" + name
+		}
+		return name
 	case LValTemp:
 		return fmt.Sprintf("_t%d", v.TempID)
 	case LValGlobal:
@@ -1516,7 +1821,9 @@ func (g *cGen) cType(t *LType) string {
 	case LTyTaggedUnion:
 		return g.structName(t.Name, t.IsExported)
 	case LTyGenerator:
-		return "void* /* generator unsupported in C */"
+		// Generator type is a pointer to the generator state struct.
+		// The struct name is derived from the function that produces it.
+		return "void* /* generator */"
 	case LTyChannel:
 		return "void* /* channel */"
 	case LTyFuncPtr:
