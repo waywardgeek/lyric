@@ -214,9 +214,10 @@ func cmdCompile(args []string) error {
 		}
 	}
 
-	// Desugar: interface fields → getters/setters, relations → field injection + impl blocks,
+	// Desugar: embeds → flatten, interface fields → getters/setters, relations → field injection + impl blocks,
 	// destructors → destroy methods on owned classes, default impls → generic functions
 	for _, pf := range files {
+		ast.DesugarInterfaceEmbeds(pf.file)
 		ast.DesugarInterfaceFields(pf.file)
 		ast.DesugarRelations(pf.file)
 		ast.DesugarDestructors(pf.file)

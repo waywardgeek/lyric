@@ -1,5 +1,110 @@
 package ast
 
+// DesugarInterfaceEmbeds flattens embedded interfaces by copying fields, methods,
+// and destructors from the embedded interface into the embedding interface,
+// substituting type parameters.
+//
+//	interface DoublyLinked<P, C> {
+//	  field P.first: C?
+//	  destructor C { ... }
+//	}
+//	interface OwningList<P, C> {
+//	  embed DoublyLinked<P, C>
+//	  destructor P { ... }
+//	}
+//
+// becomes (OwningList gets DoublyLinked's fields and destructor C, plus its own destructor P):
+//
+//	interface OwningList<P, C> {
+//	  field P.first: C?
+//	  destructor C { ... }
+//	  destructor P { ... }
+//	}
+func DesugarInterfaceEmbeds(file *File) {
+	// Build index of all interfaces by name
+	ifaceByName := map[string]*InterfaceDecl{}
+	for bi := range file.Blocks {
+		block := &file.Blocks[bi]
+		for ii := range block.Interfaces {
+			iface := &block.Interfaces[ii]
+			ifaceByName[iface.Name] = iface
+		}
+	}
+
+	for bi := range file.Blocks {
+		block := &file.Blocks[bi]
+		for ii := range block.Interfaces {
+			iface := &block.Interfaces[ii]
+			for _, emb := range iface.Embeds {
+				parent, ok := ifaceByName[emb.Name]
+				if !ok {
+					continue // unknown interface — checker will report error
+				}
+
+				// Build type param substitution map: parent.TypeParams[i] → emb.TypeArgs[i]
+				typeMap := map[string]string{}
+				for i, tp := range parent.TypeParams {
+					if i < len(emb.TypeArgs) {
+						if emb.TypeArgs[i].Kind == TypeNamed {
+							switch nt := emb.TypeArgs[i].Data.(type) {
+							case NamedType:
+								typeMap[tp.Name] = nt.Name
+							case *NamedType:
+								typeMap[tp.Name] = nt.Name
+							}
+						}
+					}
+				}
+
+				// Copy fields with type param substitution
+				for _, f := range parent.Fields {
+					newField := f
+					if mapped, ok := typeMap[f.TypeParam]; ok {
+						newField.TypeParam = mapped
+					}
+					newField.Type = substituteTypeParamsInTypeExprCopy(f.Type, typeMap)
+					iface.Fields = append(iface.Fields, newField)
+				}
+
+				// Copy methods with type param substitution
+				for _, m := range parent.Methods {
+					newMethod := m
+					if mapped, ok := typeMap[m.ReceiverType]; ok {
+						newMethod.ReceiverType = mapped
+					}
+					// Substitute type params in method params and return type
+					for pi := range newMethod.Params {
+						newMethod.Params[pi].Type = substituteTypeParamsInTypeExprCopy(newMethod.Params[pi].Type, typeMap)
+					}
+					if newMethod.ReturnType != nil {
+						rt := substituteTypeParamsInTypeExprCopy(*newMethod.ReturnType, typeMap)
+						newMethod.ReturnType = &rt
+					}
+					iface.Methods = append(iface.Methods, newMethod)
+				}
+
+				// Copy destructors with type param substitution
+				for _, d := range parent.Destructors {
+					newDestr := d
+					if mapped, ok := typeMap[d.TypeParam]; ok {
+						newDestr.TypeParam = mapped
+					}
+					newDestr.Body = deepCopyBlock(d.Body)
+					substituteTypeParamsInBlock(&newDestr.Body, typeMap)
+					iface.Destructors = append(iface.Destructors, newDestr)
+				}
+			}
+		}
+	}
+}
+
+// substituteTypeParamsInTypeExprCopy returns a copy of te with type params substituted.
+func substituteTypeParamsInTypeExprCopy(te TypeExpr, typeMap map[string]string) TypeExpr {
+	result := te
+	substituteTypeParamsInTypeExpr(&result, typeMap)
+	return result
+}
+
 // DesugarDefaultImpls extracts interface methods with bodies into top-level
 // functions with relational where clauses. This must run before the checker.
 //
@@ -359,7 +464,7 @@ func substituteTypeParamsInExpr(expr *Expr, typeMap map[string]string) {
 }
 
 func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string) {
-	if te == nil {
+	if te == nil || te.Data == nil {
 		return
 	}
 	switch te.Kind {
@@ -370,6 +475,14 @@ func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string) {
 		}
 		for i := range nt.Args {
 			substituteTypeParamsInTypeExpr(&nt.Args[i], typeMap)
+		}
+	case TypeOptional:
+		if inner, ok := te.Data.(*TypeExpr); ok {
+			substituteTypeParamsInTypeExpr(inner, typeMap)
+		}
+	case TypeSequence:
+		if inner, ok := te.Data.(*TypeExpr); ok {
+			substituteTypeParamsInTypeExpr(inner, typeMap)
 		}
 	}
 }

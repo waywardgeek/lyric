@@ -291,37 +291,37 @@ forge Parser {
 //
 // file: lexer.go
 //
-// func (t Token) String() string    :203
+// func (t Token) String() string    :205
 //
 // NewLexer creates a new lexer for the given source.
-// func NewLexer(source, filename string) *Lexer    :250
+// func NewLexer(source, filename string) *Lexer    :252
 //
-// func (l *Lexer) currentPos() ast.Pos    :259
+// func (l *Lexer) currentPos() ast.Pos    :261
 //
-// func (l *Lexer) advance() rune    :263
+// func (l *Lexer) advance() rune    :265
 //
-// func (l *Lexer) peek() rune    :278
+// func (l *Lexer) peek() rune    :280
 //
-// func (l *Lexer) peekAt(offset int) rune    :286
+// func (l *Lexer) peekAt(offset int) rune    :288
 //
 // Peek returns the next token without consuming it.
-// func (l *Lexer) Peek() Token    :296
+// func (l *Lexer) Peek() Token    :298
 //
 // Next returns the next token.
-// func (l *Lexer) Next() Token    :306
+// func (l *Lexer) Next() Token    :308
 //
-// func (l *Lexer) scan() Token    :315
+// func (l *Lexer) scan() Token    :317
 //
-// func (l *Lexer) scanString(start ast.Pos) Token    :496
+// func (l *Lexer) scanString(start ast.Pos) Token    :498
 //
 // scanFString scans f"..." and stores the raw content between quotes.
-// func (l *Lexer) scanFString(start ast.Pos) Token    :537
+// func (l *Lexer) scanFString(start ast.Pos) Token    :539
 //
-// func (l *Lexer) scanTripleString(start ast.Pos) Token    :577
+// func (l *Lexer) scanTripleString(start ast.Pos) Token    :579
 //
-// func (l *Lexer) scanNumber(start ast.Pos) Token    :593
+// func (l *Lexer) scanNumber(start ast.Pos) Token    :595
 //
-// func (l *Lexer) scanIdent(start ast.Pos) Token    :623
+// func (l *Lexer) scanIdent(start ast.Pos) Token    :625
 //
 // file: parser.go
 //
@@ -382,54 +382,57 @@ forge Parser {
 // func (p *Parser) parseInterface() (*ast.InterfaceDecl, error)    :545
 //
 // parseInterfaceField parses: field T.name: Type
-// func (p *Parser) parseInterfaceField() (*ast.InterfaceFieldDecl, error)    :626
+// func (p *Parser) parseInterfaceField() (*ast.InterfaceFieldDecl, error)    :632
+//
+// parseInterfaceEmbed parses: embed InterfaceName<TypeArg1, TypeArg2>
+// func (p *Parser) parseInterfaceEmbed() (*ast.InterfaceEmbed, error)    :663
 //
 // parseDestructorBlock parses: destructor T { body }
-// func (p *Parser) parseDestructorBlock() (*ast.DestructorBlock, error)    :657
+// func (p *Parser) parseDestructorBlock() (*ast.DestructorBlock, error)    :701
 //
 // parseImpl parses: impl Interface<T1, T2, ...> [as label] { mappings }
-// func (p *Parser) parseImpl() (*ast.ImplBlock, error)    :677
+// func (p *Parser) parseImpl() (*ast.ImplBlock, error)    :721
 //
 // parseImplMapping parses one mapping inside an impl block.
-// func (p *Parser) parseImplMapping() (*ast.ImplMapping, error)    :739
+// func (p *Parser) parseImplMapping() (*ast.ImplMapping, error)    :783
 //
 // parseClass parses: class Name[<TypeParams>](ctor_params) [implements I1, I2] { fields, methods }
-// func (p *Parser) parseClass() (*ast.ClassDecl, error)    :846
+// func (p *Parser) parseClass() (*ast.ClassDecl, error)    :890
 //
 // parseFunc parses a function/method declaration with annotations.
-// func (p *Parser) parseFunc() (*ast.FuncDecl, error)    :952
+// func (p *Parser) parseFunc() (*ast.FuncDecl, error)    :996
 //
-// func (p *Parser) parseWhereClause() (*ast.WhereClause, error)    :1044
+// func (p *Parser) parseWhereClause() (*ast.WhereClause, error)    :1088
 //
-// func (p *Parser) parseAnnotations() ast.Annotations    :1091
+// func (p *Parser) parseAnnotations() ast.Annotations    :1135
 //
 // parseExprText reads tokens until newline/EOF and returns them as text.
-// func (p *Parser) parseExprText() string    :1167
+// func (p *Parser) parseExprText() string    :1211
 //
 // parseField parses: name: Type [guarded_by(lock)] [// why: "..."]
-// func (p *Parser) parseField() (*ast.Field, error)    :1177
+// func (p *Parser) parseField() (*ast.Field, error)    :1221
 //
 // parseParam parses a function parameter: [mut] name: Type or [mut] self
-// func (p *Parser) parseParam() (*ast.Param, error)    :1216
+// func (p *Parser) parseParam() (*ast.Param, error)    :1260
 //
 // parseTypeExpr parses a type expression.
-// func (p *Parser) parseTypeExpr() (*ast.TypeExpr, error)    :1265
+// func (p *Parser) parseTypeExpr() (*ast.TypeExpr, error)    :1309
 //
-// func (p *Parser) parseBaseType() (*ast.TypeExpr, error)    :1328
+// func (p *Parser) parseBaseType() (*ast.TypeExpr, error)    :1372
 //
 // parseTypeParams parses: <T> or <T: Comparable> or <T, U> etc.
-// func (p *Parser) parseTypeParams() ([]ast.TypeParam, error)    :1522
+// func (p *Parser) parseTypeParams() ([]ast.TypeParam, error)    :1566
 //
 // parseRelation parses: relation [hint] Parent[:label] owns|refs [Child[:label]]
-// func (p *Parser) parseRelation() (*ast.RelationDecl, error)    :1555
+// func (p *Parser) parseRelation() (*ast.RelationDecl, error)    :1599
 //
-// func (p *Parser) parseRelationSideFrom(nameTok Token) ast.RelationSide    :1609
+// func (p *Parser) parseRelationSideFrom(nameTok Token) ast.RelationSide    :1653
 //
 // parseSource parses: source: ["file1.go", "file2.go"]
-// func (p *Parser) parseSource() ([]string, error)    :1625
+// func (p *Parser) parseSource() ([]string, error)    :1669
 //
 // parseFake parses: fake: "file.go"
-// func (p *Parser) parseFake() (string, error)    :1651
+// func (p *Parser) parseFake() (string, error)    :1695
 //
 // file: expr_parser.go
 //

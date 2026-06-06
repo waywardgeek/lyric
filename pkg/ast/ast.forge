@@ -76,14 +76,17 @@ forge AST {
   """
 
   doc "Desugaring Engine": """
-    desugar.go runs four ordered passes BEFORE the checker (order matters):
-    1. DesugarInterfaceFields: field T.name → getter/setter method signatures
-    2. DesugarRelations: relation decls → label-prefixed fields + impl blocks.
-       rewriteFieldType maps interface type params to concrete types.
-    3. DesugarDefaultImpls: methods with bodies in interfaces → top-level
-       generic functions with relational where clauses.
-    4. DesugarDestructors: for each owns relation, copies interface destructor
-       blocks to concrete class destroy methods. Multiple relations append.
+    desugar.go runs five ordered passes BEFORE the checker (order matters):
+    1. DesugarInterfaceEmbeds: flatten embedded interfaces — copy fields, methods,
+    and destructors from parent into child, substituting type parameters.
+    Enables OwningList/RefList to share DoublyLinked mechanics.
+    2. DesugarInterfaceFields: field T.name → getter/setter method signatures
+    3. DesugarRelations: relation decls → label-prefixed fields + impl blocks.
+    rewriteFieldType maps interface type params to concrete types.
+    4. DesugarDefaultImpls: methods with bodies in interfaces → top-level
+    generic functions with relational where clauses.
+    5. DesugarDestructors: for each owns relation, copies interface destructor
+    blocks to concrete class destroy methods. Multiple relations append.
     Each pass generates AST consumed by later passes and the checker.
   """
 
@@ -629,16 +632,24 @@ forge AST {
   }
 
   struct InterfaceDecl {
-    why: "Method signatures with composition (implements). No inheritance — satisfaction only."
+    why: "Method signatures with composition (implements/embed). No inheritance — satisfaction only."
     Name: string
     TypeParams: [TypeParam]
     Implements: [string]
+    Embeds: [InterfaceEmbed]
     Methods: [FuncDecl]
     Fields: [InterfaceFieldDecl]
     Destructors: [DestructorBlock]
     Why: string
     Span: Span
     IsPublic: bool
+  }
+
+  struct InterfaceEmbed {
+    why: "Embedded interface with type args: embed DoublyLinked<P, C>. Flattened by DesugarInterfaceEmbeds."
+    Name: string
+    TypeArgs: [TypeExpr]
+    Span: Span
   }
 
   struct DestructorBlock {
@@ -754,7 +765,17 @@ forge AST {
     Span: Span
   }
 
-  source: ["ast.go", "expr.go"]
+  pub func DesugarInterfaceEmbeds(file: File?)
+
+  pub func DesugarDefaultImpls(file: File?)
+
+  pub func DesugarInterfaceFields(file: File?)
+
+  pub func DesugarRelations(file: File?)
+
+  pub func DesugarDestructors(file: File?)
+
+  source: ["ast.go", "expr.go", "desugar.go"]
 }
 // --- index ---
 //
@@ -764,7 +785,42 @@ forge AST {
 // file: ast.go
 //
 // DocComment returns the contiguous block of comments immediately preceding
-// func (f *File) DocComment(line int) []Comment    :350
+// func (f *File) DocComment(line int) []Comment    :358
 //
 // file: expr.go
+//
+// file: desugar.go
+//
+// DesugarInterfaceEmbeds flattens embedded interfaces by copying fields, methods,
+// func DesugarInterfaceEmbeds(file *File)    :23
+//
+// substituteTypeParamsInTypeExprCopy returns a copy of te with type params substituted.
+// func substituteTypeParamsInTypeExprCopy(te TypeExpr, typeMap map[string]string) TypeExpr    :98
+//
+// DesugarDefaultImpls extracts interface methods with bodies into top-level
+// func DesugarDefaultImpls(file *File)    :115
+//
+// DesugarInterfaceFields converts interface field declarations into getter/setter
+// func DesugarInterfaceFields(file *File)    :167
+//
+// DesugarRelations processes relation declarations:
+// func DesugarRelations(file *File)    :204
+//
+// deepCopyBlock creates a deep copy of a Block by JSON-like recursive copying.
+// func deepCopyBlock(b Block) Block    :342
+//
+// substituteTypeParamsInBlock rewrites type parameter references in a block's statements.
+// func substituteTypeParamsInBlock(block *Block, typeMap map[string]string)    :350
+//
+// func substituteTypeParamsInStmt(stmt *Stmt, typeMap map[string]string)    :356
+//
+// func substituteTypeParamsInExpr(expr *Expr, typeMap map[string]string)    :406
+//
+// func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string)    :462
+//
+// DesugarDestructors generates destroy methods on classes involved in `owns` relations.
+// func DesugarDestructors(file *File)    :481
+//
+// concrete class names from the relation.
+// func rewriteFieldType(te TypeExpr, typeParams []TypeParam, rel RelationDecl) TypeExpr    :558
 

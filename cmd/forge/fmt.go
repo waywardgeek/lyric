@@ -294,6 +294,29 @@ func fmtInterface(b *strings.Builder, iface *ast.InterfaceDecl) {
 	for _, parent := range iface.Implements {
 		b.WriteString(fmt.Sprintf("    %s\n", parent))
 	}
+	for _, emb := range iface.Embeds {
+		b.WriteString(fmt.Sprintf("    embed %s", emb.Name))
+		if len(emb.TypeArgs) > 0 {
+			b.WriteString("<")
+			for i, ta := range emb.TypeArgs {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				if ta.Kind == ast.TypeNamed {
+					nt := ta.Data.(*ast.NamedType)
+					b.WriteString(nt.Name)
+				}
+			}
+			b.WriteString(">")
+		}
+		b.WriteString("\n")
+	}
+	for _, f := range iface.Fields {
+		b.WriteString(fmt.Sprintf("    field %s.%s: %s\n", f.TypeParam, f.Name, fmtType(&f.Type)))
+	}
+	for _, d := range iface.Destructors {
+		b.WriteString(fmt.Sprintf("    destructor %s { ... }\n", d.TypeParam))
+	}
 	for _, m := range iface.Methods {
 		fmtFunc(b, &m, "    ")
 	}

@@ -593,6 +593,12 @@ func (p *Parser) parseInterface() (*ast.InterfaceDecl, error) {
 			}
 			fn.IsPublic = isPub
 			iface.Methods = append(iface.Methods, *fn)
+		} else if p.peek().Kind == TEmbed {
+			emb, err := p.parseInterfaceEmbed()
+			if err != nil {
+				return nil, err
+			}
+			iface.Embeds = append(iface.Embeds, *emb)
 		} else if p.peek().Kind == TField {
 			fd, err := p.parseInterfaceField()
 			if err != nil {
@@ -651,6 +657,44 @@ func (p *Parser) parseInterfaceField() (*ast.InterfaceFieldDecl, error) {
 		Type:      *te,
 		Span:      ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: te.Span.End},
 	}, nil
+}
+
+// parseInterfaceEmbed parses: embed InterfaceName<TypeArg1, TypeArg2>
+func (p *Parser) parseInterfaceEmbed() (*ast.InterfaceEmbed, error) {
+	start := p.peek().Span.Start
+	p.next() // consume 'embed'
+
+	name, err := p.expect(TIdent)
+	if err != nil {
+		return nil, err
+	}
+	emb := &ast.InterfaceEmbed{Name: name.Text}
+	end := name.Span.End
+
+	// Parse optional type arguments: <T1, T2>
+	if p.peek().Kind == TLt {
+		p.next() // consume '<'
+		for {
+			te, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			emb.TypeArgs = append(emb.TypeArgs, *te)
+			if p.peek().Kind == TComma {
+				p.next()
+			} else {
+				break
+			}
+		}
+		gt, err := p.expect(TGt)
+		if err != nil {
+			return nil, err
+		}
+		end = gt.Span.End
+	}
+
+	emb.Span = ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: end}
+	return emb, nil
 }
 
 // parseDestructorBlock parses: destructor T { body }

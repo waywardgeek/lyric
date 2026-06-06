@@ -235,7 +235,8 @@ func cPipeline(t *testing.T, source, pkgName string) string {
 		}
 	}
 
-	// Run desugar passes (interface fields → relations → destructors → default impls)
+	// Run desugar passes (embeds → interface fields → relations → destructors → default impls)
+	ast.DesugarInterfaceEmbeds(file)
 	ast.DesugarInterfaceFields(file)
 	ast.DesugarRelations(file)
 	ast.DesugarDestructors(file)

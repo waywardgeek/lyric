@@ -211,12 +211,20 @@ type InterfaceDecl struct {
 	Name        string
 	IsPublic    bool // true if declared with `pub`
 	TypeParams  []TypeParam
-	Implements  []string // composed interfaces
+	Implements  []string             // composed interfaces (legacy)
+	Embeds      []InterfaceEmbed     // embedded interfaces with type args
 	Methods     []FuncDecl
 	Fields      []InterfaceFieldDecl // default fields: field T.name: Type
 	Destructors []DestructorBlock    // destructor T { ... } blocks
 	Why         string
 	Span        Span
+}
+
+// InterfaceEmbed represents an embedded interface: embed DoublyLinked<P, C>
+type InterfaceEmbed struct {
+	Name     string     // interface name being embedded
+	TypeArgs []TypeExpr // type arguments (e.g. P, C)
+	Span     Span
 }
 
 // DestructorBlock is a destructor code block in an interface, bound to a type parameter.

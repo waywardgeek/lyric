@@ -24,6 +24,7 @@ const (
 	TRelation
 	TField
 	TDestructor
+	TEmbed
 	TImport
 	TImplements
 	TImpl
@@ -140,6 +141,7 @@ var keywords = map[string]TokenKind{
 	"relation":   TRelation,
 	"field":      TField,
 	"destructor": TDestructor,
+	"embed":      TEmbed,
 	"import":     TImport,
 	"implements": TImplements,
 	"impl":       TImpl,
@@ -207,7 +209,7 @@ func (t Token) String() string {
 var tokenNames = map[TokenKind]string{
 	TForge: "forge", TFunc: "func", TClass: "class", TStruct: "struct",
 	TEnum: "enum", TInterface: "interface", TRelation: "relation", TField: "field",
-	TDestructor: "destructor",
+	TDestructor: "destructor", TEmbed: "embed",
 	TImport: "import", TImplements: "implements", TImpl: "impl", TAs: "as", TWhere: "where",
 	TOwns: "owns", TRefs: "refs", TMut: "mut", TSelf: "self",
 	TFrom: "from", TTrue: "true", TFalse: "false", TNil: "nil",
