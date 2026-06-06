@@ -138,6 +138,16 @@ static inline bool forge_str_has_suffix(const char* s, const char* suffix) {
     return strcmp(s + slen - suflen, suffix) == 0;
 }
 
+// FNV-1a hash for strings
+static inline uint64_t forge_hash_string(const char* s) {
+    uint64_t h = 14695981039346656037ULL;
+    for (const char* p = s; *p; p++) {
+        h ^= (uint64_t)(unsigned char)*p;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
 static inline const char* forge_str_replace(const char* s, const char* old, const char* new_s) {
     const char* pos = strstr(s, old);
     if (!pos) {

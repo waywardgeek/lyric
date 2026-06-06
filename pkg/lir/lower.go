@@ -2404,7 +2404,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 
 	// Check for built-in functions
 	switch funcName {
-	case "println", "print", "len", "append", "isnull":
+	case "println", "print", "len", "append", "isnull", "hash_string":
 		return l.emitTemp(LExpr{
 			Kind: LExprBuiltin,
 			Type: l.exprType(expr),

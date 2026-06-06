@@ -26,7 +26,9 @@ type GoBackend struct {
 	nameExported   map[string]bool // type/func/method name → is exported
 	suppressedTemps map[int]bool   // temps consumed by field-writeback patterns
 	needsIsNilHelper bool         // emit _isNil helper for generic nil checks
+	needsHashStringHelper bool    // emit _hashString helper for FNV-1a
 	inGenericFunc    bool         // true when emitting a function with type params
+	currentFuncReturnType *LType // return type of the function currently being emitted
 }
 
 // scanFieldWritebacks pre-scans statements to find temps that will be consumed
@@ -148,6 +150,15 @@ func (g *GoBackend) emit(prog *LProgram) string {
 		out.WriteString("\tif v == nil { return true }\n")
 		out.WriteString("\trv := reflect.ValueOf(v)\n")
 		out.WriteString("\treturn rv.Kind() == reflect.Ptr && rv.IsNil()\n")
+		out.WriteString("}\n\n")
+	}
+
+	// Emit _hashString helper for FNV-1a hashing
+	if g.needsHashStringHelper {
+		out.WriteString("func _hashString(s string) uint64 {\n")
+		out.WriteString("\th := fnv.New64a()\n")
+		out.WriteString("\th.Write([]byte(s))\n")
+		out.WriteString("\treturn h.Sum64()\n")
 		out.WriteString("}\n\n")
 	}
 
@@ -645,7 +656,8 @@ func (g *GoBackend) emitClassDecl(c *LClassDecl) {
 
 func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 	g.inGenericFunc = len(f.TypeParams) > 0
-	defer func() { g.inGenericFunc = false }()
+	g.currentFuncReturnType = f.ReturnType
+	defer func() { g.inGenericFunc = false; g.currentFuncReturnType = nil }()
 	name := g.visName(f.Name, f.IsExported)
 
 	// Build parameter list
@@ -685,7 +697,7 @@ func (g *GoBackend) emitFuncDecl(f *LFuncDecl) {
 		if f.ReturnType.Kind == LTyErrorResult {
 			g.writef(" (%s, error)", g.goType(f.ReturnType.Elem))
 		} else {
-			g.writef(" %s", g.goType(f.ReturnType))
+			g.writef(" %s", g.goTypeForIface(f.ReturnType))
 		}
 	}
 
@@ -1504,26 +1516,35 @@ func (g *GoBackend) emitExpr(e *LExpr) {
 
 	case LExprWrapOptional:
 		d := e.Data.(*LWrapOptionalData)
-		// Create pointer: func() *T { v := val; return &v }()
-		g.writef("func() %s { _v := ", g.goType(e.Type))
-		g.emitValue(&d.Value)
-		g.writef("; return &_v }()")
+		// For Optional(TypeVar), the return type was collapsed to just TypeVar,
+		// so wrapping is a no-op.
+		if e.Type != nil && e.Type.Kind == LTyOptional && e.Type.Elem != nil && e.Type.Elem.Kind == LTyTypeVar {
+			g.emitValue(&d.Value)
+		} else {
+			// Create pointer: func() *T { v := val; return &v }()
+			g.writef("func() %s { _v := ", g.goType(e.Type))
+			g.emitValue(&d.Value)
+			g.writef("; return &_v }()")
+		}
 
 	case LExprUnwrapOptional:
 		d := e.Data.(*LUnwrapOptionalData)
-		// For class handles, Optional(ClassHandle) is already *className in Go —
-		// unwrapping just passes through (no dereference needed).
-		// Also skip for TypeVar/Any since those may resolve to class handles.
+		// Determine whether to dereference.
 		skipDeref := false
-		if e.Type != nil {
-			switch e.Type.Kind {
-			case LTyClassHandle, LTyTypeVar, LTyAny:
+		srcType := d.Value.Type
+		if srcType != nil && srcType.Kind == LTyOptional && srcType.Elem != nil {
+			if srcType.Elem.Kind == LTyClassHandle {
+				// Direct Optional(ClassHandle): *className in Go, no deref
 				skipDeref = true
-			case LTyOptional:
-				if e.Type.Elem != nil && e.Type.Elem.Kind == LTyClassHandle {
-					skipDeref = true
-				}
+			} else if srcType.Elem.Kind == LTyTypeVar {
+				// Optional(TypeVar) was collapsed to TypeVar in function signatures,
+				// so the Go value is already the unwrapped type — no deref
+				skipDeref = true
 			}
+		}
+		// Fallback: if source type is not Optional, nothing to unwrap
+		if srcType != nil && srcType.Kind != LTyOptional {
+			skipDeref = true
 		}
 		if skipDeref {
 			g.emitValue(&d.Value)
@@ -1671,6 +1692,14 @@ func (g *GoBackend) emitBuiltin(d *LBuiltinData) {
 	case "channel_close":
 		if len(d.Args) > 0 {
 			g.writef("close(")
+			g.emitValue(&d.Args[0])
+			g.writef(")")
+		}
+	case "hash_string":
+		g.autoImport("hash/fnv")
+		g.needsHashStringHelper = true
+		if len(d.Args) > 0 {
+			g.writef("_hashString(")
 			g.emitValue(&d.Args[0])
 			g.writef(")")
 		}
@@ -1891,11 +1920,19 @@ func (g *GoBackend) emitValue(v *LValue) {
 		// Emit *new(T) to get the zero value of the type param.
 		if g.inGenericFunc && v.Type != nil && v.Type.Kind == LTyTypeVar {
 			g.writef("*new(%s)", v.Type.Name)
+		} else if g.inGenericFunc && v.Type != nil && v.Type.Kind == LTyOptional && v.Type.Elem != nil && v.Type.Elem.Kind == LTyTypeVar {
+			// Optional(TypeVar) collapsed to TypeVar — zero value
+			g.writef("*new(%s)", v.Type.Elem.Name)
+		} else if g.inGenericFunc && (v.Type == nil || v.Type.Kind == LTyAny) && g.currentFuncReturnType != nil &&
+			g.currentFuncReturnType.Kind == LTyOptional && g.currentFuncReturnType.Elem != nil && g.currentFuncReturnType.Elem.Kind == LTyTypeVar {
+			// Null with unresolved type in function returning collapsed Optional(TypeVar)
+			g.writef("*new(%s)", g.currentFuncReturnType.Elem.Name)
 		} else {
 			g.writef("nil")
 		}
 	}
 }
+
 
 // emitUnionWrappedValue emits a value with an explicit type cast when the value
 // is a literal being stored into an any-typed union variable. Without the cast,

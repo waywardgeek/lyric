@@ -152,4 +152,257 @@ forge std {
       dll_remove<P, C>(self)
     }
   }
+
+  // --- Hash table ---
+
+  // HashedList: parent owns a hash table of children, keyed by hash_key().
+  // Open-addressing with linear probing. Children stored in a dense array;
+  // a parallel bucket index maps hash slots to array positions.
+  // Child classes must implement: hash_key(self) -> u64
+  //
+  // Usage:
+  //   relation HashedList MyMap owns [MyEntry]
+  //   class MyEntry(key: string, value: i32) {
+  //     pub func hash_key(self) -> u64 { return hash_string(self.key) }
+  //   }
+  pub interface HashedList<P, C> {
+    // Dense storage of children
+    field P.children: [C]
+    // Bucket array: each slot is an index into children[], or -1 (empty), -2 (tombstone)
+    field P.buckets: [i32]
+    // Current bucket array capacity
+    field P.hash_cap: i32
+    // Number of live entries (== len(children))
+    field P.hash_count: i32
+
+    // Child back-reference and position in children array
+    field C.parent: P?
+    field C.index: i32
+
+    // Child must implement this method to provide its hash key
+    func C.hash_key(self) -> u64
+
+    // Initialize hash table with given capacity (call before first insert)
+    pub func hash_init(parent: P, capacity: i32) {
+      let mut cap = capacity
+      if cap < 8 {
+        cap = 8
+      }
+      let mut b: [i32] = []
+      let mut i: i32 = 0
+      while i < cap {
+        b = append(b, -1)
+        i = i + 1
+      }
+      parent.set_buckets(b)
+      parent.set_hash_cap(cap)
+      parent.set_hash_count(0)
+    }
+
+    // Find the bucket slot for a key, or the first empty/tombstone slot
+    pub func hash_find_slot(parent: P, key: u64) -> i32 {
+      let cap = parent.hash_cap()
+      let buckets = parent.buckets()
+      let kids = parent.children()
+      let mut slot: i32 = <i32>(key % <u64>cap)
+      let mut i: i32 = 0
+      while i < cap {
+        let idx = buckets[slot]
+        if idx == -1 {
+          return slot
+        }
+        if idx >= 0 {
+          if kids[idx].hash_key() == key {
+            return slot
+          }
+        }
+        // idx == -2 (tombstone) or hash collision: continue probing
+        slot = (slot + 1) % cap
+        i = i + 1
+      }
+      // Table full (should never happen if we rehash properly)
+      return -1
+    }
+
+    // Rehash into a larger bucket array
+    pub func hash_rehash(parent: P) {
+      let old_kids = parent.children()
+      let old_count = parent.hash_count()
+      let new_cap = parent.hash_cap() * 2
+      // Build new bucket array
+      let mut new_buckets: [i32] = []
+      let mut i: i32 = 0
+      while i < new_cap {
+        new_buckets = append(new_buckets, -1)
+        i = i + 1
+      }
+      parent.set_buckets(new_buckets)
+      parent.set_hash_cap(new_cap)
+      // Re-insert all children
+      i = 0
+      while i < old_count {
+        let key = old_kids[i].hash_key()
+        let mut slot: i32 = <i32>(key % <u64>new_cap)
+        while parent.buckets()[slot] >= 0 {
+          slot = (slot + 1) % new_cap
+        }
+        let mut b = parent.buckets()
+        b[slot] = i
+        parent.set_buckets(b)
+        i = i + 1
+      }
+    }
+
+    // Insert child into hash table
+    pub func hash_insert(parent: P, child: C) {
+      // Auto-init if needed
+      if parent.hash_cap() == 0 {
+        hash_init<P, C>(parent, 8)
+      }
+      // Rehash at 75% load
+      let count = parent.hash_count()
+      let cap = parent.hash_cap()
+      if (count + 1) * 4 > cap * 3 {
+        hash_rehash<P, C>(parent)
+      }
+      let key = child.hash_key()
+      let slot = hash_find_slot<P, C>(parent, key)
+      let bucket_val = parent.buckets()[slot]
+      if bucket_val >= 0 {
+        // Key already exists — replace value (swap child at that index)
+        let old_child = parent.children()[bucket_val]
+        old_child.set_parent(null)
+        old_child.set_index(0)
+        let mut kids = parent.children()
+        child.set_parent(parent)
+        child.set_index(bucket_val)
+        kids[bucket_val] = child
+        parent.set_children(kids)
+        return
+      }
+      // New entry: append to children array, set bucket
+      let idx = parent.hash_count()
+      child.set_parent(parent)
+      child.set_index(idx)
+      parent.set_children(append(parent.children(), child))
+      let mut b = parent.buckets()
+      b[slot] = idx
+      parent.set_buckets(b)
+      parent.set_hash_count(idx + 1)
+    }
+
+    // Look up a child by hash key. Returns null if not found.
+    pub func hash_lookup(parent: P, key: u64) -> C? {
+      if parent.hash_cap() == 0 {
+        return null
+      }
+      let cap = parent.hash_cap()
+      let buckets = parent.buckets()
+      let kids = parent.children()
+      let mut slot: i32 = <i32>(key % <u64>cap)
+      let mut i: i32 = 0
+      while i < cap {
+        let idx = buckets[slot]
+        if idx == -1 {
+          return null
+        }
+        if idx >= 0 {
+          if kids[idx].hash_key() == key {
+            return kids[idx]
+          }
+        }
+        slot = (slot + 1) % cap
+        i = i + 1
+      }
+      return null
+    }
+
+    // Remove a child by hash key. Returns true if found and removed.
+    pub func hash_remove(parent: P, key: u64) -> bool {
+      if parent.hash_cap() == 0 {
+        return false
+      }
+      let cap = parent.hash_cap()
+      let buckets = parent.buckets()
+      let kids = parent.children()
+      let mut slot: i32 = <i32>(key % <u64>cap)
+      let mut i: i32 = 0
+      while i < cap {
+        let idx = buckets[slot]
+        if idx == -1 {
+          return false
+        }
+        if idx >= 0 {
+          if kids[idx].hash_key() == key {
+            // Found it — remove from children array using swap-remove
+            let count = parent.hash_count()
+            let last_idx = count - 1
+            let child = kids[idx]
+            child.set_parent(null)
+            child.set_index(0)
+            if idx < last_idx {
+              // Swap with last child
+              let last_child = kids[last_idx]
+              last_child.set_index(idx)
+              let mut k = parent.children()
+              k[idx] = last_child
+              parent.set_children(k)
+              // Update bucket for swapped child
+              let swapped_key = last_child.hash_key()
+              let mut s: i32 = <i32>(swapped_key % <u64>cap)
+              while buckets[s] != last_idx {
+                s = (s + 1) % cap
+              }
+              let mut b2 = parent.buckets()
+              b2[s] = idx
+              parent.set_buckets(b2)
+            }
+            // Tombstone the removed slot
+            let mut b = parent.buckets()
+            b[slot] = -2
+            parent.set_buckets(b)
+            // Shrink children array
+            parent.set_children(parent.children()[0:last_idx])
+            parent.set_hash_count(last_idx)
+            return true
+          }
+        }
+        slot = (slot + 1) % cap
+        i = i + 1
+      }
+      return false
+    }
+
+    // Destructor for parent: cascade destroy all owned children
+    destructor P {
+      let kids = self.children()
+      let mut i: i32 = len(kids) - 1
+      while i >= 0 {
+        kids[i].set_parent(null)
+        kids[i].destroy()
+        i = i - 1
+      }
+    }
+
+    // Destructor for child: remove self from parent's hash table
+    destructor C {
+      let p = self.parent()
+      if !isnull(p) {
+        hash_remove<P, C>(p!, self.hash_key())
+      }
+    }
+  }
+
+  // Sym: an interned symbol with pre-computed hash.
+  // Hash is computed once at creation; all subsequent lookups use the u64.
+  pub class Sym(name: string, hash: u64) {
+    pub func get_name(self) -> string { return self.name }
+    pub func get_hash(self) -> u64 { return self.hash }
+  }
+
+  // sym: create a Sym from a string, computing its FNV-1a hash once.
+  func sym(name: string) -> Sym {
+    return Sym(name, hash_string(name))
+  }
+
 }

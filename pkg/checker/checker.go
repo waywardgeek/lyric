@@ -383,6 +383,8 @@ func New() *Checker {
 	c.scope.Define("isnull", &Type{Kind: TyFunc, Params: nil, Return: TypeBool, Name: "isnull"})
 	// make_channel(capacity?) -> channel<T> — creates a buffered or unbuffered channel
 	c.scope.Define("make_channel", &Type{Kind: TyFunc, Params: nil, Return: TypeUnknown, Name: "make_channel"})
+	// hash_string(s: string) -> u64 — FNV-1a hash of a string
+	c.scope.Define("hash_string", &Type{Kind: TyFunc, Params: []*Type{{Kind: TyString}}, Return: &Type{Kind: TyUint, Bits: 64}, Name: "hash_string"})
 	// Register builtin types
 	// error — Go's error interface, used in (T, error) return patterns
 	c.registry.Register("error", &TypeInfo{
@@ -445,6 +447,7 @@ func (c *Checker) CheckModuleFile(importPath string, fromSpan ast.Span) *ModuleE
 	c.scope.Define("append", &Type{Kind: TyFunc, Params: nil, Return: TypeUnknown, Name: "append"})
 	c.scope.Define("isnull", &Type{Kind: TyFunc, Params: nil, Return: TypeBool, Name: "isnull"})
 	c.scope.Define("make_channel", &Type{Kind: TyFunc, Params: nil, Return: TypeUnknown, Name: "make_channel"})
+	c.scope.Define("hash_string", &Type{Kind: TyFunc, Params: []*Type{{Kind: TyString}}, Return: &Type{Kind: TyUint, Bits: 64}, Name: "hash_string"})
 	c.registry.Register("error", &TypeInfo{
 		Type: &Type{Kind: TyInterface, Name: "error"},
 	})

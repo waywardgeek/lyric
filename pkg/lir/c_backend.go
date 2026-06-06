@@ -1954,6 +1954,12 @@ func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 			return fmt.Sprintf("forge_chan_close_%s(%s)", suffix, g.emitValue(&d.Args[0]))
 		}
 
+	case "hash_string":
+		if len(d.Args) > 0 {
+			return fmt.Sprintf("forge_hash_string(%s)", g.emitValue(&d.Args[0]))
+		}
+		return "0"
+
 	case "println", "Println":
 		return g.emitPrintln(d.Args)
 	}
