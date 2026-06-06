@@ -230,6 +230,92 @@ static inline const char* forge_tolower(const char* s) {
 }
 
 /* -------------------------------------------------------------------------
+ * Channels (pthreads-based, buffered and unbuffered)
+ * -------------------------------------------------------------------------
+ * Usage:
+ *   FORGE_CHAN_DEF(int32_t, ForgeChan_int32_t)
+ *   ForgeChan_int32_t* ch = forge_chan_make_int32_t(10);  // buffered
+ *   forge_chan_send_int32_t(ch, 42);
+ *   int32_t val = forge_chan_recv_int32_t(ch);
+ *   forge_chan_close_int32_t(ch);
+ *   forge_chan_free_int32_t(ch);
+ */
+#include <pthread.h>
+
+#define FORGE_CHAN_DEF(ElemType, ChanName) \
+    typedef struct { \
+        ElemType* buf; \
+        int32_t cap; \
+        int32_t len; \
+        int32_t head; \
+        int32_t tail; \
+        bool closed; \
+        pthread_mutex_t mu; \
+        pthread_cond_t not_empty; \
+        pthread_cond_t not_full; \
+    } ChanName;
+
+#define FORGE_CHAN_IMPL(ElemType, ChanName, Suffix) \
+    static inline ChanName* forge_chan_make_##Suffix(int32_t capacity) { \
+        ChanName* ch = calloc(1, sizeof(ChanName)); \
+        ch->cap = capacity > 0 ? capacity : 1; \
+        ch->buf = malloc(sizeof(ElemType) * ch->cap); \
+        pthread_mutex_init(&ch->mu, NULL); \
+        pthread_cond_init(&ch->not_empty, NULL); \
+        pthread_cond_init(&ch->not_full, NULL); \
+        return ch; \
+    } \
+    static inline void forge_chan_send_##Suffix(ChanName* ch, ElemType val) { \
+        pthread_mutex_lock(&ch->mu); \
+        while (ch->len >= ch->cap && !ch->closed) { \
+            pthread_cond_wait(&ch->not_full, &ch->mu); \
+        } \
+        if (!ch->closed) { \
+            ch->buf[ch->tail] = val; \
+            ch->tail = (ch->tail + 1) % ch->cap; \
+            ch->len++; \
+            pthread_cond_signal(&ch->not_empty); \
+        } \
+        pthread_mutex_unlock(&ch->mu); \
+    } \
+    static inline ElemType forge_chan_recv_##Suffix(ChanName* ch) { \
+        pthread_mutex_lock(&ch->mu); \
+        while (ch->len == 0 && !ch->closed) { \
+            pthread_cond_wait(&ch->not_empty, &ch->mu); \
+        } \
+        ElemType val; memset(&val, 0, sizeof(val)); \
+        if (ch->len > 0) { \
+            val = ch->buf[ch->head]; \
+            ch->head = (ch->head + 1) % ch->cap; \
+            ch->len--; \
+            pthread_cond_signal(&ch->not_full); \
+        } \
+        pthread_mutex_unlock(&ch->mu); \
+        return val; \
+    } \
+    static inline void forge_chan_close_##Suffix(ChanName* ch) { \
+        pthread_mutex_lock(&ch->mu); \
+        ch->closed = true; \
+        pthread_cond_broadcast(&ch->not_empty); \
+        pthread_cond_broadcast(&ch->not_full); \
+        pthread_mutex_unlock(&ch->mu); \
+    } \
+    static inline void forge_chan_free_##Suffix(ChanName* ch) { \
+        pthread_mutex_destroy(&ch->mu); \
+        pthread_cond_destroy(&ch->not_empty); \
+        pthread_cond_destroy(&ch->not_full); \
+        free(ch->buf); \
+        free(ch); \
+    }
+
+/* Spawn a function in a new thread (fire-and-forget detached thread) */
+static inline void forge_spawn(void* (*func)(void*), void* arg) {
+    pthread_t thread;
+    pthread_create(&thread, NULL, func, arg);
+    pthread_detach(thread);
+}
+
+/* -------------------------------------------------------------------------
  * Tagged Unions (for ad-hoc union types like string | i32 | bool)
  * -------------------------------------------------------------------------
  * Tag constants identify which member is active.

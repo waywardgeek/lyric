@@ -154,6 +154,22 @@ func TestCBackendRuns(t *testing.T) {
 		}
 	})
 
+	t.Run("channels.fg", func(t *testing.T) {
+		path := filepath.Join(testdataDir, "channels.fg")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Skipf("can't read: %v", err)
+		}
+
+		cSrc := cPipeline(t, string(data), "channels_demo")
+		output := compileCAndRun(t, cSrc, "channels")
+		expected := "received: 42\nhello\nall done\n"
+		if output != expected {
+			t.Errorf("expected %q, got %q", expected, output)
+			t.Logf("C source:\n%s", cSrc)
+		}
+	})
+
 	t.Run("demo.fg", func(t *testing.T) {
 		path := filepath.Join(testdataDir, "demo.fg")
 		data, err := os.ReadFile(path)

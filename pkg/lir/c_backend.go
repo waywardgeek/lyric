@@ -17,6 +17,7 @@ func EmitC(prog *LProgram) string {
 		sliceTypes:  map[string]string{},
 		optTypes:    map[string]string{},
 		resultTypes: map[string]string{},
+		chanTypes:   map[string]string{},
 		lambdaID:    0,
 		lambdas:     nil,
 		ifaceByName: map[string]*LInterfaceDecl{},
@@ -67,10 +68,29 @@ type cGen struct {
 	genStructName string // name of the current generator's state struct type
 	genYieldCount int    // counter for yield state labels
 
+	// Channel support
+	chanTypes map[string]string // cType(elem) → suffix name (e.g. "i32")
+	chanCount int
+
+	// Spawn support
+	spawnID    int
+	spawnFuncs []cSpawnFunc
+
 	// Interface vtable dispatch
 	ifaceByName map[string]*LInterfaceDecl // interface name → decl
 	implMap     map[string][]string        // class name → interfaces it implements
 	funcByName  map[string]*LFuncDecl      // "name" or "Class.method" → func decl
+}
+
+type cSpawnFunc struct {
+	name     string
+	bodyStr  string
+	captures []cCapture
+}
+
+type cCapture struct {
+	name string
+	typ  string
 }
 
 type cLambda struct {
@@ -122,7 +142,11 @@ func (g *cGen) generate() string {
 	for elemType, name := range g.resultTypes {
 		g.linef("FORGE_RESULT_DEF(%s, %s)", elemType, name)
 	}
-	if len(g.sliceTypes)+len(g.optTypes)+len(g.resultTypes) > 0 {
+	for cElemType, suffix := range g.chanTypes {
+		chanName := fmt.Sprintf("ForgeChan_%s", suffix)
+		g.linef("FORGE_CHAN_DEF(%s, %s)", cElemType, chanName)
+	}
+	if len(g.sliceTypes)+len(g.optTypes)+len(g.resultTypes)+len(g.chanTypes) > 0 {
 		g.line("")
 	}
 
@@ -252,6 +276,40 @@ func (g *cGen) generate() string {
 	for _, lam := range g.lambdas {
 		g.linef("static %s %s(%s) {", lam.retType, lam.name, lam.params)
 		g.buf.WriteString(lam.bodyStr)
+		g.line("}")
+		g.line("")
+	}
+
+	// Emit channel implementations (function definitions — must come after type decls)
+	for cElemType, suffix := range g.chanTypes {
+		chanName := fmt.Sprintf("ForgeChan_%s", suffix)
+		g.linef("FORGE_CHAN_IMPL(%s, %s, %s)", cElemType, chanName, suffix)
+		g.line("")
+	}
+
+	// Emit spawn wrapper functions
+	for _, sf := range g.spawnFuncs {
+		if len(sf.captures) > 0 {
+			g.linef("typedef struct %s_ctx {", sf.name)
+			g.indent++
+			for _, c := range sf.captures {
+				g.linef("%s %s;", c.typ, c.name)
+			}
+			g.indent--
+			g.linef("} %s_ctx;", sf.name)
+		}
+		g.linef("static void* %s(void* _arg) {", sf.name)
+		g.indent++
+		if len(sf.captures) > 0 {
+			g.linef("%s_ctx* _ctx = (%s_ctx*)_arg;", sf.name, sf.name)
+			for _, c := range sf.captures {
+				g.linef("%s %s = _ctx->%s;", c.typ, c.name, c.name)
+			}
+			g.line("free(_ctx);")
+		}
+		g.buf.WriteString(sf.bodyStr)
+		g.line("return NULL;")
+		g.indent--
 		g.line("}")
 		g.line("")
 	}
@@ -926,10 +984,71 @@ func (g *cGen) emitStmt(s *LStmt) {
 
 	case LStmtSend:
 		d := s.Data.(*LSend)
-		g.linef("/* channel send: %s <- %s */", g.emitValue(&d.Channel), g.emitValue(&d.Value))
+		chanType := d.Channel.Type
+		if chanType == nil {
+			if d.Channel.Kind == LValVar {
+				chanType = g.varTypes[d.Channel.Name]
+			} else if d.Channel.Kind == LValTemp {
+				if t, ok := g.tempTypes[d.Channel.TempID]; ok {
+					chanType = t
+				}
+			}
+		}
+		suffix := "void"
+		if chanType != nil && chanType.Kind == LTyChannel && chanType.Elem != nil {
+			suffix = g.chanSuffix(chanType.Elem)
+		}
+		g.linef("forge_chan_send_%s(%s, %s);", suffix, g.emitValue(&d.Channel), g.emitValue(&d.Value))
 
 	case LStmtSpawn:
-		g.line("/* spawn: goroutines not supported in C backend */")
+		d := s.Data.(*LSpawn)
+		g.spawnID++
+		funcName := fmt.Sprintf("_spawn_%d", g.spawnID)
+
+		// Auto-detect captured variables: used in body but not declared within it
+		usedVars := collectUsedVars(d.Body)
+		declaredVars := collectDeclaredVars(d.Body)
+		var captures []cCapture
+		for varName := range usedVars {
+			if !declaredVars[varName] {
+				ctyp := "void*"
+				if t, ok := g.varTypes[varName]; ok && t != nil {
+					ctyp = g.cType(t)
+				}
+				captures = append(captures, cCapture{name: varName, typ: ctyp})
+			}
+		}
+
+		// Emit the body into a separate buffer
+		savedBuf := g.buf
+		savedIndent := g.indent
+		g.buf = strings.Builder{}
+		g.indent = 1
+		g.emitStmts(d.Body)
+		bodyStr := g.buf.String()
+		g.buf = savedBuf
+		g.indent = savedIndent
+
+		g.spawnFuncs = append(g.spawnFuncs, cSpawnFunc{
+			name:     funcName,
+			bodyStr:  bodyStr,
+			captures: captures,
+		})
+
+		// Emit spawn call
+		if len(captures) > 0 {
+			g.linef("{")
+			g.indent++
+			g.linef("%s_ctx* _ctx = (%s_ctx*)malloc(sizeof(%s_ctx));", funcName, funcName, funcName)
+			for _, c := range captures {
+				g.linef("_ctx->%s = %s;", c.name, c.name)
+			}
+			g.linef("forge_spawn(%s, _ctx);", funcName)
+			g.indent--
+			g.linef("}")
+		} else {
+			g.linef("forge_spawn(%s, NULL);", funcName)
+		}
 
 	case LStmtSelect:
 		g.line("/* select: channels not supported in C backend */")
@@ -1563,7 +1682,13 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		return "NULL /* make_map: not supported in C backend */"
 
 	case LExprMakeChannel:
-		return "NULL /* make_channel: not supported in C backend */"
+		d := e.Data.(*LMakeChannelData)
+		suffix := g.chanSuffix(d.ElemType)
+		bufSize := "0"
+		if d.BufSize != nil {
+			bufSize = g.emitValue(d.BufSize)
+		}
+		return fmt.Sprintf("forge_chan_make_%s(%s)", suffix, bufSize)
 
 	case LExprFuncRef:
 		d := e.Data.(*LFuncRefData)
@@ -1775,6 +1900,43 @@ func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 			return fmt.Sprintf("forge_slice_empty(%s) /* values: maps not supported */", g.sliceTypeName(d.Args[0].Type.Elem))
 		}
 		return fmt.Sprintf("forge_slice_empty(%s) /* values: maps not supported */", g.sliceTypeName(&LType{Kind: LTyI32}))
+
+	case "channel_receive":
+		if len(d.Args) > 0 {
+			chanType := d.Args[0].Type
+			if chanType == nil {
+				if d.Args[0].Kind == LValVar {
+					chanType = g.varTypes[d.Args[0].Name]
+				} else if d.Args[0].Kind == LValTemp {
+					if t, ok := g.tempTypes[d.Args[0].TempID]; ok {
+						chanType = t
+					}
+				}
+			}
+			suffix := "void"
+			if chanType != nil && chanType.Kind == LTyChannel && chanType.Elem != nil {
+				suffix = g.chanSuffix(chanType.Elem)
+			}
+			return fmt.Sprintf("forge_chan_recv_%s(%s)", suffix, g.emitValue(&d.Args[0]))
+		}
+	case "channel_close":
+		if len(d.Args) > 0 {
+			chanType := d.Args[0].Type
+			if chanType == nil {
+				if d.Args[0].Kind == LValVar {
+					chanType = g.varTypes[d.Args[0].Name]
+				} else if d.Args[0].Kind == LValTemp {
+					if t, ok := g.tempTypes[d.Args[0].TempID]; ok {
+						chanType = t
+					}
+				}
+			}
+			suffix := "void"
+			if chanType != nil && chanType.Kind == LTyChannel && chanType.Elem != nil {
+				suffix = g.chanSuffix(chanType.Elem)
+			}
+			return fmt.Sprintf("forge_chan_close_%s(%s)", suffix, g.emitValue(&d.Args[0]))
+		}
 
 	case "println", "Println":
 		return g.emitPrintln(d.Args)
@@ -2019,6 +2181,10 @@ func (g *cGen) cType(t *LType) string {
 		// The struct name is derived from the function that produces it.
 		return "void* /* generator */"
 	case LTyChannel:
+		if t.Elem != nil {
+			suffix := g.chanSuffix(t.Elem)
+			return fmt.Sprintf("ForgeChan_%s*", suffix)
+		}
 		return "void* /* channel */"
 	case LTyFuncPtr:
 		ret := g.cReturnType(t.Return)
@@ -2148,6 +2314,24 @@ func (g *cGen) resultTypeNameFromExpr(e *LExpr) string {
 	return "ForgeResult_void"
 }
 
+// Channel type helpers — suffix is used for FORGE_CHAN_DEF/IMPL macros.
+func (g *cGen) chanSuffix(elem *LType) string {
+	key := g.cType(elem)
+	if suffix, ok := g.chanTypes[key]; ok {
+		return suffix
+	}
+	suffix := sanitizeCTypeName(key)
+	g.chanTypes[key] = suffix
+	return suffix
+}
+
+func (g *cGen) chanSuffixFromType(t *LType) string {
+	if t != nil && t.Kind == LTyChannel && t.Elem != nil {
+		return g.chanSuffix(t.Elem)
+	}
+	return "void"
+}
+
 // collectCompositeTypes walks all types to pre-register slices, optionals, and results.
 func (g *cGen) collectCompositeTypes() {
 	var containsTypeVar func(t *LType) bool
@@ -2176,6 +2360,10 @@ func (g *cGen) collectCompositeTypes() {
 			}
 		case LTyErrorResult:
 			g.resultTypeName(t.Elem)
+		case LTyChannel:
+			if t.Elem != nil {
+				g.chanSuffix(t.Elem)
+			}
 		}
 		walkType(t.Elem)
 		walkType(t.Key)
@@ -2222,6 +2410,9 @@ func (g *cGen) collectCompositeTypes() {
 				}
 			case LExprMakeSlice:
 				// No data — type info is on e.Type
+			case LExprMakeChannel:
+				d := e.Data.(*LMakeChannelData)
+				walkType(d.ElemType)
 			case LExprMakeResult:
 				d := e.Data.(*LMakeResultData)
 				walkVal(&d.Value)
@@ -2274,6 +2465,13 @@ func (g *cGen) collectCompositeTypes() {
 				case LStmtBlock:
 					d := s.Data.(*LBlock)
 					walkStmts(d.Stmts)
+				case LStmtSpawn:
+					d := s.Data.(*LSpawn)
+					walkStmts(d.Body)
+				case LStmtSend:
+					d := s.Data.(*LSend)
+					walkVal(&d.Channel)
+					walkVal(&d.Value)
 				case LStmtReturn:
 					d := s.Data.(*LReturn)
 					for i := range d.Values {
@@ -2670,4 +2868,147 @@ func cUnOp(op LUnOpKind) string {
 	default:
 		return "?"
 	}
+}
+
+// collectUsedVars scans LIR statements for all variable names referenced (read or written).
+func collectUsedVars(stmts []LStmt) map[string]bool {
+	used := map[string]bool{}
+	var walkVal func(v *LValue)
+	walkVal = func(v *LValue) {
+		if v != nil && v.Kind == LValVar {
+			used[v.Name] = true
+		}
+	}
+	var walkExpr func(e *LExpr)
+	walkExpr = func(e *LExpr) {
+		if e == nil {
+			return
+		}
+		switch e.Kind {
+		case LExprCall:
+			d := e.Data.(*LCallData)
+			for i := range d.Args {
+				walkVal(&d.Args[i])
+			}
+		case LExprMethodCall:
+			d := e.Data.(*LMethodCallData)
+			walkVal(&d.Receiver)
+			for i := range d.Args {
+				walkVal(&d.Args[i])
+			}
+		case LExprBuiltin:
+			d := e.Data.(*LBuiltinData)
+			for i := range d.Args {
+				walkVal(&d.Args[i])
+			}
+		case LExprBinOp:
+			d := e.Data.(*LBinOpData)
+			walkVal(&d.Left)
+			walkVal(&d.Right)
+		case LExprUnOp:
+			d := e.Data.(*LUnOpData)
+			walkVal(&d.Operand)
+		case LExprCast:
+			d := e.Data.(*LCastData)
+			walkVal(&d.Operand)
+		case LExprStructField:
+			d := e.Data.(*LStructFieldData)
+			walkVal(&d.Receiver)
+		case LExprClassGet:
+			d := e.Data.(*LClassGetData)
+			walkVal(&d.Handle)
+		case LExprIndexGet:
+			d := e.Data.(*LIndexGetData)
+			walkVal(&d.Collection)
+			walkVal(&d.Index)
+		case LExprWrapOptional:
+			d := e.Data.(*LWrapOptionalData)
+			walkVal(&d.Value)
+		case LExprMakeChannel:
+			d := e.Data.(*LMakeChannelData)
+			if d.BufSize != nil {
+				walkVal(d.BufSize)
+			}
+		}
+	}
+	var walkStmts func(ss []LStmt)
+	walkStmts = func(ss []LStmt) {
+		for i := range ss {
+			s := &ss[i]
+			switch s.Kind {
+			case LStmtTempDef:
+				d := s.Data.(*LTempDef)
+				walkExpr(&d.Expr)
+			case LStmtVarDecl:
+				d := s.Data.(*LVarDecl)
+				if d.Init != nil {
+					walkVal(d.Init)
+				}
+			case LStmtAssign:
+				d := s.Data.(*LAssign)
+				used[d.Target] = true
+				walkVal(&d.Value)
+			case LStmtSideEffect:
+				d := s.Data.(*LSideEffect)
+				walkExpr(&d.Expr)
+			case LStmtSend:
+				d := s.Data.(*LSend)
+				walkVal(&d.Channel)
+				walkVal(&d.Value)
+			case LStmtIf:
+				d := s.Data.(*LIf)
+				walkStmts(d.Then)
+				walkStmts(d.Else)
+			case LStmtWhile:
+				d := s.Data.(*LWhile)
+				walkStmts(d.CondBlock)
+				walkStmts(d.Body)
+			case LStmtFor:
+				d := s.Data.(*LFor)
+				walkStmts(d.Body)
+			case LStmtBlock:
+				d := s.Data.(*LBlock)
+				walkStmts(d.Stmts)
+			case LStmtReturn:
+				d := s.Data.(*LReturn)
+				for i := range d.Values {
+					walkVal(&d.Values[i])
+				}
+			}
+		}
+	}
+	walkStmts(stmts)
+	return used
+}
+
+// collectDeclaredVars scans LIR statements for variable names declared within them.
+func collectDeclaredVars(stmts []LStmt) map[string]bool {
+	decl := map[string]bool{}
+	var walkStmts func(ss []LStmt)
+	walkStmts = func(ss []LStmt) {
+		for i := range ss {
+			s := &ss[i]
+			switch s.Kind {
+			case LStmtVarDecl:
+				d := s.Data.(*LVarDecl)
+				decl[d.Name] = true
+			case LStmtIf:
+				d := s.Data.(*LIf)
+				walkStmts(d.Then)
+				walkStmts(d.Else)
+			case LStmtWhile:
+				d := s.Data.(*LWhile)
+				walkStmts(d.Body)
+			case LStmtFor:
+				d := s.Data.(*LFor)
+				decl[d.Var] = true
+				walkStmts(d.Body)
+			case LStmtBlock:
+				d := s.Data.(*LBlock)
+				walkStmts(d.Stmts)
+			}
+		}
+	}
+	walkStmts(stmts)
+	return decl
 }
