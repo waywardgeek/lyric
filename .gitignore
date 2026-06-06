@@ -19,6 +19,9 @@ Thumbs.db
 !**/*_test.go
 !cmd/**/*.go
 !pkg/**/*.go
+
+# Generated C output from .fg compilation
+*.c
 /grok-update
 /grok-gen
 /grok
