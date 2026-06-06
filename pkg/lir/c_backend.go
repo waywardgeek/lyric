@@ -304,10 +304,11 @@ func (g *cGen) generate() string {
 		if len(sf.captures) > 0 {
 			g.linef("%s_ctx* _ctx = (%s_ctx*)_arg;", sf.name, sf.name)
 			// No local copies — body accesses via (*_ctx->name)
-			// No free — ctx is shared across goroutines spawned in a loop
 		}
 		g.buf.WriteString(sf.bodyStr)
-		g.linef("free(_ctx);")
+		if len(sf.captures) > 0 {
+			g.linef("free(_ctx);")
+		}
 		g.line("return NULL;")
 		g.indent--
 		g.line("}")
