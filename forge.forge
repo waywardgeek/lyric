@@ -117,12 +117,12 @@ forge Forge {
   """
 
   doc "Future Roadmap": """
-    - C backend: maps, concurrency (pthreads), garbage collection (Boehm GC)
-    - Interface dispatch in C via vtables (needed for demo.fg)
+    - C backend: maps, lock body scoping, garbage collection (Boehm GC)
     - LLVM backend (after C backend is mature)
     - Expression parsing for requires/ensures annotations
     - Language server: AST + Span for IDE integration
     - CI integration: forge verify as pre-commit hook
+    - Bootstrap: rewrite Forge compiler in Forge
   """
 
   source: ["cmd/forge/main.go", "cmd/forge/shared.go", "cmd/forge/fmt.go", "cmd/forge/update.go"]

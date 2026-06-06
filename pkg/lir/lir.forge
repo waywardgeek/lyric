@@ -91,18 +91,28 @@ forge Lir {
     - Lambdas: hoisted to top-level static functions
     - Enums: integer tags + variant structs
     - Unions: ForgeUnion tagged struct with runtime dispatch
+    - Generators: state machine transform (Tatham/Duff's device pattern) —
+      state struct + _init()/_next() functions, yield points via switch/goto
+    - Channels: FORGE_CHAN_DEF/IMPL macros per element type, pthreads-based
+      blocking send/recv/close via mutex + condition variables
+    - Spawn: body hoisted to static function with auto-captured variables
+      in a heap-allocated context struct, pthread_create + detach
+    - Interface dispatch: vtable struct + boxed interface struct (void* data +
+      vtable pointer), static vtable instances per (class, interface) pair
     - Forward decl ordering: struct typedefs → composite macros → enums →
-      struct/class defs → interfaces → function forward decls → bodies
+      struct/class defs → generator structs → interface vtables →
+      function forward decls → chan impls → spawn funcs → lambdas → bodies
 
     inferExprType() resolves concrete C types through temp→var→unwrap chains.
     tempTypes/varTypes maps on cGen for cross-reference resolution.
 
-    Status: 31/34 .fg files compile. Missing: interface vtables, channels/threading.
+    Status: 35/36 .fg files compile. Only lock.fg remaining (variable scoping
+    in lock bodies). All other features working: vtables, channels, spawn,
+    generators, generics (via monomorphization).
   """
 
   doc "Technical Debt": """
-    - C backend: no maps, no concurrency, no GC
-    - Interface dispatch needs vtables in C (blocks demo.fg)
+    - C backend: no maps, no GC, lock body variable scoping
     - Advanced optimizations: constant folding, dead code elimination, inlining
     - Source maps for debugging generated code
   """
