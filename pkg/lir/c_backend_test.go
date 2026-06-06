@@ -137,6 +137,29 @@ func TestCBackendRuns(t *testing.T) {
 			t.Logf("C source:\n%s", cSrc)
 		}
 	})
+
+	t.Run("demo.fg", func(t *testing.T) {
+		path := filepath.Join(testdataDir, "demo.fg")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Skipf("can't read: %v", err)
+		}
+
+		cSrc := cPipeline(t, string(data), "demo")
+		output := compileCAndRun(t, cSrc, "demo")
+		expected := "[3] Design Forge: Language spec\n" +
+			"[5] Build parser: Recursive descent\n" +
+			"[4] Write tests: Full coverage\n" +
+			"Highest priority: 5\n" +
+			"------------------------------\n" +
+			"FizzBuzz: 1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz\n" +
+			"Tests are done!\n" +
+			"FORGE IS WORKING!\n"
+		if output != expected {
+			t.Errorf("expected:\n%s\ngot:\n%s", expected, output)
+			t.Logf("C source:\n%s", cSrc)
+		}
+	})
 }
 
 func cPipeline(t *testing.T, source, pkgName string) string {

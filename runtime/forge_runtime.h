@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
 
 /* -------------------------------------------------------------------------
  * Dynamic Slices
@@ -200,6 +201,23 @@ static inline const char* forge_sprintf(const char* fmt, ...) {
 /* Bool to string for printf */
 static inline const char* forge_bool_str(bool b) {
     return b ? "true" : "false";
+}
+
+/* String case conversion — heap-allocated result */
+static inline const char* forge_toupper(const char* s) {
+    size_t len = strlen(s);
+    char* r = (char*)malloc(len + 1);
+    for (size_t i = 0; i < len; i++) r[i] = (char)toupper((unsigned char)s[i]);
+    r[len] = '\0';
+    return r;
+}
+
+static inline const char* forge_tolower(const char* s) {
+    size_t len = strlen(s);
+    char* r = (char*)malloc(len + 1);
+    for (size_t i = 0; i < len; i++) r[i] = (char)tolower((unsigned char)s[i]);
+    r[len] = '\0';
+    return r;
 }
 
 /* -------------------------------------------------------------------------

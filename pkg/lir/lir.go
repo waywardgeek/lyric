@@ -629,12 +629,13 @@ type LStructDecl struct {
 
 // LClassDecl: a heap-allocated class with accessor-based field access.
 type LClassDecl struct {
-	Name      string
-	Fields    []LField
+	Name       string
+	Fields     []LField
 	TypeParams []LTypeParam
-	GuardedBy map[string]string // field → lock name
-	HasFinal  bool
+	GuardedBy  map[string]string // field → lock name
+	HasFinal   bool
 	IsExported bool
+	Implements []string // interface names this class implements
 }
 
 // LEnumDecl: a tagged union.

@@ -418,6 +418,10 @@ func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType {
 		copied.IsExported = l.exported[nt.Name]
 		return &copied
 	}
+	// Check if it's an interface
+	if _, ok := l.ifaceDecls[nt.Name]; ok {
+		return &LType{Kind: LTyAny, Name: nt.Name, IsExported: l.exported[nt.Name]}
+	}
 	// Default to struct
 	return &LType{Kind: LTyStruct, Name: nt.Name, IsExported: l.exported[nt.Name]}
 }
@@ -839,6 +843,7 @@ func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl {
 		TypeParams: typeParams,
 		GuardedBy:  guardedBy,
 		IsExported: cls.IsPublic,
+		Implements: cls.Implements,
 	}
 	l.typeParamsInScope = savedTypeParams
 	return result

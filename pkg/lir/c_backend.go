@@ -19,6 +19,28 @@ func EmitC(prog *LProgram) string {
 		resultTypes: map[string]string{},
 		lambdaID:    0,
 		lambdas:     nil,
+		ifaceByName: map[string]*LInterfaceDecl{},
+		implMap:     map[string][]string{}, // class → []interface
+		funcByName:  map[string]*LFuncDecl{},
+	}
+	// Build interface lookup
+	for i := range prog.Interfaces {
+		g.ifaceByName[prog.Interfaces[i].Name] = &prog.Interfaces[i]
+	}
+	// Build implements map from class declarations
+	for _, c := range prog.Classes {
+		if len(c.Implements) > 0 {
+			g.implMap[c.Name] = c.Implements
+		}
+	}
+	// Build function lookup
+	for i := range prog.Functions {
+		f := &prog.Functions[i]
+		key := f.Name
+		if f.Receiver != "" {
+			key = f.Receiver + "." + f.Name
+		}
+		g.funcByName[key] = f
 	}
 	return g.generate()
 }
@@ -41,9 +63,14 @@ type cGen struct {
 	currentFunc *LFuncDecl // tracks current function for return type info
 
 	// Generator state machine support
-	inGenerator  bool   // true when emitting a generator's next function
+	inGenerator   bool   // true when emitting a generator's next function
 	genStructName string // name of the current generator's state struct type
 	genYieldCount int    // counter for yield state labels
+
+	// Interface vtable dispatch
+	ifaceByName map[string]*LInterfaceDecl // interface name → decl
+	implMap     map[string][]string        // class name → interfaces it implements
+	funcByName  map[string]*LFuncDecl      // "name" or "Class.method" → func decl
 }
 
 type cLambda struct {
@@ -122,10 +149,47 @@ func (g *cGen) generate() string {
 		}
 	}
 
-	// Emit interface definitions as opaque void*
+	// Emit interface vtable and boxed types (skip generic interfaces)
 	for _, iface := range g.prog.Interfaces {
-		g.linef("typedef void* %s; /* interface */", g.structName(iface.Name, iface.IsExported))
+		if len(iface.TypeParams) > 0 {
+			continue // Generic interfaces are handled through concrete methods directly
+		}
+		ifName := g.structName(iface.Name, iface.IsExported)
+		// Vtable struct: function pointers for each method
+		g.linef("typedef struct %s_vtable {", ifName)
+		g.indent++
+		for _, m := range iface.Methods {
+			retType := g.cType(m.ReturnType)
+			var paramTypes []string
+			paramTypes = append(paramTypes, "void*") // self
+			for _, p := range m.Params {
+				paramTypes = append(paramTypes, g.cType(p.Type))
+			}
+			g.linef("%s (*%s)(%s);", retType, m.Name, strings.Join(paramTypes, ", "))
+		}
+		g.indent--
+		g.linef("} %s_vtable;", ifName)
+		// Boxed interface struct: data pointer + vtable pointer
+		g.linef("typedef struct %s {", ifName)
+		g.indent++
+		g.line("void* _data;")
+		g.linef("const %s_vtable* _vtable;", ifName)
+		g.indent--
+		g.linef("} %s;", ifName)
 		g.line("")
+	}
+
+	// Emit static vtable instances for each (class, interface) pair
+	for _, c := range g.prog.Classes {
+		className := g.structName(c.Name, c.IsExported)
+		for _, ifaceName := range c.Implements {
+			iface, ok := g.ifaceByName[ifaceName]
+			if !ok {
+				continue
+			}
+			ifName := g.structName(iface.Name, iface.IsExported)
+			g.linef("static const %s_vtable %s_as_%s;", ifName, className, ifName)
+		}
 	}
 
 	// Emit type aliases
@@ -142,6 +206,36 @@ func (g *cGen) generate() string {
 		g.emitFuncForwardDecl(&f)
 	}
 	if len(g.prog.Functions) > 0 {
+		g.line("")
+	}
+
+	// Emit vtable definitions (after forward decls so method names are known)
+	for _, c := range g.prog.Classes {
+		className := g.structName(c.Name, c.IsExported)
+		for _, ifaceName := range c.Implements {
+			iface, ok := g.ifaceByName[ifaceName]
+			if !ok {
+				continue
+			}
+			ifName := g.structName(iface.Name, iface.IsExported)
+			g.linef("static const %s_vtable %s_as_%s = {", ifName, className, ifName)
+			g.indent++
+			for _, m := range iface.Methods {
+				// Build the cast type for the function pointer
+				retType := g.cType(m.ReturnType)
+				var paramTypes []string
+				paramTypes = append(paramTypes, "void*")
+				for _, p := range m.Params {
+					paramTypes = append(paramTypes, g.cType(p.Type))
+				}
+				castType := fmt.Sprintf("%s(*)(%s)", retType, strings.Join(paramTypes, ", "))
+				g.linef(".%s = (%s)%s_%s,", m.Name, castType, className, m.Name)
+			}
+			g.indent--
+			g.linef("};")
+		}
+	}
+	if len(g.prog.Classes) > 0 {
 		g.line("")
 	}
 
@@ -274,6 +368,9 @@ func (g *cGen) emitFuncDecl(f *LFuncDecl) {
 		g.emitGeneratorFuncDecl(f)
 		return
 	}
+	// Clear per-function type maps (not for generators — they share state across init/next)
+	g.tempTypes = map[int]*LType{}
+	g.varTypes = map[string]*LType{}
 	retType := g.cReturnType(f.ReturnType)
 	params := g.cParamList(f)
 	name := g.funcName(f)
@@ -284,6 +381,12 @@ func (g *cGen) emitFuncDecl(f *LFuncDecl) {
 		g.linef("%s %s(%s) {", retType, name, params)
 	}
 	g.indent++
+	// Register param types for format specifier resolution
+	for _, p := range f.Params {
+		if p.Type != nil {
+			g.varTypes[p.Name] = p.Type
+		}
+	}
 	g.emitStmts(f.Body)
 	if name == "main" {
 		g.line("return 0;")
@@ -1145,7 +1248,17 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 			return fmt.Sprintf("({ int _v = atoi(%s); %s _r = forge_ok(_v, %s); _r; })",
 				g.emitValue(&d.Args[0]), resultType, resultType)
 		}
-		args := g.emitArgs(d.Args)
+		// strings stdlib
+		if name == "strings.ToUpper" && len(d.Args) > 0 {
+			return fmt.Sprintf("forge_toupper(%s)", g.emitValue(&d.Args[0]))
+		}
+		if name == "strings.ToLower" && len(d.Args) > 0 {
+			return fmt.Sprintf("forge_tolower(%s)", g.emitValue(&d.Args[0]))
+		}
+		if name == "strings.Contains" && len(d.Args) >= 2 {
+			return fmt.Sprintf("(strstr(%s, %s) != NULL)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+		}
+		args := g.emitArgsBoxed(d.Func, d.Args)
 		// If calling a generator function, redirect to its _init function
 		if g.isGenFuncByName(name) {
 			return fmt.Sprintf("%s_init(%s)", name, args)
@@ -1156,6 +1269,26 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		d := e.Data.(*LMethodCallData)
 		recv := g.emitValue(&d.Receiver)
 		args := g.emitArgs(d.Args)
+
+		// Check if receiver is interface-typed → vtable dispatch
+		recvType := d.Receiver.Type
+		if recvType == nil {
+			if d.Receiver.Kind == LValTemp {
+				recvType = g.tempTypes[d.Receiver.TempID]
+			} else if d.Receiver.Kind == LValVar {
+				recvType = g.varTypes[d.Receiver.Name]
+			}
+		}
+		if recvType != nil && recvType.Kind == LTyAny && recvType.Name != "" {
+			if _, isIface := g.ifaceByName[recvType.Name]; isIface {
+				// Vtable dispatch: recv._vtable->method(recv._data, args...)
+				if args != "" {
+					return fmt.Sprintf("%s._vtable->%s(%s._data, %s)", recv, d.Method, recv, args)
+				}
+				return fmt.Sprintf("%s._vtable->%s(%s._data)", recv, d.Method, recv)
+			}
+		}
+
 		className := ""
 		if d.Receiver.Type != nil {
 			className = d.Receiver.Type.Name
@@ -1761,6 +1894,57 @@ func (g *cGen) emitArgs(args []LValue) string {
 	return strings.Join(parts, ", ")
 }
 
+// emitArgsBoxed emits function call arguments, boxing concrete types when the
+// target function parameter is interface-typed.
+func (g *cGen) emitArgsBoxed(funcName string, args []LValue) string {
+	// Look up target function to find param types (use original name, not cSafeName)
+	fn := g.funcByName[funcName]
+	var parts []string
+	for i, a := range args {
+		argStr := g.emitValue(&a)
+		// Check if this arg needs boxing (concrete → interface)
+		if fn != nil && i < len(fn.Params) {
+			pt := fn.Params[i].Type
+			if pt != nil && pt.Kind == LTyAny && pt.Name != "" {
+				if _, isIface := g.ifaceByName[pt.Name]; isIface {
+					// Resolve concrete type of the argument
+					concreteClass := g.resolveConcreteClass(&a)
+					if concreteClass != "" {
+						ifName := g.structName(pt.Name, pt.IsExported)
+						className := g.structName(concreteClass, false)
+						argStr = fmt.Sprintf("(%s){._data = %s, ._vtable = &%s_as_%s}",
+							ifName, argStr, className, ifName)
+					}
+				}
+			}
+		}
+		parts = append(parts, argStr)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// resolveConcreteClass returns the class name for a value, or "" if unknown.
+func (g *cGen) resolveConcreteClass(v *LValue) string {
+	t := v.Type
+	if t == nil {
+		if v.Kind == LValTemp {
+			t = g.tempTypes[v.TempID]
+		} else if v.Kind == LValVar {
+			t = g.varTypes[v.Name]
+		}
+	}
+	if t == nil {
+		return ""
+	}
+	if t.Kind == LTyClassHandle {
+		return t.Name
+	}
+	if t.Kind == LTyOptional && t.Elem != nil && t.Elem.Kind == LTyClassHandle {
+		return t.Elem.Name
+	}
+	return ""
+}
+
 // ---------------------------------------------------------------------------
 // Type mapping
 // ---------------------------------------------------------------------------
@@ -1853,6 +2037,12 @@ func (g *cGen) cType(t *LType) string {
 	case LTyTypeVar:
 		return fmt.Sprintf("void* /* typevar %s */", t.Name)
 	case LTyAny:
+		// If this is a named interface type, use the boxed struct type
+		if t.Name != "" {
+			if _, isIface := g.ifaceByName[t.Name]; isIface {
+				return g.structName(t.Name, t.IsExported)
+			}
+		}
 		return "void*"
 	case LTyUnion:
 		return "ForgeUnion"
@@ -2218,6 +2408,11 @@ func (g *cGen) inferExprType(e *LExpr) *LType {
 	// Try to infer from function call return type
 	if e.Kind == LExprCall {
 		d := e.Data.(*LCallData)
+		// Known stdlib functions that return strings
+		switch d.Func {
+		case "strings.ToUpper", "strings.ToLower", "strconv.Itoa":
+			return &LType{Kind: LTyString}
+		}
 		for _, fn := range g.prog.Functions {
 			if fn.Name == d.Func || (fn.IsExported && fn.Name == cSafeName(d.Func)) {
 				if fn.ReturnType != nil && fn.ReturnType.Kind != LTyAny {
@@ -2231,7 +2426,24 @@ func (g *cGen) inferExprType(e *LExpr) *LType {
 	if e.Kind == LExprMethodCall {
 		d := e.Data.(*LMethodCallData)
 		recvType := d.Receiver.Type
+		if recvType == nil {
+			if d.Receiver.Kind == LValTemp {
+				recvType = g.tempTypes[d.Receiver.TempID]
+			} else if d.Receiver.Kind == LValVar {
+				recvType = g.varTypes[d.Receiver.Name]
+			}
+		}
 		if recvType != nil {
+			// Check for interface method return type
+			if recvType.Kind == LTyAny && recvType.Name != "" {
+				if iface, ok := g.ifaceByName[recvType.Name]; ok {
+					for _, m := range iface.Methods {
+						if m.Name == d.Method && m.ReturnType != nil {
+							return m.ReturnType
+						}
+					}
+				}
+			}
 			typeName := recvType.Name
 			// Apply class renames for monomorphized classes
 			if g.prog.ClassRenames != nil {
