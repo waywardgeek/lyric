@@ -1,0 +1,28 @@
+forge char_escape {
+  func main() {
+    // Character literals
+    let a: u8 = 'A'
+    let nl: u8 = '\n'
+    let tb: u8 = '\t'
+    let zr: u8 = '\0'
+    let hex: u8 = '\x41'
+    println(f"A = {a}")
+    println(f"nl = {nl}")
+    println(f"tb = {tb}")
+    println(f"zr = {zr}")
+    println(f"hex A = {hex}")
+
+    // String escape sequences
+    let s = "hello\tworld"
+    let s2 = "hex: \x48\x49"
+    println(s)
+    println(s2)
+
+    // Character comparison
+    let x: u8 = 'Z'
+    let y: u8 = 90
+    if x == y {
+      println("Z is 90")
+    }
+  }
+}

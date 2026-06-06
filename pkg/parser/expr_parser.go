@@ -368,6 +368,18 @@ func (p *Parser) parsePrimaryExpr() (*ast.Expr, error) {
 			Data: &ast.IntLitExpr{Value: tok.Text},
 			Span: tok.Span,
 		}, nil
+	case TCharLit:
+		p.next()
+		// Character literal — convert to integer value (u8)
+		val := 0
+		if len(tok.Text) > 0 {
+			val = int(tok.Text[0])
+		}
+		return &ast.Expr{
+			Kind: ast.ExprIntLit,
+			Data: &ast.IntLitExpr{Value: fmt.Sprintf("%d", val), TypeHint: "u8"},
+			Span: tok.Span,
+		}, nil
 	case TFloatLit:
 		p.next()
 		return &ast.Expr{
@@ -1057,13 +1069,20 @@ func (p *Parser) parsePattern() (*ast.Pattern, error) {
 			Data: &ast.IdentPattern{Name: tok.Text},
 			Span: tok.Span,
 		}, nil
-	case TIntLit, TStringLit, TTrue, TFalse:
+	case TIntLit, TCharLit, TStringLit, TTrue, TFalse:
 		p.next()
 		expr := ast.Expr{Span: tok.Span}
 		switch tok.Kind {
 		case TIntLit:
 			expr.Kind = ast.ExprIntLit
 			expr.Data = &ast.IntLitExpr{Value: tok.Text}
+		case TCharLit:
+			expr.Kind = ast.ExprIntLit
+			val := 0
+			if len(tok.Text) > 0 {
+				val = int(tok.Text[0])
+			}
+			expr.Data = &ast.IntLitExpr{Value: fmt.Sprintf("%d", val), TypeHint: "u8"}
 		case TStringLit:
 			expr.Kind = ast.ExprStringLit
 			expr.Data = &ast.StringLitExpr{Value: tok.Text}

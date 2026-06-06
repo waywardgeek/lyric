@@ -146,6 +146,7 @@ var (
 	TypeError   = &Type{Kind: TyError}
 	TypeI32     = &Type{Kind: TyInt, Bits: 32}
 	TypeI64     = &Type{Kind: TyInt, Bits: 64}
+	TypeU8      = &Type{Kind: TyUint, Bits: 8}
 	TypeF64     = &Type{Kind: TyFloat, Bits: 64}
 )
 
@@ -873,6 +874,10 @@ func (c *Checker) checkExpr(expr *ast.Expr) *Type {
 func (c *Checker) inferExpr(expr *ast.Expr) *Type {
 	switch expr.Kind {
 	case ast.ExprIntLit:
+		lit := expr.Data.(*ast.IntLitExpr)
+		if lit.TypeHint == "u8" {
+			return TypeU8
+		}
 		return TypeI32 // default integer literal type
 	case ast.ExprFloatLit:
 		return TypeF64

@@ -66,6 +66,7 @@ const (
 	TStringLit
 	TTripleStringLit // """..."""
 	TFStringLit      // f"...{expr}..." — interpolated string (raw content stored in Text)
+	TCharLit         // 'c' — character literal (u8 value)
 
 	// Punctuation
 	TLParen    // (
@@ -218,7 +219,7 @@ var tokenNames = map[TokenKind]string{
 	TBreak: "break", TContinue: "continue", TCascadeKw: "cascade",
 	TSpawn: "spawn", TSelect: "select", TCase: "case", TLock: "lock", TPub: "pub", TYield: "yield",
 	TIdent: "ident", TIntLit: "int", TFloatLit: "float",
-	TStringLit: "string", TTripleStringLit: "triple_string", TFStringLit: "fstring",
+	TStringLit: "string", TTripleStringLit: "triple_string", TFStringLit: "fstring", TCharLit: "char",
 	TLParen: "(", TRParen: ")", TLBrace: "{", TRBrace: "}",
 	TLBracket: "[", TRBracket: "]", TComma: ",", TColon: ":",
 	TDot: ".", TArrow: "->", TFatArrow: "=>", TBiArrow: "<->", TPipe: "|",
@@ -372,6 +373,11 @@ func (l *Lexer) scan() Token {
 		return l.scanString(start)
 	}
 
+	// Character literal
+	if r == '\'' {
+		return l.scanCharLit(start)
+	}
+
 	// Number
 	if r >= '0' && r <= '9' {
 		return l.scanNumber(start)
@@ -495,6 +501,69 @@ func (l *Lexer) scan() Token {
 	return Token{Kind: TIdent, Text: string(r), Span: ast.Span{Start: start, End: l.currentPos()}}
 }
 
+// scanEscape handles a backslash escape sequence, writing the result to buf.
+// The backslash has already been consumed. Returns false on invalid escape.
+func (l *Lexer) scanEscape(buf *strings.Builder) bool {
+	next := l.advance()
+	switch next {
+	case 'n':
+		buf.WriteByte('\n')
+	case 'r':
+		buf.WriteByte('\r')
+	case 't':
+		buf.WriteByte('\t')
+	case '\\':
+		buf.WriteByte('\\')
+	case '\'':
+		buf.WriteByte('\'')
+	case '"':
+		buf.WriteByte('"')
+	case '0':
+		buf.WriteByte(0)
+	case 'x':
+		// Two hex digits
+		hi := l.advance()
+		lo := l.advance()
+		val := hexVal(hi)<<4 | hexVal(lo)
+		buf.WriteByte(byte(val))
+	default:
+		buf.WriteByte('\\')
+		buf.WriteRune(next)
+		return false
+	}
+	return true
+}
+
+func hexVal(r rune) byte {
+	switch {
+	case r >= '0' && r <= '9':
+		return byte(r - '0')
+	case r >= 'a' && r <= 'f':
+		return byte(r - 'a' + 10)
+	case r >= 'A' && r <= 'F':
+		return byte(r - 'A' + 10)
+	default:
+		return 0
+	}
+}
+
+func (l *Lexer) scanCharLit(start ast.Pos) Token {
+	l.advance() // opening '
+	var buf strings.Builder
+	r := l.peek()
+	if r == '\\' {
+		l.advance()
+		l.scanEscape(&buf)
+	} else {
+		buf.WriteRune(l.advance())
+	}
+	if l.peek() == '\'' {
+		l.advance() // closing '
+	}
+	// Store the byte value as the text
+	return Token{Kind: TCharLit, Text: buf.String(), Span: ast.Span{Start: start, End: l.currentPos()}}
+}
+
 func (l *Lexer) scanString(start ast.Pos) Token {
 	l.advance() // opening "
 
@@ -512,20 +581,7 @@ func (l *Lexer) scanString(start ast.Pos) Token {
 			return Token{Kind: TStringLit, Text: buf.String(), Span: ast.Span{Start: start, End: l.currentPos()}}
 		}
 		if r == '\\' {
-			next := l.advance()
-			switch next {
-			case 'n':
-				buf.WriteByte('\n')
-			case 't':
-				buf.WriteByte('\t')
-			case '"':
-				buf.WriteByte('"')
-			case '\\':
-				buf.WriteByte('\\')
-			default:
-				buf.WriteByte('\\')
-				buf.WriteRune(next)
-			}
+			l.scanEscape(&buf)
 		} else {
 			buf.WriteRune(r)
 		}
@@ -551,23 +607,15 @@ func (l *Lexer) scanFString(start ast.Pos) Token {
 		} else if r == '"' && depth == 0 {
 			return Token{Kind: TFStringLit, Text: buf.String(), Span: ast.Span{Start: start, End: l.currentPos()}}
 		} else if r == '\\' && depth == 0 {
-			next := l.advance()
-			switch next {
-			case 'n':
-				buf.WriteByte('\n')
-			case 't':
-				buf.WriteByte('\t')
-			case '"':
-				buf.WriteByte('"')
-			case '\\':
-				buf.WriteByte('\\')
-			case '{':
-				buf.WriteByte('{') // escaped brace — literal {
-			case '}':
-				buf.WriteByte('}') // escaped brace — literal }
-			default:
-				buf.WriteByte('\\')
-				buf.WriteRune(next)
+			// Check for escaped braces first
+			if l.peek() == '{' {
+				buf.WriteByte('{')
+				l.advance()
+			} else if l.peek() == '}' {
+				buf.WriteByte('}')
+				l.advance()
+			} else {
+				l.scanEscape(&buf)
 			}
 		} else {
 			buf.WriteRune(r)

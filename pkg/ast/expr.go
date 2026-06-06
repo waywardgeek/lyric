@@ -44,7 +44,8 @@ type IdentExpr struct {
 }
 
 type IntLitExpr struct {
-	Value string // keep as string to support i256
+	Value    string // keep as string to support i256
+	TypeHint string // "u8" for character literals, "" for default (i32)
 }
 
 type FloatLitExpr struct {
