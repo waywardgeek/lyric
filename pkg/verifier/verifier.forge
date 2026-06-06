@@ -153,66 +153,66 @@ forge Verifier {
 // func verifyCompleteness(block forgeast.ForgeBlock, goInfo *goTypeInfo, forgePath, goFile string, result *Result)    :223
 //
 // isExported returns true if a Go name starts with an uppercase letter.
-// func isExported(name string) bool    :287
+// func isExported(name string) bool    :290
 //
-// func parseGoDir(dir string) (*goTypeInfo, error)    :294
+// func parseGoDir(dir string) (*goTypeInfo, error)    :297
 //
-// func parseGoFile(path string) (*goTypeInfo, error)    :316
+// func parseGoFile(path string) (*goTypeInfo, error)    :319
 //
-// func extractGoTypes(file *ast.File, info *goTypeInfo)    :334
+// func extractGoTypes(file *ast.File, info *goTypeInfo)    :337
 //
-// func extractFuncInfo(d *ast.FuncDecl) *goFuncInfo    :400
+// func extractFuncInfo(d *ast.FuncDecl) *goFuncInfo    :403
 //
-// func extractFuncType(ft *ast.FuncType) *goFuncInfo    :404
+// func extractFuncType(ft *ast.FuncType) *goFuncInfo    :407
 //
-// func receiverTypeName(expr ast.Expr) string    :433
+// func receiverTypeName(expr ast.Expr) string    :436
 //
-// func typeExprString(expr ast.Expr) string    :451
+// func typeExprString(expr ast.Expr) string    :454
 //
 // forgeTypeToGoString converts a forge TypeExpr into the string format that
-// func forgeTypeToGoString(t forgeast.TypeExpr) string    :491
+// func forgeTypeToGoString(t forgeast.TypeExpr) string    :494
 //
 // forgeNameToGo maps forge primitive type names to Go equivalents.
-// func forgeNameToGo(name string) string    :557
+// func forgeNameToGo(name string) string    :560
 //
 // typesMatch compares a forge type string against a Go type string.
-// func typesMatch(forgeStr, goStr string) bool    :600
+// func typesMatch(forgeStr, goStr string) bool    :603
 //
 // stripPackagePrefix removes Go package qualifiers from a type string.
-// func stripPackagePrefix(goType string) string    :626
+// func stripPackagePrefix(goType string) string    :629
 //
 // findGoName checks if a name exists in a map, trying both PascalCase and camelCase.
-// func findGoName(name string, names map[string]*goFuncInfo) (string, bool)    :661
+// func findGoName(name string, names map[string]*goFuncInfo) (string, bool)    :664
 //
-// func verifyStruct(s forgeast.StructDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :677
+// func verifyStruct(s forgeast.StructDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :680
 //
-// func verifyClass(c forgeast.ClassDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :714
+// func verifyClass(c forgeast.ClassDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :717
 //
-// func verifyEnum(e forgeast.EnumDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :776
+// func verifyEnum(e forgeast.EnumDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :779
 //
-// func verifyInterface(i forgeast.InterfaceDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :796
+// func verifyInterface(i forgeast.InterfaceDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :799
 //
-// func verifyFunction(f forgeast.FuncDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :814
+// func verifyFunction(f forgeast.FuncDecl, goInfo *goTypeInfo, forgeFile, goFile string, result *Result)    :817
 //
 // toGoFieldName tries PascalCase first (exported), then the original name (unexported).
-// func toGoFieldName(name string) string    :838
+// func toGoFieldName(name string) string    :841
 //
 // findGoField checks if a field exists, trying PascalCase, camelCase, and exact match.
-// func findGoField(name string, fields map[string]string) bool    :843
+// func findGoField(name string, fields map[string]string) bool    :846
 //
 // findGoFieldType returns the Go type string for a field, trying PascalCase, camelCase, and exact match.
-// func findGoFieldType(name string, fields map[string]string) (string, bool)    :849
+// func findGoFieldType(name string, fields map[string]string) (string, bool)    :852
 //
 // verifyFuncSignature checks parameter count and return type of a forge function against Go.
-// func verifyFuncSignature(context string, forgeFunc forgeast.FuncDecl, goFunc *goFuncInfo, forgeFile, goFile string, result *Result)    :865
+// func verifyFuncSignature(context string, forgeFunc forgeast.FuncDecl, goFunc *goFuncInfo, forgeFile, goFile string, result *Result)    :868
 //
-// func toGoMethodName(name string) string    :937
+// func toGoMethodName(name string) string    :940
 //
 // snakeToPascal converts snake_case to PascalCase.
-// func snakeToPascal(s string) string    :942
+// func snakeToPascal(s string) string    :945
 //
 // snakeToCamel converts snake_case to camelCase.
-// func snakeToCamel(s string) string    :956
+// func snakeToCamel(s string) string    :959
 
 // --- dependencies ---
 //
