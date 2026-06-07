@@ -108,7 +108,13 @@ forge bootstrap {
                       expression kinds, all statement kinds, patterns, match
                       arms, blocks, struct/map/list/tuple literals, lambdas,
                       casts, f-string interpolation.
+
+    desugar.fg      — ~760 lines. AST desugaring passes. forge desugar { }.
+                      5 passes (must run in order): InterfaceEmbeds,
+                      InterfaceFields, Relations, Destructors, DefaultImpls.
+                      Helper functions for type param substitution, deep copy,
+                      field type rewriting. Entry point: desugar_all(file).
   """
 
-  source: ["bootstrap/ast.fg", "bootstrap/lexer.fg", "bootstrap/parser.fg", "bootstrap/expr_parser.fg"]
+  source: ["bootstrap/ast.fg", "bootstrap/lexer.fg", "bootstrap/parser.fg", "bootstrap/expr_parser.fg", "bootstrap/desugar.fg"]
 }

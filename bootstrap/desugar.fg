@@ -1,0 +1,757 @@
+// desugar.fg — AST desugaring passes for the Forge bootstrap compiler
+// Ported from pkg/ast/desugar.go
+//
+// Desugar order (must be maintained):
+//   1. DesugarInterfaceEmbeds — flatten embedded interfaces
+//   2. DesugarInterfaceFields — convert field decls to getter/setter methods
+//   3. DesugarRelations — inject fields + impl blocks from relations
+//   4. DesugarDestructors — copy interface destructors to concrete classes
+//   5. DesugarDefaultImpls — extract interface methods with bodies to top-level functions
+
+forge desugar {
+
+  // ---- 1. DesugarInterfaceEmbeds ----
+  // Flattens embedded interfaces by copying fields, methods, and destructors
+  // from the embedded interface into the embedding interface, substituting type params.
+
+  func desugar_interface_embeds(file: File) {
+    // Build index of all interfaces by name
+    let iface_map = dict_new<InterfaceDecl>()
+    for block in file.fb_children() {
+      for iface in block.id_children() {
+        if !isnull(iface.name) {
+          dict_set<InterfaceDecl>(iface_map, iface.name!.name, iface)
+        }
+      }
+    }
+
+    for block in file.fb_children() {
+      for iface in block.id_children() {
+        for emb in iface.ie_children() {
+          if isnull(emb.name) { continue }
+          let entry = dict_get<InterfaceDecl>(iface_map, emb.name!.name)
+          if isnull(entry) { continue }
+          let parent_iface = entry!.value
+
+          // Build type param substitution map: parent.TypeParams[i] -> emb.TypeArgs[i]
+          let type_map = dict_new<string>()
+          let parent_tps = parent_iface.itp_children()
+          let emb_args = emb.ie_arg_children()
+          let mut i: i32 = 0
+          while i < len(parent_tps) {
+            if i < len(emb_args) {
+              let tp = parent_tps[i]
+              let arg = emb_args[i]
+              if !isnull(tp.name) {
+                let arg_name = type_expr_name(arg)
+                if !isnull(arg_name) {
+                  dict_set<string>(type_map, tp.name!.name, arg_name!.name)
+                }
+              }
+            }
+            i = i + 1
+          }
+
+          // Copy fields with type param substitution
+          for field in parent_iface.ifd_children() {
+            let new_field = InterfaceFieldDecl {
+              type_param: substitute_sym(field.type_param, type_map),
+              name: field.name,
+              type_expr: substitute_type_expr_copy(field.type_expr, type_map),
+              span: field.span,
+            }
+            array_append<InterfaceDecl, InterfaceFieldDecl>(iface, new_field)
+          }
+
+          // Copy destructors with type param substitution
+          for db in parent_iface.idb_children() {
+            let body_copy = deep_copy_block(db.body)
+            if !isnull(body_copy) {
+              substitute_type_params_in_block(body_copy!, type_map)
+            }
+            let new_db = DestructorBlock {
+              type_param: substitute_sym(db.type_param, type_map),
+              body: body_copy,
+              span: db.span,
+            }
+            array_append<InterfaceDecl, DestructorBlock>(iface, new_db)
+          }
+        }
+      }
+    }
+  }
+
+  // ---- 2. DesugarInterfaceFields ----
+  // Converts interface field declarations into getter/setter methods.
+  //   field P.first: C?  =>  func P.first(self) -> C?  +  func P.set_first(mut self, val: C?)
+
+  func desugar_interface_fields(file: File) {
+    for block in file.fb_children() {
+      for iface in block.id_children() {
+        for fd in iface.ifd_children() {
+          // Getter: func T.name(self) -> Type
+          let self_param = Param {
+            name: sym("self"),
+            type_expr: null,
+            is_mut: false,
+            is_self: true,
+            span: fd.span,
+          }
+          let getter = FuncDecl {
+            name: fd.name,
+            is_public: false,
+            receiver_type: fd.type_param,
+            return_type: fd.type_expr,
+            annotations: null,
+            body: null,
+            span: fd.span,
+          }
+          array_append<FuncDecl, Param>(getter, self_param)
+          array_append<InterfaceDecl, FuncDecl>(iface, getter)
+
+          // Setter: func T.set_name(mut self, val: Type)
+          let mut setter_name: Sym? = null
+          if !isnull(fd.name) {
+            setter_name = sym("set_" + fd.name!.name)
+          }
+          let self_param2 = Param {
+            name: sym("self"),
+            type_expr: null,
+            is_mut: true,
+            is_self: true,
+            span: fd.span,
+          }
+          let val_param = Param {
+            name: sym("val"),
+            type_expr: fd.type_expr,
+            is_mut: false,
+            is_self: false,
+            span: fd.span,
+          }
+          let setter = FuncDecl {
+            name: setter_name,
+            is_public: false,
+            receiver_type: fd.type_param,
+            return_type: null,
+            annotations: null,
+            body: null,
+            span: fd.span,
+          }
+          array_append<FuncDecl, Param>(setter, self_param2)
+          array_append<FuncDecl, Param>(setter, val_param)
+          array_append<InterfaceDecl, FuncDecl>(iface, setter)
+        }
+      }
+    }
+  }
+
+  // ---- 3. DesugarRelations ----
+  // Processes relation declarations: injects fields into concrete classes
+  // and generates impl blocks with field bindings.
+
+  func desugar_relations(file: File) {
+    for block in file.fb_children() {
+      // Build interface lookup
+      let iface_map = dict_new<InterfaceDecl>()
+      for iface in block.id_children() {
+        if !isnull(iface.name) {
+          dict_set<InterfaceDecl>(iface_map, iface.name!.name, iface)
+        }
+      }
+
+      // Build class lookup: name -> ClassDecl
+      let class_map = dict_new<ClassDecl>()
+      for cls in block.cd_children() {
+        if !isnull(cls.name) {
+          dict_set<ClassDecl>(class_map, cls.name!.name, cls)
+        }
+      }
+
+      for rel in block.rd_children() {
+        if isnull(rel.hint) { continue }
+        let iface_entry = dict_get<InterfaceDecl>(iface_map, rel.hint!.name)
+        if isnull(iface_entry) { continue }
+        let iface = iface_entry!.value
+
+        let iface_fields = iface.ifd_children()
+        if len(iface_fields) == 0 { continue }
+
+        let iface_tps = iface.itp_children()
+        if len(iface_tps) < 2 { continue }
+
+        // For each interface field, inject into the appropriate concrete class
+        let mut mappings: [ImplMapping] = []
+        for fd in iface_fields {
+          if isnull(fd.type_param) { continue }
+          let tp_name = fd.type_param!.name
+
+          // Determine which side this field belongs to
+          let mut side_name: string = ""
+          let mut side_label: string = ""
+          if !isnull(iface_tps[0].name) && tp_name == iface_tps[0].name!.name {
+            if !isnull(rel.parent.type_name) {
+              side_name = rel.parent.type_name!.name
+            }
+            if !isnull(rel.parent.label) {
+              side_label = rel.parent.label!.name
+            }
+          } else if !isnull(iface_tps[1].name) && tp_name == iface_tps[1].name!.name {
+            if !isnull(rel.child.type_name) {
+              side_name = rel.child.type_name!.name
+            }
+            if !isnull(rel.child.label) {
+              side_label = rel.child.label!.name
+            }
+          } else {
+            continue
+          }
+
+          if side_name == "" { continue }
+          let cls_entry = dict_get<ClassDecl>(class_map, side_name)
+          if isnull(cls_entry) { continue }
+          let cls = cls_entry!.value
+
+          // Build field name with label prefix
+          let mut field_name: string = ""
+          if !isnull(fd.name) {
+            field_name = fd.name!.name
+          }
+          if side_label != "" {
+            field_name = side_label + "_" + field_name
+          }
+
+          // Rewrite type: replace type param references with concrete types
+          let field_type = rewrite_field_type(fd.type_expr, iface_tps, rel)
+
+          // Inject field into concrete class
+          let new_field = Field {
+            name: sym(field_name),
+            is_public: false,
+            type_expr: field_type,
+            default_value: null,
+            guarded_by: null,
+            span: fd.span,
+          }
+          array_append<ClassDecl, Field>(cls, new_field)
+
+          // Generate field binding for getter
+          let getter_mapping = ImplMapping {
+            type_param: fd.type_param,
+            method_name: fd.name,
+            kind: FieldBind,
+            target_class: sym(side_name),
+            target_member: sym(field_name),
+            inline_func: null,
+            span: fd.span,
+          }
+          mappings = append(mappings, getter_mapping)
+
+          // Generate field binding for setter
+          let mut setter_name: Sym? = null
+          if !isnull(fd.name) {
+            setter_name = sym("set_" + fd.name!.name)
+          }
+          let setter_mapping = ImplMapping {
+            type_param: fd.type_param,
+            method_name: setter_name,
+            kind: FieldBind,
+            target_class: sym(side_name),
+            target_member: sym(field_name),
+            inline_func: null,
+            span: fd.span,
+          }
+          mappings = append(mappings, setter_mapping)
+        }
+
+        // Create or merge impl block
+        if len(mappings) > 0 {
+          let mut parent_name: string = ""
+          if !isnull(rel.parent.type_name) {
+            parent_name = rel.parent.type_name!.name
+          }
+          let mut child_name: string = ""
+          if !isnull(rel.child.type_name) {
+            child_name = rel.child.type_name!.name
+          }
+
+          // Look for existing impl block
+          let mut existing: ImplBlock? = null
+          for ib in block.ib_children() {
+            if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
+              let ta = ib.ib_arg_children()
+              if len(ta) >= 2 {
+                let n0 = type_expr_name(ta[0])
+                let n1 = type_expr_name(ta[1])
+                if !isnull(n0) && !isnull(n1) && n0!.name == parent_name && n1!.name == child_name {
+                  existing = ib
+                }
+              }
+            }
+          }
+
+          if !isnull(existing) {
+            // Merge: add mappings not already present
+            let existing_mappings = existing!.ibm_children()
+            for m in mappings {
+              let mut found = false
+              for em in existing_mappings {
+                if sym_eq(em.type_param, m.type_param) && sym_eq(em.method_name, m.method_name) {
+                  found = true
+                }
+              }
+              if !found {
+                array_append<ImplBlock, ImplMapping>(existing!, m)
+              }
+            }
+          } else {
+            // Create new impl block
+            let new_ib = ImplBlock {
+              interface_name: rel.hint,
+              label: null,
+              span: rel.span,
+            }
+            let ta0 = TypeExpr {
+              kind: Named(sym(parent_name), []),
+              span: rel.span,
+            }
+            let ta1 = TypeExpr {
+              kind: Named(sym(child_name), []),
+              span: rel.span,
+            }
+            array_append<ImplBlock, TypeExpr>(new_ib, ta0)
+            array_append<ImplBlock, TypeExpr>(new_ib, ta1)
+            for m in mappings {
+              array_append<ImplBlock, ImplMapping>(new_ib, m)
+            }
+            array_append<ForgeBlock, ImplBlock>(block, new_ib)
+          }
+        }
+      }
+    }
+  }
+
+  // ---- 4. DesugarDestructors ----
+  // Generates destroy methods on classes involved in relations by copying
+  // interface destructor blocks to concrete classes.
+
+  func desugar_destructors(file: File) {
+    for block in file.fb_children() {
+      // Build interface lookup
+      let iface_map = dict_new<InterfaceDecl>()
+      for iface in block.id_children() {
+        if !isnull(iface.name) {
+          dict_set<InterfaceDecl>(iface_map, iface.name!.name, iface)
+        }
+      }
+
+      // Build class lookup
+      let class_map = dict_new<ClassDecl>()
+      for cls in block.cd_children() {
+        if !isnull(cls.name) {
+          dict_set<ClassDecl>(class_map, cls.name!.name, cls)
+        }
+      }
+
+      // Collect destructor blocks per class name
+      // Since Dict can only store single values, we use a Dict<Block> where
+      // each Block wraps all destructor stmts for that class as sub-blocks.
+      let destroy_methods = dict_new<FuncDecl>()
+
+      for rel in block.rd_children() {
+        if isnull(rel.hint) { continue }
+        let iface_entry = dict_get<InterfaceDecl>(iface_map, rel.hint!.name)
+        if isnull(iface_entry) { continue }
+        let iface = iface_entry!.value
+
+        let destructors = iface.idb_children()
+        if len(destructors) == 0 { continue }
+
+        let iface_tps = iface.itp_children()
+        if len(iface_tps) < 2 { continue }
+
+        // Map type params to concrete class names
+        let type_map = dict_new<string>()
+        if !isnull(iface_tps[0].name) && !isnull(rel.parent.type_name) {
+          dict_set<string>(type_map, iface_tps[0].name!.name, rel.parent.type_name!.name)
+        }
+        if !isnull(iface_tps[1].name) && !isnull(rel.child.type_name) {
+          dict_set<string>(type_map, iface_tps[1].name!.name, rel.child.type_name!.name)
+        }
+
+        for db in destructors {
+          if isnull(db.type_param) { continue }
+          let mut class_name: string = ""
+          let entry = dict_get<string>(type_map, db.type_param!.name)
+          if isnull(entry) { continue }
+          class_name = entry!.value
+
+          let cls_entry = dict_get<ClassDecl>(class_map, class_name)
+          if isnull(cls_entry) { continue }
+
+          // Deep copy and substitute type params
+          let body_copy = deep_copy_block(db.body)
+          if isnull(body_copy) { continue }
+          substitute_type_params_in_block(body_copy!, type_map)
+
+          // Get or create destroy method for this class
+          let method_entry = dict_get<FuncDecl>(destroy_methods, class_name)
+          let mut method: FuncDecl? = null
+          if !isnull(method_entry) {
+            method = method_entry!.value
+          } else {
+            let self_param = Param {
+              name: sym("self"),
+              type_expr: null,
+              is_mut: true,
+              is_self: true,
+              span: db.span,
+            }
+            let destroy_body = Block { span: db.span }
+            let m = FuncDecl {
+              name: sym("destroy"),
+              is_public: true,
+              receiver_type: null,
+              return_type: null,
+              annotations: null,
+              body: destroy_body,
+              span: db.span,
+            }
+            array_append<FuncDecl, Param>(m, self_param)
+            dict_set<FuncDecl>(destroy_methods, class_name, m)
+            method = m
+          }
+
+          // Wrap destructor body in a block stmt to avoid variable collisions
+          let wrapper_stmt = Stmt {
+            kind: BlockStmt(body_copy!),
+            span: db.span,
+          }
+          array_append<Block, Stmt>(method!.body!, wrapper_stmt)
+        }
+      }
+
+      // Attach destroy methods to classes
+      for cls in block.cd_children() {
+        if isnull(cls.name) { continue }
+        let entry = dict_get<FuncDecl>(destroy_methods, cls.name!.name)
+        if !isnull(entry) {
+          array_append<ClassDecl, FuncDecl>(cls, entry!.value)
+        }
+      }
+    }
+  }
+
+  // ---- 5. DesugarDefaultImpls ----
+  // Extracts interface methods with bodies into top-level functions
+  // with relational where clauses.
+
+  func desugar_default_impls(file: File) {
+    for block in file.fb_children() {
+      for iface in block.id_children() {
+        let methods = iface.im_children()
+        let mut kept: [FuncDecl] = []
+        for m in methods {
+          if !isnull(m.body) {
+            // Extract as top-level function
+            let fn = m
+            fn.receiver_type = null
+
+            // Add interface type params
+            let iface_tps = iface.itp_children()
+            for tp in iface_tps {
+              let new_tp = TypeParam {
+                name: tp.name,
+                constraint: tp.constraint,
+                span: tp.span,
+              }
+              array_append<FuncDecl, TypeParam>(fn, new_tp)
+            }
+
+            // Add relational where clause
+            let mut where_args: [TypeExpr] = []
+            for tp in iface_tps {
+              let arg = TypeExpr {
+                kind: Named(tp.name!, []),
+                span: tp.span,
+              }
+              where_args = append(where_args, arg)
+            }
+            let wc = WhereClause {
+              variable: null,
+              constraint: iface.name,
+              span: iface.span,
+            }
+            for arg in where_args {
+              array_append<WhereClause, TypeExpr>(wc, arg)
+            }
+            array_append<FuncDecl, WhereClause>(fn, wc)
+
+            // Remove from interface, add to block
+            array_append<ForgeBlock, FuncDecl>(block, fn)
+          } else {
+            kept = append(kept, m)
+          }
+        }
+
+        // Replace interface methods with kept-only list
+        // Clear existing and re-add kept methods
+        // NOTE: ArrayList doesn't have a bulk-replace API, so we remove all
+        // and re-add the kept ones
+        for m in methods {
+          let mut found = false
+          for k in kept {
+            // Reference equality — both are class handles
+            if m == k {
+              found = true
+            }
+          }
+          if !found {
+            // Already moved to block.Functions via array_append above
+            // Just need to remove from interface's method list
+            array_remove<InterfaceDecl, FuncDecl>(m)
+          }
+        }
+      }
+    }
+  }
+
+  // ---- Main entry point ----
+
+  func desugar_all(file: File) {
+    desugar_interface_embeds(file)
+    desugar_interface_fields(file)
+    desugar_relations(file)
+    desugar_destructors(file)
+    desugar_default_impls(file)
+  }
+
+  // ---- Helper functions ----
+
+  // Extract the name Sym from a TypeExpr if it's a Named type
+  func type_expr_name(te: TypeExpr) -> Sym? {
+    match te.kind {
+      Named(name, args) => { return name }
+      _ => { return null }
+    }
+  }
+
+  // Compare two optional Syms by name string
+  func sym_eq(a: Sym?, b: Sym?) -> bool {
+    if isnull(a) && isnull(b) { return true }
+    if isnull(a) || isnull(b) { return false }
+    return a!.name == b!.name
+  }
+
+  // Substitute a Sym through the type map
+  func substitute_sym(s: Sym?, type_map: Dict<string>) -> Sym? {
+    if isnull(s) { return null }
+    let entry = dict_get<string>(type_map, s!.name)
+    if isnull(entry) { return s }
+    return sym(entry!.value)
+  }
+
+  // Create a copy of a TypeExpr with type params substituted
+  func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<string>) -> TypeExpr? {
+    if isnull(te) { return null }
+    let result = TypeExpr {
+      kind: te!.kind,
+      span: te!.span,
+    }
+    substitute_type_params_in_type_expr(result, type_map)
+    return result
+  }
+
+  // Substitute type params in a TypeExpr in place
+  func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<string>) {
+    match te.kind {
+      Named(name, args) => {
+        let entry = dict_get<string>(type_map, name.name)
+        if !isnull(entry) {
+          te.kind = Named(sym(entry!.value), args)
+        }
+        let mut i: i32 = 0
+        while i < len(args) {
+          // args[i] is a TypeExpr class — recurse
+          substitute_type_params_in_type_expr(args[i], type_map)
+          i = i + 1
+        }
+      }
+      Optional(inner) => {
+        substitute_type_params_in_type_expr(inner, type_map)
+      }
+      Sequence(elem) => {
+        substitute_type_params_in_type_expr(elem, type_map)
+      }
+      _ => {}
+    }
+  }
+
+  // Rewrite a field's type, replacing interface type params with concrete types from the relation
+  func rewrite_field_type(te: TypeExpr?, iface_tps: [TypeParam], rel: RelationDecl) -> TypeExpr? {
+    if isnull(te) { return null }
+    match te!.kind {
+      Named(name, args) => {
+        if len(iface_tps) >= 1 && !isnull(iface_tps[0].name) && name.name == iface_tps[0].name!.name {
+          if !isnull(rel.parent.type_name) {
+            return TypeExpr {
+              kind: Named(rel.parent.type_name!, []),
+              span: te!.span,
+            }
+          }
+        }
+        if len(iface_tps) >= 2 && !isnull(iface_tps[1].name) && name.name == iface_tps[1].name!.name {
+          if !isnull(rel.child.type_name) {
+            return TypeExpr {
+              kind: Named(rel.child.type_name!, []),
+              span: te!.span,
+            }
+          }
+        }
+        return te
+      }
+      Optional(inner) => {
+        let new_inner = rewrite_field_type(inner, iface_tps, rel)
+        if isnull(new_inner) { return te }
+        return TypeExpr {
+          kind: Optional(new_inner!),
+          span: te!.span,
+        }
+      }
+      Sequence(elem) => {
+        let new_elem = rewrite_field_type(elem, iface_tps, rel)
+        if isnull(new_elem) { return te }
+        return TypeExpr {
+          kind: Sequence(new_elem!),
+          span: te!.span,
+        }
+      }
+      _ => { return te }
+    }
+  }
+
+  // ---- Deep copy ----
+
+  func deep_copy_block(b: Block?) -> Block? {
+    if isnull(b) { return null }
+    let new_block = Block { span: b!.span }
+    for stmt in b!.bs_children() {
+      let new_stmt = deep_copy_stmt(stmt)
+      array_append<Block, Stmt>(new_block, new_stmt)
+    }
+    return new_block
+  }
+
+  func deep_copy_stmt(s: Stmt) -> Stmt {
+    // Create a new Stmt with the same kind — since StmtKind is an enum (value type),
+    // this copies the associated data. However, class references (Expr, Block) within
+    // the enum data are shared. For type param substitution this is acceptable because
+    // substitute functions create new enum values rather than mutating class fields.
+    return Stmt {
+      kind: s.kind,
+      span: s.span,
+    }
+  }
+
+  // ---- Type param substitution in blocks/stmts/exprs ----
+
+  func substitute_type_params_in_block(block: Block, type_map: Dict<string>) {
+    for stmt in block.bs_children() {
+      substitute_type_params_in_stmt(stmt, type_map)
+    }
+  }
+
+  func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<string>) {
+    match stmt.kind {
+      ExprStmt(expr) => {
+        substitute_type_params_in_expr(expr, type_map)
+      }
+      Assign(target, value) => {
+        substitute_type_params_in_expr(value, type_map)
+      }
+      VarDecl(name, names, type_expr, is_mut, value) => {
+        if !isnull(value) {
+          substitute_type_params_in_expr(value!, type_map)
+        }
+      }
+      Return(value) => {
+        if !isnull(value) {
+          substitute_type_params_in_expr(value!, type_map)
+        }
+      }
+      If(condition, then_block, else_ifs, else_block) => {
+        substitute_type_params_in_expr(condition, type_map)
+        substitute_type_params_in_block(then_block, type_map)
+        for ei in else_ifs {
+          if !isnull(ei.condition) {
+            substitute_type_params_in_expr(ei.condition!, type_map)
+          }
+          if !isnull(ei.body) {
+            substitute_type_params_in_block(ei.body!, type_map)
+          }
+        }
+        if !isnull(else_block) {
+          substitute_type_params_in_block(else_block!, type_map)
+        }
+      }
+      While(condition, body) => {
+        substitute_type_params_in_expr(condition, type_map)
+        substitute_type_params_in_block(body, type_map)
+      }
+      For(var_name, index_var, collection, body) => {
+        substitute_type_params_in_expr(collection, type_map)
+        substitute_type_params_in_block(body, type_map)
+      }
+      BlockStmt(block) => {
+        substitute_type_params_in_block(block, type_map)
+      }
+      _ => {}
+    }
+  }
+
+  func substitute_type_params_in_expr(expr: Expr, type_map: Dict<string>) {
+    match expr.kind {
+      Call(func_expr, type_args, args) => {
+        let mut i: i32 = 0
+        while i < len(type_args) {
+          substitute_type_params_in_type_expr(type_args[i], type_map)
+          i = i + 1
+        }
+        substitute_type_params_in_expr(func_expr, type_map)
+        i = 0
+        while i < len(args) {
+          substitute_type_params_in_expr(args[i], type_map)
+          i = i + 1
+        }
+      }
+      MethodCall(receiver, method, type_args, args) => {
+        let mut i: i32 = 0
+        while i < len(type_args) {
+          substitute_type_params_in_type_expr(type_args[i], type_map)
+          i = i + 1
+        }
+        substitute_type_params_in_expr(receiver, type_map)
+        i = 0
+        while i < len(args) {
+          substitute_type_params_in_expr(args[i], type_map)
+          i = i + 1
+        }
+      }
+      Unary(op, operand) => {
+        substitute_type_params_in_expr(operand, type_map)
+      }
+      Binary(left, op, right) => {
+        substitute_type_params_in_expr(left, type_map)
+        substitute_type_params_in_expr(right, type_map)
+      }
+      FieldAccess(receiver, field_name) => {
+        substitute_type_params_in_expr(receiver, type_map)
+      }
+      Index(receiver, index) => {
+        substitute_type_params_in_expr(receiver, type_map)
+        substitute_type_params_in_expr(index, type_map)
+      }
+      _ => {}
+    }
+  }
+
+}
