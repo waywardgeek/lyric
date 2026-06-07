@@ -306,7 +306,7 @@ forge parser {
       LCharLit => {
         self.next()
         let mut val: i32 = 0
-        if tok.text.length > 0 {
+        if len(tok.text) > 0 {
           val = <i32>tok.text[0]
         }
         return (Expr { IntLit(itoa(val), sym("u8")), span: tok.span }, null)
@@ -416,8 +416,10 @@ forge parser {
     let mut depth: i32 = 1
     while depth > 0 && self.peek().kind != SEOF {
       match self.peek().kind {
-        PLBracket => { depth = depth + 1; self.next() }
-        PRBracket => { depth = depth - 1; self.next() }
+        PLBracket => { depth = depth + 1
+          self.next() }
+        PRBracket => { depth = depth - 1
+          self.next() }
         _ => { self.next() }
       }
     }
@@ -443,7 +445,7 @@ forge parser {
     let end = self.expect(PRBrace)?
     return (Expr {
       MapLit(keys, values),
-      span: Span { start: map_tok.span.start, end: end!.span.end }
+      span: Span { start: lbrace.span.start, end: end!.span.end }
     }, null)
   }
 
@@ -548,8 +550,10 @@ forge parser {
       KFor      => { return self.parse_for() }
       KWhile    => { return self.parse_while() }
       KMatch    => { return self.parse_match_stmt() }
-      KBreak    => { self.next(); return (Stmt { Break, tok.span }, null) }
-      KContinue => { self.next(); return (Stmt { Continue, tok.span }, null) }
+      KBreak    => { self.next()
+        return (Stmt { Break, tok.span }, null) }
+      KContinue => { self.next()
+        return (Stmt { Continue, tok.span }, null) }
       KCascade  => { return self.parse_cascade() }
       KSpawn    => { return self.parse_spawn() }
       KSelect   => { return self.parse_select() }
@@ -796,7 +800,7 @@ forge parser {
       LCharLit => {
         self.next()
         let mut val: i32 = 0
-        if tok.text.length > 0 { val = <i32>tok.text[0] }
+        if len(tok.text) > 0 { val = <i32>tok.text[0] }
         let expr = Expr { kind: IntLit(itoa(val), sym("u8")), span: tok.span }
         return (Pattern { Literal(expr), span: tok.span }, null)
       }
@@ -890,7 +894,7 @@ forge parser {
       self.next()
       self.expect(PFatArrow)?
       let body = self.parse_block()?
-      return (SelectCase { true, body, Span { start, body!.span.end } }, null)
+      return (SelectCase { is_default: true, body: body, span: Span { start, body!.span.end } }, null)
     }
     self.expect(KCase)?
     // Try: case ident = expr => body (receive with binding)
@@ -1066,7 +1070,8 @@ forge parser {
         let expr_text = raw[expr_start:i]
         i = i + 1  // skip }
 
-        let expr_lex = new_lexer(expr_text, tok.span.start.file)
+        let file_sym = tok.span.start.file
+        let expr_lex = new_lexer(expr_text, file_sym!)
         let expr_parser = Parser { lex: expr_lex }
         let expr = expr_parser.parse_expr()?
         parts = append(parts, expr!)

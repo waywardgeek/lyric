@@ -1,0 +1,10 @@
+forge test_dict {
+  func main() {
+    let d = dict_new<i32>()
+    dict_set<i32>(d, "hello", 42)
+    let result = dict_get<i32>(d, "hello")
+    if !isnull(result) {
+      print(itoa(result!.value))
+    }
+  }
+}

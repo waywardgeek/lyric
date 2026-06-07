@@ -937,7 +937,7 @@ forge parser {
         label = sym(self.next().text)
       }
     }
-    return RelationSide { type_name: sym(name_tok.text), label: label }
+    return RelationSide { type_name: sym(first.text), label: label }
   }
 
   // ---- Type expressions ----

@@ -46,75 +46,71 @@ forge lexer {
     span: Span
   }
 
-  // ---- Keyword tables (Dict<TokenKind>) ----
+  // ---- Keyword lookup (if-else chain for C backend compatibility) ----
 
-  func init_keywords() -> Dict<TokenKind> {
-    let t = dict_new<TokenKind>()
-    dict_set<TokenKind>(t, "forge", KForge)
-    dict_set<TokenKind>(t, "func", KFunc)
-    dict_set<TokenKind>(t, "fn", KFunc)
-    dict_set<TokenKind>(t, "class", KClass)
-    dict_set<TokenKind>(t, "struct", KStruct)
-    dict_set<TokenKind>(t, "enum", KEnum)
-    dict_set<TokenKind>(t, "interface", KInterface)
-    dict_set<TokenKind>(t, "relation", KRelation)
-    dict_set<TokenKind>(t, "field", KField)
-    dict_set<TokenKind>(t, "destructor", KDestructor)
-    dict_set<TokenKind>(t, "embed", KEmbed)
-    dict_set<TokenKind>(t, "import", KImport)
-    dict_set<TokenKind>(t, "implements", KImplements)
-    dict_set<TokenKind>(t, "impl", KImpl)
-    dict_set<TokenKind>(t, "as", KAs)
-    dict_set<TokenKind>(t, "type", KType)
-    dict_set<TokenKind>(t, "where", KWhere)
-    dict_set<TokenKind>(t, "owns", KOwns)
-    dict_set<TokenKind>(t, "refs", KRefs)
-    dict_set<TokenKind>(t, "mut", KMut)
-    dict_set<TokenKind>(t, "self", KSelf)
-    dict_set<TokenKind>(t, "from", KFrom)
-    dict_set<TokenKind>(t, "true", KTrue)
-    dict_set<TokenKind>(t, "false", KFalse)
-    dict_set<TokenKind>(t, "nil", KNil)
-    dict_set<TokenKind>(t, "null", KNil)
-    dict_set<TokenKind>(t, "let", KLet)
-    dict_set<TokenKind>(t, "if", KIf)
-    dict_set<TokenKind>(t, "else", KElse)
-    dict_set<TokenKind>(t, "for", KFor)
-    dict_set<TokenKind>(t, "in", KIn)
-    dict_set<TokenKind>(t, "while", KWhile)
-    dict_set<TokenKind>(t, "match", KMatch)
-    dict_set<TokenKind>(t, "return", KReturn)
-    dict_set<TokenKind>(t, "break", KBreak)
-    dict_set<TokenKind>(t, "continue", KContinue)
-    dict_set<TokenKind>(t, "cascade", KCascade)
-    dict_set<TokenKind>(t, "spawn", KSpawn)
-    dict_set<TokenKind>(t, "select", KSelect)
-    dict_set<TokenKind>(t, "case", KCase)
-    dict_set<TokenKind>(t, "lock", KLock)
-    dict_set<TokenKind>(t, "yield", KYield)
-    dict_set<TokenKind>(t, "pub", KPub)
-    return t
+  func lookup_keyword(text: string) -> TokenKind? {
+    if text == "forge" { return KForge }
+    if text == "func" { return KFunc }
+    if text == "class" { return KClass }
+    if text == "struct" { return KStruct }
+    if text == "enum" { return KEnum }
+    if text == "interface" { return KInterface }
+    if text == "relation" { return KRelation }
+    if text == "destructor" { return KDestructor }
+    if text == "embed" { return KEmbed }
+    if text == "import" { return KImport }
+    if text == "impl" { return KImpl }
+    if text == "as" { return KAs }
+    if text == "type" { return KType }
+    if text == "where" { return KWhere }
+    if text == "owns" { return KOwns }
+    if text == "refs" { return KRefs }
+    if text == "mut" { return KMut }
+    if text == "self" { return KSelf }
+    if text == "from" { return KFrom }
+    if text == "true" { return KTrue }
+    if text == "false" { return KFalse }
+    if text == "nil" { return KNil }
+    if text == "null" { return KNil }
+    if text == "let" { return KLet }
+    if text == "if" { return KIf }
+    if text == "else" { return KElse }
+    if text == "for" { return KFor }
+    if text == "in" { return KIn }
+    if text == "while" { return KWhile }
+    if text == "match" { return KMatch }
+    if text == "return" { return KReturn }
+    if text == "break" { return KBreak }
+    if text == "continue" { return KContinue }
+    if text == "cascade" { return KCascade }
+    if text == "spawn" { return KSpawn }
+    if text == "select" { return KSelect }
+    if text == "case" { return KCase }
+    if text == "lock" { return KLock }
+    if text == "yield" { return KYield }
+    if text == "pub" { return KPub }
+    return null
   }
 
-  func init_annot_keywords() -> Dict<TokenKind> {
-    let t = dict_new<TokenKind>()
-    dict_set<TokenKind>(t, "why", AWhy)
-    dict_set<TokenKind>(t, "doc", ADoc)
-    dict_set<TokenKind>(t, "invariant", AInvariant)
-    dict_set<TokenKind>(t, "requires", ARequires)
-    dict_set<TokenKind>(t, "ensures", AEnsures)
-    dict_set<TokenKind>(t, "raises", ARaises)
-    dict_set<TokenKind>(t, "concurrent", AConcurrent)
-    dict_set<TokenKind>(t, "requires_lock", ARequiresLock)
-    dict_set<TokenKind>(t, "excludes_lock", AExcludesLock)
-    dict_set<TokenKind>(t, "guarded_by", AGuardedBy)
-    dict_set<TokenKind>(t, "spawns", ASpawns)
-    dict_set<TokenKind>(t, "pure", APure)
-    dict_set<TokenKind>(t, "source", ASource)
-    dict_set<TokenKind>(t, "fake", AFake)
-    dict_set<TokenKind>(t, "verified_at", AVerifiedAt)
-    return t
+  func lookup_annot_keyword(text: string) -> TokenKind? {
+    if text == "why" { return AWhy }
+    if text == "doc" { return ADoc }
+    if text == "invariant" { return AInvariant }
+    if text == "requires" { return ARequires }
+    if text == "ensures" { return AEnsures }
+    if text == "raises" { return ARaises }
+    if text == "concurrent" { return AConcurrent }
+    if text == "requires_lock" { return ARequiresLock }
+    if text == "excludes_lock" { return AExcludesLock }
+    if text == "guarded_by" { return AGuardedBy }
+    if text == "spawns" { return ASpawns }
+    if text == "pure" { return APure }
+    if text == "source" { return ASource }
+    if text == "fake" { return AFake }
+    if text == "verified_at" { return AVerifiedAt }
+    return null
   }
+
 
   // ---- Lexer ----
 
@@ -134,8 +130,6 @@ forge lexer {
     line: i32 = 1
     column: i32 = 1
     peeked_token: Token?
-    keywords: Dict<TokenKind>?
-    annot_keywords: Dict<TokenKind>?
   }
   relation ArrayList Lexer:lc owns [Comment:lc]
 
@@ -158,9 +152,7 @@ forge lexer {
   func new_lexer(src_text: string, filename: Sym) -> Lexer {
     let lex = Lexer {
       src: src_text,
-      filename: filename,
-      keywords: init_keywords(),
-      annot_keywords: init_annot_keywords()
+      filename: filename
     }
     return lex
   }
@@ -428,15 +420,15 @@ forge lexer {
     }
 
     // Check keywords
-    let kw = dict_get<TokenKind>(self.keywords!, text)
+    let kw = lookup_keyword(text)
     if !isnull(kw) {
-      return make_token(kw!.value, text, start, self.current_pos())
+      return make_token(kw!, text, start, self.current_pos())
     }
 
     // Check annotation keywords
-    let akw = dict_get<TokenKind>(self.annot_keywords!, text)
+    let akw = lookup_annot_keyword(text)
     if !isnull(akw) {
-      return make_token(akw!.value, text, start, self.current_pos())
+      return make_token(akw!, text, start, self.current_pos())
     }
 
     return make_token(LIdent, text, start, self.current_pos())
