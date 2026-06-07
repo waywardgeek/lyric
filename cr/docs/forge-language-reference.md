@@ -485,7 +485,7 @@ Two builtins, both compiler-provided (they inject file and line automatically):
 | `assert(cond, msg)` | If `cond` is false, prints `FAIL file:line: msg` and exits with code 1 |
 | `assert_eq(a, b, msg)` | If `a != b`, prints `FAIL file:line: msg` with expected/actual values and exits with code 1 |
 
-`assert_eq` uses auto-generated `to_string()` for enums (prints variant name) and primitives. For classes and structs, it prints the type name.
+`assert_eq` uses auto-generated `to_string()` for enums (variant name), structs and classes (field dump, e.g., `Pos{line: 1, col: 5}`), and primitives.
 
 ### Running Tests
 

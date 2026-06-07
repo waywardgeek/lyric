@@ -449,6 +449,12 @@ func (c *Checker) registerBuiltins() {
 		Return: &Type{Kind: TyTuple, Fields: []TypeField{{Type: &Type{Kind: TyFloat, Bits: 64}}, {Type: TypeBool}}}, Name: "parse_float"})
 	c.scope.Define("char_to_string", &Type{Kind: TyFunc, Params: []*Type{TypeU8},
 		Return: TypeString, Name: "char_to_string"})
+
+	// Testing
+	c.scope.Define("assert", &Type{Kind: TyFunc, Params: []*Type{TypeBool, TypeString},
+		Return: TypeUnit, Name: "assert"})
+	c.scope.Define("assert_eq", &Type{Kind: TyFunc, Params: nil, // variadic: (any, any, string)
+		Return: TypeUnit, Name: "assert_eq"})
 }
 
 // CheckModuleFile parses, checks, and caches a .fg module file.

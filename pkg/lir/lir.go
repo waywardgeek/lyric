@@ -260,6 +260,8 @@ type LMethodCallData struct {
 type LBuiltinData struct {
 	Name string // "len", "append", "println", "print", "printf"
 	Args []LValue
+	File string // source file (for assert/assert_eq)
+	Line int    // source line (for assert/assert_eq)
 }
 
 type LStructLitData struct {

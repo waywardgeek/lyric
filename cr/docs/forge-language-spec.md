@@ -959,10 +959,10 @@ FAIL  test_lexer_basic
 | `i8`–`i64`, `u8`–`u64` | Decimal number |
 | `f32`, `f64` | Decimal with fraction |
 | `string` | The string value (quoted in assert output) |
-| Structs | Type name (e.g., `Pos`) |
-| Classes | Type name (e.g., `Lexer`) |
+| Structs | Field dump (e.g., `Pos{line: 1, col: 5}`) |
+| Classes | Field dump (e.g., `Lexer{source: "...", pos: 0}`) |
 
-Auto-generated enum `to_string()` is the critical piece — most test assertions compare enum variants (token kinds, type kinds, expression kinds).
+Auto-generated enum `to_string()` is the critical piece — most test assertions compare enum variants (token kinds, type kinds, expression kinds). Struct and class `to_string()` dumps all fields, which is invaluable for debugging position mismatches, AST node differences, etc.
 
 ### The `forge test` Command
 

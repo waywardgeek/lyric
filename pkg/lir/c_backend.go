@@ -132,7 +132,30 @@ func (g *cGen) generate() string {
 	g.line("#include <stdbool.h>")
 	g.line("#include <string.h>")
 	g.line("#include <stdarg.h>")
+	g.line("#include <setjmp.h>")
 	g.line(`#include "forge_runtime.h"`)
+	g.line("")
+	// Test assertion support (always emitted — small cost, simpler than conditional)
+	g.line("static jmp_buf _forge_test_jmp;")
+	g.line("static int _forge_test_failed;")
+	g.line(`#define forge_assert(cond, msg, file, line) do { \`)
+	g.line(`    if (!(cond)) { \`)
+	g.line(`        fprintf(stderr, "  assert failed at %s:%d\n    %.*s\n", file, line, (int)(msg).len, (const char*)(msg).data); \`)
+	g.line(`        _forge_test_failed = 1; \`)
+	g.line(`        longjmp(_forge_test_jmp, 1); \`)
+	g.line(`    } \`)
+	g.line(`} while(0)`)
+	g.line(`#define forge_assert_eq(eq, actual_str, expected_str, msg, file, line) do { \`)
+	g.line(`    if (!(eq)) { \`)
+	g.line(`        forge_string _a = (actual_str); \`)
+	g.line(`        forge_string _e = (expected_str); \`)
+	g.line(`        fprintf(stderr, "  assert_eq failed at %s:%d\n    %.*s\n    expected: %.*s\n    got:      %.*s\n", \`)
+	g.line(`            file, line, (int)(msg).len, (const char*)(msg).data, \`)
+	g.line(`            (int)_e.len, (const char*)_e.data, (int)_a.len, (const char*)_a.data); \`)
+	g.line(`        _forge_test_failed = 1; \`)
+	g.line(`        longjmp(_forge_test_jmp, 1); \`)
+	g.line(`    } \`)
+	g.line(`} while(0)`)
 	g.line("")
 
 	// Pre-scan to collect all composite types used in the program
@@ -262,6 +285,9 @@ func (g *cGen) generate() string {
 		g.linef("typedef %s %s;", g.cType(td.Type), g.visName(td.Name, td.IsExported))
 		g.line("")
 	}
+
+	// Auto-generate to_string functions for enums, structs, and classes (used by assert_eq)
+	g.emitToStringFunctions()
 
 	// Forward-declare all functions (including methods)
 	for _, f := range g.prog.Functions {
@@ -2226,6 +2252,24 @@ func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 		return g.emitPrintln(d.Args)
 	case "print", "Print":
 		return g.emitFprint("stdout", d.Args, false)
+
+	case "assert":
+		if len(d.Args) >= 2 {
+			cond := g.emitValue(&d.Args[0])
+			msg := g.emitValue(&d.Args[1])
+			return fmt.Sprintf(`forge_assert(%s, %s, %q, %d)`, cond, msg, d.File, d.Line)
+		}
+	case "assert_eq":
+		if len(d.Args) >= 3 {
+			actual := &d.Args[0]
+			expected := &d.Args[1]
+			msg := g.emitValue(&d.Args[2])
+			toStringA := g.toStringExpr(actual)
+			toStringE := g.toStringExpr(expected)
+			eqExpr := g.eqExpr(actual, expected)
+			return fmt.Sprintf(`forge_assert_eq(%s, %s, %s, %s, %q, %d)`,
+				eqExpr, toStringA, toStringE, msg, d.File, d.Line)
+		}
 	}
 	// Generic fallback
 	var args []string
@@ -2237,6 +2281,181 @@ func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 
 func (g *cGen) emitPrintln(args []LValue) string {
 	return g.emitFprint("stdout", args, true)
+}
+
+// ---------------------------------------------------------------------------
+// Testing support: to_string and equality helpers for assert_eq
+// ---------------------------------------------------------------------------
+
+// resolveValueType resolves the LType for a value, checking temp/var type maps.
+func (g *cGen) resolveValueType(v *LValue) *LType {
+	if v.Type != nil {
+		return v.Type
+	}
+	if v.Kind == LValTemp {
+		if t, ok := g.tempTypes[v.TempID]; ok {
+			return t
+		}
+	}
+	if v.Kind == LValVar {
+		if t, ok := g.varTypes[v.Name]; ok {
+			return t
+		}
+	}
+	return nil
+}
+
+// toStringExpr returns a C expression that produces a forge_string representation of v.
+func (g *cGen) toStringExpr(v *LValue) string {
+	t := g.resolveValueType(v)
+	val := g.emitValue(v)
+	if t == nil {
+		return fmt.Sprintf(`FORGE_STR("<unknown>")`)
+	}
+	switch t.Kind {
+	case LTyBool:
+		return fmt.Sprintf(`(%s ? FORGE_STR("true") : FORGE_STR("false"))`, val)
+	case LTyI8, LTyI16, LTyI32, LTyPlatformInt:
+		return fmt.Sprintf(`forge_sprintf("%%d", %s)`, val)
+	case LTyI64:
+		return fmt.Sprintf(`forge_sprintf("%%lld", (long long)%s)`, val)
+	case LTyU8, LTyU16, LTyU32, LTyPlatformUint:
+		return fmt.Sprintf(`forge_sprintf("%%u", (unsigned)%s)`, val)
+	case LTyU64:
+		return fmt.Sprintf(`forge_sprintf("%%llu", (unsigned long long)%s)`, val)
+	case LTyF32:
+		return fmt.Sprintf(`forge_sprintf("%%g", (double)%s)`, val)
+	case LTyF64:
+		return fmt.Sprintf(`forge_sprintf("%%g", %s)`, val)
+	case LTyString:
+		return fmt.Sprintf(`forge_sprintf("\"%%.*s\"", (int)%s.len, (const char*)%s.data)`, val, val)
+	case LTyTaggedUnion:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`%s_to_string(%s)`, name, val)
+	case LTyStruct:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`%s_to_string(%s)`, name, val)
+	case LTyClassHandle:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`(%s == NULL ? FORGE_STR("null") : %s_to_string(%s))`, val, name, val)
+	default:
+		return fmt.Sprintf(`FORGE_STR("<%s>")`, t.Name)
+	}
+}
+
+// eqExpr returns a C boolean expression comparing two values for equality.
+func (g *cGen) eqExpr(a, b *LValue) string {
+	t := g.resolveValueType(a)
+	va := g.emitValue(a)
+	vb := g.emitValue(b)
+	if t != nil && t.Kind == LTyString {
+		return fmt.Sprintf("forge_str_eq(%s, %s)", va, vb)
+	}
+	if t != nil && t.Kind == LTyTaggedUnion {
+		return fmt.Sprintf("(%s.tag == %s.tag)", va, vb)
+	}
+	return fmt.Sprintf("(%s == %s)", va, vb)
+}
+
+// emitToStringFunctions emits auto-generated to_string functions for enums, structs, and classes.
+func (g *cGen) emitToStringFunctions() {
+	// Enum to_string: switch on tag, return variant name
+	for _, e := range g.prog.Enums {
+		name := g.structName(e.Name, e.IsExported)
+		g.linef("static forge_string %s_to_string(%s v) {", name, name)
+		g.indent++
+		g.line("switch (v.tag) {")
+		g.indent++
+		for _, v := range e.Variants {
+			g.linef("case %s_%s: return FORGE_STR(\"%s\");", name, v.Name, v.Name)
+		}
+		g.linef(`default: return FORGE_STR("<unknown %s>");`, e.Name)
+		g.indent--
+		g.line("}")
+		g.indent--
+		g.line("}")
+		g.line("")
+	}
+
+	// Struct to_string: dump all fields
+	for _, s := range g.prog.Structs {
+		name := g.structName(s.Name, s.IsExported)
+		g.linef("static forge_string %s_to_string(%s v) {", name, name)
+		g.indent++
+		g.emitFieldDumpToString(s.Name, s.Fields, "v.")
+		g.indent--
+		g.line("}")
+		g.line("")
+	}
+
+	// Class to_string: dump all fields (receiver is pointer)
+	for _, c := range g.prog.Classes {
+		name := g.structName(c.Name, c.IsExported)
+		g.linef("static forge_string %s_to_string(%s* v) {", name, name)
+		g.indent++
+		g.emitFieldDumpToString(c.Name, c.Fields, "v->")
+		g.indent--
+		g.line("}")
+		g.line("")
+	}
+}
+
+// emitFieldDumpToString emits the body of a to_string function that dumps fields.
+// prefix is "v" for structs, "v->" for classes.
+func (g *cGen) emitFieldDumpToString(typeName string, fields []LField, prefix string) {
+	if len(fields) == 0 {
+		g.linef(`return FORGE_STR("%s{}");`, typeName)
+		return
+	}
+	// Build format string and args
+	g.linef(`forge_string _result = FORGE_STR("%s{");`, typeName)
+	for i, f := range fields {
+		fieldVal := prefix + cSafeName(f.Name)
+		if i > 0 {
+			g.line(`_result = forge_str_concat(_result, FORGE_STR(", "));`)
+		}
+		g.linef(`_result = forge_str_concat(_result, FORGE_STR("%s: "));`, f.Name)
+		fieldStr := g.fieldToStringExpr(f.Type, fieldVal)
+		g.linef(`_result = forge_str_concat(_result, %s);`, fieldStr)
+	}
+	g.line(`_result = forge_str_concat(_result, FORGE_STR("}"));`)
+	g.line("return _result;")
+}
+
+// fieldToStringExpr returns a C expression that converts a field value to forge_string.
+func (g *cGen) fieldToStringExpr(t *LType, val string) string {
+	if t == nil {
+		return `FORGE_STR("?")`
+	}
+	switch t.Kind {
+	case LTyBool:
+		return fmt.Sprintf(`(%s ? FORGE_STR("true") : FORGE_STR("false"))`, val)
+	case LTyI8, LTyI16, LTyI32, LTyPlatformInt:
+		return fmt.Sprintf(`forge_sprintf("%%d", %s)`, val)
+	case LTyI64:
+		return fmt.Sprintf(`forge_sprintf("%%lld", (long long)%s)`, val)
+	case LTyU8, LTyU16, LTyU32, LTyPlatformUint:
+		return fmt.Sprintf(`forge_sprintf("%%u", (unsigned)%s)`, val)
+	case LTyU64:
+		return fmt.Sprintf(`forge_sprintf("%%llu", (unsigned long long)%s)`, val)
+	case LTyF32:
+		return fmt.Sprintf(`forge_sprintf("%%g", (double)%s)`, val)
+	case LTyF64:
+		return fmt.Sprintf(`forge_sprintf("%%g", %s)`, val)
+	case LTyString:
+		return fmt.Sprintf(`forge_sprintf("\"%%.*s\"", (int)%s.len, (const char*)%s.data)`, val, val)
+	case LTyTaggedUnion:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`%s_to_string(%s)`, name, val)
+	case LTyStruct:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`%s_to_string(%s)`, name, val)
+	case LTyClassHandle:
+		name := g.structName(t.Name, false)
+		return fmt.Sprintf(`(%s == NULL ? FORGE_STR("null") : %s_to_string(%s))`, val, name, val)
+	default:
+		return fmt.Sprintf(`FORGE_STR("<%s>")`, t.Name)
+	}
 }
 
 func (g *cGen) emitFprint(stream string, args []LValue, newline bool) string {
@@ -3357,4 +3576,37 @@ func collectDeclaredVars(stmts []LStmt) map[string]bool {
 	}
 	walkStmts(stmts)
 	return decl
+}
+
+// EmitTestRunner generates a C main() function that discovers and runs all test_* functions.
+// It replaces the normal main() and uses setjmp/longjmp for test isolation.
+// testFuncs is a list of test function names found in the program.
+func EmitTestRunner(testFuncs []string) string {
+	var b strings.Builder
+	b.WriteString("\n// --- Test runner (generated by forge test) ---\n")
+	b.WriteString("int main(int _argc, char** _argv) {\n")
+	b.WriteString("    int _passed = 0, _failed_count = 0, _total = 0;\n")
+	b.WriteString("    struct { const char* name; void (*fn)(void); } _tests[] = {\n")
+	for _, name := range testFuncs {
+		b.WriteString(fmt.Sprintf("        {\"%s\", %s},\n", name, name))
+	}
+	b.WriteString("    };\n")
+	b.WriteString(fmt.Sprintf("    _total = %d;\n", len(testFuncs)))
+	b.WriteString("    for (int _i = 0; _i < _total; _i++) {\n")
+	b.WriteString("        _forge_test_failed = 0;\n")
+	b.WriteString("        if (setjmp(_forge_test_jmp) == 0) {\n")
+	b.WriteString("            _tests[_i].fn();\n")
+	b.WriteString("        }\n")
+	b.WriteString("        if (_forge_test_failed) {\n")
+	b.WriteString(`            fprintf(stderr, "FAIL  %s\n", _tests[_i].name);` + "\n")
+	b.WriteString("            _failed_count++;\n")
+	b.WriteString("        } else {\n")
+	b.WriteString(`            fprintf(stderr, "PASS  %s\n", _tests[_i].name);` + "\n")
+	b.WriteString("            _passed++;\n")
+	b.WriteString("        }\n")
+	b.WriteString("    }\n")
+	b.WriteString(`    fprintf(stderr, "\n%d tests, %d passed, %d failed\n", _total, _passed, _failed_count);` + "\n")
+	b.WriteString("    return _failed_count > 0 ? 1 : 0;\n")
+	b.WriteString("}\n")
+	return b.String()
 }

@@ -11,6 +11,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -29,6 +30,7 @@ Commands:
   gen      <package-dir>              Scaffold a new .forge file from Go source
   fmt      <file.forge> [...]          Format .forge files
   compile  <file.fg> [...] [-o out]            Compile .fg files to C
+  test     <file.fg> [...]            Compile, discover test_* functions, run tests
 `
 
 func main() {
@@ -52,6 +54,8 @@ func main() {
 		err = cmdFmt(args)
 	case "compile":
 		err = cmdCompile(args)
+	case "test":
+		err = cmdTest(args)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return
@@ -280,4 +284,149 @@ func loadStdlib(dir string) *ast.File {
 		}
 	}
 	return combined
+}
+
+// --- test ---
+
+func cmdTest(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: forge test <file.fg> [...]")
+	}
+
+	// Parse all input files
+	var files []*ast.File
+	for _, input := range args {
+		src, err := os.ReadFile(input)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", input, err)
+		}
+		file, err := parser.ParseFile(string(src), input)
+		if err != nil {
+			return err
+		}
+		files = append(files, file)
+	}
+
+	// Merge stdlib
+	stdlibDir := ast.FindStdlibDir()
+	if stdlibDir != "" {
+		stdFile := loadStdlib(stdlibDir)
+		if stdFile != nil {
+			for _, f := range files {
+				ast.MergeStdlib(f, stdFile)
+			}
+		}
+	}
+
+	// Desugar
+	for _, f := range files {
+		ast.DesugarInterfaceEmbeds(f)
+		ast.DesugarInterfaceFields(f)
+		ast.DesugarRelations(f)
+		ast.DesugarDestructors(f)
+		ast.DesugarDefaultImpls(f)
+	}
+
+	// Check
+	ch := checker.New()
+	for _, f := range files {
+		ch.CheckFile(f)
+	}
+	if errs := ch.Errors(); len(errs) > 0 {
+		for _, e := range errs {
+			fmt.Fprintln(os.Stderr, e)
+		}
+	}
+
+	// Merge and lower
+	merged := ast.MergeFiles(files)
+	lowerer := lir.NewLowerer()
+	prog := lowerer.Lower(merged)
+	prog.Package = "test"
+	lir.Optimize(prog)
+	lir.Monomorphize(prog)
+	lir.RewriteImplRenames(prog)
+
+	// Discover test_* functions
+	var testFuncs []string
+	for _, f := range prog.Functions {
+		name := f.Name
+		if f.Receiver != "" {
+			continue
+		}
+		if strings.HasPrefix(name, "test_") {
+			testFuncs = append(testFuncs, name)
+		}
+	}
+
+	if len(testFuncs) == 0 {
+		fmt.Fprintln(os.Stderr, "no test_* functions found")
+		return nil
+	}
+
+	// Generate C source + test runner
+	cSrc := lir.EmitC(prog)
+	cSrc += lir.EmitTestRunner(testFuncs)
+
+	// Write to temp file
+	tmpDir, err := os.MkdirTemp("", "forge-test-*")
+	if err != nil {
+		return fmt.Errorf("creating temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cFile := filepath.Join(tmpDir, "test.c")
+	binFile := filepath.Join(tmpDir, "test")
+	if err := os.WriteFile(cFile, []byte(cSrc), 0644); err != nil {
+		return fmt.Errorf("writing C: %w", err)
+	}
+
+	// Copy runtime header
+	runtimeDir := findRuntimeDir()
+	if runtimeDir != "" {
+		rtSrc, err := os.ReadFile(filepath.Join(runtimeDir, "forge_runtime.h"))
+		if err == nil {
+			os.WriteFile(filepath.Join(tmpDir, "forge_runtime.h"), rtSrc, 0644)
+		}
+	}
+
+	// Compile
+	gcc := exec.Command("gcc", "-std=gnu11", "-O0", "-g", "-o", binFile, cFile, "-I", tmpDir)
+	gcc.Stderr = os.Stderr
+	gcc.Stdout = os.Stdout
+	if err := gcc.Run(); err != nil {
+		return fmt.Errorf("gcc compilation failed: %w", err)
+	}
+
+	// Run
+	test := exec.Command(binFile)
+	test.Stderr = os.Stderr
+	test.Stdout = os.Stdout
+	if err := test.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		return err
+	}
+	return nil
+}
+
+func findRuntimeDir() string {
+	// Check relative to executable
+	exe, err := os.Executable()
+	if err == nil {
+		dir := filepath.Join(filepath.Dir(exe), "..", "runtime")
+		if _, err := os.Stat(filepath.Join(dir, "forge_runtime.h")); err == nil {
+			return dir
+		}
+	}
+	// Check relative to working directory
+	candidates := []string{"runtime", "../runtime", "../../runtime"}
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "forge_runtime.h")); err == nil {
+			abs, _ := filepath.Abs(c)
+			return abs
+		}
+	}
+	return ""
 }

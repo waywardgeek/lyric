@@ -2491,6 +2491,17 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 			Type: l.exprType(expr),
 			Data: &LBuiltinData{Name: funcName, Args: args},
 		})
+	case "assert", "assert_eq":
+		return l.emitTemp(LExpr{
+			Kind: LExprBuiltin,
+			Type: l.exprType(expr),
+			Data: &LBuiltinData{
+				Name: funcName,
+				Args: args,
+				File: expr.Span.Start.File,
+				Line: expr.Span.Start.Line,
+			},
+		})
 	case "make_channel":
 		// make_channel<T>() or make_channel<T>(bufSize)
 		resultType := l.exprType(expr)
