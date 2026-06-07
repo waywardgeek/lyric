@@ -11,7 +11,7 @@ class User {
     }
 }
 
-fn main() {
+func main() {
     let u1 = User { name: "Alice", email: "alice@example.com" }
     let u2 = User { name: "Bob", email: null }
     println(u1.get_name())

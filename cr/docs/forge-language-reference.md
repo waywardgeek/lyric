@@ -43,7 +43,6 @@ struct Point {
 - Copied by value. No methods. No generics.
 - Direct field access: `p.x`.
 - Fields can have defaults: `width: i32 = 800`.
-- **Avoid** putting strings, slices, or class refs in structs — they make copies expensive.
 
 ## Classes (Heap-Allocated, By Reference)
 
@@ -112,11 +111,40 @@ enum Shape {
 Match on enums:
 ```forge
 match shape {
-  Circle(r) => println(f"radius: {r}")
-  Rect(w, h) => println(f"{w}x{h}")
-  Point => println("point")
+  Circle(r) => { println(f"radius: {r}") }
+  Rect(w, h) => { println(f"{w}x{h}") }
+  Point => { println("point") }
 }
 ```
+
+### Multi-pattern match arms
+
+Multiple patterns per arm separated by `|`:
+```forge
+match kind {
+  OPlus | OMinus => { PREC_ADDITIVE }
+  OStar | OSlash | OPercent => { PREC_MULT }
+  OEqEq | OBangEq => { PREC_EQUALITY }
+  _ => { PREC_NONE }
+}
+```
+
+This works for simple variants, variants with bindings (if all alternatives bind the same names), and wildcard `_`.
+
+### Match as expression
+
+`match` can be used as an expression (returns a value):
+```forge
+let prec = match kind {
+  OPlus => { 9 }
+  OStar => { 10 }
+  _ => { 0 }
+}
+```
+
+### Match on non-enum values
+
+Match works on enum types. For non-enum dispatch, use `if`/`else if` chains.
 
 ## Type Aliases
 
@@ -164,14 +192,57 @@ func T.method(self) -> i32 { ... }
 let f = (x: i32) -> i32 { return x * 2 }
 ```
 
-## Try Operator
+## Try Operator and Error Handling
+
+Forge uses `(T, error)` tuples for error handling, similar to Go.
+
+### The `error` interface
+
+`error` is a built-in interface declared in stdlib:
+
+```forge
+interface error {
+  func error.message(self) -> string
+}
+```
+
+Any class with a `message(self) -> string` method satisfies `error` via structural subtyping. The stdlib provides a default concrete implementation:
+
+```forge
+class Error {
+    msg: string
+    pub func message(self) -> string { return self.msg }
+}
+```
+
+### Custom error types
+
+```forge
+class ParseError {
+    msg: string
+    span: Span
+    source_line: string
+
+    pub func message(self) -> string {
+        return f"{self.span.start.line}: {self.msg}"
+    }
+}
+```
+
+Any class with `message(self) -> string` can be used where `error` is expected.
+
+### The `?` operator
+
+The `?` operator propagates errors from `(T, error)` returns:
 
 ```forge
 func load() -> (string, error) {
-  let data = read_file("x.txt")?    // propagates error
+  let data = read_file("x.txt")?    // propagates error on failure
   return (data, null)
 }
 ```
+
+**Important**: `?` only unwraps the error — the value side remains optional. So after `let x = foo()?`, `x` is `T?` and you need `x!` to unwrap it. This is a known ergonomic issue.
 
 Statement-level only. Containing function must return `(T, error)`.
 
@@ -381,3 +452,14 @@ source: ["file.go"]
 ```
 
 These are for human/AI understanding, not runtime behavior.
+
+**Note**: `source`, `why`, `doc`, `fake`, and other annotation keywords are reserved — they cannot be used as field or variable names. Use `src` instead of `source`.
+
+## Known Gotchas
+
+- **`source` is a keyword** — can't use as field/param name. Use `src` or `src_text`.
+- **`fn` vs `func`** — `fn` is for type syntax only (e.g., `fn(i32) -> bool`), `func` for declarations.
+- **No ternary if-expression** — use `let mut x = ...; if cond { x = a } else { x = b }`.
+- **`?` returns optional** — after `let x = foo()?`, `x` is `T?`, not `T`. Use `x!` to unwrap.
+- **`forge fmt` lexer bug** — keywords inside string literals are tokenized as keywords, causing parse failures on strings containing words like `doc`, `source`, etc.
+- **Checker warnings for cross-file refs** — the checker prints "undefined variable" warnings for symbols defined in other `.fg` files. These are non-fatal; the lowerer proceeds.

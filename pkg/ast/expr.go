@@ -278,10 +278,11 @@ type MatchStmt struct {
 }
 
 type MatchArm struct {
-	Pattern Pattern
-	Guard   *Expr // optional: `if <expr>` guard clause
-	Body    Block
-	Span    Span
+	Pattern  Pattern
+	Patterns []Pattern // additional alternative patterns (pat1 | pat2 | pat3)
+	Guard    *Expr     // optional: `if <expr>` guard clause
+	Body     Block
+	Span     Span
 }
 
 type SpawnStmt struct {

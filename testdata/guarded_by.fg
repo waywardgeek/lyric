@@ -7,13 +7,13 @@ forge guarded_demo {
     mu: lock
     label: string
 
-    pub fn increment(mut self) {
+    pub func increment(mut self) {
       lock(self.mu) {
         self.count = self.count + 1
       }
     }
 
-    pub fn get_label(self) -> string {
+    pub func get_label(self) -> string {
       return self.label
     }
   }

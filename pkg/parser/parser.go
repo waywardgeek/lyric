@@ -52,6 +52,32 @@ func (p *Parser) skipNewlines() {
 	}
 }
 
+// peekAnnotation checks if the current token is a TIdent that matches an annotation keyword.
+// Returns the annotation TokenKind if it matches, or 0 if not.
+func (p *Parser) peekAnnotation() TokenKind {
+	tok := p.peek()
+	if tok.Kind != TIdent {
+		return 0
+	}
+	if kind, ok := annotationKeywords[tok.Text]; ok {
+		return kind
+	}
+	return 0
+}
+
+// consumeAnnotation checks the current token for an annotation keyword match.
+// If it matches, consumes the token (rewriting its Kind) and returns true.
+func (p *Parser) consumeAnnotation(expected TokenKind) bool {
+	tok := p.peek()
+	if tok.Kind == TIdent {
+		if kind, ok := annotationKeywords[tok.Text]; ok && kind == expected {
+			p.next() // consume it
+			return true
+		}
+	}
+	return false
+}
+
 // isWhyAnnotation peeks ahead to determine if the current `why` token is an annotation
 // (why: "string literal") vs a field name (why: TypeExpr). Returns true for annotation form.
 func (p *Parser) isWhyAnnotation() bool {
@@ -181,6 +207,13 @@ func (p *Parser) parseForgeItem(block *ast.ForgeBlock) error {
 		isPub = true
 		p.next() // consume 'pub'
 		tok = p.peek()
+	}
+
+	// Annotation keywords lex as TIdent — rewrite to their token kind for the switch below.
+	if tok.Kind == TIdent {
+		if kind, ok := annotationKeywords[tok.Text]; ok {
+			tok.Kind = kind
+		}
 	}
 
 	switch tok.Kind {
@@ -360,7 +393,7 @@ func (p *Parser) parseInvariant() (*ast.InvariantDecl, error) {
 	}
 	// Check for optional verified_at
 	p.skipNewlines()
-	if p.peek().Kind == TVerifiedAt {
+	if p.peekAnnotation() == TVerifiedAt {
 		p.next()
 		if _, err := p.expect(TColon); err != nil {
 			return nil, err
@@ -444,7 +477,7 @@ func (p *Parser) parseStruct() (*ast.StructDecl, error) {
 	p.skipNewlines()
 
 	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
-		if p.peek().Kind == TWhy && p.isWhyAnnotation() {
+		if p.peekAnnotation() == TWhy && p.isWhyAnnotation() {
 			why, err := p.parseWhy()
 			if err != nil {
 				return nil, err
@@ -492,7 +525,7 @@ func (p *Parser) parseEnum() (*ast.EnumDecl, error) {
 	p.skipNewlines()
 
 	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
-		if p.peek().Kind == TWhy && p.isWhyAnnotation() {
+		if p.peekAnnotation() == TWhy && p.isWhyAnnotation() {
 			why, err := p.parseWhy()
 			if err != nil {
 				return nil, err
@@ -596,25 +629,25 @@ func (p *Parser) parseInterface() (*ast.InterfaceDecl, error) {
 	p.skipNewlines()
 
 	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
-		if p.peek().Kind == TWhy && p.isWhyAnnotation() {
+		if p.peekAnnotation() == TWhy && p.isWhyAnnotation() {
 			why, err := p.parseWhy()
 			if err != nil {
 				return nil, err
 			}
 			iface.Why = why
-		} else if p.peek().Kind == TImplements {
+		} else if p.peek().Kind == TImplements || p.peekAnnotation() == TImplements {
 			p.next()
 			imp, err := p.expect(TIdent)
 			if err != nil {
 				return nil, err
 			}
 			iface.Implements = append(iface.Implements, imp.Text)
-		} else if p.peek().Kind == TFunc || p.peek().Kind == TPub {
+		} else if p.peek().Kind == TFunc || p.peekAnnotation() == TFunc || p.peek().Kind == TPub {
 			isPub := false
 			if p.peek().Kind == TPub {
 				isPub = true
 				p.next() // consume 'pub'
-				if p.peek().Kind != TFunc {
+				if p.peek().Kind != TFunc && p.peekAnnotation() != TFunc {
 					return nil, &ParseError{Message: "expected func after pub in interface body", Span: p.peek().Span}
 				}
 			}
@@ -630,7 +663,7 @@ func (p *Parser) parseInterface() (*ast.InterfaceDecl, error) {
 				return nil, err
 			}
 			iface.Embeds = append(iface.Embeds, *emb)
-		} else if p.peek().Kind == TField {
+		} else if p.peek().Kind == TField || p.peekAnnotation() == TField {
 			fd, err := p.parseInterfaceField()
 			if err != nil {
 				return nil, err
@@ -939,7 +972,7 @@ func (p *Parser) parseClass() (*ast.ClassDecl, error) {
 	}
 
 	// Optional implements
-	if p.peek().Kind == TImplements {
+	if p.peek().Kind == TImplements || p.peekAnnotation() == TImplements {
 		p.next()
 		for {
 			imp, err := p.expect(TIdent)
@@ -961,25 +994,25 @@ func (p *Parser) parseClass() (*ast.ClassDecl, error) {
 	p.skipNewlines()
 
 	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
-		if p.peek().Kind == TWhy && p.isWhyAnnotation() {
+		if p.peekAnnotation() == TWhy && p.isWhyAnnotation() {
 			why, err := p.parseWhy()
 			if err != nil {
 				return nil, err
 			}
 			cls.Why = why
-		} else if p.peek().Kind == TSource {
+		} else if p.peekAnnotation() == TSource {
 			src, err := p.parseSource()
 			if err != nil {
 				return nil, err
 			}
 			cls.Source = src
-		} else if p.peek().Kind == TFunc || p.peek().Kind == TPub {
+		} else if p.peek().Kind == TFunc || p.peekAnnotation() == TFunc || p.peek().Kind == TPub {
 			isPub := false
 			if p.peek().Kind == TPub {
 				isPub = true
 				p.next() // consume 'pub'
 				// After pub, could be func or a field
-				if p.peek().Kind != TFunc {
+				if p.peek().Kind != TFunc && p.peekAnnotation() != TFunc {
 					// pub field: pub name: Type [= default]
 					field, err := p.parseField()
 					if err != nil {
@@ -1163,6 +1196,12 @@ func (p *Parser) parseAnnotations() ast.Annotations {
 	var ann ast.Annotations
 	for {
 		tok := p.peek()
+		// Annotation keywords lex as TIdent — rewrite for the switch
+		if tok.Kind == TIdent {
+			if kind, ok := annotationKeywords[tok.Text]; ok {
+				tok.Kind = kind
+			}
+		}
 		switch tok.Kind {
 		case TWhy:
 			why, _ := p.parseWhy()
@@ -1265,7 +1304,7 @@ func (p *Parser) parseField() (*ast.Field, error) {
 	}
 
 	// Optional guarded_by
-	if p.peek().Kind == TGuardedBy {
+	if p.peekAnnotation() == TGuardedBy {
 		p.next()
 		if _, err := p.expect(TLParen); err != nil {
 			return nil, err
@@ -1409,6 +1448,13 @@ func (p *Parser) parseTypeExpr() (*ast.TypeExpr, error) {
 func (p *Parser) parseBaseType() (*ast.TypeExpr, error) {
 	start := p.peek().Span.Start
 	tok := p.peek()
+
+	// Handle contextual keywords (fn → TFunc)
+	if tok.Kind == TIdent {
+		if kind, ok := annotationKeywords[tok.Text]; ok {
+			tok.Kind = kind
+		}
+	}
 
 	switch tok.Kind {
 	case TFunc:

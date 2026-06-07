@@ -134,17 +134,16 @@ const (
 var keywords = map[string]TokenKind{
 	"forge":       TForge,
 	"func":       TFunc,
-	"fn":         TFunc,
 	"class":      TClass,
 	"struct":     TStruct,
 	"enum":       TEnum,
 	"interface":  TInterface,
 	"relation":   TRelation,
-	"field":      TField,
+	// "field" is contextual — moved to annotationKeywords
 	"destructor": TDestructor,
 	"embed":      TEmbed,
 	"import":     TImport,
-	"implements": TImplements,
+	// "implements" is contextual — moved to annotationKeywords
 	"impl":       TImpl,
 	"as":         TAs,
 	"type":       TType,
@@ -172,13 +171,19 @@ var keywords = map[string]TokenKind{
 	"spawn":      TSpawn,
 	"select":     TSelect,
 	"case":       TCase,
-	"lock":       TLock,
+	// "lock" and "implements" are contextual — moved to annotationKeywords
 	"yield":      TYield,
 	"pub":        TPub,
 }
 
 // Annotation keywords are only recognized in annotation position (after newline + indent).
+// annotationKeywords maps annotation names to token kinds.
+// These are NOT lexed as keywords — the parser checks for them contextually
+// via peekAnnotation(), so they can be used as variable names.
 var annotationKeywords = map[string]TokenKind{
+	"field":         TField,
+	"lock":          TLock,
+	"implements":    TImplements,
 	"why":           TWhy,
 	"doc":           TDoc,
 	"invariant":     TInvariant,
@@ -693,10 +698,8 @@ func (l *Lexer) scanIdent(start ast.Pos) Token {
 		return Token{Kind: kind, Text: text, Span: ast.Span{Start: start, End: l.currentPos()}}
 	}
 
-	// Check annotation keywords
-	if kind, ok := annotationKeywords[text]; ok {
-		return Token{Kind: kind, Text: text, Span: ast.Span{Start: start, End: l.currentPos()}}
-	}
+	// Annotation keywords are NOT lexed — they stay as TIdent.
+	// The parser handles them contextually via peekAnnotation().
 
 	return Token{Kind: TIdent, Text: text, Span: ast.Span{Start: start, End: l.currentPos()}}
 }

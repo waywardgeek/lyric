@@ -1636,7 +1636,7 @@ func TestGuardedByAccessInsideLock(t *testing.T) {
     count: i32 guarded_by(mu)
     mu: lock
 
-    pub fn increment(mut self) {
+    pub func increment(mut self) {
       lock(self.mu) {
         self.count = self.count + 1
       }
@@ -1652,7 +1652,7 @@ func TestGuardedByAccessOutsideLock(t *testing.T) {
     count: i32 guarded_by(mu)
     mu: lock
 
-    pub fn bad_read(self) -> i32 {
+    pub func bad_read(self) -> i32 {
       return self.count
     }
   }
@@ -1670,7 +1670,7 @@ func TestGuardedByWrongLock(t *testing.T) {
     mu1: lock
     mu2: lock
 
-    pub fn wrong_lock(mut self) {
+    pub func wrong_lock(mut self) {
       lock(self.mu2) {
         self.data = 42
       }
@@ -1687,7 +1687,7 @@ func TestGuardedByFreeFieldAccess(t *testing.T) {
     count: i32 guarded_by(mu)
     mu: lock
 
-    pub fn get_label(self) -> string {
+    pub func get_label(self) -> string {
       return self.label
     }
   }

@@ -738,6 +738,19 @@ func (p *Parser) parseBlock() (*ast.Block, error) {
 
 func (p *Parser) parseStmt() (*ast.Stmt, error) {
 	tok := p.peek()
+	// Handle contextual keywords — only rewrite when context confirms keyword usage
+	if tok.Kind == TIdent {
+		if tok.Text == "lock" {
+			// lock(expr) { ... } — only if followed by '('
+			saved := *p.lex
+			p.next()
+			next := p.peek()
+			*p.lex = saved
+			if next.Kind == TLParen {
+				tok.Kind = TLock
+			}
+		}
+	}
 	switch tok.Kind {
 	case TLet:
 		return p.parseVarDecl()
@@ -1017,6 +1030,16 @@ func (p *Parser) parseMatchArms() ([]ast.MatchArm, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Multi-pattern: pat1 | pat2 | pat3
+		var altPatterns []ast.Pattern
+		for p.peek().Kind == TPipe {
+			p.next()
+			alt, err := p.parsePattern()
+			if err != nil {
+				return nil, err
+			}
+			altPatterns = append(altPatterns, *alt)
+		}
 		// Optional guard clause: `if <expr>`
 		var guard *ast.Expr
 		if p.peek().Kind == TIf {
@@ -1034,7 +1057,7 @@ func (p *Parser) parseMatchArms() ([]ast.MatchArm, error) {
 		if err != nil {
 			return nil, err
 		}
-		arms = append(arms, ast.MatchArm{Pattern: *pat, Guard: guard, Body: *body, Span: body.Span})
+		arms = append(arms, ast.MatchArm{Pattern: *pat, Patterns: altPatterns, Guard: guard, Body: *body, Span: body.Span})
 		p.skipNewlines()
 	}
 	if _, err := p.expect(TRBrace); err != nil {

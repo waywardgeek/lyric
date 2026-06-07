@@ -13,7 +13,7 @@ import (
 // TestEndToEndSimple tests the full pipeline: parse → check → lower → emit Go
 func TestEndToEndSimple(t *testing.T) {
 	source := `forge simple {
-  fn main() {
+  func main() {
     let x: i32 = 10
     let y: i32 = 20
     let z = x + y
@@ -35,7 +35,7 @@ func TestEndToEndStruct(t *testing.T) {
     Y: f64
   }
 
-  pub fn distance(p: Point) -> f64 {
+  pub func distance(p: Point) -> f64 {
     return p.X + p.Y
   }
 }`
@@ -57,7 +57,7 @@ func TestEndToEndEnum(t *testing.T) {
     Rectangle(width: f64, height: f64)
   }
 
-  pub fn area(s: Shape) -> f64 {
+  pub func area(s: Shape) -> f64 {
     match s {
       Circle(r) => {
         return r * r
@@ -82,7 +82,7 @@ func TestEndToEndEnum(t *testing.T) {
 // TestEndToEndControl tests if/while/for lowering
 func TestEndToEndControl(t *testing.T) {
 	source := `forge control {
-  pub fn countdown(n: i32) {
+  pub func countdown(n: i32) {
     let mut i = n
     while i > 0 {
       println(i)

@@ -470,7 +470,13 @@ forge std {
     return hash_remove<Dict<V>, DictEntry<V>>(d, h)
   }
 
-  // Error: concrete error type for (T, error) returns and ? operator.
+  // error: interface for (T, error) returns and ? operator.
+  // Any class with message(self) -> string satisfies error.
+  interface error {
+    func error.message(self) -> string
+  }
+
+  // Error: default concrete error type satisfying the error interface.
   pub class Error {
     msg: string
 

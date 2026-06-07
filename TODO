@@ -1,2 +1,3 @@
 * Generics for structs
-
+* More builtin types, i128, i256, u128, u256, f128
+* Identical funcion merging

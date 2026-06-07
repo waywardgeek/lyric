@@ -5,12 +5,12 @@ import (
 )
 
 func TestLexerKeywords(t *testing.T) {
-	input := "forge func class struct enum interface relation import implements where owns refs mut self"
+	input := "forge func class struct enum interface relation import where owns refs mut self"
 	lex := NewLexer(input, "test.forge")
 
 	expected := []TokenKind{
 		TForge, TFunc, TClass, TStruct, TEnum, TInterface,
-		TRelation, TImport, TImplements, TWhere, TOwns, TRefs, TMut, TSelf,
+		TRelation, TImport, TWhere, TOwns, TRefs, TMut, TSelf,
 		TEOF,
 	}
 
@@ -23,21 +23,30 @@ func TestLexerKeywords(t *testing.T) {
 }
 
 func TestLexerAnnotations(t *testing.T) {
+	// Annotation keywords are now contextual — they lex as TIdent
+	// and the parser resolves them via peekAnnotation()
 	input := "concurrent requires ensures raises requires_lock excludes_lock guarded_by spawns pure source fake verified_at"
 	lex := NewLexer(input, "test.forge")
 
-	expected := []TokenKind{
-		TConcurrent, TRequires, TEnsures, TRaises,
-		TRequiresLock, TExcludesLock, TGuardedBy,
-		TSpawns, TPure, TSource, TFake, TVerifiedAt,
-		TEOF,
+	expectedTexts := []string{
+		"concurrent", "requires", "ensures", "raises",
+		"requires_lock", "excludes_lock", "guarded_by",
+		"spawns", "pure", "source", "fake", "verified_at",
 	}
 
-	for _, want := range expected {
+	for _, want := range expectedTexts {
 		got := lex.Next()
-		if got.Kind != want {
-			t.Errorf("expected %v, got %v (%q)", tokenNames[want], tokenNames[got.Kind], got.Text)
+		if got.Kind != TIdent || got.Text != want {
+			t.Errorf("expected ident %q, got %v %q", want, tokenNames[got.Kind], got.Text)
 		}
+		// Verify it maps back to an annotation keyword
+		if _, ok := annotationKeywords[got.Text]; !ok {
+			t.Errorf("%q not found in annotationKeywords map", got.Text)
+		}
+	}
+	eof := lex.Next()
+	if eof.Kind != TEOF {
+		t.Errorf("expected EOF, got %v", tokenNames[eof.Kind])
 	}
 }
 
@@ -81,9 +90,9 @@ func TestLexerTripleString(t *testing.T) {
 """`
 	lex := NewLexer(input, "test.forge")
 
-	tok := lex.Next() // doc
-	if tok.Kind != TDoc {
-		t.Errorf("expected doc, got %v", tokenNames[tok.Kind])
+	tok := lex.Next() // doc (now lexes as TIdent since annotation keywords are contextual)
+	if tok.Kind != TIdent || tok.Text != "doc" {
+		t.Errorf("expected ident 'doc', got %v %q", tokenNames[tok.Kind], tok.Text)
 	}
 
 	tok = lex.Next() // "Arch"

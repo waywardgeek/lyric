@@ -12,7 +12,7 @@ enum Option {
     None
 }
 
-fn describe(opt: Option) -> string {
+func describe(opt: Option) -> string {
     return match opt {
         Some(Circle(r)) => { f"circle with radius {r}" }
         Some(Rect(w, h)) => { f"rect {w}x{h}" }
@@ -20,7 +20,7 @@ fn describe(opt: Option) -> string {
     }
 }
 
-fn main() {
+func main() {
     let c = Some(Circle(3.14))
     let r = Some(Rect(10.0, 20.0))
     let n = None

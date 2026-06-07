@@ -379,9 +379,12 @@ func New() *Checker {
 	// Register builtin functions
 	c.registerBuiltins()
 	// Register builtin types
-	// error — Go's error interface, used in (T, error) return patterns
+	// error — interface satisfied by any class with message(self) -> string
 	c.registry.Register("error", &TypeInfo{
 		Type: &Type{Kind: TyInterface, Name: "error"},
+		Methods: map[string]*Type{
+			"message": {Kind: TyFunc, Params: nil, Return: TypeString, Name: "message"},
+		},
 	})
 	return c
 }
@@ -491,9 +494,10 @@ func (c *Checker) CheckModuleFile(importPath string, fromSpan ast.Span) *ModuleE
 	c.registerBuiltins()
 	c.registry.Register("error", &TypeInfo{
 		Type: &Type{Kind: TyInterface, Name: "error"},
+		Methods: map[string]*Type{
+			"message": {Kind: TyFunc, Params: nil, Return: TypeString, Name: "message"},
+		},
 	})
-
-	// Check the module
 	c.CheckFile(file)
 
 	// Extract exports: pub types and pub functions

@@ -1394,6 +1394,21 @@ func (l *Lowerer) lowerLambda(expr *ast.Expr) LValue {
 // emitMatch lowers a match statement/expression. If result is non-nil, each arm's
 // last expression is assigned to the result variable (match-as-expression).
 func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo) {
+	// Expand multi-pattern arms (pat1 | pat2 => body) into separate arms
+	var expanded []ast.MatchArm
+	for _, arm := range ms.Arms {
+		expanded = append(expanded, arm)
+		for _, alt := range arm.Patterns {
+			expanded = append(expanded, ast.MatchArm{
+				Pattern: alt,
+				Guard:   arm.Guard,
+				Body:    arm.Body,
+				Span:    arm.Span,
+			})
+		}
+	}
+	ms.Arms = expanded
+
 	matchVal := l.lowerExpr(&ms.Value)
 
 	// Check if this is an enum match

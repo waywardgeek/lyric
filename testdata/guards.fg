@@ -11,7 +11,7 @@ func classify(n: i32) -> string {
     }
 }
 
-fn main() {
+func main() {
     let result = classify(-5)
     println(result)
     println(classify(0))
