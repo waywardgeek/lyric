@@ -1052,7 +1052,7 @@ forge parser {
     let mut buf = new_string_builder()
     let mut i: i32 = 0
 
-    while i < <i32>raw.length {
+    while i < len(raw) {
       if raw[i] == '{' {
         parts = append(parts, Expr {
           StringLit(buf.to_string()),
@@ -1062,7 +1062,7 @@ forge parser {
         i = i + 1  // skip {
         let mut depth: i32 = 1
         let expr_start = i
-        while i < <i32>raw.length && depth > 0 {
+        while i < len(raw) && depth > 0 {
           if raw[i] == '{' { depth = depth + 1 }
           if raw[i] == '}' { depth = depth - 1 }
           if depth > 0 { i = i + 1 }

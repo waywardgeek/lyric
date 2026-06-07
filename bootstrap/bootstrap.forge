@@ -1,0 +1,114 @@
+// bootstrap.forge — Understanding-Driven Development for the Forge bootstrap compiler
+// This is the self-hosting Forge compiler written in Forge, compiled via C backend.
+
+forge bootstrap {
+  why: "Self-hosting compiler: Forge source → C → native binary. Proves the language can express its own toolchain. Four files: ast.fg (types), lexer.fg (tokenization), parser.fg (PEG/Pratt parsing), expr_parser.fg (expressions/statements/patterns)."
+
+  doc "Architecture": """
+    The bootstrap compiler is a port of the Go compiler (pkg/parser/, pkg/ast/)
+    into Forge itself. It targets the C backend exclusively — the Go backend was
+    deleted. The four files form a single `forge` compilation unit merged by
+    MergeFiles before lowering.
+
+    Data flow: source string → Lexer → Token stream → Parser → AST (File)
+
+    Key design choices:
+    - ast.fg defines ALL types: the parser imports nothing, just uses them
+    - lexer.fg and parser.fg are separate forge blocks but share the same
+      compilation unit (both `forge lexer` and `forge parser` blocks)
+    - expr_parser.fg is a second `forge parser` block — Forge merges blocks
+      with the same name, so all Parser methods are available across both files
+
+    Compilation command:
+      go run ./cmd/forge/ compile bootstrap/ast.fg bootstrap/lexer.fg \
+        bootstrap/parser.fg bootstrap/expr_parser.fg
+      gcc -std=gnu11 -o forge-bootstrap out.c -Iruntime/ -lpthread
+  """
+
+  doc "Invariants": """
+    1. Sym for identifiers, string for raw text. All AST name fields (FuncDecl.name,
+       ClassDecl.name, Param.name, etc.) are Sym?. Token.text is string (raw lexed
+       text). Sym is created via sym() at parse time when the text becomes a semantic
+       identifier. String stays string only for: source text, literal values, file
+       paths, doc content, error messages.
+
+    2. ArrayList relations for parent→child ownership. Every parent→[child] is
+       modeled as `relation ArrayList Parent:label owns [Child:label]`. Never use
+       bare `[Child]` fields on classes for owned collections — use relations so
+       destructors cascade correctly.
+
+    3. Classes for identity types, structs for value types. AST nodes are classes
+       (heap-allocated, passed by reference). Pos, Span, RelationSide,
+       StructLitField, LexerState, ArgListResult are structs (stack-allocated,
+       copied by value).
+
+    4. Error model: (T?, error) tuples with ? operator. All fallible parse methods
+       return (T?, error). The ? operator extracts and early-returns on error.
+       Error is the stdlib concrete error class.
+
+    5. Two forge blocks merge into one. parser.fg declares `forge parser` and
+       expr_parser.fg also declares `forge parser`. The compiler's MergeFiles
+       combines them. All Parser methods, helper functions, and constants from
+       both files are available to each other.
+
+    6. Keyword lookup uses if-else chains, not Dict. The C backend needs no
+       runtime initialization for keyword tables. Dict/HashedList would require
+       constructor calls before first use. If-else chains compile to direct
+       string comparisons.
+
+    7. Token.text preserves original source text. Even for keywords, text contains
+       the matched string ("func", "class", etc.). The parser converts to Sym via
+       sym(tok.text) when storing in AST nodes.
+  """
+
+  doc "Coding Conventions": """
+    - Use sym(tok.text) when storing identifier text into AST Sym? fields
+    - Use new_string_builder() for string building, not concatenation
+    - Use array_append<P, C>(parent, child) for relation-managed collections
+    - Use append(slice, elem) only for non-relation slices (implements, args, etc.)
+    - External methods: `func T.method(self)` not methods inside class body
+      (except for simple getters in stdlib classes)
+    - Match expressions for dispatch, if-else for simple boolean checks
+    - Positional struct literals for small structs (Pos, Span), named fields for
+      larger ones (FuncDecl, ClassDecl)
+    - TODOs are acceptable for unimplemented features; never use wrong patterns
+      as shortcuts
+  """
+
+  doc "Known TODOs": """
+    - Type params not stored on StructDecl, EnumDecl, InterfaceDecl, ClassDecl,
+      FuncDecl parse_type_params results (parsed but discarded)
+    - Annotations not parsed (concurrent, requires, ensures, etc.)
+    - source/fake keywords consumed but not stored
+    - why annotations inside struct/enum/class parsed but not stored
+    - Type args not stored on generic struct literals (TypeName<T> { ... })
+    - forge fmt can't handle bootstrap files (keywords in string literals)
+  """
+
+  doc "File Map": """
+    ast.fg          — 391 lines. AST type definitions. forge ast { } block.
+                      Structs: Pos, Span, RelationSide, StructLitField.
+                      Enums: TypeExprKind, ExprKind, StmtKind, PatternKind,
+                             UnaryOp, BinaryOp, ImplMappingKind, RelationKind.
+                      ~25 classes, ~15 ArrayList relations.
+
+    lexer.fg        — 641 lines. Lexer + Token. forge lexer { } block.
+                      TokenKind enum (~80 variants), Lexer class with
+                      save/restore state, character helpers, literal scanners
+                      (string, char, number, fstring, triple-string),
+                      keyword lookup via if-else chains.
+
+    parser.fg       — 1120 lines. Top-level + declaration parsing. forge parser { }.
+                      Parses: forge blocks, structs, enums, interfaces, classes,
+                      functions, relations, impl blocks, imports, type aliases,
+                      type expressions, where clauses.
+
+    expr_parser.fg  — 1118 lines. Expressions + statements. forge parser { }.
+                      Pratt parser with 12 precedence levels. Parses: all
+                      expression kinds, all statement kinds, patterns, match
+                      arms, blocks, struct/map/list/tuple literals, lambdas,
+                      casts, f-string interpolation.
+  """
+
+  source: ["bootstrap/ast.fg", "bootstrap/lexer.fg", "bootstrap/parser.fg", "bootstrap/expr_parser.fg"]
+}

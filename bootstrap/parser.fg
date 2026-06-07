@@ -503,7 +503,7 @@ forge parser {
         KImplements => {
           self.next()
           let imp = self.expect(LIdent)?
-          iface.implements = append(iface.implements, imp!.text)
+          iface.implements = append(iface.implements, sym(imp!.text))
         }
         KPub => {
           self.next()
@@ -719,7 +719,7 @@ forge parser {
       self.next()
       while true {
         let imp = self.expect(LIdent)?
-        cls.implements = append(cls.implements, imp!.text)
+        cls.implements = append(cls.implements, sym(imp!.text))
         if self.peek().kind == PComma {
           self.next()
         } else {
