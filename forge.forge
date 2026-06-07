@@ -33,7 +33,8 @@ forge Forge {
   doc "System Architecture": """
     Classic compiler pipeline with a parallel verification track:
 
-    Source → Parser → AST → Desugar → Checker → Lowerer → LIR → {Go backend, C backend}
+    Source → Parser → AST → Desugar → Checker → Lowerer → LIR → C backend
+
     ↑
     .forge → Parser → AST → Verifier ← Go source (go/ast)    [mono pass for C]
 
@@ -48,7 +49,7 @@ forge Forge {
     - LIR Lowerer: flatten expressions to SSA-like temps, resolve all sugar
     - LIR Optimizer: eliminate redundant temps, destructure multi-returns
     - LIR Monomorphizer: specialize generics (required for C, optional for Go)
-    - Backends: thin syntax emitters (<1500 LOC each)
+    - Backends: thin C syntax emitter (~1700 LOC)
   """
 
   doc "Compilation Pipeline": """
@@ -66,8 +67,8 @@ forge Forge {
     6. Monomorphize (optional, required for C): collect instantiations →
     specialize → remove generics → rewrite call sites. Name mangling:
     Stack[i32] → Stack_i32.
-    7. Backend: Go (native generics, interfaces, goroutines) or C (runtime
-    macros for slices/optionals/errors, lambda hoisting, malloc for classes).
+    7. C Backend: runtime macros for slices/optionals/errors, lambda hoisting,
+    malloc for classes, vtable dispatch for interfaces.
   """
 
   doc "Verification Pipeline": """
@@ -107,6 +108,7 @@ forge Forge {
 
     Go backend: pass-through (Go has native generics).
     C backend: monomorphize to concrete specialized copies.
+    NOTE: Go backend was removed 2026-06-07. C is the sole compilation target.
   """
 
   doc "Contracts": """
@@ -163,19 +165,8 @@ forge Forge {
   """
 
   doc "Known Failures": """
-    Pre-existing test failures as of 2026-06-07. Do NOT investigate these without
-    explicit instruction — they are known issues, not regressions.
-
-    1. TestMonomorphizeOutputMatches/{classes,collections,inference}.fg — Go backend
-    Optional(TypeVar) issues: `return nil` for generic T, incorrect dereferencing of
-    non-pointer type vars. These are Go backend limitations with generics. Bootstrap
-    targets C backend specifically to avoid these.
-
-    2. Checker warnings for stdlib interface methods (dict_get calling hash_lookup,
-    etc.) — interface methods are desugared to class methods, but Dict functions
-    call them as free functions. The checker warns but the lowerer proceeds,
-    producing LTyAny for unresolved expressions. The C backend's inferExprType
-    + resolveFieldType recover concrete types in most cases.
+    As of 2026-06-07, ALL tests pass. The Go backend (which had Optional(TypeVar)
+    issues in TestMonomorphizeOutputMatches) was deleted — C is the sole target.
 
     FIXED (2026-06-07, commit 8c904d2):
     - TestCBackendRuns/demo.fg — was caused by MergeStdlib matching primitive types

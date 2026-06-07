@@ -5,7 +5,7 @@
 //	forge verify <file.forge> [file.forge...]    Check .forge files against Go source
 //	forge update <file.forge> [file.forge...]    Regenerate function index and dependencies
 //	forge gen <package-dir>                    Scaffold a new .forge file from Go source
-//	forge compile <file.fg> [-o out] [-pkg p] [--mono] [--c]  Compile .fg files
+//	forge compile <file.fg> [-o out] [-pkg p]  Compile .fg files to C
 package main
 
 import (
@@ -28,7 +28,7 @@ Commands:
   update   <file.forge> [...]          Regenerate function index and dependencies
   gen      <package-dir>              Scaffold a new .forge file from Go source
   fmt      <file.forge> [...]          Format .forge files
-  compile  <file.fg> [...] [-o out] [--mono] [--c]   Compile .fg files
+  compile  <file.fg> [...] [-o out]            Compile .fg files to C
 `
 
 func main() {
@@ -141,8 +141,6 @@ func cmdCompile(args []string) error {
 	pkg := "main"
 	modPath := ""
 	_ = modPath // reserved for future multi-file module support
-	useMono := false
-	useC := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -161,11 +159,8 @@ func cmdCompile(args []string) error {
 			if i < len(args) {
 				modPath = args[i]
 			}
-		case "--mono":
-			useMono = true
 		case "--c":
-			useC = true
-			useMono = true // C requires monomorphization
+			// accepted for backwards compatibility, already the default
 		default:
 			inputs = append(inputs, args[i])
 		}
@@ -192,11 +187,7 @@ func cmdCompile(args []string) error {
 		}
 		out := output
 		if out == "" {
-			ext := ".go"
-			if useC {
-				ext = ".c"
-			}
-			out = strings.TrimSuffix(filepath.Base(input), filepath.Ext(input)) + ext
+			out = strings.TrimSuffix(filepath.Base(input), filepath.Ext(input)) + ".c"
 		}
 		files = append(files, parsedFile{file: file, input: input, output: out})
 	}
@@ -243,27 +234,16 @@ func cmdCompile(args []string) error {
 
 	out := output
 	if out == "" {
-		ext := ".go"
-		if useC {
-			ext = ".c"
-		}
-		out = strings.TrimSuffix(filepath.Base(inputs[0]), filepath.Ext(inputs[0])) + ext
+		out = strings.TrimSuffix(filepath.Base(inputs[0]), filepath.Ext(inputs[0])) + ".c"
 	}
 
 	lowerer := lir.NewLowerer()
 	prog := lowerer.Lower(merged)
 	prog.Package = pkg
 	lir.Optimize(prog)
-	if useMono {
-		lir.Monomorphize(prog)
-	}
+	lir.Monomorphize(prog)
 	lir.RewriteImplRenames(prog)
-	var src string
-	if useC {
-		src = lir.EmitC(prog)
-	} else {
-		src = lir.EmitGo(prog)
-	}
+	src := lir.EmitC(prog)
 
 	if err := os.WriteFile(out, []byte(src), 0644); err != nil {
 		return fmt.Errorf("writing %s: %w", out, err)

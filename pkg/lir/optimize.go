@@ -497,7 +497,7 @@ func destructureMultiReturn(stmts []LStmt) []LStmt {
 // Same for method calls: _tN := slice.push(x) → slice = slice.push(x)
 
 func rewriteAppendReassign(stmts []LStmt) []LStmt {
-	// No-op: handled in go_backend by detecting SideEffect(append(...))
+	// No-op: handled in C backend by detecting SideEffect(append(...))
 	return stmts
 }
 

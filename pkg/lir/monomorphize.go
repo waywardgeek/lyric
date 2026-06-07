@@ -10,7 +10,8 @@ import (
 // at call sites. After this pass, no LTyTypeVar remains in the program.
 //
 // This is required for backends that don't support generics natively (e.g. C).
-// The Go backend can skip this pass since Go has native generics.
+// Monomorphize specializes all generic types and functions into concrete versions.
+// Required for the C backend since C has no native generics.
 func Monomorphize(prog *LProgram) {
 	m := &monoPass{
 		prog:            prog,

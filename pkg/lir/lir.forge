@@ -1,9 +1,9 @@
 // lir.forge — Low-level Intermediate Representation for the Forge compiler
 forge Lir {
-  why: "Bridge between AST and backend code generators. Resolves ALL semantic complexity during lowering so backends are thin syntax emitters (<1500 LOC each). Key properties: structured control flow (not basic blocks), flat expressions (SSA-like temps), type variables preserved for Go backend (monomorphized for C)."
+  why: "Bridge between AST and the C backend. Resolves ALL semantic complexity during lowering so the backend is a thin syntax emitter (~1700 LOC). Key properties: structured control flow (not basic blocks), flat expressions (SSA-like temps), type variables monomorphized before C emission."
 
   doc "Architecture": """
-    Pipeline: AST + Registry → Lowerer → LProgram → Optimizer → [Monomorphizer] → Backend
+    Pipeline: AST + Registry → Lowerer → LProgram → Optimizer → Monomorphizer → C Backend
 
     The Lowerer converts a type-checked AST into an LProgram. It flattens all
     nested expressions into SSA-like temporaries (%0, %1, ...), resolves enums
@@ -12,7 +12,7 @@ forge Lir {
     and generators into goroutine+channel patterns.
 
     Structured control flow preserved (LStmtIf, LStmtWhile, LStmtFor, LStmtSwitch)
-    — NOT basic blocks. Essential for emitting idiomatic Go/C.
+    — NOT basic blocks. Essential for emitting idiomatic C.
 
     While-loop conditions use CondBlock+CondVar: statements in CondBlock compute
     the condition value, re-evaluated each iteration without code duplication.
@@ -26,8 +26,8 @@ forge Lir {
     - Enums → LTyTaggedUnion. Match → switch on variant tag + field extraction.
     - Classes → LTyClassHandle (pointer to heap struct). Field access via
     LExprClassGet/LStmtClassSet.
-    - Generics: type params preserved as LTyTypeVar (Go backend uses native
-    generics). Monomorphize pass specializes for C.
+    - Generics: type params preserved as LTyTypeVar during lowering.
+    Monomorphize pass specializes all generics before C emission.
     - Impl blocks → forwarding wrapper methods (lowerImplBlock). Three kinds:
     alias (=) forwards call, field bind (<->) generates getter/setter,
     inline body emitted directly.

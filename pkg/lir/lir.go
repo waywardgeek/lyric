@@ -6,7 +6,7 @@
 // Design principles:
 //   - Structured control flow (if/while/for/switch), NOT basic blocks
 //   - Flat expressions — no nesting, every subexpression gets a named temporary
-//   - Type variables preserved for Go backend (LTyTypeVar); future C backend would monomorphize
+//   - Type variables used for monomorphization (LTyTypeVar); C backend requires monomorphized output
 //   - All sugar resolved — no ?, no match-as-expression, no f-strings, no method syntax on primitives
 package lir
 
@@ -14,7 +14,7 @@ package lir
 // Types
 // ---------------------------------------------------------------------------
 
-// LType represents a type in the LIR. For the Go backend, type variables are preserved
+// LType represents a type in the LIR. Type variables are preserved
 // as LTyTypeVar; a future C backend would monomorphize them away before reaching here.
 type LType struct {
 	Kind       LTypeKind

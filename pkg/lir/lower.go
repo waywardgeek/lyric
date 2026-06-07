@@ -1313,7 +1313,7 @@ func (l *Lowerer) lowerForGenerator(fs *ast.ForStmt, iterVal LValue) {
 	elemType := iterVal.Type.Elem
 
 	// The generator value IS the iterator closure already.
-	// Emit: for x in iterVal — the Go backend will handle gen types specially.
+	// Emit: for x in iterVal — the C backend handles gen types specially.
 	// For now, we lower it as a regular for-in and let the backend handle gen types.
 	l.emit(LStmt{Kind: LStmtFor, Data: &LFor{
 		Var:        fs.Var,
@@ -2542,7 +2542,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 				val.Type != nil && val.Type.Kind == LTySlice &&
 				(val.Type.Elem == nil || val.Type.Elem.Kind == LTyAny) {
 				val.Type = allFields[i].Type
-				// Also update the underlying temp's expression type so the Go backend emits correct type
+				// Also update the underlying temp's expression type so the C backend emits correct type
 				if val.Kind == LValTemp {
 					for si := len(l.stmts) - 1; si >= 0; si-- {
 						if l.stmts[si].Kind == LStmtTempDef {
@@ -2639,7 +2639,7 @@ func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue {
 	var paramTypes []*LType
 	for i := range mc.Args {
 		args = append(args, l.lowerExpr(&mc.Args[i]))
-		// Capture checker-resolved param type for nil arg handling in Go backend
+		// Capture checker-resolved param type for nil arg handling in C backend
 		paramTypes = append(paramTypes, l.exprType(&mc.Args[i]))
 	}
 
