@@ -2798,6 +2798,12 @@ func (g *cGen) linef(format string, args ...interface{}) {
 // resolveFieldType looks up a field type from program declarations.
 func (g *cGen) resolveFieldType(ownerType *LType, field string) *LType {
 	name := ownerType.Name
+	// Apply class renames for monomorphized classes (e.g., DictEntry → DictEntry_i32)
+	if g.prog.ClassRenames != nil {
+		if renamed, ok := g.prog.ClassRenames[name]; ok {
+			name = renamed
+		}
+	}
 	for _, s := range g.prog.Structs {
 		if s.Name == name {
 			for _, f := range s.Fields {
