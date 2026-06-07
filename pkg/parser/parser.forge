@@ -156,7 +156,7 @@ forge Parser {
     `for item in list { ... }`). Resolution via exprDepth counter:
     - exprDepth > 0 (inside parens, brackets, arg lists): always struct literal
     - exprDepth == 0 (statement context): use isStructLitAhead() lookahead
-      which checks for `{}` (empty) or `ident:` (named field) patterns
+    which checks for `{}` (empty) or `ident:` (named field) patterns
 
     parseArgList and paren/bracket parsing increment exprDepth.
   """
@@ -295,8 +295,6 @@ forge Parser {
 
   class Lexer {
     why: "Stateful scanner. Handles triple-quoted strings, collapses newline sequences, tracks line/column. State is copyable for parser lookahead save/restore."
-    Source: string
-    Filename: string
     Comments: [ast.Comment]
     func Next(mut self) -> Token
     func Peek(self) -> Token
@@ -311,7 +309,6 @@ forge Parser {
 
   class Parser {
     why: "Recursive descent + Pratt hybrid parser. Declaration parsing via recursive descent; expression parsing via precedence climbing. Internal methods are unexported — only ParseFile/ParseString are public."
-    Lex: Lexer
   }
 
   // ---- Public API ----

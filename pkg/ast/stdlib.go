@@ -249,7 +249,16 @@ func collectUsedTypeNames(file *File) map[string]bool {
 	return names
 }
 
+// primitiveTypes are built-in type names that should not trigger stdlib merging.
+var primitiveTypes = map[string]bool{
+	"string": true, "bool": true, "any": true, "error": true,
+	"i8": true, "i16": true, "i32": true, "i64": true, "i128": true, "i256": true,
+	"u8": true, "u16": true, "u32": true, "u64": true, "u128": true, "u256": true,
+	"f32": true, "f64": true, "int": true, "uint": true, "byte": true, "rune": true,
+}
+
 // collectTypeNames recursively extracts NamedType names from a type expression.
+// Excludes primitive types to avoid false-positive stdlib merging.
 func collectTypeNames(te *TypeExpr, names map[string]bool) {
 	if te == nil {
 		return
@@ -257,9 +266,13 @@ func collectTypeNames(te *TypeExpr, names map[string]bool) {
 	switch te.Kind {
 	case TypeNamed:
 		if d, ok := te.Data.(NamedType); ok {
-			names[d.Name] = true
+			if !primitiveTypes[d.Name] {
+				names[d.Name] = true
+			}
 		} else if dp, ok := te.Data.(*NamedType); ok {
-			names[dp.Name] = true
+			if !primitiveTypes[dp.Name] {
+				names[dp.Name] = true
+			}
 		}
 	case TypeOptional:
 		if d, ok := te.Data.(OptionalType); ok {
