@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -363,7 +364,59 @@ func collectFuncCallNamesStmt(stmt *Stmt, names map[string]bool) {
 	case StmtAssign:
 		if d, ok := stmt.Data.(*AssignStmt); ok {
 			collectFuncCallNamesExpr(&d.Value, names)
+			collectFuncCallNamesExpr(&d.Target, names)
 		}
+	case StmtMatch:
+		if d, ok := stmt.Data.(*MatchStmt); ok {
+			collectFuncCallNamesExpr(&d.Value, names)
+			for _, arm := range d.Arms {
+				collectFuncCallNames(arm.Body.Stmts, names)
+				if arm.Guard != nil {
+					collectFuncCallNamesExpr(arm.Guard, names)
+				}
+			}
+		}
+	case StmtWhile:
+		if d, ok := stmt.Data.(*WhileStmt); ok {
+			collectFuncCallNamesExpr(&d.Condition, names)
+			collectFuncCallNames(d.Body.Stmts, names)
+		}
+	case StmtBlock:
+		if d, ok := stmt.Data.(*Block); ok {
+			collectFuncCallNames(d.Stmts, names)
+		}
+	case StmtSpawn:
+		if d, ok := stmt.Data.(*SpawnStmt); ok {
+			collectFuncCallNames(d.Body.Stmts, names)
+		}
+	case StmtSelect:
+		if d, ok := stmt.Data.(*SelectStmt); ok {
+			for _, c := range d.Cases {
+				if c.Expr != nil {
+					collectFuncCallNamesExpr(c.Expr, names)
+				}
+				collectFuncCallNames(c.Body.Stmts, names)
+			}
+		}
+	case StmtLock:
+		if d, ok := stmt.Data.(*LockStmt); ok {
+			collectFuncCallNamesExpr(&d.Mutex, names)
+			collectFuncCallNames(d.Body.Stmts, names)
+		}
+	case StmtCascade:
+		if d, ok := stmt.Data.(*CascadeStmt); ok {
+			collectFuncCallNames(d.Body.Stmts, names)
+		}
+	case StmtYield:
+		if d, ok := stmt.Data.(*YieldStmt); ok {
+			if d.Value != nil {
+				collectFuncCallNamesExpr(d.Value, names)
+			}
+		}
+	case StmtBreak, StmtContinue:
+		// no expressions to collect
+	default:
+		panic(fmt.Sprintf("collectFuncCallNamesStmt: unhandled StmtKind %d", stmt.Kind))
 	}
 }
 
@@ -410,6 +463,76 @@ func collectFuncCallNamesExpr(expr *Expr, names map[string]bool) {
 				collectFuncCallNamesExpr(&d.Fields[i].Value, names)
 			}
 		}
+	case ExprMatch:
+		if d, ok := expr.Data.(*MatchStmt); ok {
+			collectFuncCallNamesExpr(&d.Value, names)
+			for _, arm := range d.Arms {
+				collectFuncCallNames(arm.Body.Stmts, names)
+				if arm.Guard != nil {
+					collectFuncCallNamesExpr(arm.Guard, names)
+				}
+			}
+		}
+	case ExprLambda:
+		if d, ok := expr.Data.(*LambdaExpr); ok {
+			collectFuncCallNames(d.Body.Stmts, names)
+		}
+	case ExprIndex:
+		if d, ok := expr.Data.(*IndexExpr); ok {
+			collectFuncCallNamesExpr(&d.Receiver, names)
+			collectFuncCallNamesExpr(&d.Index, names)
+		}
+	case ExprSlice:
+		if d, ok := expr.Data.(*SliceExpr); ok {
+			collectFuncCallNamesExpr(&d.Receiver, names)
+			if d.Low != nil {
+				collectFuncCallNamesExpr(d.Low, names)
+			}
+			if d.High != nil {
+				collectFuncCallNamesExpr(d.High, names)
+			}
+		}
+	case ExprListLit:
+		if d, ok := expr.Data.(*ListLitExpr); ok {
+			for i := range d.Elems {
+				collectFuncCallNamesExpr(&d.Elems[i], names)
+			}
+		}
+	case ExprMapLit:
+		if d, ok := expr.Data.(*MapLitExpr); ok {
+			for i := range d.Entries {
+				collectFuncCallNamesExpr(&d.Entries[i].Key, names)
+				collectFuncCallNamesExpr(&d.Entries[i].Value, names)
+			}
+		}
+	case ExprTupleLit:
+		if d, ok := expr.Data.(*TupleLitExpr); ok {
+			for i := range d.Elems {
+				collectFuncCallNamesExpr(&d.Elems[i], names)
+			}
+		}
+	case ExprCast:
+		if d, ok := expr.Data.(*CastExpr); ok {
+			collectFuncCallNamesExpr(&d.Operand, names)
+		}
+	case ExprUnwrap:
+		if d, ok := expr.Data.(*UnwrapExpr); ok {
+			collectFuncCallNamesExpr(&d.Operand, names)
+		}
+	case ExprTry:
+		if d, ok := expr.Data.(*TryExpr); ok {
+			collectFuncCallNamesExpr(&d.Operand, names)
+		}
+	case ExprStringInterp:
+		if d, ok := expr.Data.(*StringInterpExpr); ok {
+			for i := range d.Parts {
+				collectFuncCallNamesExpr(&d.Parts[i], names)
+			}
+		}
+	case ExprIdent, ExprIntLit, ExprFloatLit, ExprStringLit, ExprBoolLit, ExprNil:
+		// no sub-expressions to collect
+	default:
+		panic(fmt.Sprintf("collectFuncCallNamesExpr: unhandled ExprKind %d", expr.Kind))
 	}
 }
 

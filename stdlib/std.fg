@@ -512,4 +512,14 @@ forge std {
     return StringBuilder { buf: "" }
   }
 
+  // range: generate integers from start (inclusive) to end (exclusive).
+  // Usage: for i in range(0, n) { ... }
+  pub func range(start: i32, end: i32) -> gen i32 {
+    let mut i: i32 = start
+    while i < end {
+      yield i
+      i = i + 1
+    }
+  }
+
 }
