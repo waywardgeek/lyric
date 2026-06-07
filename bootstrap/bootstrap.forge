@@ -92,6 +92,10 @@ forge bootstrap {
   """
 
   doc "Known TODOs": """
+    - Module/import system: currently all files merge into one flat namespace.
+      Post-bootstrap priority — design in Forge after self-hosting, not in Go.
+      Will need: import syntax, directory-based modules, cross-module name
+      resolution, pub visibility across boundaries, auto file discovery.
     - Type params not stored on StructDecl, EnumDecl, InterfaceDecl, ClassDecl,
       FuncDecl parse_type_params results (parsed but discarded)
     - Annotations not parsed (concurrent, requires, ensures, etc.)

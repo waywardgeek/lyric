@@ -159,12 +159,17 @@ forge Forge {
   """
 
   doc "Future Roadmap": """
+    - Module system (POST-BOOTSTRAP): import "checker" resolving to directories,
+    cross-module name resolution, pub visibility enforcement across boundaries,
+    automatic file discovery within module directories. Design this IN Forge
+    after self-hosting — touches parser, checker, lowerer, and C backend.
+    Flat namespace is fine through bootstrap (~12 files); pain starts at 20+.
     - C backend: maps, lock body scoping, garbage collection (Boehm GC)
     - LLVM backend (after C backend is mature)
     - Expression parsing for requires/ensures annotations
     - Language server: AST + Span for IDE integration
     - CI integration: forge verify as pre-commit hook
-    - Bootstrap: rewrite Forge compiler in Forge
+    - Bootstrap: rewrite Forge compiler in Forge (IN PROGRESS)
   """
 
   doc "Known Failures": """
