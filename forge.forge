@@ -166,20 +166,23 @@ forge Forge {
     Pre-existing test failures as of 2026-06-07. Do NOT investigate these without
     explicit instruction — they are known issues, not regressions.
 
-    1. TestCBackendRuns/demo.fg — MergeStdlib pulls Dict/Sym code into programs
-    that don't use Dict. The Sym class is emitted as struct (not class handle),
-    causing gcc errors. Root cause: MergeStdlib doesn't distinguish whether a
-    program actually uses Dict; it pulls transitively based on relation types.
+    1. TestMonomorphizeOutputMatches/{classes,collections,inference}.fg — Go backend
+    Optional(TypeVar) issues: `return nil` for generic T, incorrect dereferencing of
+    non-pointer type vars. These are Go backend limitations with generics. Bootstrap
+    targets C backend specifically to avoid these.
 
-    2. TestVerifyAstForge — ast.forge still references CtorParams field on
-    ClassDecl, which was removed from the Go implementation. Run `forge update`
-    on ast.forge to fix.
-
-    3. Checker warnings for stdlib interface methods (dict_get calling hash_lookup,
+    2. Checker warnings for stdlib interface methods (dict_get calling hash_lookup,
     etc.) — interface methods are desugared to class methods, but Dict functions
     call them as free functions. The checker warns but the lowerer proceeds,
     producing LTyAny for unresolved expressions. The C backend's inferExprType
     + resolveFieldType recover concrete types in most cases.
+
+    FIXED (2026-06-07, commit 8c904d2):
+    - TestCBackendRuns/demo.fg — was caused by MergeStdlib matching primitive types
+    (string, i32) in funcReferencesTypes, pulling entire Dict/Sym chain into programs
+    that don't use them. Fixed by filtering primitiveTypes in collectTypeNames.
+    - TestVerifyAstForge — CtorParams field removed from ClassDecl but not ast.forge.
+    - TestVerifyParserForge — unexported fields (Source, Filename, Lex) in .forge.
   """
 
   source: ["cmd/forge/main.go", "cmd/forge/shared.go", "cmd/forge/fmt.go", "cmd/forge/update.go"]

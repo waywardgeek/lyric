@@ -155,6 +155,21 @@ forge AST {
     produces silent failures. All desugar runs BEFORE the checker.
   """
 
+  doc "Invariants — MergeStdlib": """
+    MergeStdlib uses collectUsedTypeNames and funcReferencesTypes to decide
+    which stdlib declarations to pull into user code. Primitive type names
+    (string, i32, bool, u64, etc.) MUST be excluded from type-name collection.
+
+    Without this filter, funcReferencesTypes matches stdlib functions that
+    return 'string' (e.g. to_string, get_name) against user code that merely
+    uses 'string' as a type. This triggers transitive pulling: to_string →
+    Sym → Dict → DictEntry → HashedList → the entire stdlib, even for programs
+    that don't use any stdlib types.
+
+    The primitiveTypes map in stdlib.go is the exclusion filter. Any new
+    primitive type added to the language must also be added there.
+  """
+
   doc "Technical Debt": """
     - No semantic validation: no checks for circular interface inheritance or
     duplicate fields at the AST level
