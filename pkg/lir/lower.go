@@ -2,6 +2,7 @@ package lir
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -93,32 +94,33 @@ func (l *Lowerer) Lower(file *ast.File) *LProgram {
 	}
 	l.prog = prog
 
-	for _, block := range file.Blocks {
-		// First pass: register types
-		l.registerTypes(&block)
+	// First pass: register ALL types across all blocks before lowering any.
+	// This ensures cross-block references (e.g., test file using enum variants
+	// from a library file) resolve correctly regardless of block ordering.
+	for i := range file.Blocks {
+		block := &file.Blocks[i]
+		l.registerTypes(block)
 
 		// Set package name from first block
 		if prog.Package == "" {
 			prog.Package = block.Name
 		}
 
-		// Lower imports
+		// Pre-register imports
 		for _, imp := range block.Imports {
 			prog.Imports = append(prog.Imports, LImport{
 				Alias: imp.Alias,
 				Path:  imp.Path,
 			})
-			// Track import alias → path for package-qualified call detection
 			alias := imp.Alias
 			if alias == "" {
-				// Use last segment of path as alias
 				parts := strings.Split(imp.Path, "/")
 				alias = parts[len(parts)-1]
 			}
 			l.importAliases[alias] = imp.Path
 		}
 
-		// Lower type aliases
+		// Lower type aliases (needed for type resolution in later blocks)
 		for _, ta := range block.TypeAliases {
 			loweredType := l.lowerTypeExpr(&ta.Type)
 			l.typeAliasTypes[ta.Name] = loweredType
@@ -129,13 +131,16 @@ func (l *Lowerer) Lower(file *ast.File) *LProgram {
 			})
 		}
 
-		// Pre-register all class names so cross-references in structs/enums
-		// resolve to LTyClassHandle (must happen before struct & enum lowering)
+		// Pre-register class names for cross-references
 		for _, cls := range block.Classes {
 			if _, ok := l.classFields[cls.Name]; !ok {
 				l.classFields[cls.Name] = nil
 			}
 		}
+	}
+
+	// Second pass: lower all blocks (types already registered in first pass)
+	for _, block := range file.Blocks {
 
 		// Lower structs
 		for _, s := range block.Structs {
@@ -208,6 +213,12 @@ func (l *Lowerer) Lower(file *ast.File) *LProgram {
 			prog.Functions = append(prog.Functions, wrappers...)
 		}
 	}
+
+	// Validate: no LTyAny in function signatures or temp definitions.
+	// LTyAny means the checker's type annotation was lost (usually due to
+	// AST Expr value-type copies in range loops). Catch it here rather than
+	// letting void* propagate to the C backend.
+	l.validateNoAnyTypes()
 
 	return prog
 }
@@ -3017,3 +3028,50 @@ func (l *Lowerer) lowerTry(expr *ast.Expr) LValue {
 
 // Ensure strings import is used (for strings.Contains etc. in method lowering)
 var _ = strings.Contains
+
+// validateNoAnyTypes checks that no function parameter, return type, or temp
+// definition has type LTyAny after lowering. LTyAny means a checker type
+// annotation was lost (usually from AST Expr value-type copies).
+func (l *Lowerer) validateNoAnyTypes() {
+	for _, f := range l.prog.Functions {
+		// Check params
+		for _, p := range f.Params {
+			if p.Type != nil && p.Type.Kind == LTyAny {
+				fmt.Fprintf(os.Stderr, "lowerer: function %s param %q has unresolved type (LTyAny)\n", f.Name, p.Name)
+			}
+		}
+		// Check return type
+		if f.ReturnType != nil && f.ReturnType.Kind == LTyAny {
+			fmt.Fprintf(os.Stderr, "lowerer: function %s has unresolved return type (LTyAny)\n", f.Name)
+		}
+		// Check all temps recursively
+		validateStmtsNoAny(f.Name, f.Body)
+	}
+}
+
+func validateStmtsNoAny(funcName string, stmts []LStmt) {
+	for _, stmt := range stmts {
+		switch stmt.Kind {
+		case LStmtTempDef:
+			td := stmt.Data.(*LTempDef)
+			if td.Expr.Type != nil && td.Expr.Type.Kind == LTyAny {
+				fmt.Fprintf(os.Stderr, "lowerer: function %s temp _t%d has unresolved type (LTyAny)\n", funcName, td.ID)
+			}
+		case LStmtBlock:
+			b := stmt.Data.(*LBlock)
+			validateStmtsNoAny(funcName, b.Stmts)
+		case LStmtIf:
+			ifData := stmt.Data.(*LIf)
+			validateStmtsNoAny(funcName, ifData.Then)
+			validateStmtsNoAny(funcName, ifData.Else)
+		case LStmtSwitch:
+			sw := stmt.Data.(*LSwitch)
+			for _, c := range sw.Cases {
+				validateStmtsNoAny(funcName, c.Body)
+			}
+		case LStmtFor:
+			forData := stmt.Data.(*LFor)
+			validateStmtsNoAny(funcName, forData.Body)
+		}
+	}
+}

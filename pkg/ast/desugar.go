@@ -193,14 +193,17 @@ func DesugarInterfaceFields(file *File) {
 // 1. Injects default fields from the interface into concrete classes (with label prefixing)
 // 2. Generates impl blocks with field bindings mapping interface getters to concrete fields
 func DesugarRelations(file *File) {
+	// Build global interface lookup across ALL blocks (interfaces may be in stdlib block 0
+	// while relations referencing them are in user blocks)
+	globalIfaceMap := make(map[string]*InterfaceDecl)
+	for bi := range file.Blocks {
+		for ii := range file.Blocks[bi].Interfaces {
+			globalIfaceMap[file.Blocks[bi].Interfaces[ii].Name] = &file.Blocks[bi].Interfaces[ii]
+		}
+	}
+
 	for bi := range file.Blocks {
 		block := &file.Blocks[bi]
-
-		// Build interface lookup: name -> InterfaceDecl
-		ifaceMap := make(map[string]*InterfaceDecl)
-		for ii := range block.Interfaces {
-			ifaceMap[block.Interfaces[ii].Name] = &block.Interfaces[ii]
-		}
 
 		// Build class lookup: name -> index in block.Classes
 		classIdx := make(map[string]int)
@@ -209,7 +212,7 @@ func DesugarRelations(file *File) {
 		}
 
 		for _, rel := range block.Relations {
-			iface := ifaceMap[rel.Hint]
+			iface := globalIfaceMap[rel.Hint]
 			if iface == nil || len(iface.Fields) == 0 {
 				continue
 			}

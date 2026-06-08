@@ -307,39 +307,33 @@ func cmdTest(args []string) error {
 		files = append(files, file)
 	}
 
+	// Merge all files into one compilation unit before processing
+	merged := ast.MergeFiles(files)
+
 	// Merge stdlib
 	stdlibDir := ast.FindStdlibDir()
 	if stdlibDir != "" {
 		stdFile := loadStdlib(stdlibDir)
 		if stdFile != nil {
-			for _, f := range files {
-				ast.MergeStdlib(f, stdFile)
-			}
+			ast.MergeStdlib(merged, stdFile)
 		}
 	}
 
 	// Desugar
-	for _, f := range files {
-		ast.DesugarInterfaceEmbeds(f)
-		ast.DesugarInterfaceFields(f)
-		ast.DesugarRelations(f)
-		ast.DesugarDestructors(f)
-		ast.DesugarDefaultImpls(f)
-	}
+	ast.DesugarInterfaceEmbeds(merged)
+	ast.DesugarInterfaceFields(merged)
+	ast.DesugarRelations(merged)
+	ast.DesugarDestructors(merged)
+	ast.DesugarDefaultImpls(merged)
 
 	// Check
 	ch := checker.New()
-	for _, f := range files {
-		ch.CheckFile(f)
-	}
+	ch.CheckFile(merged)
 	if errs := ch.Errors(); len(errs) > 0 {
 		for _, e := range errs {
 			fmt.Fprintln(os.Stderr, e)
 		}
 	}
-
-	// Merge and lower
-	merged := ast.MergeFiles(files)
 	lowerer := lir.NewLowerer()
 	prog := lowerer.Lower(merged)
 	prog.Package = "test"

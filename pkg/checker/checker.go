@@ -1264,6 +1264,10 @@ func (c *Checker) checkMethodCall(expr *ast.Expr) *Type {
 	if recvType.Kind == TyStruct || recvType.Kind == TyClass {
 		if info := c.registry.Lookup(recvType.Name); info != nil {
 			if methType, ok := info.Methods[mc.Method]; ok && methType.Kind == TyFunc {
+				// Check argument types
+				for i := range mc.Args {
+					c.checkExpr(&mc.Args[i])
+				}
 				return methType.Return
 			}
 		}
@@ -2208,6 +2212,46 @@ func (c *Checker) CheckFile(file *ast.File) {
 	if file.Filename != "" && c.currentFile == "" {
 		c.currentFile = file.Filename
 	}
+	// Phase 0: Pre-register all type names across all blocks so cross-block
+	// references in function/method signatures resolve correctly during Phase 1.
+	// Without this, a test block declaring `func f() -> Token` fails to resolve
+	// Token if it's defined in a later block.
+	for i := range file.Blocks {
+		block := &file.Blocks[i]
+		for _, s := range block.Structs {
+			if c.registry.Lookup(s.Name) == nil {
+				c.registry.Register(s.Name, &TypeInfo{
+					Type:   &Type{Kind: TyStruct, Name: s.Name},
+					Fields: make(map[string]*Type),
+				})
+			}
+		}
+		for _, cls := range block.Classes {
+			if c.registry.Lookup(cls.Name) == nil {
+				c.registry.Register(cls.Name, &TypeInfo{
+					Type:    &Type{Kind: TyClass, Name: cls.Name},
+					Fields:  make(map[string]*Type),
+					Methods: make(map[string]*Type),
+				})
+			}
+		}
+		for _, e := range block.Enums {
+			if c.registry.Lookup(e.Name) == nil {
+				c.registry.Register(e.Name, &TypeInfo{
+					Type: &Type{Kind: TyEnum, Name: e.Name},
+				})
+			}
+		}
+		for _, iface := range block.Interfaces {
+			if c.registry.Lookup(iface.Name) == nil {
+				c.registry.Register(iface.Name, &TypeInfo{
+					Type:    &Type{Kind: TyInterface, Name: iface.Name},
+					Fields:  make(map[string]*Type),
+					Methods: make(map[string]*Type),
+				})
+			}
+		}
+	}
 	// Phase 1: Register all types, functions, and constants across all blocks
 	// so cross-block references resolve correctly in multi-file compilation.
 	for i := range file.Blocks {
@@ -2216,6 +2260,47 @@ func (c *Checker) CheckFile(file *ast.File) {
 	// Phase 2: Check function and method bodies (all names now in scope).
 	for i := range file.Blocks {
 		c.checkForgeBlockBodies(&file.Blocks[i])
+	}
+
+	// Phase 3: Validate all function signatures are fully resolved.
+	c.validateAllTypesResolved(file)
+}
+
+// validateAllTypesResolved checks that no function parameter or return type
+// is TyUnknown after type checking. This catches resolution failures at the
+// source rather than letting them propagate as void* in the C backend.
+func (c *Checker) validateAllTypesResolved(file *ast.File) {
+	for _, block := range file.Blocks {
+		for _, fn := range block.Functions {
+			// Skip generic functions — their type vars are resolved at instantiation
+			if len(fn.TypeParams) > 0 {
+				continue
+			}
+			fnType := c.scope.Lookup(fn.Name)
+			if fnType == nil {
+				// External methods are registered under receiver.method
+				if fn.ReceiverType != "" {
+					fnType = c.scope.Lookup(fn.ReceiverType + "." + fn.Name)
+				}
+				if fnType == nil {
+					continue
+				}
+			}
+			if fnType.Kind == TyFunc {
+				for i, p := range fnType.Params {
+					if p.Kind == TyUnknown {
+						paramName := ""
+						if i < len(fn.Params) {
+							paramName = fn.Params[i].Name
+						}
+						fmt.Fprintf(os.Stderr, "checker: function %s: parameter %q has unresolved type\n", fn.Name, paramName)
+					}
+				}
+				if fnType.Return != nil && fnType.Return.Kind == TyUnknown {
+					fmt.Fprintf(os.Stderr, "checker: function %s: return type is unresolved\n", fn.Name)
+				}
+			}
+		}
 	}
 }
 
@@ -2640,6 +2725,17 @@ func (c *Checker) checkImplements(cls *ast.ClassDecl) {
 func (c *Checker) registerFunc(fn *ast.FuncDecl) {
 	fnType := c.funcDeclToType(fn)
 	c.scope.Define(fn.Name, fnType)
+
+	// For external methods (func T.method(self) syntax), also register
+	// in the receiver type's Methods map so checkMethodCall can find them.
+	if fn.ReceiverType != "" {
+		if info := c.registry.Lookup(fn.ReceiverType); info != nil {
+			if info.Methods == nil {
+				info.Methods = make(map[string]*Type)
+			}
+			info.Methods[fn.Name] = fnType
+		}
+	}
 }
 
 // grantRelationalMethods populates typeVarMethods from a relational constraint.

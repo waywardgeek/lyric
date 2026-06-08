@@ -37,6 +37,7 @@ func EmitC(prog *LProgram) string {
 		ifaceByName: map[string]*LInterfaceDecl{},
 		implMap:     map[string][]string{}, // class → []interface
 		funcByName:  map[string]*LFuncDecl{},
+		simpleEnums: map[string]bool{},
 	}
 	// Build interface lookup
 	for i := range prog.Interfaces {
@@ -97,9 +98,12 @@ type cGen struct {
 	funcByName  map[string]*LFuncDecl      // "name" or "Class.method" → func decl
 
 	// OS builtin helpers needed
-	needsOsArgs  bool
-	needsExecCmd bool
+	needsOsArgs   bool
+	needsExecCmd  bool
 	needsPathJoin bool
+
+	// Simple enum tracking (all-unit-variant enums emitted as C enum, not tagged union)
+	simpleEnums map[string]bool
 }
 
 type cSpawnFunc struct {
@@ -180,7 +184,13 @@ func (g *cGen) generate() string {
 		g.linef("typedef struct %s %s;", g.structName(c.Name, c.IsExported), g.structName(c.Name, c.IsExported))
 	}
 	for _, e := range g.prog.Enums {
-		g.linef("typedef struct %s %s;", g.structName(e.Name, e.IsExported), g.structName(e.Name, e.IsExported))
+		if isSimpleEnum(&e) {
+			// Simple enums: emit complete typedef enum definition here
+			// so they're available as complete types for FORGE_OPT_DEF below
+			g.emitSimpleEnumDecl(&e)
+		} else {
+			g.linef("typedef struct %s %s;", g.structName(e.Name, e.IsExported), g.structName(e.Name, e.IsExported))
+		}
 	}
 	if len(g.prog.Structs)+len(g.prog.Classes)+len(g.prog.Enums) > 0 {
 		g.line("")
@@ -215,8 +225,11 @@ func (g *cGen) generate() string {
 	}
 
 	// Emit enum definitions first (other types may reference them)
+	// Simple enums already emitted in forward-decl section as typedef enum
 	for _, e := range g.prog.Enums {
-		g.emitEnumDecl(&e)
+		if !isSimpleEnum(&e) {
+			g.emitEnumDecl(&e)
+		}
 	}
 
 	// Emit struct definitions
@@ -290,8 +303,12 @@ func (g *cGen) generate() string {
 	g.emitToStringFunctions()
 
 	// Forward-declare all functions (including methods)
+	// Skip unmonomorphized generic functions (still have TypeParams — dead code from stdlib merge)
 	for _, f := range g.prog.Functions {
 		if g.funcName(&f) == "main" {
+			continue
+		}
+		if len(f.TypeParams) > 0 {
 			continue
 		}
 		g.emitFuncForwardDecl(&f)
@@ -347,6 +364,9 @@ func (g *cGen) generate() string {
 	funcBuf := g.buf
 	g.buf = strings.Builder{}
 	for _, f := range g.prog.Functions {
+		if len(f.TypeParams) > 0 {
+			continue // skip unmonomorphized generic functions
+		}
 		g.emitFuncDecl(&f)
 	}
 	funcCode := g.buf.String()
@@ -497,6 +517,17 @@ func (g *cGen) emitOsHelpers() {
 	}
 }
 
+// isSimpleEnum returns true if all variants are unit variants (no associated data).
+// Simple enums can be emitted as plain C enums instead of tagged union structs.
+func isSimpleEnum(e *LEnumDecl) bool {
+	for _, v := range e.Variants {
+		if len(v.Fields) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // Type declarations
 // ---------------------------------------------------------------------------
@@ -528,6 +559,23 @@ func (g *cGen) emitClassDecl(c *LClassDecl) {
 	}
 	g.indent--
 	g.line("};")
+	g.line("")
+}
+
+func (g *cGen) emitSimpleEnumDecl(e *LEnumDecl) {
+	name := g.structName(e.Name, e.IsExported)
+	g.simpleEnums[name] = true
+	g.linef("typedef enum {")
+	g.indent++
+	for i, v := range e.Variants {
+		comma := ","
+		if i == len(e.Variants)-1 {
+			comma = ""
+		}
+		g.linef("%s_%s = %d%s", name, v.Name, v.Tag, comma)
+	}
+	g.indent--
+	g.linef("} %s;", name)
 	g.line("")
 }
 
@@ -1658,7 +1706,13 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 			val := g.emitValue(&f.Value)
 			// Auto-wrap non-null values for optional fields
 			if fieldType := g.findClassField(classFields, f.Name); fieldType != nil && fieldType.Kind == LTyOptional {
-				if f.Value.Kind == LValLitNull {
+				// Class handle optionals are just pointers — no ForgeOpt wrapping needed
+				if fieldType.Elem != nil && fieldType.Elem.Kind == LTyClassHandle {
+					if f.Value.Kind == LValLitNull {
+						val = "NULL"
+					}
+					// else: value is already a pointer, use as-is
+				} else if f.Value.Kind == LValLitNull {
 					optName := g.optTypeName(fieldType.Elem)
 					val = fmt.Sprintf("forge_none(%s)", optName)
 				} else if f.Value.Type == nil || f.Value.Type.Kind != LTyOptional {
@@ -1839,6 +1893,10 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 			enumName = "Enum"
 		}
 		structName := g.structName(enumName, false)
+		// Simple enums (all unit variants) — just the tag constant
+		if g.simpleEnums[structName] {
+			return fmt.Sprintf("%s_%s", structName, d.Variant)
+		}
 		if len(d.Fields) == 0 {
 			return fmt.Sprintf("(%s){.tag = %s_%s}", structName, structName, d.Variant)
 		}
@@ -1853,7 +1911,15 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 
 	case LExprVariantTag:
 		d := e.Data.(*LVariantTagData)
-		return fmt.Sprintf("%s.tag", g.emitValue(&d.Value))
+		val := g.emitValue(&d.Value)
+		// For simple enums, the value IS the tag (no .tag field)
+		if vt := g.resolveValueType(&d.Value); vt != nil && vt.Kind == LTyTaggedUnion {
+			name := g.structName(vt.Name, false)
+			if g.simpleEnums[name] {
+				return val
+			}
+		}
+		return fmt.Sprintf("%s.tag", val)
 
 	case LExprVariantData:
 		d := e.Data.(*LVariantDataData)
@@ -2352,6 +2418,10 @@ func (g *cGen) eqExpr(a, b *LValue) string {
 		return fmt.Sprintf("forge_str_eq(%s, %s)", va, vb)
 	}
 	if t != nil && t.Kind == LTyTaggedUnion {
+		name := g.structName(t.Name, false)
+		if g.simpleEnums[name] {
+			return fmt.Sprintf("(%s == %s)", va, vb)
+		}
 		return fmt.Sprintf("(%s.tag == %s.tag)", va, vb)
 	}
 	return fmt.Sprintf("(%s == %s)", va, vb)
@@ -2359,12 +2429,27 @@ func (g *cGen) eqExpr(a, b *LValue) string {
 
 // emitToStringFunctions emits auto-generated to_string functions for enums, structs, and classes.
 func (g *cGen) emitToStringFunctions() {
+	// Build set of types that already have a user-defined to_string method
+	hasToString := map[string]bool{}
+	for _, f := range g.prog.Functions {
+		if f.Name == "to_string" && f.Receiver != "" {
+			hasToString[f.Receiver] = true
+		}
+	}
+
 	// Enum to_string: switch on tag, return variant name
 	for _, e := range g.prog.Enums {
 		name := g.structName(e.Name, e.IsExported)
+		if hasToString[e.Name] || hasToString[name] {
+			continue
+		}
 		g.linef("static forge_string %s_to_string(%s v) {", name, name)
 		g.indent++
-		g.line("switch (v.tag) {")
+		if g.simpleEnums[name] {
+			g.line("switch (v) {")
+		} else {
+			g.line("switch (v.tag) {")
+		}
 		g.indent++
 		for _, v := range e.Variants {
 			g.linef("case %s_%s: return FORGE_STR(\"%s\");", name, v.Name, v.Name)
@@ -2380,6 +2465,9 @@ func (g *cGen) emitToStringFunctions() {
 	// Struct to_string: dump all fields
 	for _, s := range g.prog.Structs {
 		name := g.structName(s.Name, s.IsExported)
+		if hasToString[s.Name] || hasToString[name] {
+			continue
+		}
 		g.linef("static forge_string %s_to_string(%s v) {", name, name)
 		g.indent++
 		g.emitFieldDumpToString(s.Name, s.Fields, "v.")
@@ -2391,6 +2479,9 @@ func (g *cGen) emitToStringFunctions() {
 	// Class to_string: dump all fields (receiver is pointer)
 	for _, c := range g.prog.Classes {
 		name := g.structName(c.Name, c.IsExported)
+		if hasToString[c.Name] || hasToString[name] {
+			continue
+		}
 		g.linef("static forge_string %s_to_string(%s* v) {", name, name)
 		g.indent++
 		g.emitFieldDumpToString(c.Name, c.Fields, "v->")
