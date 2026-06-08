@@ -212,12 +212,21 @@ forge Checker {
     - Cascade/Expr: check inner expression(s)
   """
 
-  doc "Invariants — Two-Phase Checking": """
-    CheckFile is split into two phases:
-    1. registerForgeBlock: registers all types/functions/constants across ALL
-       blocks. This must complete for all blocks before phase 2 starts, so
-       cross-block type references resolve correctly in multi-file compilation.
-    2. checkForgeBlockBodies: checks function/method bodies.
+  doc "Invariants — Multi-Phase Checking": """
+    CheckFile handles single-file checking (all phases within one file).
+    CheckFiles handles multi-file compilation with cross-file resolution:
+
+    Phase 0: Pre-register all type NAMES (stubs) across ALL files/blocks.
+    Phase 1: registerForgeBlock for ALL files — registers full types,
+       functions, constants, impl methods across ALL blocks.
+    Phase 2: checkForgeBlockBodies for ALL files — checks function bodies.
+
+    CRITICAL: For multi-file compilation, use CheckFiles (not repeated
+    CheckFile calls). CheckFile runs all 3 phases per-file sequentially,
+    so methods defined in file B are invisible when checking file A's bodies.
+    CheckFiles runs Phase 0+1 across ALL files before ANY Phase 2, so
+    cross-file method calls (e.g., parser.fg calling parse_block from
+    expr_parser.fg) resolve correctly.
 
     Phase 1 uses `for _, f := range block.Functions` (copies ok — only reads
     names/types, doesn't annotate Expr nodes).
@@ -225,6 +234,7 @@ forge Checker {
     (pointer into slice — REQUIRED because checkExpr annotates ResolvedType
     on Expr nodes reached through the FuncDecl's Body pointer).
   """
+
 
   doc "Invariants — ResolvedType Contract": """
     checkExpr(expr *Expr) sets expr.ResolvedType = *checker.Type on every
