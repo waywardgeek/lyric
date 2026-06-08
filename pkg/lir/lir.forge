@@ -121,6 +121,29 @@ forge Lir {
     Dict<V> and HashedList<P,C> compile and run (test_dict.fg, hashed_list.fg).
   """
 
+  doc "Invariants — Three-Phase Lowering": """
+    Lower() runs three phases:
+    Phase 0: Pre-register ALL class names across ALL blocks (classFields[name]=nil).
+      This must happen before registerTypes because field type resolution
+      (lowerNamedType) checks classFields to distinguish classes from structs.
+      Without this, cross-block class references (e.g., Comment in ast.fg
+      referenced by Lexer's lc_children in lexer.fg) resolve as LTyStruct
+      instead of LTyClassHandle, causing ForgeSlice_Comment vs
+      ForgeSlice_Commentptr type mismatches in generated C.
+    Phase 1: registerTypes for ALL blocks (populates fields, variants, exports).
+    Phase 2: Lower ALL blocks (types fully registered, cross-refs safe).
+  """
+
+  doc "Invariants — Default Field Values": """
+    Class fields can have default values (e.g., `line: i32 = 1`). The Lowerer
+    stores these in fieldDefaults[className][fieldName] = *ast.Expr during
+    registerTypes. During lowerStructLit for class allocations, any field not
+    explicitly provided in the struct literal is filled with its default value
+    by lowering the default expression. Uses index-based iteration
+    (&cls.Fields[i]) to avoid AST Expr value-type copy bugs.
+    Struct defaults are NOT yet implemented — only classes.
+  """
+
   doc "Invariants — C Backend ClassRenames": """
     After monomorphization, LIR expressions (ClassGet, MethodCall, etc.) still
     carry the ORIGINAL generic class names (e.g., 'DictEntry', 'Dict'). The
