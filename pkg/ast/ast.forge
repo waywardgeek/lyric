@@ -50,6 +50,12 @@ forge AST {
     control). Supports cardinality (IsMany via [Child] brackets), labeled sides
     (Node:outEdges owns [Edge:fromNode]), and implementation hints (DoublyLinked,
     ArrayList, Hashed).
+
+    INVARIANT: RelationSide.TypeArgs must be preserved from parsing through desugar.
+    Generic relations like HashedList Dict<V>:d store ["V"] in TypeArgs. The
+    rewriteFieldType function uses these to construct NamedType.Args when injecting
+    fields (d_parent: Dict<V>, not Dict). Without this, monomorphization can't
+    distinguish Dict<ClassDecl> from Dict<InterfaceDecl>.
   """
 
   doc "Expression and Statement AST (.fg support)": """

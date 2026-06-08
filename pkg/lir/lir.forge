@@ -156,6 +156,19 @@ forge Lir {
     This was the root cause of all Dict<V> C backend errors (2026-06-07).
   """
 
+  doc "Invariants — TypeArgs Propagation": """
+    LType has a TypeArgs []*LType field. This MUST be preserved through:
+    1. Lowerer: lowerCheckerType and lowerNamedType copy TypeArgs from checker/AST
+    2. Monomorphizer substType: propagates TypeArgs through specialization
+    3. Monomorphizer substTypeRemoveVars: mangles class/struct names using TypeArgs
+    4. Desugar rewriteFieldType: constructs NamedType.Args from RelationSide.TypeArgs
+
+    Without TypeArgs, generic class instances (Dict<ClassDecl> vs Dict<InterfaceDecl>)
+    collide in monomorphization (both mangle to "CDict"). The desugar layer must
+    preserve TypeArgs on relation-injected fields (e.g., HashedList Dict<V>:d injects
+    d_parent: Dict<V>, not d_parent: Dict).
+  """
+
   doc "Invariants — Multi-Return Destructuring and TempTypes": """
     The optimizer's multi-return destructuring converts TempDefs into VarDecls
     with _tN_val/_tN_err naming. When subsequent code references these values
