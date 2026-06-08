@@ -54,6 +54,7 @@ type Type struct {
 	TypeParamNames       []string    // for func: generic type parameter names
 	TypeParamConstraints []string    // for func: constraints (parallel to TypeParamNames)
 	Variants       []*Type    // for union: member types
+	TypeArgs       []*Type    // for class/struct: concrete type arguments (e.g., DictEntry<InterfaceDecl>)
 }
 
 // TypeField is a named or positional field in a tuple/struct.
@@ -310,12 +311,13 @@ type VariantInfo struct {
 
 // TypeInfo holds registered type information.
 type TypeInfo struct {
-	Type          *Type
-	Fields        map[string]*Type        // struct/class fields
-	FieldOrder    []string                // field names in declaration order (for positional struct literals)
-	Methods       map[string]*Type        // method signatures (as TyFunc)
-	Variants      map[string]*VariantInfo // enum variants (variant name → info)
-	GuardedFields map[string]string       // field name → lock name (guarded_by annotations)
+	Type           *Type
+	Fields         map[string]*Type        // struct/class fields
+	FieldOrder     []string                // field names in declaration order (for positional struct literals)
+	Methods        map[string]*Type        // method signatures (as TyFunc)
+	Variants       map[string]*VariantInfo // enum variants (variant name → info)
+	GuardedFields  map[string]string       // field name → lock name (guarded_by annotations)
+	TypeParamNames []string                // generic type parameter names (for substitution)
 }
 
 // Registry holds all known types in the program.
@@ -723,6 +725,14 @@ func (c *Checker) resolveNamedType(name string, args []ast.TypeExpr) *Type {
 	default:
 		// Check registry for user-defined types
 		if info := c.registry.Lookup(name); info != nil {
+			// Track type arguments on generic class/struct instances
+			if len(args) > 0 {
+				var typeArgs []*Type
+				for i := range args {
+					typeArgs = append(typeArgs, c.resolveTypeExpr(&args[i]))
+				}
+				return &Type{Kind: info.Type.Kind, Name: info.Type.Name, TypeArgs: typeArgs}
+			}
 			return info.Type
 		}
 		// Check scope for type variables (generics)
@@ -732,6 +742,25 @@ func (c *Checker) resolveNamedType(name string, args []ast.TypeExpr) *Type {
 		// Unknown type — could be an error, but return TyVar for .forge compatibility
 		return &Type{Kind: TyVar, Name: name}
 	}
+}
+
+// buildTypeArgSubst creates a type substitution map from a type's TypeArgs
+// and the class/struct's TypeParamNames. Returns nil if no substitution needed.
+func (c *Checker) buildTypeArgSubst(recvType *Type) map[string]*Type {
+	if len(recvType.TypeArgs) == 0 {
+		return nil
+	}
+	info := c.registry.Lookup(recvType.Name)
+	if info == nil || len(info.TypeParamNames) == 0 {
+		return nil
+	}
+	subst := make(map[string]*Type)
+	for i, name := range info.TypeParamNames {
+		if i < len(recvType.TypeArgs) {
+			subst[name] = recvType.TypeArgs[i]
+		}
+	}
+	return subst
 }
 
 // assignableTo checks if 'from' type can be used where 'to' type is expected.
@@ -873,6 +902,16 @@ func substituteType(t *Type, subst map[string]*Type) *Type {
 		return &Type{Kind: TyChannel, Elem: substituteType(t.Elem, subst)}
 	case TyGenerator:
 		return &Type{Kind: TyGenerator, Elem: substituteType(t.Elem, subst)}
+	case TyClass, TyStruct:
+		// Track type arguments on generic class/struct instances
+		if len(t.TypeArgs) > 0 {
+			newArgs := make([]*Type, len(t.TypeArgs))
+			for i, a := range t.TypeArgs {
+				newArgs[i] = substituteType(a, subst)
+			}
+			return &Type{Kind: t.Kind, Name: t.Name, TypeArgs: newArgs}
+		}
+		return t
 	default:
 		return t
 	}
@@ -1307,7 +1346,12 @@ func (c *Checker) checkMethodCall(expr *ast.Expr) *Type {
 				for i := range mc.Args {
 					c.checkExpr(&mc.Args[i])
 				}
-				return methType.Return
+				retType := methType.Return
+				// Substitute type args for generic class instances
+				if subst := c.buildTypeArgSubst(recvType); subst != nil {
+					retType = substituteType(retType, subst)
+				}
+				return retType
 			}
 		}
 	}
@@ -1529,6 +1573,10 @@ func (c *Checker) checkFieldAccess(expr *ast.Expr) *Type {
 					if !c.heldLocks[lockName] {
 						c.error(expr.Span, "field %q is guarded by %q and must be accessed within lock(%s) { ... }", fa.Field, lockName, lockName)
 					}
+				}
+				// Substitute type args for generic class instances
+				if subst := c.buildTypeArgSubst(recvType); subst != nil {
+					return substituteType(fieldType, subst)
 				}
 				return fieldType
 			}
@@ -2539,6 +2587,9 @@ func (c *Checker) registerStruct(s *ast.StructDecl) {
 		Fields:        make(map[string]*Type),
 		GuardedFields: make(map[string]string),
 	}
+	for _, tp := range s.TypeParams {
+		info.TypeParamNames = append(info.TypeParamNames, tp.Name)
+	}
 	for _, f := range s.Fields {
 		info.Fields[f.Name] = c.resolveTypeExpr(&f.Type)
 		info.FieldOrder = append(info.FieldOrder, f.Name)
@@ -2555,6 +2606,10 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 		Fields:        make(map[string]*Type),
 		Methods:       make(map[string]*Type),
 		GuardedFields: make(map[string]string),
+	}
+	// Record type param names for generic substitution
+	for _, tp := range cls.TypeParams {
+		info.TypeParamNames = append(info.TypeParamNames, tp.Name)
 	}
 	// Register type params as type variables in a temporary scope for resolving field/method types
 	c.pushScope()
@@ -2698,9 +2753,30 @@ func (c *Checker) registerImplMethods(impl *ast.ImplBlock) {
 			continue
 		}
 
+		substituted := c.substituteMethodType(methType, subst)
+
 		// Only add if not already defined (don't override explicit methods)
 		if _, exists := classInfo.Methods[m.MethodName]; !exists {
-			classInfo.Methods[m.MethodName] = c.substituteMethodType(methType, subst)
+			classInfo.Methods[m.MethodName] = substituted
+		}
+
+		// For field-bind mappings with label prefixes (e.g., children → fb_children),
+		// also register the label-prefixed method name. This is needed because a class
+		// can have multiple relations of the same interface type (e.g., ForgeBlock has
+		// many ArrayList relations), and the label prefix disambiguates them.
+		if m.Kind == ast.ImplFieldBind && m.TargetMember != "" && m.TargetMember != m.MethodName {
+			if strings.HasPrefix(m.MethodName, "set_") {
+				// Setter: set_children → set_fb_children
+				prefixedName := "set_" + m.TargetMember
+				if _, exists := classInfo.Methods[prefixedName]; !exists {
+					classInfo.Methods[prefixedName] = substituted
+				}
+			} else {
+				// Getter: children → fb_children
+				if _, exists := classInfo.Methods[m.TargetMember]; !exists {
+					classInfo.Methods[m.TargetMember] = substituted
+				}
+			}
 		}
 	}
 }
