@@ -1,6 +1,19 @@
 // lexer.forge — understanding doc for the bootstrap lexer package
 forge lexer {
-  why: "Tokenizer for Forge source. Produces Token stream with TokenKind enum, keyword lookup via Dict."
+  why: "Tokenizer for Forge source. Produces Token stream with TokenKind enum. Stateful scanner tracking line/column for source mapping."
+
+  doc "Architecture": """
+    Linear scan: raw text → Token stream. The Lexer scans char-by-char
+    producing Token objects with Kind, Text, and Span.
+
+    Key features:
+    - Triple-quoted strings (""" ... """)
+    - F-string interpolation (f"text {expr}")
+    - Char literals ('a', '\n', '\x41')
+    - Number scanning with type suffixes (42i64, 3.14f32)
+    - Comment collection for fmt/doc generation
+    - Newline collapsing (multiple \n → single TNewline)
+  """
 
   doc "Invariants — Keyword Lookup": """
     The lexer uses if-else chains for keyword lookup (not Dict) because the
@@ -8,12 +21,29 @@ forge lexer {
     an identifier token.
 
     LexerState (save_state/restore_state) enables parser backtracking for
-    ambiguous constructs like struct literals vs blocks.
+    ambiguous constructs like struct literals vs blocks. LexerState is a
+    simple struct copy — cheap to save/restore.
   """
 
   doc "Invariants — No Line Continuation": """
     Forge's lexer does not support line continuation for binary operators.
     Multi-condition expressions must be on ONE line or extracted into helpers.
+  """
+
+  doc "Invariants — Contextual Keywords": """
+    doc, why, source, fake, field, lock, implements, embed are contextual
+    keywords. The lexer emits them as TIdent; the parser resolves them
+    contextually based on position. This allows these words to be used as
+    identifiers in field/param/variable positions.
+
+    Exception: forge-block keywords (struct, class, enum, func, etc.) are
+    always lexed as their specific TokenKind.
+  """
+
+  doc "Invariants — Token Splitting for Nested Generics": """
+    Nested generics like Dict<Dict<V>> produce >> which lexes as TShr.
+    The parser splits TShr into two TGt tokens using a pushBack mechanism.
+    The lexer itself does NOT handle this — it's a parser responsibility.
   """
 
   source: ["lexer.fg"]

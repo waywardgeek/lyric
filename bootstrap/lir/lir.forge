@@ -1,12 +1,48 @@
 // lir.forge — understanding doc for the bootstrap LIR package
 forge lir {
-  why: "Low-level Intermediate Representation types. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST."
+  why: "Low-level Intermediate Representation types. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST. Structured control flow (not basic blocks), flat expressions (SSA-like temps)."
+
+  doc "Architecture": """
+    LIR sits between AST and C backend:
+    AST + Checker annotations → Lowerer → LProgram → Optimizer → Monomorphizer → C Backend
+
+    Key properties:
+    - All expressions flattened to SSA-like temps (%0, %1, ...)
+    - Structured control flow preserved (LStmtIf, LStmtWhile, LStmtFor, LStmtSwitch)
+    - Enums → tagged unions with integer tags
+    - Classes → heap handles (LTyClassHandle)
+    - Try (?) → extract+check+early-return pattern
+  """
 
   doc "Invariants — Nullable Variant Fields": """
     Like AST Expr/Stmt, LIR uses nullable fields per variant:
     LExpr has bin_op: LBinOpData?, call: LCallData?, etc.
     LStmt has temp_def: LTempDef?, assign: LAssignData?, etc.
     Same rationale: void* has no type recovery in C.
+  """
+
+  doc "Invariants — Type System": """
+    LTypeKind enum covers: LTyInt, LTyUint, LTyFloat, LTyBool, LTyString,
+    LTyUnit, LTySlice, LTyMap, LTyTuple, LTyOptional, LTyChannel,
+    LTyStruct, LTyClassHandle, LTyTaggedUnion, LTyFunc, LTyTypeVar,
+    LTyAny, LTyError, LTyErrorResult, LTyMutex, LTyUnion.
+
+    LTyAny is the fallback for unresolved types — maps to void* in C.
+    LTyClassHandle means "pointer to heap-allocated class" — already a pointer.
+    LTyErrorResult wraps (T, error) tuples with value/error fields.
+    LTyTaggedUnion represents enum types with integer tag + variant data.
+  """
+
+  doc "Invariants — Expression Flattening": """
+    Every sub-expression is assigned to a unique temp: %0 = b * c; %1 = a + %0.
+    Backends NEVER see nested expressions — all operands are LValue
+    (LValTemp, LValVar, or a literal). The temp counter is per-function.
+  """
+
+  doc "Invariants — While Loop Conditions": """
+    While-loop conditions use CondBlock + CondVar: statements in CondBlock
+    compute the condition value into CondVar. The CondBlock is re-evaluated
+    each iteration without code duplication.
   """
 
   source: ["lir.fg"]

@@ -1,16 +1,38 @@
 // desugar.forge — understanding doc for the bootstrap desugar package
 forge desugar {
-  why: "Five-pass AST desugaring: embeds → interface fields → relations → destructors → default impls. Each pass creates AST consumed by the next."
+  why: "Five-pass AST desugaring: embeds → interface fields → relations → destructors → default impls. Each pass creates AST consumed by the next. Runs BEFORE the checker."
 
   doc "Invariants — Pass Order": """
     The desugar passes MUST run in this order:
-    1. DesugarInterfaceEmbeds — copies fields/destructors from embedded interfaces
-    2. DesugarInterfaceFields — generates getter/setter methods from field declarations
-    3. DesugarRelations — injects ownership fields and back-pointers
-    4. DesugarDestructors — copies interface destructor bodies to implementing classes
-    5. DesugarDefaultImpls — copies default method implementations
+    1. DesugarInterfaceEmbeds — copies fields/destructors from embedded interfaces,
+       substituting type parameters. Enables OwningList/RefList to share
+       DoublyLinked mechanics.
+    2. DesugarInterfaceFields — generates getter/setter method signatures
+       from `field T.name: Type` declarations
+    3. DesugarRelations — relation decls → label-prefixed fields + impl blocks.
+       Uses globalIfaceMap across all blocks for cross-block interface lookup.
+       rewriteFieldType maps interface type params to concrete types.
+    4. DesugarDestructors — for each owns relation, copies interface destructor
+       blocks to concrete class destroy methods. Multiple relations append.
+       Wraps each body in StmtBlock for variable name isolation.
+    5. DesugarDefaultImpls — extracts interface methods with bodies into
+       top-level generic functions with relational where clauses
 
-    Each pass wraps generated code in StmtBlock for variable name isolation.
+    Each pass generates AST consumed by later passes. Running out of order
+    produces silent failures. All desugar runs BEFORE the checker.
+  """
+
+  doc "Invariants — Cross-Block Interface Lookup": """
+    DesugarRelations needs to find interface declarations across ALL forge
+    blocks. It builds a globalIfaceMap before processing relations, so
+    interfaces defined in one block can be referenced by relations in another.
+  """
+
+  doc "Invariants — Type Parameter Substitution": """
+    When copying interface fields/methods/destructors to concrete classes,
+    type parameters must be substituted with concrete types from the
+    relation declaration. substituteTypeParamsInBlock recursively rewrites
+    all type references in a block's statements and expressions.
   """
 
   source: ["desugar.fg"]

@@ -1,6 +1,22 @@
 // checker.forge — understanding doc for the bootstrap checker package
 forge checker {
-  why: "Two-phase type checker: Phase 1 registers all type/function declarations, Phase 2 checks function bodies. Scope chain for lexical scoping."
+  why: "Two-phase type checker: Phase 1 registers all type/function declarations, Phase 2 checks function bodies. Scope chain for lexical scoping. All registries use Dict<V> with Sym keys."
+
+  doc "Architecture": """
+    The checker performs a two-phase pass over the AST:
+
+    Phase 1 (register_block): Walks all interfaces, structs, classes, enums,
+    and top-level functions, registering them into Dict registries. Interfaces
+    registered first (classes may implement them). Enum variants registered
+    as constructors in scope.
+
+    Phase 2 (check_block): Walks function bodies performing type inference
+    and validation. Each expression returns its inferred type; each statement
+    is checked for consistency.
+
+    State: scope (lexical variable bindings via nested Dict chain), registries
+    (named type definitions), errors (accumulated list).
+  """
 
   doc "Invariants — Two-Phase Checking": """
     The checker MUST run in two phases:
@@ -10,12 +26,53 @@ forge checker {
 
     This ensures forward references resolve correctly — a function can
     reference a class declared later in the same file.
+
+    For multi-file compilation, Phase 1 must run across ALL files before
+    ANY Phase 2 begins. Otherwise, cross-file references fail.
   """
 
   doc "Invariants — Dict and Sym Usage": """
     All registries use Dict<V> (string-keyed hash table) with Sym keys:
     structs, classes, enums, interfaces, type_aliases, func_sigs, scope,
     class_fields. API: dict_get(d, sym(name)) -> V?
+
+    Scope is a linked list of Dict levels. push_scope() creates a new
+    Dict with parent pointer; pop_scope() restores parent. Lookup walks
+    the parent chain.
+  """
+
+  doc "Invariants — Type Representation": """
+    Bootstrap uses a CheckerType class with kind field (enum) and nullable
+    fields for sub-types (elem, key, val, params, return_type, fields).
+
+    Primitive kinds: TyInt, TyUint, TyFloat (with bits for width), TyBool,
+    TyString. Composite: TyList, TyMap, TyTuple, TyOptional, TyChannel,
+    TyStruct, TyClass, TyEnum, TyInterface, TyFunc, TyVar, TyUnion.
+    Special: TyUnit, TyUnknown, TyError.
+  """
+
+  doc "Invariants — Generic Functions": """
+    Generic functions declare type parameters <T: Constraint>. During
+    Phase 2, TypeParams are registered as TyVar in the function's scope.
+    Call-site type inference via match_type_vars (first-arg-wins).
+    substituteType replaces TyVar with concrete types recursively.
+
+    Constraint validation: Comparable → numeric/string/bool,
+    Equatable/Hashable → same set.
+  """
+
+  doc "Invariants — Error Handling": """
+    error is a built-in interface. Functions return (T, error) tuples.
+    Try operator (?) extracts T from (T, error), returns early on error.
+    nil is assignable to optional and interface types (including error).
+  """
+
+  doc "Invariants — Enum Variant Registration": """
+    registerEnum stores variant info and defines variant names in scope:
+    - Unit variants: defined as enum-typed values
+    - Field variants: defined as TyFunc constructors (fields → enum type)
+    When multiple enums share variant names, the LAST registered wins
+    in scope — disambiguation must happen via checker type annotations.
   """
 
   source: ["checker.fg"]
