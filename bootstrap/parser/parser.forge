@@ -35,12 +35,15 @@ forge parser {
 
   doc "Invariants — Struct Literal Ambiguity": """
     `Ident {` is ambiguous: struct literal vs variable + block. Resolution
-    via expr_depth counter:
-    - expr_depth > 0 (inside parens, brackets, arg lists): always struct literal
-    - expr_depth == 0 (statement context): use is_struct_lit_ahead() lookahead
-      which checks for `{}` (empty) or `ident:` (named field) patterns
+    via noStructLit flag (Rust approach):
+    - for/while/if/match condition expressions set noStructLit=true
+    - When noStructLit is true, is_struct_lit_ahead() always returns false
+    - This means struct literals in these positions require parens:
+      `for x in (Point {}) { }` not `for x in Point {} { }`
+    - Everywhere else (let, return, args, etc.) struct literals work normally
 
-    parse_arg_list and paren/bracket parsing increment expr_depth.
+    The exprDepth counter (incremented in arg lists and brackets) is a
+    separate mechanism for positional struct literals inside expressions.
   """
 
   doc "Invariants — Lookahead and State Restoration": """
