@@ -1,6 +1,6 @@
 forge stdlib {
 
-  doc "Architecture" {
+  doc "Architecture": """
     // stdlib/std.fg — Forge standard library, auto-merged into user code.
     //
     // MergeStdlib (pkg/ast/stdlib.go) selectively pulls stdlib declarations
@@ -13,9 +13,9 @@ forge stdlib {
     //   6. Merged into block 0 of the user file only (multi-file: each file independently)
     //
     // stdlib/string.fg — String utility functions (str_contains, str_split_n, etc.)
-  }
+  """
 
-  doc "Identifiers" {
+  doc "Identifiers": """
     // --- Interfaces (pulled when user relations reference them) ---
     // ArrayList<P, C>: dynamic array with parent backref. Generates: array_append, array_remove, children()/parent()/index() getters
     // DoublyLinked<P, C>: next/prev doubly-linked list operations
@@ -56,9 +56,9 @@ forge stdlib {
     // read_file(path: string) -> (string, bool): read file contents
     // write_file(path: string, content: string) -> bool: write file
     // make_channel<T>(cap?: i32) -> channel<T>: create channel
-  }
+  """
 
-  doc "Invariants" {
+  doc "Invariants": """
     // 1. collectFuncCallNamesStmt MUST handle ALL StmtKind variants — default panics.
     //    Missing a case silently drops function calls, preventing stdlib merger from
     //    pulling needed functions. The match-arm bug (2026-06-07) caused `range()` to
@@ -76,6 +76,6 @@ forge stdlib {
     //
     // 5. range() is a generator function (gen i32), not a builtin. It must be in
     //    stdlib so it gets merged via the standard function-call-name collection path.
-  }
+  """
 
 }

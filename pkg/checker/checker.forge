@@ -417,6 +417,10 @@ forge Checker {
     why: "Tracks nesting depth inside loops for break/continue validation."
     func CheckFile(mut self, file: File?)
       why: "Primary entry point. Registers all types, then checks all function bodies."
+    func CheckFiles(mut self, files: [File?])
+      why: "Cross-file compilation. Runs Phase 0+1 across ALL files before Phase 2 (body checking)."
+    func validateAllTypesResolved(self, file: File?)
+      why: "Post-check validation that no function parameter or return type remains unresolved."
     func Errors(self) -> [error]
     pub func CheckModuleFile(self, importPath: string, fromSpan: ast.Span) -> ModuleExports?
   }

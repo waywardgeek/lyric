@@ -192,6 +192,7 @@ forge Lir {
   """
 
 
+  doc "Invariants — AST Pointer Stability in Lowerer": """
     The lowerer reads checker annotations (ResolvedType) from AST Expr nodes.
     exprType(expr *Expr) extracts ResolvedType, casts to *checker.Type, and
     converts to *LType via lowerCheckerType. If ResolvedType is nil, returns
