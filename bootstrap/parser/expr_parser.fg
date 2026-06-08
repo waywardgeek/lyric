@@ -80,6 +80,17 @@ forge parser {
     return self.parse_prec_expr(PREC_NONE + 1)
   }
 
+  // parse_expr_no_struct_lit parses an expression but suppresses struct literal
+  // parsing. Used in for/while/if/match where the expression precedes a
+  // mandatory block, so `Ident {` must be treated as variable + block start.
+  func Parser.parse_expr_no_struct_lit(self) -> (Expr?, error) {
+    let old = self.no_struct_lit
+    self.no_struct_lit = true
+    let result = self.parse_prec_expr(PREC_NONE + 1)
+    self.no_struct_lit = old
+    return result
+  }
+
   func Parser.parse_prec_expr(self, min_prec: i32) -> (Expr?, error) {
     let mut left = self.parse_unary_expr()?
 
@@ -353,6 +364,10 @@ forge parser {
         return (Expr { Ident(sym("self")), span: tok.span }, null)
       }
       PLParen => {
+        // Check for paren-lambda: (params) -> RetType { body }
+        if self.is_paren_lambda_ahead() {
+          return self.parse_paren_lambda(tok.span.start)
+        }
         // Parenthesized expr or tuple literal
         self.next()
         if self.peek().kind == PRParen {
@@ -454,7 +469,7 @@ forge parser {
   func Parser.parse_match_expr(self) -> (Expr?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'match'
-    let value = self.parse_expr()?
+    let value = self.parse_expr_no_struct_lit()?
     self.expect(PLBrace)?
     self.skip_newlines()
     let arms = self.parse_match_arms()?
@@ -508,6 +523,69 @@ forge parser {
       }
     }
     self.expect(PPipe)?
+
+    let mut ret_type: TypeExpr? = null
+    if self.peek().kind == PArrow {
+      self.next()
+      ret_type = self.parse_type_expr()?
+    }
+
+    let body = self.parse_block()?
+    return (Expr {
+      Lambda(params, ret_type, body!),
+      span: Span { start: start, end: body!.span.end }
+    }, null)
+  }
+
+  // ---- Paren-lambda: (params) -> RetType { body } ----
+
+  func Parser.is_paren_lambda_ahead(self) -> bool {
+    // Save state, try to scan (ident: type, ...) -> pattern
+    let saved = self.lex!.save_state()
+    self.next()  // consume (
+    self.skip_newlines()
+    let mut looks_like_lambda = false
+    if self.peek().kind == PRParen {
+      // () -> ... is a zero-param lambda
+      self.next()
+      if self.peek().kind == PArrow {
+        looks_like_lambda = true
+      }
+    } else if self.peek().kind == LIdent {
+      self.next()
+      if self.peek().kind == PColon {
+        // (ident: — looks like param, skip to ) and check for ->
+        let mut depth: i32 = 1
+        while depth > 0 && self.peek().kind != SEOF {
+          if self.peek().kind == PLParen { depth = depth + 1 }
+          if self.peek().kind == PRParen { depth = depth - 1 }
+          if depth > 0 { self.next() }
+        }
+        if self.peek().kind == PRParen {
+          self.next()
+          if self.peek().kind == PArrow {
+            looks_like_lambda = true
+          }
+        }
+      }
+    }
+    self.lex!.restore_state(saved)
+    return looks_like_lambda
+  }
+
+  func Parser.parse_paren_lambda(self, start: Pos) -> (Expr?, error) {
+    self.next()  // consume (
+    let mut params: [Param] = []
+    self.skip_newlines()
+    while self.peek().kind != PRParen && self.peek().kind != SEOF {
+      let param = self.parse_param()?
+      params = append(params, param!)
+      if self.peek().kind == PComma {
+        self.next()
+      }
+      self.skip_newlines()
+    }
+    self.expect(PRParen)?
 
     let mut ret_type: TypeExpr? = null
     if self.peek().kind == PArrow {
@@ -656,7 +734,7 @@ forge parser {
   func Parser.parse_if(self) -> (Stmt?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'if'
-    let cond = self.parse_expr()?
+    let cond = self.parse_expr_no_struct_lit()?
     let then_block = self.parse_block()?
 
     let mut else_ifs: [ElseIf] = []
@@ -666,7 +744,7 @@ forge parser {
       self.next()
       if self.peek().kind == KIf {
         self.next()
-        let elif_cond = self.parse_expr()?
+        let elif_cond = self.parse_expr_no_struct_lit()?
         let elif_body = self.parse_block()?
         else_ifs = append(else_ifs, ElseIf {
           elif_cond,
@@ -699,7 +777,7 @@ forge parser {
       let actual_var = self.expect_ident()?
       // Swap: index_var has first name, var_name gets second
       self.expect(KIn)?
-      let collection = self.parse_expr()?
+      let collection = self.parse_expr_no_struct_lit()?
       let body = self.parse_block()?
       return (Stmt {
         For(sym(actual_var!.text), index_var, collection!, body!),
@@ -708,7 +786,7 @@ forge parser {
     }
 
     self.expect(KIn)?
-    let collection = self.parse_expr()?
+    let collection = self.parse_expr_no_struct_lit()?
     let body = self.parse_block()?
     return (Stmt {
       For(sym(var_name!.text), null, collection!, body!),
@@ -721,7 +799,7 @@ forge parser {
   func Parser.parse_while(self) -> (Stmt?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'while'
-    let cond = self.parse_expr()?
+    let cond = self.parse_expr_no_struct_lit()?
     let body = self.parse_block()?
     return (Stmt {
       While(cond!, body!),
@@ -734,7 +812,7 @@ forge parser {
   func Parser.parse_match_stmt(self) -> (Stmt?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'match'
-    let value = self.parse_expr()?
+    let value = self.parse_expr_no_struct_lit()?
     self.expect(PLBrace)?
     self.skip_newlines()
     let arms = self.parse_match_arms()?
@@ -1007,6 +1085,9 @@ forge parser {
   // ---- Struct literal ----
 
   func Parser.is_struct_lit_ahead(self) -> bool {
+    if self.no_struct_lit {
+      return false
+    }
     let saved = self.lex!.save_state()
     self.next()  // consume {
     self.skip_newlines()

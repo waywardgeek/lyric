@@ -462,7 +462,7 @@ forge parser_tests {
   }
 
   func test_interface_with_field() {
-    let b = tp_parse("forge t { interface HasName<T> { field T name: string } }")
+    let b = tp_parse("forge t { interface HasName<T> { field T.name: string } }")
     let iface = b.id_children[0]
     assert_eq(len(iface.itp_children), 1, "one type param")
     assert_eq(len(iface.ifd_children), 1, "one field decl")

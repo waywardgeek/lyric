@@ -261,6 +261,7 @@ type ImplMapping struct {
 // ImplBlock maps an interface to concrete types.
 type ImplBlock struct {
 	InterfaceName string     // "Graph", "DoublyLinked"
+	ForType       string     // optional: "impl Printable for Dog" — the implementing type
 	TypeArgs      []TypeExpr // concrete types: <CircuitGraph, Component, Wire>
 	Label         string     // optional: "as byEmail" for disambiguation
 	Mappings      []ImplMapping

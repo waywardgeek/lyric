@@ -517,7 +517,7 @@ forge Lir {
   }
 
   struct LSwitchCase {
-    Tag: int
+    Tag: int       // -1 means default/wildcard case → must emit "default:" in C, not "case -1:"
     Binding: string
     Body: [LStmt]
   }

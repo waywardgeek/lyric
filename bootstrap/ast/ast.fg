@@ -192,6 +192,7 @@ forge ast {
 
   class ImplBlock {
     interface_name: Sym?
+    for_type: Sym?
     label: Sym?
     span: Span
   }

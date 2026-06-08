@@ -101,6 +101,16 @@ func (p *Parser) parseExpr() (*ast.Expr, error) {
 	return p.parsePrecExpr(precNone + 1)
 }
 
+// parseExprNoStructLit parses an expression but suppresses struct literal
+// parsing. Used in for/while/if/match where the expression precedes a
+// mandatory block, so `Ident {` must be treated as variable + block start.
+func (p *Parser) parseExprNoStructLit() (*ast.Expr, error) {
+	old := p.noStructLit
+	p.noStructLit = true
+	defer func() { p.noStructLit = old }()
+	return p.parsePrecExpr(precNone + 1)
+}
+
 func (p *Parser) parsePrecExpr(minPrec int) (*ast.Expr, error) {
 	left, err := p.parseUnaryExpr()
 	if err != nil {
@@ -602,7 +612,7 @@ func (p *Parser) parseMapLit(mapTok Token) (*ast.Expr, error) {
 func (p *Parser) parseMatchExpr() (*ast.Expr, error) {
 	start := p.peek().Span.Start
 	p.next() // consume 'match'
-	value, err := p.parseExpr()
+	value, err := p.parseExprNoStructLit()
 	if err != nil {
 		return nil, err
 	}
@@ -911,7 +921,7 @@ func (p *Parser) parseYield() (*ast.Stmt, error) {
 func (p *Parser) parseIf() (*ast.Stmt, error) {
 	start := p.peek().Span.Start
 	p.next() // consume 'if'
-	cond, err := p.parseExpr()
+	cond, err := p.parseExprNoStructLit()
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +936,7 @@ func (p *Parser) parseIf() (*ast.Stmt, error) {
 		p.next()
 		if p.peek().Kind == TIf {
 			p.next()
-			elifCond, err := p.parseExpr()
+			elifCond, err := p.parseExprNoStructLit()
 			if err != nil {
 				return nil, err
 			}
@@ -976,7 +986,7 @@ func (p *Parser) parseFor() (*ast.Stmt, error) {
 	if _, err := p.expect(TIn); err != nil {
 		return nil, err
 	}
-	collection, err := p.parseExpr()
+	collection, err := p.parseExprNoStructLit()
 	if err != nil {
 		return nil, err
 	}
@@ -994,7 +1004,7 @@ func (p *Parser) parseFor() (*ast.Stmt, error) {
 func (p *Parser) parseWhile() (*ast.Stmt, error) {
 	start := p.peek().Span.Start
 	p.next() // consume 'while'
-	cond, err := p.parseExpr()
+	cond, err := p.parseExprNoStructLit()
 	if err != nil {
 		return nil, err
 	}
@@ -1363,6 +1373,9 @@ func (p *Parser) parseExprOrAssign() (*ast.Stmt, error) {
 // isStructLitAhead peeks past { to see if the first content is Ident: (field initializer).
 // An empty {} is also treated as a struct literal.
 func (p *Parser) isStructLitAhead() bool {
+	if p.noStructLit {
+		return false
+	}
 	// Save lexer state for lookahead
 	saved := *p.lex
 	savedErrors := len(p.errors)

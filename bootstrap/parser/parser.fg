@@ -12,6 +12,7 @@ forge parser {
 
   class Parser {
     lex: Lexer?
+    no_struct_lit: bool
   }
 
   func new_parser(src_text: string, filename: string) -> Parser {
@@ -153,6 +154,21 @@ forge parser {
         array_append<ForgeBlock, ImportDecl>(block, imp!)
         return (true, null)
       }
+      KLet => {
+        // Top-level constant: let NAME: Type = value
+        // TODO: add ConstDecl to AST and store properly
+        self.next()  // consume 'let'
+        self.expect_ident()?  // name
+        if self.peek().kind == PColon {
+          self.next()
+          self.parse_type_expr()?
+        }
+        if self.peek().kind == OAssign {
+          self.next()
+          self.parse_expr()?
+        }
+        return (true, null)
+      }
       KStruct => {
         let s = self.parse_struct()?
         s!.is_public = is_pub
@@ -259,6 +275,16 @@ forge parser {
   func Parser.parse_import(self) -> (ImportDecl?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'import'
+
+    // Two forms: import "path" OR import alias from "path"
+    if self.peek().kind == LStringLit {
+      let path = self.next()
+      return (ImportDecl {
+        path: path.text,
+        span: self.make_span(start)
+      }, null)
+    }
+
     let alias = self.expect(LIdent)?
     self.expect(KFrom)?
     let path = self.expect(LStringLit)?
@@ -400,7 +426,9 @@ forge parser {
 
     if self.peek().kind == PLt {
       let params = self.parse_type_params()?
-      // TODO: store type params on struct via relation
+      for tp in params {
+        array_append<StructDecl, TypeParam>(s, tp)
+      }
     }
 
     self.expect(PLBrace)?
@@ -432,7 +460,9 @@ forge parser {
 
     if self.peek().kind == PLt {
       let params = self.parse_type_params()?
-      // TODO: store type params
+      for tp in params {
+        array_append<EnumDecl, TypeParam>(e, tp)
+      }
     }
 
     self.expect(PLBrace)?
@@ -486,7 +516,9 @@ forge parser {
 
     if self.peek().kind == PLt {
       let params = self.parse_type_params()?
-      // TODO: store type params
+      for tp in params {
+        array_append<InterfaceDecl, TypeParam>(iface, tp)
+      }
     }
 
     self.expect(PLBrace)?
@@ -609,6 +641,13 @@ forge parser {
       self.expect(PGt)?
     }
 
+    // Optional: for ConcreteType
+    if self.peek().kind == KFor {
+      self.next()
+      let for_type = self.expect(LIdent)?
+      impl_block.for_type = sym(for_type!.text)
+    }
+
     // Optional: as label
     if self.peek().kind == KAs {
       self.next()
@@ -620,14 +659,82 @@ forge parser {
     self.skip_newlines()
 
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      let mapping = self.parse_impl_mapping()?
-      array_append<ImplBlock, ImplMapping>(impl_block, mapping!)
+      if impl_block.for_type != null {
+        let mapping = self.parse_impl_mapping_short(impl_block.for_type!)?
+        array_append<ImplBlock, ImplMapping>(impl_block, mapping!)
+      } else {
+        let mapping = self.parse_impl_mapping()?
+        array_append<ImplBlock, ImplMapping>(impl_block, mapping!)
+      }
       self.skip_newlines()
     }
 
     self.expect(PRBrace)?
     impl_block.span = self.make_span(start)
     return (impl_block, null)
+  }
+
+  // Short-form mapping: method = member (used with "impl Iface for Type")
+  func Parser.parse_impl_mapping_short(self, for_type: Sym) -> (ImplMapping?, error) {
+    let start = self.peek().span.start
+    let method_name = self.expect(LIdent)?
+
+    let m = ImplMapping {
+      type_param: for_type,
+      method_name: sym(method_name!.text),
+      kind: Alias,
+      span: Span { start: start, end: start }
+    }
+
+    match self.peek().kind {
+      OAssign => {
+        self.next()
+        let member = self.expect(LIdent)?
+        m.kind = Alias
+        m.target_class = for_type
+        m.target_member = sym(member!.text)
+      }
+      PBiArrow => {
+        self.next()
+        let member = self.expect(LIdent)?
+        m.kind = FieldBind
+        m.target_class = for_type
+        m.target_member = sym(member!.text)
+      }
+      PLParen => {
+        let fn = FuncDecl {
+          name: sym(method_name!.text),
+          receiver_type: for_type,
+          span: Span { start: start, end: start }
+        }
+        self.next()  // consume '('
+        self.skip_newlines()
+        while self.peek().kind != PRParen && self.peek().kind != SEOF {
+          let param = self.parse_param()?
+          array_append<FuncDecl, Param>(fn, param!)
+          if self.peek().kind == PComma {
+            self.next()
+          }
+          self.skip_newlines()
+        }
+        self.expect(PRParen)?
+        if self.peek().kind == PArrow {
+          self.next()
+          let ret = self.parse_type_expr()?
+          fn.return_type = ret
+        }
+        let body = self.parse_block()?
+        fn.body = body
+        m.kind = Inline
+        m.inline_func = fn
+      }
+      _ => {
+        return (null, self.make_error(self.peek().span, f"expected '=', '<->', or '(' in impl mapping"))
+      }
+    }
+
+    m.span = self.make_span(start)
+    return (m, null)
   }
 
   func Parser.parse_impl_mapping(self) -> (ImplMapping?, error) {
@@ -711,7 +818,9 @@ forge parser {
 
     if self.peek().kind == PLt {
       let params = self.parse_type_params()?
-      // TODO: store type params
+      for tp in params {
+        array_append<ClassDecl, TypeParam>(cls, tp)
+      }
     }
 
     // Optional implements
@@ -791,7 +900,9 @@ forge parser {
     // Optional type parameters
     if self.peek().kind == PLt {
       let params = self.parse_type_params()?
-      // TODO: store via relation
+      for tp in params {
+        array_append<FuncDecl, TypeParam>(fn, tp)
+      }
     }
 
     // Parameters

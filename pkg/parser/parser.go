@@ -27,10 +27,11 @@ func (e *ParseError) Error() string {
 
 // Parser is a PEG parser for .forge files.
 type Parser struct {
-	lex       *Lexer
-	errors    []error
-	exprDepth int    // tracks nesting inside () and [] where { can't start a block
-	pushed    *Token // pushed-back token (for >> splitting)
+	lex         *Lexer
+	errors      []error
+	exprDepth   int    // tracks nesting inside () and [] where { can't start a block
+	noStructLit bool   // suppresses struct literal parsing (set in for/while/if/match conditions)
+	pushed      *Token // pushed-back token (for >> splitting)
 }
 
 // ParseFile parses a .forge or .fg file into an AST.
@@ -834,6 +835,16 @@ func (p *Parser) parseImpl() (*ast.ImplBlock, error) {
 		}
 	}
 
+	// Optional: for ConcreteType (ergonomic impl syntax)
+	if p.peek().Kind == TFor {
+		p.next()
+		forType, err := p.expect(TIdent)
+		if err != nil {
+			return nil, err
+		}
+		impl.ForType = forType.Text
+	}
+
 	// Optional: as label
 	if p.peek().Kind == TAs {
 		p.next()
@@ -850,7 +861,13 @@ func (p *Parser) parseImpl() (*ast.ImplBlock, error) {
 	p.skipNewlines()
 
 	for p.peek().Kind != TRBrace && p.peek().Kind != TEOF {
-		mapping, err := p.parseImplMapping()
+		var mapping *ast.ImplMapping
+		var err error
+		if impl.ForType != "" {
+			mapping, err = p.parseImplMappingShort(impl.ForType)
+		} else {
+			mapping, err = p.parseImplMapping()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -864,6 +881,80 @@ func (p *Parser) parseImpl() (*ast.ImplBlock, error) {
 	}
 	impl.Span = ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: end.Span.End}
 	return impl, nil
+}
+
+// parseImplMappingShort parses a short-form mapping: method = member
+// Used when impl has "for Type" — the type param and target class are implicit.
+func (p *Parser) parseImplMappingShort(forType string) (*ast.ImplMapping, error) {
+	start := p.peek().Span.Start
+	methodName, err := p.expect(TIdent)
+	if err != nil {
+		return nil, err
+	}
+	m := &ast.ImplMapping{
+		TypeParam:  forType,
+		MethodName: methodName.Text,
+	}
+	if p.peek().Kind == TAssign {
+		p.next()
+		member, err := p.expect(TIdent)
+		if err != nil {
+			return nil, err
+		}
+		m.Kind = ast.ImplAlias
+		m.TargetClass = forType
+		m.TargetMember = member.Text
+	} else if p.peek().Kind == TBiArrow {
+		p.next()
+		member, err := p.expect(TIdent)
+		if err != nil {
+			return nil, err
+		}
+		m.Kind = ast.ImplFieldBind
+		m.TargetClass = forType
+		m.TargetMember = member.Text
+	} else if p.peek().Kind == TLParen {
+		// Inline method: method(params) -> RetType { body }
+		fn := &ast.FuncDecl{
+			Name:         methodName.Text,
+			ReceiverType: forType,
+		}
+		p.next() // consume '('
+		p.skipNewlines()
+		for p.peek().Kind != TRParen && p.peek().Kind != TEOF {
+			param, err := p.parseParam()
+			if err != nil {
+				return nil, err
+			}
+			fn.Params = append(fn.Params, *param)
+			if p.peek().Kind == TComma {
+				p.next()
+			}
+			p.skipNewlines()
+		}
+		if _, err := p.expect(TRParen); err != nil {
+			return nil, err
+		}
+		if p.peek().Kind == TArrow {
+			p.next()
+			ret, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			fn.ReturnType = ret
+		}
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		fn.Body = body
+		m.Kind = ast.ImplInline
+		m.InlineFunc = fn
+	} else {
+		return nil, &ParseError{Message: fmt.Sprintf("expected '=', '<->', or '(' in impl mapping, got %s", tokenNames[p.peek().Kind]), Span: p.peek().Span}
+	}
+	m.Span = ast.Span{Start: ast.Pos{File: p.lex.filename, Line: start.Line, Column: start.Column}, End: p.peek().Span.Start}
+	return m, nil
 }
 
 // parseImplMapping parses one mapping inside an impl block.
