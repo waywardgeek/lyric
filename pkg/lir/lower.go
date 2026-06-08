@@ -1690,14 +1690,22 @@ func (l *Lowerer) emitNestedEnumMatch(ms *ast.MatchStmt, matchVal LValue, enumNa
 		// Extract the inner value (the first field of the outer variant)
 		innerFieldName := ""
 		var innerFieldType *LType
-		if info, ok := l.variantCtors[outerVP.Name]; ok && len(info.fieldNames) > 0 {
-			innerFieldName = info.fieldNames[0]
-		}
+		// Look up field names from the correct enum (not collision-prone variantCtors)
 		if variants, ok := l.enumVariants[enumName]; ok {
 			for _, v := range variants {
-				if v.Name == outerVP.Name && len(v.Fields) > 0 {
-					innerFieldType = v.Fields[0].Type
+				if v.Name == outerVP.Name {
+					if len(v.Fields) > 0 {
+						innerFieldName = v.Fields[0].Name
+						innerFieldType = v.Fields[0].Type
+					}
+					break
 				}
+			}
+		}
+		// Fallback to variantCtors if enumVariants didn't have field names
+		if innerFieldName == "" {
+			if info, ok := l.variantCtors[outerVP.Name]; ok && len(info.fieldNames) > 0 {
+				innerFieldName = info.fieldNames[0]
 			}
 		}
 		if innerFieldType == nil {
@@ -1757,14 +1765,11 @@ func (l *Lowerer) emitNestedEnumMatch(ms *ast.MatchStmt, matchVal LValue, enumNa
 				l.stmts = nil
 
 				// Extract fields from inner variant
-				if info, ok := l.variantCtors[innerVP.Name]; ok {
+				if _, ok := l.variantCtors[innerVP.Name]; ok {
 					for i, binding := range innerVP.Bindings {
 						if binding.Kind == ast.PatIdent {
 							bp := dataAs[ast.IdentPattern](binding.Data)
-							fieldName := ""
-							if i < len(info.fieldNames) {
-								fieldName = info.fieldNames[i]
-							}
+							fieldName := l.findVariantFieldName(innerEnumName, innerVP.Name, i)
 							var fieldType *LType
 							if variants, ok := l.enumVariants[innerEnumName]; ok {
 								for _, v := range variants {
@@ -1874,14 +1879,11 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 		saved := l.stmts
 		l.stmts = nil
 
-		if info, ok := l.variantCtors[vp.Name]; ok {
+		if _, ok := l.variantCtors[vp.Name]; ok {
 			for i, binding := range vp.Bindings {
 				if binding.Kind == ast.PatIdent {
 					bp := dataAs[ast.IdentPattern](binding.Data)
-					fieldName := ""
-					if i < len(info.fieldNames) {
-						fieldName = info.fieldNames[i]
-					}
+					fieldName := l.findVariantFieldName(enumName, vp.Name, i)
 					var fieldType *LType
 					if variants, ok := l.enumVariants[enumName]; ok {
 						for _, v := range variants {
@@ -2122,6 +2124,23 @@ func (l *Lowerer) findVariantTag(enumName, variantName string) int {
 		}
 	}
 	return -1
+}
+
+// findVariantFieldName returns the i-th field name for a variant in the specified enum.
+// Uses enumVariants (keyed by enum name) to avoid collision issues with variantCtors.
+func (l *Lowerer) findVariantFieldName(enumName, variantName string, fieldIndex int) string {
+	if variants, ok := l.enumVariants[enumName]; ok {
+		for _, v := range variants {
+			if v.Name == variantName && fieldIndex < len(v.Fields) {
+				return v.Fields[fieldIndex].Name
+			}
+		}
+	}
+	// Fallback to variantCtors
+	if info, ok := l.variantCtors[variantName]; ok && fieldIndex < len(info.fieldNames) {
+		return info.fieldNames[fieldIndex]
+	}
+	return ""
 }
 
 func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt) {
