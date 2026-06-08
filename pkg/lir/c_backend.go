@@ -19,6 +19,92 @@ func dedup[T any](items []T, key func(T) string) []T {
 	return result
 }
 
+// topoSortStructs sorts struct declarations so that a struct embedding another
+// struct by value comes after the embedded struct. This is required because C
+// needs complete type definitions for by-value fields.
+func topoSortStructs(structs []LStructDecl) []LStructDecl {
+	if len(structs) <= 1 {
+		return structs
+	}
+	// Build name→index map
+	nameIdx := map[string]int{}
+	for i, s := range structs {
+		nameIdx[s.Name] = i
+	}
+	// Build adjacency: if struct A has a field of type B (by value), A depends on B
+	deps := make([][]int, len(structs))
+	for i, s := range structs {
+		for _, f := range s.Fields {
+			depName := structTypeName(f.Type)
+			if depName == "" {
+				continue
+			}
+			if j, ok := nameIdx[depName]; ok && j != i {
+				deps[i] = append(deps[i], j)
+			}
+		}
+	}
+	// Kahn's algorithm
+	inDeg := make([]int, len(structs))
+	for i := range deps {
+		for _, j := range deps[i] {
+			inDeg[j]++ // j must come before i, but we invert: i depends on j
+		}
+	}
+	// Actually: deps[i] = list of j that i depends on. We need reverse edges.
+	// deps[i] has j means i needs j first → j has an edge to i in topo order.
+	revDeps := make([][]int, len(structs))
+	inDeg2 := make([]int, len(structs))
+	for i := range deps {
+		for _, j := range deps[i] {
+			revDeps[j] = append(revDeps[j], i)
+			inDeg2[i]++
+		}
+	}
+	var queue []int
+	for i, d := range inDeg2 {
+		if d == 0 {
+			queue = append(queue, i)
+		}
+	}
+	var result []LStructDecl
+	for len(queue) > 0 {
+		idx := queue[0]
+		queue = queue[1:]
+		result = append(result, structs[idx])
+		for _, next := range revDeps[idx] {
+			inDeg2[next]--
+			if inDeg2[next] == 0 {
+				queue = append(queue, next)
+			}
+		}
+	}
+	// If cycle or missed items, append remaining
+	if len(result) < len(structs) {
+		added := map[string]bool{}
+		for _, s := range result {
+			added[s.Name] = true
+		}
+		for _, s := range structs {
+			if !added[s.Name] {
+				result = append(result, s)
+			}
+		}
+	}
+	return result
+}
+
+// structTypeName returns the struct name if the type is a named struct type, else "".
+func structTypeName(t *LType) string {
+	if t == nil {
+		return ""
+	}
+	if t.Kind == LTyStruct {
+		return t.Name
+	}
+	return ""
+}
+
 // EmitC generates C source code from a monomorphized LIR program.
 // The program MUST be monomorphized before calling this — C has no generics.
 func EmitC(prog *LProgram) string {
@@ -208,8 +294,30 @@ func (g *cGen) generate() string {
 		g.line("")
 	}
 
-	// Emit optional/result/channel type typedefs BEFORE struct/class definitions
-	// because fields may reference these types (e.g., string? field → ForgeOpt_forge_string)
+	// Emit enum definitions first (other types may reference them)
+	// Simple enums already emitted in forward-decl section as typedef enum
+	for _, e := range g.prog.Enums {
+		if !isSimpleEnum(&e) {
+			g.emitEnumDecl(&e)
+		}
+	}
+
+	// Emit struct definitions (topologically sorted so embedded structs come first)
+	g.prog.Structs = topoSortStructs(g.prog.Structs)
+	for _, s := range g.prog.Structs {
+		g.emitStructDecl(&s)
+	}
+
+	// Emit class definitions (heap-allocated structs)
+	for _, c := range g.prog.Classes {
+		g.emitClassDecl(&c)
+	}
+
+	// Emit optional/result/channel type typedefs AFTER struct/class/enum definitions
+	// These macros embed the element type by value, so the type must be complete.
+	// Class-handle optionals are nullable pointers (no FORGE_OPT needed),
+	// so the types referenced here are primitives, strings, enums, and structs —
+	// all complete by this point.
 	for elemType, name := range g.optTypes {
 		g.linef("FORGE_OPT_DEF(%s, %s)", elemType, name)
 	}
@@ -222,24 +330,6 @@ func (g *cGen) generate() string {
 	}
 	if len(g.optTypes)+len(g.resultTypes)+len(g.chanTypes) > 0 {
 		g.line("")
-	}
-
-	// Emit enum definitions first (other types may reference them)
-	// Simple enums already emitted in forward-decl section as typedef enum
-	for _, e := range g.prog.Enums {
-		if !isSimpleEnum(&e) {
-			g.emitEnumDecl(&e)
-		}
-	}
-
-	// Emit struct definitions
-	for _, s := range g.prog.Structs {
-		g.emitStructDecl(&s)
-	}
-
-	// Emit class definitions (heap-allocated structs)
-	for _, c := range g.prog.Classes {
-		g.emitClassDecl(&c)
 	}
 
 	// Emit generator state struct typedefs
