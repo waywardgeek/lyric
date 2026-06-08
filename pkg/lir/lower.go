@@ -2611,7 +2611,34 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 			enumName = resultType.Name
 			tag = l.findVariantTag(enumName, funcName)
 		}
+		// Propagate field types to untyped slice args (e.g. empty list literals like [])
 		var fieldVals []LValue
+		if variants, ok := l.enumVariants[enumName]; ok {
+			for _, v := range variants {
+				if v.Name == funcName {
+					for i, arg := range args {
+						if i < len(v.Fields) && v.Fields[i].Type != nil && v.Fields[i].Type.Kind == LTySlice &&
+							arg.Type != nil && arg.Type.Kind == LTySlice &&
+							(arg.Type.Elem == nil || arg.Type.Elem.Kind == LTyAny) {
+							args[i].Type = v.Fields[i].Type
+							// Update the underlying temp's expression type
+							if arg.Kind == LValTemp {
+								for si := len(l.stmts) - 1; si >= 0; si-- {
+									if l.stmts[si].Kind == LStmtTempDef {
+										td := l.stmts[si].Data.(*LTempDef)
+										if td.ID == arg.TempID {
+											td.Expr.Type = v.Fields[i].Type
+											break
+										}
+									}
+								}
+							}
+						}
+					}
+					break
+				}
+			}
+		}
 		fieldVals = append(fieldVals, args...)
 		return l.emitTemp(LExpr{
 			Kind: LExprVariantConstruct,
@@ -2825,6 +2852,15 @@ func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {
 	fa := dataAs[ast.FieldAccessExpr](expr.Data)
 	recv := l.lowerExpr(&fa.Receiver)
 	resultType := l.exprType(expr)
+
+	// Resolve tuple field access on ErrorResult types: ._0 → value (Elem type), ._1 → error (string)
+	if resultType.Kind == LTyAny && recv.Type != nil && recv.Type.Kind == LTyErrorResult {
+		if fa.Field == "_0" && recv.Type.Elem != nil {
+			resultType = recv.Type.Elem
+		} else if fa.Field == "_1" {
+			resultType = &LType{Kind: LTyAny} // error field is const char* in C — keep as any to avoid forge_string mismatch
+		}
+	}
 
 	if recv.Type != nil && recv.Type.Kind == LTyClassHandle {
 		return l.emitTemp(LExpr{

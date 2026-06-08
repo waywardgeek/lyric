@@ -1159,7 +1159,17 @@ func (g *cGen) emitStmt(s *LStmt) {
 				if valType != nil && valType.Kind == LTyErrorResult {
 					g.linef("return %s;", val)
 				} else {
-					g.linef("return forge_ok(%s, %s);", val, resultName)
+					// If the ErrorResult wraps an Optional, and the value isn't already optional, wrap it
+					retElem := g.currentFunc.ReturnType.Elem
+
+					if retElem != nil && retElem.Kind == LTyOptional && !g.isClassOptional(retElem) &&
+						(valType == nil || valType.Kind != LTyOptional) &&
+						d.Values[0].Kind != LValLitNull {
+						optName := g.optTypeName(retElem.Elem)
+						g.linef("return forge_ok(forge_some(%s, %s), %s);", val, optName, resultName)
+					} else {
+						g.linef("return forge_ok(%s, %s);", val, resultName)
+					}
 				}
 			} else if g.currentFunc != nil && g.currentFunc.ReturnType != nil && g.currentFunc.ReturnType.Kind == LTyOptional {
 				if g.isClassOptional(g.currentFunc.ReturnType) {
@@ -1188,7 +1198,20 @@ func (g *cGen) emitStmt(s *LStmt) {
 			valStr := g.emitValue(&d.Values[0])
 			// If error is not nil/null, it's an error return
 			if d.Values[1].Kind == LValLitNull || d.Values[1].Kind == LValLitString && d.Values[1].StrVal == "" {
-				g.linef("return forge_ok(%s, %s);", valStr, resultName)
+				// Wrap value in forge_some if ErrorResult's Elem is Optional and value isn't already optional
+				retElem := g.currentFunc.ReturnType.Elem
+				valType := d.Values[0].Type
+				if valType == nil && d.Values[0].Kind == LValTemp {
+					valType = g.tempTypes[d.Values[0].TempID]
+				}
+				if retElem != nil && retElem.Kind == LTyOptional && !g.isClassOptional(retElem) &&
+					(valType == nil || valType.Kind != LTyOptional) &&
+					d.Values[0].Kind != LValLitNull {
+					optName := g.optTypeName(retElem.Elem)
+					g.linef("return forge_ok(forge_some(%s, %s), %s);", valStr, optName, resultName)
+				} else {
+					g.linef("return forge_ok(%s, %s);", valStr, resultName)
+				}
 			} else {
 				g.linef("return forge_err(%s, %s);", g.emitValueAsCStr(&d.Values[1]), resultName)
 			}
@@ -1878,6 +1901,31 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 				return fmt.Sprintf("forge_str_concat(%s, %s)", left, right)
 			}
 		}
+		// Optional null comparison: opt != null → opt.has_value, opt == null → !opt.has_value
+		// Only for non-pointer optionals (class handle optionals use NULL pointer)
+		if (d.Op == LBinEq || d.Op == LBinNe) &&
+			(d.Right.Kind == LValLitNull || d.Left.Kind == LValLitNull) {
+			var optVal string
+			var optType *LType
+			if d.Right.Kind == LValLitNull {
+				optVal = left
+				optType = d.Left.Type
+				if optType == nil && d.Left.Kind == LValTemp {
+					optType = g.tempTypes[d.Left.TempID]
+				} else if optType == nil && d.Left.Kind == LValVar {
+					optType = g.varTypes[d.Left.Name]
+				}
+			} else {
+				optVal = right
+				optType = d.Right.Type
+			}
+			if optType != nil && optType.Kind == LTyOptional && !g.isClassOptional(optType) {
+				if d.Op == LBinNe {
+					return fmt.Sprintf("%s.has", optVal)
+				}
+				return fmt.Sprintf("(!%s.has)", optVal)
+			}
+		}
 		return fmt.Sprintf("(%s %s %s)", left, cBinOp(d.Op), right)
 
 	case LExprUnOp:
@@ -1907,6 +1955,16 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		}
 		if recvType != nil && recvType.Kind == LTyClassHandle {
 			return fmt.Sprintf("%s->%s", g.emitValue(&d.Receiver), d.Field)
+		}
+		// Map tuple field access ._0/._1 to .val/.err for ErrorResult types
+		if recvType != nil && recvType.Kind == LTyErrorResult {
+			field := d.Field
+			if field == "_0" {
+				field = "value"
+			} else if field == "_1" {
+				field = "error"
+			}
+			return fmt.Sprintf("%s.%s", g.emitValue(&d.Receiver), field)
 		}
 		return fmt.Sprintf("%s.%s", g.emitValue(&d.Receiver), d.Field)
 
