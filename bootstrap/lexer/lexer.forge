@@ -28,6 +28,10 @@ forge lexer {
   doc "Invariants — No Line Continuation": """
     Forge's lexer does not support line continuation for binary operators.
     Multi-condition expressions must be on ONE line or extracted into helpers.
+
+    bracketDepth tracks () and [] nesting — newlines suppressed when > 0.
+    {} braces do NOT increment bracketDepth (they delimit blocks with statements).
+    bracketDepth is included in LexerState save/restore.
   """
 
   doc "Invariants — Contextual Keywords": """
