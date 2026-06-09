@@ -2970,6 +2970,8 @@ func (g *cGen) printfSpecAndArg(v *LValue) (string, string) {
 		return "%.*s", fmt.Sprintf("(int)%s.len, (const char*)%s.data", g.emitValue(v), g.emitValue(v))
 	case LTyError:
 		return "%s", g.emitValue(v)
+	case LTyAny:
+		return "%p", g.emitValue(v)
 	default:
 		return "%d", g.emitValue(v)
 	}
@@ -2994,15 +2996,23 @@ func (g *cGen) emitArgsBoxed(funcName string, args []LValue) string {
 		// Check if this arg needs boxing (concrete → interface)
 		if fn != nil && i < len(fn.Params) {
 			pt := fn.Params[i].Type
-			if pt != nil && pt.Kind == LTyAny && pt.Name != "" {
-				if _, isIface := g.ifaceByName[pt.Name]; isIface {
-					// Resolve concrete type of the argument
-					concreteClass := g.resolveConcreteClass(&a)
-					if concreteClass != "" {
-						ifName := g.structName(pt.Name, pt.IsExported)
-						className := g.structName(concreteClass, false)
-						argStr = fmt.Sprintf("(%s){._data = %s, ._vtable = &%s_as_%s}",
-							ifName, argStr, className, ifName)
+			if pt != nil && pt.Kind == LTyAny {
+				if pt.Name != "" {
+					if _, isIface := g.ifaceByName[pt.Name]; isIface {
+						// Resolve concrete type of the argument
+						concreteClass := g.resolveConcreteClass(&a)
+						if concreteClass != "" {
+							ifName := g.structName(pt.Name, pt.IsExported)
+							className := g.structName(concreteClass, false)
+							argStr = fmt.Sprintf("(%s){._data = %s, ._vtable = &%s_as_%s}",
+								ifName, argStr, className, ifName)
+						}
+					}
+				} else {
+					// Pure any (void*) — box primitives with intptr_t cast
+					argType := g.resolveValueType(&a)
+					if argType != nil && g.isPrimitiveType(argType) {
+						argStr = fmt.Sprintf("(void*)(intptr_t)(%s)", argStr)
 					}
 				}
 			}
@@ -3010,6 +3020,17 @@ func (g *cGen) emitArgsBoxed(funcName string, args []LValue) string {
 		parts = append(parts, argStr)
 	}
 	return strings.Join(parts, ", ")
+}
+
+// isPrimitiveType returns true for numeric, bool, and string types.
+func (g *cGen) isPrimitiveType(t *LType) bool {
+	switch t.Kind {
+	case LTyI8, LTyI16, LTyI32, LTyI64, LTyU8, LTyU16, LTyU32, LTyU64,
+		LTyF32, LTyF64, LTyBool, LTyPlatformInt, LTyPlatformUint:
+		return true
+	default:
+		return false
+	}
 }
 
 // resolveConcreteClass returns the class name for a value, or "" if unknown.

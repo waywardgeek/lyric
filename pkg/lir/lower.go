@@ -534,6 +534,10 @@ func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType {
 	case checker.TyGenerator:
 		return &LType{Kind: LTyGenerator, Elem: l.lowerCheckerType(ct.Elem)}
 	case checker.TyStruct:
+		// The checker maps `lock` type to TyStruct{Name:"Mutex"} — intercept here
+		if ct.Name == "Mutex" {
+			return &LType{Kind: LTyMutex}
+		}
 		t := &LType{Kind: LTyStruct, Name: ct.Name, IsExported: l.exported[ct.Name]}
 		if len(ct.TypeArgs) > 0 {
 			for _, ta := range ct.TypeArgs {
