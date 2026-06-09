@@ -48,7 +48,8 @@ forge checker {
     Primitive kinds: TyInt, TyUint, TyFloat (with bits for width), TyBool,
     TyString. Composite: TyList, TyMap, TyTuple, TyOptional, TyChannel,
     TyStruct, TyClass, TyEnum, TyInterface, TyFunc, TyVar, TyUnion.
-    Special: TyUnit, TyUnknown, TyError.
+    Special: TyUnit, TyNil (nil literal — assignable to all types),
+    TyError (cascade suppressor), TyUnknown (legacy fallback).
   """
 
   doc "Invariants — Generic Functions": """

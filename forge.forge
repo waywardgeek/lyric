@@ -16,9 +16,12 @@ forge Forge {
 
     2. ClassRenames after monomorphization. LIR expressions carry ORIGINAL generic
     class names (e.g., 'DictEntry'). The program's class/struct lists contain only
-    MONOMORPHIZED names ('DictEntry_i32'). Any function that looks up fields, emits
-    types, or resolves methods by class name MUST check prog.ClassRenames first.
-    Without this, lookups fail silently → void*/LTyAny fallback → gcc errors.
+    MONOMORPHIZED names ('DictEntry_i32'). Per-function ClassRenameMap (set by
+    Phase 6 ResolveClassNames) maps bare generic names to their specialized
+    versions within each function's scope. The old global ClassRenames map was
+    last-writer-wins, causing Dict destroy methods to all use the wrong type.
+    Any function that looks up fields, emits types, or resolves methods by
+    class name MUST check the per-function map first, then fall back to global.
 
     3. MergeStdlib into block 0 ONLY. Merging into every block creates duplicate
     struct definitions in generated C. Must also merge RELATIONS (not just
@@ -30,7 +33,9 @@ forge Forge {
     4. Desugar order matters: InterfaceEmbeds → InterfaceFields → Relations →
     Destructors → DefaultImpls. Each pass creates AST consumed by the next.
     DesugarDestructors wraps each relation's body in StmtBlock (block scoping)
-    to avoid variable name collisions.
+    to avoid variable name collisions. deepCopyBlock MUST deep copy TypeArgs
+    slices (not share) — destructor bodies are copied per-relation and type
+    substitution mutates TypeArgs in place.
   """
 
   doc "System Architecture": """
@@ -51,14 +56,13 @@ forge Forge {
     - Checker: types, scopes, constraints → annotated AST
     - LIR Lowerer: flatten expressions to SSA-like temps, resolve all sugar
     - LIR Optimizer: eliminate redundant temps, destructure multi-returns
-    - LIR Monomorphizer: specialize generics (required for C, optional for Go)
-    - Backends: thin C syntax emitter (~1700 LOC)
+    - LIR Monomorphizer: specialize generics (6-phase, required for C)
+    - C Backend: thin C syntax emitter (~1700 LOC)
   """
 
   doc "Compilation Pipeline": """
     1. Parser: lexes + parses .fg into ast.File (FuncDecl.Body populated)
-    2. Desugar: InterfaceFields → Relations → DefaultImpls → Destructors
-    (order matters — each pass creates AST consumed by the next)
+    2. Desugar: InterfaceEmbeds → InterfaceFields → Relations → Destructors → DefaultImpls
     3. Checker: type inference, scope validation, generic substitution,
     constraint satisfaction, relational method grants. Annotates AST
     Expr nodes with ResolvedType.
@@ -71,7 +75,7 @@ forge Forge {
     specialize → remove generics → rewrite call sites. Name mangling:
     Stack[i32] → Stack_i32.
     7. C Backend: runtime macros for slices/optionals/errors, lambda hoisting,
-    malloc for classes, vtable dispatch for interfaces.
+    malloc for classes, __builtin_unreachable() for exhaustive switches.
   """
 
   doc "Verification Pipeline": """
@@ -109,9 +113,7 @@ forge Forge {
     Relational constraints: where Graph<G, N, E> grants interface methods to
     type variables within function scope.
 
-    Go backend: pass-through (Go has native generics).
     C backend: monomorphize to concrete specialized copies.
-    NOTE: Go backend was removed 2026-06-07. C is the sole compilation target.
   """
 
   doc "Contracts": """
@@ -123,6 +125,13 @@ forge Forge {
     4. Result/Finding — verifier output. CLI/CI consumers.
     5. forge_runtime.h — C execution environment contract. C backend emits code
     depending on runtime macros for slices, optionals, errors, unions.
+
+    6. Post-checker validators — validateAllExprsResolved and
+    validateFieldAndMethodAccess ensure no nil ResolvedType or invalid
+    field/method access reaches the lowerer.
+
+    7. ValidatePostMono — invariant checker verifying no LTyTypeVar or
+    generic funcs/classes survive monomorphization Phase 3.
   """
 
   doc "UDD Methodology": """
@@ -134,7 +143,7 @@ forge Forge {
     - AI writes .forge files as post-process, human reviews them
     - Structural verifier catches signature/type drift at commit time
     - .forge files replace design.md — they have a forcing function for accuracy
-      (AI is the primary consumer; stale .forge → wrong design decisions)
+    (AI is the primary consumer; stale .forge → wrong design decisions)
     - Read .forge BEFORE modifying source in that directory
     - Zone 2 function index enables surgical file reads (line number jumps)
 
@@ -152,7 +161,7 @@ forge Forge {
     pkg/ast/         — AST nodes + desugaring engine. Leaf package.
     pkg/parser/      — Lexer + recursive descent/Pratt parser.
     pkg/checker/     — Type checker, inference, constraints, scope validation.
-    pkg/lir/         — Lowerer, optimizer, monomorphizer, Go+C backends.
+    pkg/lir/         — Lowerer, optimizer, monomorphizer, C backend.
     pkg/verifier/    — .forge vs Go structural comparison engine.
     runtime/         — C runtime header (slices, optionals, errors, unions).
     cmd/forge/       — Unified CLI: verify, update, gen, fmt, compile.
@@ -164,7 +173,7 @@ forge Forge {
     automatic file discovery within module directories. Design this IN Forge
     after self-hosting — touches parser, checker, lowerer, and C backend.
     Flat namespace is fine through bootstrap (~12 files); pain starts at 20+.
-    - C backend: maps, lock body scoping, garbage collection (Boehm GC)
+    - C backend: lock body scoping, garbage collection (Boehm GC)
     - LLVM backend (after C backend is mature)
     - Expression parsing for requires/ensures annotations
     - Language server: AST + Span for IDE integration
@@ -173,15 +182,9 @@ forge Forge {
   """
 
   doc "Known Failures": """
-    As of 2026-06-07, ALL tests pass. The Go backend (which had Optional(TypeVar)
-    issues in TestMonomorphizeOutputMatches) was deleted — C is the sole target.
-
-    FIXED (2026-06-07, commit 8c904d2):
-    - TestCBackendRuns/demo.fg — was caused by MergeStdlib matching primitive types
-    (string, i32) in funcReferencesTypes, pulling entire Dict/Sym chain into programs
-    that don't use them. Fixed by filtering primitiveTypes in collectTypeNames.
-    - TestVerifyAstForge — CtorParams field removed from ClassDecl but not ast.forge.
-    - TestVerifyParserForge — unexported fields (Source, Filename, Lex) in .forge.
+    As of 2026-06-09, ALL tests pass (249+ Go tests, 100/100 C tests).
+    Bootstrap: 0 GCC errors, 0 GCC warnings, 0 void* LIR violations.
+    8,049 lines Forge → 30,094 lines C.
   """
 
   source: ["cmd/forge/main.go", "cmd/forge/shared.go", "cmd/forge/fmt.go", "cmd/forge/update.go"]

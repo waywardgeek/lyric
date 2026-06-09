@@ -24,7 +24,7 @@ forge Bootstrap {
         bootstrap/desugar/desugar.fg bootstrap/checker/checker.fg \
         bootstrap/lir/lir.fg bootstrap/lowerer/lowerer.fg
 
-    Output: a single C file (~16K lines) linked against forge_runtime.h.
+    Output: a single C file (~30K lines) linked against forge_runtime.h.
   """
 
   doc "Dependency Graph": """
@@ -86,9 +86,8 @@ forge Bootstrap {
   """
 
   doc "Test Status": """
-    Compile: forge compile --c (all 8 files) → 0 C compilation errors
-    Tests: forge test testdata/test_parser.fg (+ bootstrap files) →
-      3/47 passing. 44 runtime failures (parser can't parse all constructs).
-      Test binary hangs after ~10 tests (infinite loop in failing test).
+    Compile: forge compile --c (all 8 files) → 0 GCC errors, 0 warnings
+    Tests: forge test → 100/100 passing (lexer 31, parser 52, desugar 12, test_min 5)
+    Output: 8,049 lines Forge → 30,094 lines C
   """
 }

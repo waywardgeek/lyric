@@ -46,7 +46,7 @@ forge ast {
   doc "Invariants — Expression and Statement Kinds": """
     ExprKind enum: Ident, IntLit, FloatLit, StringLit, StringInterp, BoolLit,
     Nil, Unary, Binary, Call, MethodCall, FieldAccess, Index, ListLit,
-    TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice.
+    TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice, Is.
 
     StmtKind enum: VarDecl, Assign, Return, Expr, If, For, While, Match,
     Block, Cascade, Break, Continue, Spawn, Select, Lock, IfLet, LetElse.

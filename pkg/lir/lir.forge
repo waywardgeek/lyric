@@ -32,12 +32,17 @@ forge Lir {
     alias (=) forwards call, field bind (<->) generates getter/setter,
     inline body emitted directly.
     - Try (?): extract error → null check → early return → extract value.
+    Returns T (not T?) — matches Rust/Swift semantics.
     - Generators: yield → channel send, for..in generator → poll loop.
     - Lambdas: captured as LExprFuncLit with params and body.
     - String interpolation → LExprFormat with parts list.
     - Union type matching → LStmtTypeSwitch (distinct from enum LStmtSwitch).
     - Nested enum patterns → emitNestedEnumMatch: groups arms by outer variant,
     recursively emits inner type switches.
+    - If-let: desugars to match with two arms (matched variant + wildcard).
+    - Let-else: outer-scope binding decls + tag check + field extraction + else block.
+    - Cast: `expr as Type` syntax (was `<Type>expr`). Lowered to LExprCast.
+    - Is operator: `expr is Variant` lowered to tag comparison (== variant tag int).
   """
 
   doc "Optimization Pass": """
@@ -58,16 +63,18 @@ forge Lir {
   """
 
   doc "Monomorphization": """
-    LIR→LIR pass, optional for Go (native generics), required for C.
-    Four phases:
-    1. Index all generic declarations (funcs, structs, classes)
-    2. Deep walk: collect every unique instantiation from call sites/type refs
-    3. Specialize: create concrete copies with mangled names
-    (Stack[i32] → Stack_i32, identity[i32,string] → identity_i32_string)
-    4. Rewrite: update all call sites and type references to specialized versions
+    LIR→LIR pass, required for C (sole backend).
+    Six phases:
+    1. Collection — iteratively discovers all generic instantiations
+    2. Specialization — creates concrete versions with mangled names
+    (Stack[i32] → Stack_i32). Each gets a ClassRenameMap.
+    3. Filtering — removes all generic declarations
+    4. Rewrite — update all call sites in function bodies
+    5. Signature/Field rewrite — substTypeRemoveVars mangles names with TypeArgs
+    6. ResolveClassNames — per-function ClassRenameMap fixes bare generic names
 
-    ClassRenames map tracks mono renames — applied only in C backend's cType()
-    to avoid breaking Go backend which uses Stack[int32] syntax.
+    Per-function ClassRenameMap replaces the old global ClassRenames map which
+    was last-writer-wins (caused Dict destroy methods to all use wrong type).
   """
 
   doc "Go Backend (DELETED 2026-06-07)": """
@@ -115,7 +122,8 @@ forge Lir {
     tempTypes/varTypes maps on cGen for cross-reference resolution.
     spawnCaptures map on cGen redirects variable access in spawn bodies.
 
-    Status: 43/45 .fg files compile+link, all Go tests pass. Features working:
+    Status: 36/36 .fg files compile+link, all Go tests pass, 0 GCC errors,
+    0 warnings, 0 void* LIR violations. Features working:
     vtables, channels, spawn with capture-by-reference, generators, generics
     (via monomorphization), mutex/lock.
     Dict<V> and HashedList<P,C> compile and run (test_dict.fg, hashed_list.fg).
@@ -124,12 +132,12 @@ forge Lir {
   doc "Invariants — Three-Phase Lowering": """
     Lower() runs three phases:
     Phase 0: Pre-register ALL class names across ALL blocks (classFields[name]=nil).
-      This must happen before registerTypes because field type resolution
-      (lowerNamedType) checks classFields to distinguish classes from structs.
-      Without this, cross-block class references (e.g., Comment in ast.fg
-      referenced by Lexer's lc_children in lexer.fg) resolve as LTyStruct
-      instead of LTyClassHandle, causing ForgeSlice_Comment vs
-      ForgeSlice_Commentptr type mismatches in generated C.
+    This must happen before registerTypes because field type resolution
+    (lowerNamedType) checks classFields to distinguish classes from structs.
+    Without this, cross-block class references (e.g., Comment in ast.fg
+    referenced by Lexer's lc_children in lexer.fg) resolve as LTyStruct
+    instead of LTyClassHandle, causing ForgeSlice_Comment vs
+    ForgeSlice_Commentptr type mismatches in generated C.
     Phase 1: registerTypes for ALL blocks (populates fields, variants, exports).
     Phase 2: Lower ALL blocks (types fully registered, cross-refs safe).
   """
@@ -225,7 +233,6 @@ forge Lir {
     discard warnings.
   """
 
-
   doc "Invariants — AST Pointer Stability in Lowerer": """
     The lowerer reads checker annotations (ResolvedType) from AST Expr nodes.
     exprType(expr *Expr) extracts ResolvedType, casts to *checker.Type, and
@@ -258,14 +265,14 @@ forge Lir {
 
     Phase 1: Collection — iteratively discovers all generic instantiations.
     Phase 2: Specialization — creates concrete versions of generic functions,
-      classes, and structs. Each specialized function gets a ClassRenameMap.
+    classes, and structs. Each specialized function gets a ClassRenameMap.
     Phase 3: Filtering — removes all generic declarations. After this phase,
-      NO generic functions, classes, or structs remain in the program.
+    NO generic functions, classes, or structs remain in the program.
     Phase 4: Rewrite call sites in all function bodies.
     Phase 5: Rewrite function signatures, class fields, struct fields via
-      substTypeRemoveVars (mangles names with TypeArgs).
+    substTypeRemoveVars (mangles names with TypeArgs).
     Phase 6: ResolveClassNames — applies per-function ClassRenameMap to fix
-      bare generic class names that substType couldn't resolve.
+    bare generic class names that substType couldn't resolve.
 
     After Phase 3, no generic declarations exist. After Phase 6, no generic
     class REFERENCES should exist either. ValidatePostMono checks both.
@@ -290,9 +297,10 @@ forge Lir {
   """
 
   doc "Technical Debt": """
-    - C backend: no maps, no GC
+    - C backend: no GC (SoA + arena + deterministic destruction planned)
     - Advanced optimizations: constant folding, dead code elimination, inlining
     - Source maps for debugging generated code
+    - inferExprType() in C backend is tech debt — type resolution belongs in checker
   """
 
   // Kind discriminators — iota-based enum constants on these types
@@ -324,6 +332,7 @@ forge Lir {
     Variants: [LVariant]
     Bits: int
     IsExported: bool
+    TypeArgs: [LType?]
   }
 
   struct LField {
@@ -403,6 +412,8 @@ forge Lir {
   struct LBuiltinData {
     Name: string
     Args: [LValue]
+    File: string
+    Line: int
   }
 
   struct LStructLitData {
@@ -557,11 +568,12 @@ forge Lir {
   }
 
   struct LSwitchCase {
-    Tag: int       // -1 means default/wildcard case → must emit "default:" in C, not "case -1:"
+    Tag: int
     Binding: string
     Body: [LStmt]
   }
 
+  // -1 means default/wildcard case → must emit "default:" in C, not "case -1:"
   struct LReturn {
     Values: [LValue]
   }
@@ -657,6 +669,7 @@ forge Lir {
     ReceiverTypeParams: [LTypeParam]
     TypeParams: [LTypeParam]
     RelationalConstraints: [LRelationalConstraint]
+    ClassRenameMap: map[string]string
   }
 
   struct LParam {
@@ -748,185 +761,199 @@ forge Lir {
 // file: lower.go
 //
 // dataAs extracts a value from an any-typed Data field, handling both pointer and value storage.
-// func dataAs[T any](data any) *T    :13
+// func dataAs[T any](data any) *T    :14
 //
 // NewLowerer creates a new AST→LIR lowering pass.
-// func NewLowerer() *Lowerer    :73
+// func NewLowerer() *Lowerer    :77
 //
 // Lower converts an entire AST file to an LIR program.
-// func (l *Lowerer) Lower(file *ast.File) *LProgram    :90
+// func (l *Lowerer) Lower(file *ast.File) *LProgram    :95
 //
 // registerTypes populates variant/class lookup tables before lowering.
-// func (l *Lowerer) registerTypes(block *ast.ForgeBlock)    :216
+// func (l *Lowerer) registerTypes(block *ast.ForgeBlock)    :238
 //
-// func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType    :330
+// func (l *Lowerer) lowerTypeExpr(te *ast.TypeExpr) *LType    :355
 //
-// func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType    :394
+// func (l *Lowerer) lowerNamedType(nt *ast.NamedType) *LType    :428
 //
 // lowerCheckerType converts a checker.Type to an LType.
-// func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType    :458
+// func (l *Lowerer) lowerCheckerType(ct *checker.Type) *LType    :500
 //
-// func lirIntType(bits int) *LType    :543
+// func lirIntType(bits int) *LType    :605
 //
-// func lirUintType(bits int) *LType    :557
+// func lirUintType(bits int) *LType    :619
 //
-// func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl    :575
+// func (l *Lowerer) lowerStructDecl(s *ast.StructDecl) LStructDecl    :637
 //
-// func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl    :598
+// func (l *Lowerer) lowerEnumDecl(e *ast.EnumDecl) LEnumDecl    :660
 //
-// func (l *Lowerer) lowerInterfaceDecl(iface *ast.InterfaceDecl) LInterfaceDecl    :603
+// func (l *Lowerer) lowerInterfaceDecl(iface *ast.InterfaceDecl) LInterfaceDecl    :665
 //
 // lowerImplBlock generates forwarding wrapper methods for impl block aliases.
-// func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl    :655
+// func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl    :717
 //
 // substImplParams substitutes type variables in method params with concrete types.
-// func (l *Lowerer) substImplParams(params []LParam, typeArgMap map[string]string) []LParam    :825
+// func (l *Lowerer) substImplParams(params []LParam, typeArgMap map[string]*LType) []LParam    :936
 //
 // substImplType replaces type variables with their concrete types from the impl block.
-// func (l *Lowerer) substImplType(t *LType, typeArgMap map[string]string) *LType    :834
+// func (l *Lowerer) substImplType(t *LType, typeArgMap map[string]*LType) *LType    :945
 //
-// func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl    :866
+// func (l *Lowerer) lowerClassDecl(cls *ast.ClassDecl) LClassDecl    :974
 //
-// func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl    :900
+// func (l *Lowerer) lowerFuncDecl(fn *ast.FuncDecl, receiver string) LFuncDecl    :1008
 //
-// func (l *Lowerer) lowerBlock(block *ast.Block) []LStmt    :990
+// func (l *Lowerer) lowerBlock(block *ast.Block) []LStmt    :1098
 //
-// func (l *Lowerer) emit(stmt LStmt)    :1004
+// func (l *Lowerer) emit(stmt LStmt)    :1112
 //
-// func (l *Lowerer) lowerStmt(stmt *ast.Stmt)    :1008
+// func (l *Lowerer) lowerStmt(stmt *ast.Stmt)    :1116
 //
-// func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt)    :1054
+// func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt)    :1162
 //
-// func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt)    :1112
+// func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt)    :1338
 //
-// func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt)    :1178
+// func (l *Lowerer) lowerReturnStmt(stmt *ast.Stmt)    :1404
 //
-// func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt)    :1218
+// func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt)    :1444
 //
-// func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt)    :1227
+// func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt)    :1453
 //
-// func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LStmt    :1247
+// func (l *Lowerer) lowerElseIfs(elseIfs []ast.ElseIf, finalElse *ast.Block) []LStmt    :1495
 //
-// func (l *Lowerer) lowerForStmt(stmt *ast.Stmt)    :1267
+// func (l *Lowerer) lowerForStmt(stmt *ast.Stmt)    :1515
 //
 // lowerForGenerator desugars `for x in gen_expr` into:
-// func (l *Lowerer) lowerForGenerator(fs *ast.ForStmt, iterVal LValue)    :1312
+// func (l *Lowerer) lowerForGenerator(fs *ast.ForStmt, iterVal LValue)    :1560
 //
-// func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt)    :1327
+// func (l *Lowerer) lowerWhileStmt(stmt *ast.Stmt)    :1575
 //
-// func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt)    :1345
+// func (l *Lowerer) lowerMatchStmt(stmt *ast.Stmt)    :1593
 //
-// func (l *Lowerer) lowerMatchExpr(expr *ast.Expr) LValue    :1350
+// func (l *Lowerer) lowerMatchExpr(expr *ast.Expr) LValue    :1598
 //
-// func (l *Lowerer) lowerLambda(expr *ast.Expr) LValue    :1372
+// func (l *Lowerer) lowerLambda(expr *ast.Expr) LValue    :1620
 //
 // emitMatch lowers a match statement/expression. If result is non-nil, each arm's
-// func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo)    :1421
+// func (l *Lowerer) emitMatch(ms *ast.MatchStmt, result *matchResultInfo)    :1669
 //
 // isUnionMatch checks if this is a union type match (match on any with type patterns).
-// func (l *Lowerer) isUnionMatch(matchVal LValue, ms *ast.MatchStmt) bool    :1481
+// func (l *Lowerer) isUnionMatch(matchVal LValue, ms *ast.MatchStmt) bool    :1729
 //
 // emitUnionTypeSwitch emits a type switch for union type matching.
-// func (l *Lowerer) emitUnionTypeSwitch(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo)    :1494
+// func (l *Lowerer) emitUnionTypeSwitch(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo)    :1742
 //
 // forgeNameToLType converts a Forge type name to an LType (fallback for union patterns).
-// func (l *Lowerer) forgeNameToLType(name string) *LType    :1530
+// func (l *Lowerer) forgeNameToLType(name string) *LType    :1778
 //
 // lowerArmBody lowers a match arm body. If result is non-nil (match-as-expression),
-// func (l *Lowerer) lowerArmBody(block *ast.Block, result *matchResultInfo) []LStmt    :1555
+// func (l *Lowerer) lowerArmBody(block *ast.Block, result *matchResultInfo) []LStmt    :1803
 //
 // hasNestedVariantPatterns checks if any arm in an enum match has a binding
-// func (l *Lowerer) hasNestedVariantPatterns(ms *ast.MatchStmt) bool    :1588
+// func (l *Lowerer) hasNestedVariantPatterns(ms *ast.MatchStmt) bool    :1836
 //
 // emitNestedEnumMatch handles match expressions where arms have nested variant
-// func (l *Lowerer) emitNestedEnumMatch(ms *ast.MatchStmt, matchVal LValue, enumName string, result *matchResultInfo)    :1605
+// func (l *Lowerer) emitNestedEnumMatch(ms *ast.MatchStmt, matchVal LValue, enumName string, result *matchResultInfo)    :1853
 //
 // armHasNestedVariant checks if a single arm has nested variant patterns.
-// func (l *Lowerer) armHasNestedVariant(arm *ast.MatchArm) bool    :1799
+// func (l *Lowerer) armHasNestedVariant(arm *ast.MatchArm) bool    :2052
 //
-// func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string, result *matchResultInfo) LSwitchCase    :1811
+// func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName string, result *matchResultInfo) LSwitchCase    :2064
 //
-// func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo)    :1902
+// func (l *Lowerer) lowerMatchAsIfElse(ms *ast.MatchStmt, matchVal LValue, result *matchResultInfo)    :2152
 //
 // getTupleElement extracts the i-th element from a tuple match expression.
-// func (l *Lowerer) getTupleElement(ms *ast.MatchStmt, matchVal LValue, idx int) LValue    :2069
+// func (l *Lowerer) getTupleElement(ms *ast.MatchStmt, matchVal LValue, idx int) LValue    :2319
 //
-// func (l *Lowerer) findVariantTag(enumName, variantName string) int    :2080
+// func (l *Lowerer) findVariantTag(enumName, variantName string) int    :2330
 //
-// func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt)    :2091
+// findVariantFieldName returns the i-th field name for a variant in the specified enum.
+// func (l *Lowerer) findVariantFieldName(enumName, variantName string, fieldIndex int) string    :2343
 //
-// func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt)    :2096
+// func (l *Lowerer) lowerBlockStmt(stmt *ast.Stmt)    :2358
 //
-// func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase    :2106
+// func (l *Lowerer) lowerSelectStmt(stmt *ast.Stmt)    :2363
+//
+// func (l *Lowerer) lowerSelectCase(c *ast.SelectCase) LSelectCase    :2373
 //
 // lowerExpr flattens an AST expression into a sequence of TempDefs and returns
-// func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue    :2146
+// func (l *Lowerer) lowerExpr(expr *ast.Expr) LValue    :2413
 //
 // lowerExprInto is like lowerExpr but used in contexts where we need the
-// func (l *Lowerer) lowerExprInto(expr *ast.Expr) LValue    :2210
+// func (l *Lowerer) lowerExprInto(expr *ast.Expr) LValue    :2477
 //
 // emitTemp creates a new temporary and emits a TempDef statement.
-// func (l *Lowerer) emitTemp(expr LExpr) LValue    :2215
+// func (l *Lowerer) emitTemp(expr LExpr) LValue    :2482
 //
 // exprType extracts the checker-annotated type from an AST expression.
-// func (l *Lowerer) exprType(expr *ast.Expr) *LType    :2223
+// func (l *Lowerer) exprType(expr *ast.Expr) *LType    :2491
 //
-// func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue    :2234
+// knownPackageReturnType returns the correct LType for known package-qualified
+// func (l *Lowerer) knownPackageReturnType(funcName string) *LType    :2503
 //
-// func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue    :2254
+// func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue    :2518
 //
-// func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue    :2264
+// func (l *Lowerer) lowerIntLit(expr *ast.Expr) LValue    :2549
 //
-// func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue    :2274
+// func (l *Lowerer) lowerFloatLit(expr *ast.Expr) LValue    :2559
 //
-// func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue    :2279
+// func (l *Lowerer) lowerStringLit(expr *ast.Expr) LValue    :2569
 //
-// func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue    :2284
+// func (l *Lowerer) lowerBoolLit(expr *ast.Expr) LValue    :2574
+//
+// func (l *Lowerer) lowerBinary(expr *ast.Expr) LValue    :2579
 //
 // coerceNumericBinary inserts LExprCast when binary operands have different numeric types.
-// func (l *Lowerer) coerceNumericBinary(left, right LValue, resultType *LType) (LValue, LValue)    :2311
+// func (l *Lowerer) coerceNumericBinary(left, right LValue, resultType *LType) (LValue, LValue)    :2606
 //
-// func isNumericKind(k LTypeKind) bool    :2343
+// func isNumericKind(k LTypeKind) bool    :2638
 //
 // widerNumericType returns the wider of two numeric types for coercion.
-// func (l *Lowerer) widerNumericType(a, b *LType) *LType    :2354
+// func (l *Lowerer) widerNumericType(a, b *LType) *LType    :2649
 //
-// func mapBinaryOp(op ast.BinaryOp) LBinOpKind    :2379
+// func mapBinaryOp(op ast.BinaryOp) LBinOpKind    :2674
 //
-// func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue    :2421
+// func (l *Lowerer) lowerUnary(expr *ast.Expr) LValue    :2716
 //
-// func (l *Lowerer) lowerCall(expr *ast.Expr) LValue    :2445
+// func (l *Lowerer) lowerCall(expr *ast.Expr) LValue    :2740
 //
 // extractTypeArgs gets type arguments from a CallExpr, either explicit or inferred by the checker.
-// func (l *Lowerer) extractTypeArgs(ce *ast.CallExpr) []*LType    :2587
+// func (l *Lowerer) extractTypeArgs(ce *ast.CallExpr) []*LType    :2935
 //
-// func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue    :2609
+// func (l *Lowerer) lowerMethodCall(expr *ast.Expr) LValue    :2957
 //
-// func (l *Lowerer) lowerBuiltinMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :2677
+// func (l *Lowerer) lowerBuiltinMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :3029
 //
-// func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :2696
+// func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, resultType *LType) LValue    :3048
 //
-// func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue    :2719
+// func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue    :3071
 //
-// func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue    :2739
+// func (l *Lowerer) lowerIndex(expr *ast.Expr) LValue    :3100
 //
-// func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue    :2751
+// func (l *Lowerer) lowerSliceExpr(expr *ast.Expr) LValue    :3112
 //
-// func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue    :2772
+// func (l *Lowerer) lowerListLit(expr *ast.Expr) LValue    :3133
 //
-// func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue    :2788
+// func (l *Lowerer) lowerMapLit(expr *ast.Expr) LValue    :3149
 //
-// func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue    :2811
+// func (l *Lowerer) lowerTupleLit(expr *ast.Expr) LValue    :3172
 //
-// func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue    :2826
+// func (l *Lowerer) lowerStructLit(expr *ast.Expr) LValue    :3187
 //
-// func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue    :2876
+// func (l *Lowerer) lowerStringInterp(expr *ast.Expr) LValue    :3264
 //
-// func (l *Lowerer) lowerCast(expr *ast.Expr) LValue    :2915
+// func (l *Lowerer) lowerCast(expr *ast.Expr) LValue    :3303
 //
-// func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue    :2927
+// func (l *Lowerer) lowerUnwrap(expr *ast.Expr) LValue    :3315
 //
-// func (l *Lowerer) lowerTry(expr *ast.Expr) LValue    :2939
+// func (l *Lowerer) lowerTry(expr *ast.Expr) LValue    :3327
+//
+// lExprKindName returns a human-readable name for an LExpr kind.
+// func lExprKindName(kind LExprKind) string    :3375
+//
+// validateNoAnyTypes checks that no function parameter, return type, temp,
+// func (l *Lowerer) validateNoAnyTypes()    :3435
+//
+// func validateStmtsNoAny(funcName string, stmts []LStmt)    :3452
 
 // --- dependencies ---
 //

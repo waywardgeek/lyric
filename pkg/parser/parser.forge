@@ -87,12 +87,13 @@ forge Parser {
     Primary expressions: identifiers, all literal types (int, float, string, bool,
     nil), parenthesized expressions, list literals [a, b], map literals map[K]V{...},
     lambda |params| -> RetType { body }, match expressions, cast expressions
-    <Type>expr, f-string interpolation f"text {expr}", and .fg keywords used as
+    expr as Type, f-string interpolation f"text {expr}", and .fg keywords used as
     identifiers (true, false, nil, map).
 
     Postfix operations include: method calls (obj.method()), field access (obj.field),
     generic call disambiguation (tryParseTypeArgs with backtracking), function calls,
-    indexing (xs[i]), and unwrap (expr! — ExprUnwrap, for optional dereferencing).
+    indexing (xs[i]), unwrap (expr! — ExprUnwrap), try (expr? — ExprTry),
+    and is (expr is Variant — ExprIs, for variant/type checking).
 
     Generic call disambiguation: when a postfix `<` is
     encountered, tryParseTypeArgs() saves lexer state, attempts to parse type args,
@@ -118,7 +119,13 @@ forge Parser {
     - Otherwise → parseExprOrAssign (expression or assignment statement)
 
     Compound assignment (+=, -=, *=, /=) is desugared in the parser:
-    `x += y` becomes `x = x + y` at the AST level, keeping the transpiler simple.
+    `x += y` becomes `x = x + y` at the AST level, keeping downstream stages simple.
+
+    if-let: `if let Pattern = expr { body }` — parseIf detects `let` after `if`,
+    parses pattern and value, stores in IfStmt.LetPattern and IfStmt.LetValue.
+
+    let-else: `let Pattern = expr else { body }` — parseVarDecl detects pattern
+    after `let`, stores in VarDeclStmt.Pattern and VarDeclStmt.ElseBlock.
 
     Pattern parsing for match arms supports: identifier, variant(bindings),
     literal, wildcard (_), and tuple patterns.
@@ -149,6 +156,18 @@ forge Parser {
     expr.Data.(*ast.CallExpr) and need pointer stability. If any parse
     path stores a value instead of a pointer, downstream annotation via
     checkExpr(expr *Expr) will annotate a copy, not the original.
+  """
+
+  doc "Invariants — noStructLit Flag (Rust Approach)": """
+    for/while/if/match conditions suppress struct literal parsing via a
+    noStructLit flag. Without this, `for item in list { ... }` would parse
+    `list { ... }` as a struct literal. This is the Rust solution to the
+    same grammar ambiguity.
+
+    noStructLit is set before parsing the condition expression and cleared
+    after. When set, parsePrimaryExpr skips struct literal detection for
+    `Ident {` patterns. This is orthogonal to exprDepth (which handles
+    the same ambiguity inside parens/brackets).
   """
 
   doc "Invariants — Struct Literal Ambiguity": """
@@ -333,169 +352,172 @@ forge Parser {
 // func (t Token) String() string    :211
 //
 // NewLexer creates a new lexer for the given source.
-// func NewLexer(source, filename string) *Lexer    :258
+// func NewLexer(source, filename string) *Lexer    :259
 //
-// func (l *Lexer) currentPos() ast.Pos    :267
+// func (l *Lexer) currentPos() ast.Pos    :268
 //
-// func (l *Lexer) advance() rune    :271
+// func (l *Lexer) advance() rune    :272
 //
-// func (l *Lexer) peek() rune    :286
+// func (l *Lexer) peek() rune    :287
 //
-// func (l *Lexer) peekAt(offset int) rune    :294
+// func (l *Lexer) peekAt(offset int) rune    :295
 //
 // Peek returns the next token without consuming it.
-// func (l *Lexer) Peek() Token    :304
+// func (l *Lexer) Peek() Token    :305
 //
 // Next returns the next token.
-// func (l *Lexer) Next() Token    :314
+// func (l *Lexer) Next() Token    :315
 //
-// func (l *Lexer) scan() Token    :323
+// func (l *Lexer) scan() Token    :324
 //
 // scanEscape handles a backslash escape sequence, writing the result to buf.
-// func (l *Lexer) scanEscape(buf *strings.Builder) bool    :511
+// func (l *Lexer) scanEscape(buf *strings.Builder) bool    :519
 //
-// func hexVal(r rune) byte    :542
+// func hexVal(r rune) byte    :550
 //
-// func (l *Lexer) scanCharLit(start ast.Pos) Token    :555
+// func (l *Lexer) scanCharLit(start ast.Pos) Token    :563
 //
-// func (l *Lexer) scanString(start ast.Pos) Token    :572
+// func (l *Lexer) scanString(start ast.Pos) Token    :580
 //
 // scanFString scans f"..." and stores the raw content between quotes.
-// func (l *Lexer) scanFString(start ast.Pos) Token    :600
+// func (l *Lexer) scanFString(start ast.Pos) Token    :608
 //
-// func (l *Lexer) scanTripleString(start ast.Pos) Token    :632
+// func (l *Lexer) scanTripleString(start ast.Pos) Token    :640
 //
-// func (l *Lexer) scanNumber(start ast.Pos) Token    :648
+// func (l *Lexer) scanNumber(start ast.Pos) Token    :656
 //
-// func (l *Lexer) scanIdent(start ast.Pos) Token    :678
+// func (l *Lexer) scanIdent(start ast.Pos) Token    :686
 //
 // file: parser.go
 //
 // func (e *ParseError) Error() string    :17
 //
 // ParseFile parses a .forge or .fg file into an AST.
-// func ParseFile(source, filename string) (*ast.File, error)    :37
+// func ParseFile(source, filename string) (*ast.File, error)    :38
 //
 // ParseString parses from a string, using "<string>" as the filename.
-// func ParseString(source string) (*ast.File, error)    :44
+// func ParseString(source string) (*ast.File, error)    :45
 //
-// func (p *Parser) peek() Token    :48
+// func (p *Parser) peek() Token    :49
 //
-// func (p *Parser) next() Token    :54
+// func (p *Parser) next() Token    :55
 //
-// func (p *Parser) pushBack(t Token)    :62
+// func (p *Parser) pushBack(t Token)    :63
 //
-// func (p *Parser) skipNewlines()    :66
+// func (p *Parser) skipNewlines()    :67
 //
 // peekAnnotation checks if the current token is a TIdent that matches an annotation keyword.
-// func (p *Parser) peekAnnotation() TokenKind    :74
+// func (p *Parser) peekAnnotation() TokenKind    :75
 //
 // consumeAnnotation checks the current token for an annotation keyword match.
-// func (p *Parser) consumeAnnotation(expected TokenKind) bool    :87
+// func (p *Parser) consumeAnnotation(expected TokenKind) bool    :88
 //
 // isWhyAnnotation peeks ahead to determine if the current `why` token is an annotation
-// func (p *Parser) isWhyAnnotation() bool    :100
+// func (p *Parser) isWhyAnnotation() bool    :101
 //
 // newError creates a ParseError with the source line from the lexer.
-// func (p *Parser) newError(span ast.Span, format string, args ...any) *ParseError    :111
+// func (p *Parser) newError(span ast.Span, format string, args ...any) *ParseError    :112
 //
 // getSourceLine extracts the source line at the given 1-based line number.
-// func (p *Parser) getSourceLine(line int) string    :120
+// func (p *Parser) getSourceLine(line int) string    :121
 //
-// func (p *Parser) expect(kind TokenKind) (Token, error)    :137
+// func (p *Parser) expect(kind TokenKind) (Token, error)    :138
 //
 // expectIdentLike accepts TIdent or any annotation keyword that could be used as a name.
-// func (p *Parser) expectIdentLike() (Token, error)    :146
+// func (p *Parser) expectIdentLike() (Token, error)    :147
 //
-// func (p *Parser) parseFile() (*ast.File, error)    :163
+// func (p *Parser) parseFile() (*ast.File, error)    :164
 //
-// func (p *Parser) parseForgeBlock() (*ast.ForgeBlock, error)    :186
+// func (p *Parser) parseForgeBlock() (*ast.ForgeBlock, error)    :187
 //
-// func (p *Parser) parseForgeItem(block *ast.ForgeBlock) error    :218
+// func (p *Parser) parseForgeItem(block *ast.ForgeBlock) error    :240
 //
 // parseWhy parses: why: "..."
-// func (p *Parser) parseWhy() (string, error)    :369
+// func (p *Parser) parseWhy() (string, error)    :391
 //
 // parseDoc parses: doc "Section": """..."""
-// func (p *Parser) parseDoc() (*ast.DocBlock, error)    :382
+// func (p *Parser) parseDoc() (*ast.DocBlock, error)    :404
 //
 // parseInvariant parses: invariant: "claim" [verified_at: "hash"]
-// func (p *Parser) parseInvariant() (*ast.InvariantDecl, error)    :404
+// func (p *Parser) parseInvariant() (*ast.InvariantDecl, error)    :426
 //
 // parseImport parses: import alias from "path"
-// func (p *Parser) parseImport() (*ast.ImportDecl, error)    :436
+// func (p *Parser) parseImport() (*ast.ImportDecl, error)    :458
 //
 // parseTypeAlias parses: type Name = TypeExpr
-// func (p *Parser) parseTypeAlias() (*ast.TypeAliasDecl, error)    :458
+// func (p *Parser) parseTypeAlias() (*ast.TypeAliasDecl, error)    :480
 //
 // parseStruct parses: struct Name[<TypeParams>] { fields }
-// func (p *Parser) parseStruct() (*ast.StructDecl, error)    :480
+// func (p *Parser) parseStruct() (*ast.StructDecl, error)    :502
 //
 // parseEnum parses: enum Name[<TypeParams>] { Variants }
-// func (p *Parser) parseEnum() (*ast.EnumDecl, error)    :529
+// func (p *Parser) parseEnum() (*ast.EnumDecl, error)    :551
 //
-// func (p *Parser) parseEnumVariant() (*ast.EnumVariant, error)    :576
+// func (p *Parser) parseEnumVariant() (*ast.EnumVariant, error)    :598
 //
-// func (p *Parser) parseTupleField() (*ast.TupleField, error)    :608
+// func (p *Parser) parseTupleField() (*ast.TupleField, error)    :630
 //
 // parseInterface parses: interface Name[<TypeParams>] { methods }
-// func (p *Parser) parseInterface() (*ast.InterfaceDecl, error)    :633
+// func (p *Parser) parseInterface() (*ast.InterfaceDecl, error)    :655
 //
 // parseInterfaceField parses: field T.name: Type
-// func (p *Parser) parseInterfaceField() (*ast.InterfaceFieldDecl, error)    :720
+// func (p *Parser) parseInterfaceField() (*ast.InterfaceFieldDecl, error)    :742
 //
 // parseInterfaceEmbed parses: embed InterfaceName<TypeArg1, TypeArg2>
-// func (p *Parser) parseInterfaceEmbed() (*ast.InterfaceEmbed, error)    :751
+// func (p *Parser) parseInterfaceEmbed() (*ast.InterfaceEmbed, error)    :773
 //
 // parseDestructorBlock parses: destructor T { body }
-// func (p *Parser) parseDestructorBlock() (*ast.DestructorBlock, error)    :789
+// func (p *Parser) parseDestructorBlock() (*ast.DestructorBlock, error)    :811
 //
 // parseImpl parses: impl Interface<T1, T2, ...> [as label] { mappings }
-// func (p *Parser) parseImpl() (*ast.ImplBlock, error)    :809
+// func (p *Parser) parseImpl() (*ast.ImplBlock, error)    :831
+//
+// parseImplMappingShort parses a short-form mapping: method = member
+// func (p *Parser) parseImplMappingShort(forType string) (*ast.ImplMapping, error)    :909
 //
 // parseImplMapping parses one mapping inside an impl block.
-// func (p *Parser) parseImplMapping() (*ast.ImplMapping, error)    :871
+// func (p *Parser) parseImplMapping() (*ast.ImplMapping, error)    :983
 //
 // parseClass parses: class Name[<TypeParams>](ctor_params) [implements I1, I2] { fields, methods }
-// func (p *Parser) parseClass() (*ast.ClassDecl, error)    :980
+// func (p *Parser) parseClass() (*ast.ClassDecl, error)    :1092
 //
 // parseFunc parses a function/method declaration with annotations.
-// func (p *Parser) parseFunc() (*ast.FuncDecl, error)    :1078
+// func (p *Parser) parseFunc() (*ast.FuncDecl, error)    :1190
 //
-// func (p *Parser) parseWhereClause() (*ast.WhereClause, error)    :1172
+// func (p *Parser) parseWhereClause() (*ast.WhereClause, error)    :1284
 //
-// func (p *Parser) parseAnnotations() ast.Annotations    :1219
+// func (p *Parser) parseAnnotations() ast.Annotations    :1331
 //
 // parseExprText reads tokens until newline/EOF and returns them as text.
-// func (p *Parser) parseExprText() string    :1301
+// func (p *Parser) parseExprText() string    :1413
 //
 // parseField parses: name: Type [guarded_by(lock)] [// why: "..."]
-// func (p *Parser) parseField() (*ast.Field, error)    :1311
+// func (p *Parser) parseField() (*ast.Field, error)    :1423
 //
 // parseParam parses a function parameter: [mut] name: Type or [mut] self
-// func (p *Parser) parseParam() (*ast.Param, error)    :1360
+// func (p *Parser) parseParam() (*ast.Param, error)    :1472
 //
 // parseTypeExpr parses a type expression.
-// func (p *Parser) parseTypeExpr() (*ast.TypeExpr, error)    :1409
+// func (p *Parser) parseTypeExpr() (*ast.TypeExpr, error)    :1521
 //
-// func (p *Parser) parseBaseType() (*ast.TypeExpr, error)    :1472
+// func (p *Parser) parseBaseType() (*ast.TypeExpr, error)    :1584
 //
 // parseTypeParams parses: <T> or <T: Comparable> or <T, U> etc.
-// func (p *Parser) parseTypeParams() ([]ast.TypeParam, error)    :1684
+// func (p *Parser) parseTypeParams() ([]ast.TypeParam, error)    :1796
 //
 // parseRelation parses: relation [hint] Parent[:label] owns|refs [Child[:label]]
-// func (p *Parser) parseRelation() (*ast.RelationDecl, error)    :1717
+// func (p *Parser) parseRelation() (*ast.RelationDecl, error)    :1829
 //
-// func (p *Parser) parseRelationSideFrom(nameTok Token) ast.RelationSide    :1771
+// func (p *Parser) parseRelationSideFrom(nameTok Token) ast.RelationSide    :1883
 //
 // parseSource parses: source: ["file1.go", "file2.go"]
-// func (p *Parser) parseSource() ([]string, error)    :1801
+// func (p *Parser) parseSource() ([]string, error)    :1913
 //
 // parseFake parses: fake: "file.go"
-// func (p *Parser) parseFake() (string, error)    :1827
+// func (p *Parser) parseFake() (string, error)    :1939
 //
 // parseConstDecl parses a top-level constant: let NAME: Type = value
-// func (p *Parser) parseConstDecl() (*ast.ConstDecl, error)    :1840
+// func (p *Parser) parseConstDecl() (*ast.ConstDecl, error)    :1952
 //
 // file: expr_parser.go
 //
@@ -506,71 +528,83 @@ forge Parser {
 // parseExpr parses an expression using Pratt/precedence climbing.
 // func (p *Parser) parseExpr() (*ast.Expr, error)    :100
 //
-// func (p *Parser) parsePrecExpr(minPrec int) (*ast.Expr, error)    :104
+// parseExprNoStructLit parses an expression but suppresses struct literal
+// func (p *Parser) parseExprNoStructLit() (*ast.Expr, error)    :107
 //
-// func (p *Parser) parseUnaryExpr() (*ast.Expr, error)    :129
+// func (p *Parser) parsePrecExpr(minPrec int) (*ast.Expr, error)    :114
 //
-// func (p *Parser) parsePostfixExpr() (*ast.Expr, error)    :158
+// func (p *Parser) parseUnaryExpr() (*ast.Expr, error)    :139
 //
-// func (p *Parser) parseArgList() ([]ast.Expr, ast.Pos, error)    :352
+// func (p *Parser) parsePostfixExpr() (*ast.Expr, error)    :168
 //
-// func (p *Parser) parsePrimaryExpr() (*ast.Expr, error)    :375
+// func (p *Parser) parseArgList() ([]ast.Expr, ast.Pos, error)    :362
 //
-// func (p *Parser) parseMapLit(mapTok Token) (*ast.Expr, error)    :545
+// func (p *Parser) parsePrimaryExpr() (*ast.Expr, error)    :385
 //
-// func (p *Parser) parseMatchExpr() (*ast.Expr, error)    :602
+// func (p *Parser) parseMapLit(mapTok Token) (*ast.Expr, error)    :555
+//
+// func (p *Parser) parseMatchExpr() (*ast.Expr, error)    :612
 //
 // parseCastExpr parses <Type>expr — explicit type conversion.
-// func (p *Parser) parseCastExpr() (*ast.Expr, error)    :626
+// func (p *Parser) parseCastExpr() (*ast.Expr, error)    :636
 //
 // parseLambdaExpr parses |params| -> ReturnType { body } or |params| { body }
-// func (p *Parser) parseLambdaExpr() (*ast.Expr, error)    :650
+// func (p *Parser) parseLambdaExpr() (*ast.Expr, error)    :660
 //
 // parseBlock parses { stmts... }
-// func (p *Parser) parseBlock() (*ast.Block, error)    :722
+// func (p *Parser) parseBlock() (*ast.Block, error)    :732
 //
-// func (p *Parser) parseStmt() (*ast.Stmt, error)    :747
+// func (p *Parser) parseStmt() (*ast.Stmt, error)    :757
 //
-// func (p *Parser) parseVarDecl() (*ast.Stmt, error)    :803
+// func (p *Parser) parseVarDecl() (*ast.Stmt, error)    :813
 //
-// func (p *Parser) parseReturn() (*ast.Stmt, error)    :878
+// isPatternLetAhead checks if the current position looks like a pattern in let context.
+// func (p *Parser) isPatternLetAhead() bool    :897
 //
-// func (p *Parser) parseYield() (*ast.Stmt, error)    :897
+// parseLetElse parses: let Pattern = expr else { body }
+// func (p *Parser) parseLetElse(start ast.Pos, isMut bool) (*ast.Stmt, error)    :913
 //
-// func (p *Parser) parseIf() (*ast.Stmt, error)    :911
+// func (p *Parser) parseReturn() (*ast.Stmt, error)    :944
 //
-// func (p *Parser) parseFor() (*ast.Stmt, error)    :959
+// func (p *Parser) parseYield() (*ast.Stmt, error)    :963
 //
-// func (p *Parser) parseWhile() (*ast.Stmt, error)    :994
+// func (p *Parser) parseIf() (*ast.Stmt, error)    :977
 //
-// func (p *Parser) parseMatchStmt() (*ast.Stmt, error)    :1012
+// parseIfLet parses: if let Pattern = expr { body } [else { body }]
+// func (p *Parser) parseIfLet(start ast.Pos) (*ast.Stmt, error)    :1032
 //
-// func (p *Parser) parseMatchArms() ([]ast.MatchArm, error)    :1034
+// func (p *Parser) parseFor() (*ast.Stmt, error)    :1070
 //
-// func (p *Parser) parsePattern() (*ast.Pattern, error)    :1077
+// func (p *Parser) parseWhile() (*ast.Stmt, error)    :1105
 //
-// func (p *Parser) parseCascade() (*ast.Stmt, error)    :1175
+// func (p *Parser) parseMatchStmt() (*ast.Stmt, error)    :1123
 //
-// func (p *Parser) parseSpawn() (*ast.Stmt, error)    :1189
+// func (p *Parser) parseMatchArms() ([]ast.MatchArm, error)    :1145
 //
-// func (p *Parser) parseSelect() (*ast.Stmt, error)    :1203
+// func (p *Parser) parsePattern() (*ast.Pattern, error)    :1188
 //
-// func (p *Parser) parseSelectCase() (*ast.SelectCase, error)    :1229
+// func (p *Parser) parseCascade() (*ast.Stmt, error)    :1286
 //
-// func (p *Parser) parseLock() (*ast.Stmt, error)    :1279
+// func (p *Parser) parseSpawn() (*ast.Stmt, error)    :1300
 //
-// func (p *Parser) parseExprOrAssign() (*ast.Stmt, error)    :1303
+// func (p *Parser) parseSelect() (*ast.Stmt, error)    :1314
+//
+// func (p *Parser) parseSelectCase() (*ast.SelectCase, error)    :1340
+//
+// func (p *Parser) parseLock() (*ast.Stmt, error)    :1390
+//
+// func (p *Parser) parseExprOrAssign() (*ast.Stmt, error)    :1414
 //
 // isStructLitAhead peeks past { to see if the first content is Ident: (field initializer).
-// func (p *Parser) isStructLitAhead() bool    :1365
+// func (p *Parser) isStructLitAhead() bool    :1476
 //
-// func (p *Parser) parseStructLit(nameTok Token) (*ast.Expr, error)    :1387
+// func (p *Parser) parseStructLit(nameTok Token) (*ast.Expr, error)    :1501
 //
 // parseFString processes the raw text of an f-string token, splitting on {expr}
-// func (p *Parser) parseFString(tok Token) (*ast.Expr, error)    :1439
+// func (p *Parser) parseFString(tok Token) (*ast.Expr, error)    :1553
 //
 // tryParseTypeArgs attempts to parse <TypeExpr, TypeExpr, ...> and consume the '>'.
-// func (p *Parser) tryParseTypeArgs() ([]ast.TypeExpr, bool)    :1502
+// func (p *Parser) tryParseTypeArgs() ([]ast.TypeExpr, bool)    :1616
 
 // --- dependencies ---
 //

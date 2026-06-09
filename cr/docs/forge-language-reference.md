@@ -53,7 +53,7 @@ Note: `{}` braces do NOT suppress newlines (they delimit blocks with statements)
 
 `bool`, `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `string`, `any`
 
-- Default integer literal: `i32`. Cast with `<u64>(x)`.
+- Default integer literal: `i32`. Cast with `x as u64`.
 - `int`/`uint` — platform-width, Go interop only.
 - `any` — empty interface / `void*`.
 - Character literals: `'A'` → `u8` (65). Escapes: `\n \r \t \\ \' \" \0 \x##`.
@@ -63,6 +63,7 @@ Note: `{}` braces do NOT suppress newlines (they delimit blocks with statements)
 ```
 T?                  // optional (nullable)
 [T]                 // slice (fat pointer: data + len + cap)
+map[K]V             // associative map (K must be comparable)
 (T1, T2)            // tuple
 fn(T1, T2) -> R     // function type
 chan T               // channel
@@ -242,6 +243,9 @@ These compile to `static` globals in C.
 ```forge
 if cond { ... } else if cond2 { ... } else { ... }
 
+// if-expression (both branches required, same type)
+let result = if cond { a } else { b }
+
 while cond { ... }
 
 for item in collection { ... }
@@ -250,6 +254,16 @@ for item, idx in collection { ... }
 match expr {
   Pattern => ...
 }
+```
+
+### Variant Check: `is`
+
+```forge
+if expr.kind is ExprCall { ... }
+if not (node is Leaf) { ... }
+```
+
+Returns `bool`. Does not bind variables — use `if let` for destructuring.
 ```
 
 ### Block Scoping
@@ -268,6 +282,26 @@ func example() {
 ```
 
 This is used internally by the compiler for code generation (e.g., destructor body injection wraps each relation's cleanup in a block to avoid variable name collisions). Block scoping works at all pipeline levels: AST (`StmtBlock`), LIR (`LStmtBlock`), and C backend (emits `{ }`). Block scoping is not yet exposed as user-facing Forge syntax but the infrastructure is complete.
+
+## Maps
+
+```forge
+let empty: map[string]i32 = {:}
+let keywords = {"if": TIf, "else": TElse, "for": TFor}
+```
+
+**Operations:**
+```forge
+m[key]              // lookup — returns V? (null if absent)
+m[key] = value      // insert or update
+delete(m, key)      // remove key
+len(m)              // entry count
+for key, value in m { ... }   // iteration (unordered)
+```
+
+Keys must be comparable (primitives, `string`, `Sym`, structs with all-comparable fields).
+
+**Note:** The bootstrap currently uses `Dict<V>` (string-keyed via `Sym`) and `HashedList` relations for hash tables. `map[K]V` is the general-purpose built-in that supersedes these for non-relational use cases.
 
 ## Functions
 
@@ -331,12 +365,12 @@ The `?` operator propagates errors from `(T, error)` returns:
 
 ```forge
 func load() -> (string, error) {
-  let data = read_file("x.txt")?    // propagates error on failure
+  let data = read_file("x.txt")?    // propagates error on failure, data is string
   return (data, null)
 }
 ```
 
-**Important**: `?` only unwraps the error — the value side remains optional. So after `let x = foo()?`, `x` is `T?` and you need `x!` to unwrap it. This is a known ergonomic issue.
+`?` unwraps the success value: after `let x = foo()?`, `x` is `T` (not `T?`). If the error is non-nil, the function returns immediately with the error.
 
 Statement-level only. Containing function must return `(T, error)`.
 
@@ -505,7 +539,7 @@ Child must implement `hash_key(self) -> u64`. Functions: `hash_insert`, `hash_lo
 
 **Testing:** `assert(cond, msg)`, `assert_eq(actual, expected, msg)`. See [Testing](#testing).
 
-**Operators:** `x!` unwrap optional, `<T>(expr)` cast, `x[i]` index, `x[lo:hi]` slice.
+**Operators:** `x!` unwrap optional, `expr as T` cast, `x[i]` index, `x[lo:hi]` slice.
 
 ## Testing
 
@@ -618,11 +652,7 @@ These are for human/AI understanding, not runtime behavior.
 
 - **Annotation keywords are contextual** — `source`, `why`, `doc`, `fake`, `field`, `lock`, `implements` can be used as variable/field names (they lex as identifiers).
 - **`fn` vs `func`** — `func` is the only function keyword. `fn` is for type syntax only (e.g., `fn(i32) -> bool`) and is a contextual keyword — it can be used as a variable name.
-- **No ternary if-expression** — use `let mut x = ...; if cond { x = a } else { x = b }`.
-- **`?` returns optional** — after `let x = foo()?`, `x` is `T?`, not `T`. Use `x!` to unwrap.
-- **`forge fmt` lexer bug** — keywords inside string literals are tokenized as keywords, causing parse failures on strings containing words like `doc`, `source`, etc.
-- **Checker warnings for cross-file refs** — the checker uses a two-phase approach (register all types/functions across blocks, then check bodies), so most cross-file references resolve correctly. Remaining warnings come from within-block ordering issues (e.g., `dict_get` calling `hash_lookup` which is an interface method, not a free function). These are non-fatal; the lowerer proceeds but produces `void*` types for unresolved expressions.
-- **No `is` operator** — `expr.kind is Variant` doesn't exist. Use a helper function with `match` or a `match` expression directly.
+- **`forge fmt` lexer bug** — keywords inside string literals are tokenized as keywords, causing parse failures on strings containing words like `doc`, `source`, etc. Fix planned.
 - **Enum variant construction** — must use positional args: `Variant(a, b, c)`. Named args like `Variant(x: a, y: b)` are not supported in call-syntax construction (use struct literal syntax `Struct { x: a }` for structs only).
 - **`append(slice, item)` builtin** — exists for plain slices; for relation-owned lists use `array_append<P,C>(parent, child)`.
 
@@ -630,7 +660,7 @@ These are for human/AI understanding, not runtime behavior.
 
 **Completed .fg files**: `bootstrap/ast.fg`, `bootstrap/lexer.fg`, `bootstrap/parser.fg`, `bootstrap/expr_parser.fg`, `bootstrap/desugar.fg`, `bootstrap/checker.fg`, `bootstrap/lir.fg`, `bootstrap/lowerer.fg`
 
-**Compilation**: `forge compile --c bootstrap/*.fg` produces ~15,844 lines of C. Checker warnings are non-fatal.
+**Compilation**: `forge compile --c bootstrap/*.fg` produces ~30,094 lines of C. **0 GCC errors, 0 warnings, 0 void* violations.** 100/100 C tests pass (lexer 31, parser 52, desugar 12, test_min 5). 8,049 lines Forge → 30,094 lines C. All 249+ Go tests pass.
 
 **Compiler architecture notes** (learned during bootstrap):
 - `CheckFile` uses two-phase processing: register all types/functions across blocks first, then check bodies. This is required for multi-file compilation.

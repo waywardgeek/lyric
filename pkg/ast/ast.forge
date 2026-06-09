@@ -1,6 +1,6 @@
 // ast.forge — the Forge AST's own understanding
 forge AST {
-  why: "Foundational data model for the Forge language. Defines the Abstract Syntax Tree shared by both .forge (declaration-only) and .fg (full implementation) files. A leaf package with no internal dependencies — pure data structures consumed by parser, checker, and transpiler."
+  why: "Foundational data model for the Forge language. Defines the Abstract Syntax Tree shared by both .forge (declaration-only) and .fg (full implementation) files. A leaf package with no internal dependencies — pure data structures consumed by parser, checker, and lowerer/C backend."
 
   doc "Architecture": """
     The AST is a strict hierarchy rooted in File. A File contains one or more
@@ -10,8 +10,9 @@ forge AST {
 
     Data flows in from the parser, which transforms raw source text into this tree.
     Once constructed, the AST becomes the source of truth for the entire toolchain:
-    the checker validates it, the transpiler emits Go from it, and the verifier
-    compares it against Go source for drift detection.
+    the checker validates it, the lowerer converts it to LIR, and the C backend
+    emits C from LIR. The verifier compares .forge declarations against Go source
+    for drift detection.
 
     Two file formats share the same AST:
     - .forge: declaration-only (FuncDecl.Body is nil, no Stmt/Expr nodes)
@@ -92,11 +93,12 @@ forge AST {
     bitwise, shift)
     - Access: Call, MethodCall, FieldAccess, Index
     - Composite: ListLit, TupleLit, MapLit, Lambda, Match-as-expression
+    - Type ops: Cast (expr as Type), Unwrap (expr!), Try (expr?), Is (expr is Variant)
 
     Statements use a tagged union (StmtKind + Stmt.Data):
-    - Declarations: VarDecl (let/let mut, optional type + initializer)
-    - Control flow: If/ElseIf/Else, For (for..in), While, Match (with patterns),
-    Break, Continue, Return
+    - Declarations: VarDecl (let/let mut, optional type + initializer, let-else with pattern)
+    - Control flow: If/ElseIf/Else (also if-let), For (for..in), While,
+    Match (with patterns), Break, Continue, Return
     - Other: Assign, ExprStmt, Block (scoped), Cascade (deferred cleanup)
 
     Patterns (for match arms): Ident, Literal, Variant(bindings), Wildcard, Tuple.
@@ -207,6 +209,46 @@ forge AST {
     compilation because calls inside match arms were never walked.
   """
 
+  doc "Invariants — deepCopyBlock and TypeArgs": """
+    deepCopyBlock/deepCopyStmt/deepCopyExpr/deepCopyTypeExpr perform recursive
+    deep copies of AST nodes. CRITICAL: CallExpr and MethodCallExpr contain
+    TypeArgs []TypeExpr slices. These MUST be deep-copied (not shared).
+
+    Without deep copying TypeArgs, substituteTypeParamsRichInTypeExpr mutates
+    the shared array. When destructor bodies are copied for multiple relations,
+    the last relation's type substitution wins for ALL copies. This caused
+    30+ GCC warnings where all destructors called array_remove_CWhereClause_CTypeExpr
+    regardless of their actual relation types.
+  """
+
+  doc "Invariants — Cross-Block Relation Class Lookup": """
+    DesugarRelations must find classes across ALL ForgeBlock nodes, not just the
+    current block. A relation like `Lexer:lc owns [Comment:lc]` in lexer.fg
+    references Comment from ast.fg (a different block after MergeStdlib).
+
+    Implementation: global classLoc map (blockIdx + classIdx) built across all
+    blocks. Field injection targets file.Blocks[ci.blockIdx].Classes[ci.classIdx].
+
+    Without cross-block lookup, child classes in other blocks get no fields
+    injected and no ImplMethodRenames registered, causing missing method errors.
+  """
+
+  doc "Invariants — Post-Checker Validation": """
+    Two post-checker validators ensure AST integrity before lowering:
+
+    1. validateAllExprsResolved (checker.go): walks every Expr node in the AST
+    and panics if any has nil ResolvedType. Only runs when checker has zero
+    errors (to avoid false positives from error-recovery paths).
+
+    2. validateFieldAndMethodAccess (checker.go): walks all ExprFieldAccess and
+    ExprMethodCall nodes, verifies the field/method exists on the receiver's
+    resolved type. Panics on invalid access.
+
+    These catch bugs where the checker fails to annotate an expression (e.g.
+    f-string literal parts, struct field defaults, nil comparisons, tuple
+    field access) which would otherwise produce void* in the C backend.
+  """
+
   doc "Invariants — Stmt/Expr Data Type Mapping": """
     The Data field on Stmt and Expr holds a typed payload. The type varies per
     Kind, and several mappings are NON-OBVIOUS:
@@ -227,8 +269,6 @@ forge AST {
     - No serialization: no JSON/protobuf support for external tooling or caching
     - No Visitor pattern: as node types grow, traversal logic in consumers gets
     unwieldy — may need a walker/visitor
-    - MatchExpr: match-as-expression exists in AST but Go can't express switch as
-    expression — transpiler emits placeholder
   """
 
   // ---- Source positions ----
@@ -486,7 +526,7 @@ forge AST {
   }
 
   struct CastExpr {
-    why: "<TargetType>expr — explicit type conversion. Rune heritage."
+    why: "expr as TargetType — explicit type conversion."
     TargetType: TypeExpr
     Operand: Expr
   }
@@ -497,7 +537,7 @@ forge AST {
   }
 
   struct TryExpr {
-    why: "expr? — error propagation. Extracts T from (T, error) tuple, returns early on error."
+    why: "expr? — error propagation. Extracts T from (T, error) tuple, returns early on error. Returns T (not T?)."
     Operand: Expr
   }
 
@@ -534,12 +574,14 @@ forge AST {
   }
 
   struct VarDeclStmt {
-    why: "let or let mut. Type and Value are both optional (but at least one must be present). Names is used for tuple destructuring: let (a, b) = expr."
+    why: "let or let mut. Type and Value are both optional (but at least one must be present). Names is used for tuple destructuring: let (a, b) = expr. ElseBlock + Pattern support let-else: `let Variant(x) = expr else { return }`."
     Name: string
     Names: [string]
     IsMut: bool
     Type: TypeExpr?
     Value: Expr?
+    ElseBlock: Block?
+    Pattern: Pattern?
   }
 
   struct AssignStmt {
@@ -556,10 +598,13 @@ forge AST {
   }
 
   struct IfStmt {
+    why: "if-let support: when LetPattern is set, this is `if let Pattern = LetValue { ... }`. Condition is unused in that case."
     Condition: Expr
     Then: Block
     ElseIfs: [ElseIf]
     Else: Block?
+    LetPattern: Pattern?
+    LetValue: Expr?
   }
 
   struct ElseIf {
@@ -600,7 +645,7 @@ forge AST {
   }
 
   struct SpawnStmt {
-    why: "spawn { body } — launches a goroutine. Transpiles to go func() { body }()."
+    why: "spawn { body } — launches a goroutine. Compiles to go func() { body }()."
     Body: Block
   }
 
@@ -626,7 +671,7 @@ forge AST {
   // optional: `case val = ch.receive()` binds received value
   // nil for default case; ch.receive() or ch.send(val)
   struct LockStmt {
-    why: "lock(mu) { body } — scoped mutex lock. Transpiles to { mu.Lock(); defer mu.Unlock(); body }."
+    why: "lock(mu) { body } — scoped mutex lock. Compiles to { mu.Lock(); defer mu.Unlock(); body }."
     Mutex: Expr
     Body: Block
   }
@@ -799,10 +844,11 @@ forge AST {
 
   struct RelationSide {
     TypeName: string
-    TypeArgs: [string]  // type parameters, e.g. ["V"] from Dict<V>
+    TypeArgs: [string]
     Label: string
   }
 
+  // type parameters, e.g. ["V"] from Dict<V>
   struct RelationDecl {
     why: "Explicit ownership/reference relationship."
     Hint: string
@@ -864,6 +910,7 @@ forge AST {
     Label: string
     Mappings: [ImplMapping]
     Span: Span
+    ForType: string
   }
 
   // ---- Top-level ----
@@ -930,7 +977,7 @@ forge AST {
 // file: ast.go
 //
 // DocComment returns the contiguous block of comments immediately preceding
-// func (f *File) DocComment(line int) []Comment    :369
+// func (f *File) DocComment(line int) []Comment    :371
 //
 // file: expr.go
 //
@@ -952,20 +999,41 @@ forge AST {
 // func DesugarRelations(file *File)    :195
 //
 // deepCopyBlock creates a deep copy of a Block by JSON-like recursive copying.
-// func deepCopyBlock(b Block) Block    :333
+// func deepCopyBlock(b Block) Block    :352
+//
+// func deepCopyStmt(s Stmt) Stmt    :360
+//
+// func deepCopyExpr(e Expr) Expr    :438
+//
+// func deepCopyTypeExpr(te TypeExpr) TypeExpr    :530
 //
 // substituteTypeParamsInBlock rewrites type parameter references in a block's statements.
-// func substituteTypeParamsInBlock(block *Block, typeMap map[string]string)    :341
+// func substituteTypeParamsInBlock(block *Block, typeMap map[string]string)    :554
 //
-// func substituteTypeParamsInStmt(stmt *Stmt, typeMap map[string]string)    :347
+// func substituteTypeParamsInStmt(stmt *Stmt, typeMap map[string]string)    :560
 //
-// func substituteTypeParamsInExpr(expr *Expr, typeMap map[string]string)    :397
+// func substituteTypeParamsInExpr(expr *Expr, typeMap map[string]string)    :617
 //
-// func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string)    :453
+// func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string)    :673
+//
+// func substituteTypeParamsRichInBlock(block *Block, typeMap map[string]TypeExpr)    :701
+//
+// func substituteTypeParamsRichInStmt(stmt *Stmt, typeMap map[string]TypeExpr)    :707
+//
+// func substituteTypeParamsRichInExpr(expr *Expr, typeMap map[string]TypeExpr)    :768
+//
+// func substituteTypeParamsRichInTypeExpr(te *TypeExpr, typeMap map[string]TypeExpr)    :824
 //
 // DesugarDestructors generates destroy methods on classes involved in relations.
-// func DesugarDestructors(file *File)    :480
+// func DesugarDestructors(file *File)    :853
+//
+// renameMethodCallsInBlock renames method calls in a block using the provided map.
+// func renameMethodCallsInBlock(block *Block, renames map[string]string)    :968
+//
+// func renameMethodCallsInStmt(stmt *Stmt, renames map[string]string)    :974
+//
+// func renameMethodCallsInExpr(expr *Expr, renames map[string]string)    :1015
 //
 // concrete class names from the relation.
-// func rewriteFieldType(te TypeExpr, typeParams []TypeParam, rel RelationDecl) TypeExpr    :559
+// func rewriteFieldType(te TypeExpr, typeParams []TypeParam, rel RelationDecl) TypeExpr    :1053
 

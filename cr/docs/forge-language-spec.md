@@ -137,7 +137,7 @@ is a checker error; use `let x: T? = null`.
 T?            // optional: T or null
 T | U         // union: T or U (exhaustively typed)
 [T]           // slice of T (fat pointer: data + len + cap)
-map[K]V       // associative array (Go maps)
+map[K]V       // associative map from K to V
 (T, U)        // anonymous tuple (positional)
 (T, U, V)     // triple, etc.
 chan T         // CSP channel
@@ -146,6 +146,25 @@ fn(T, U) -> V // function type
 
 **String as byte slice:** `string` is `[u8]` internally. String indexing (`s[i]`)
 returns `u8`. C interop via `forge_str_to_cstr()` null-terminates on demand.
+
+**Maps:** `map[K]V` is a built-in associative container. Keys must be comparable
+(primitives, `string`, `Sym`, structs with all-comparable fields). Maps are
+heap-allocated and passed by reference.
+
+```forge
+let empty: map[string]i32 = {:}
+let keywords = {"if": TIf, "else": TElse, "for": TFor}
+let mixed = {"name": "forge", "version": "0.1"}
+```
+
+**Map operations:**
+```forge
+m[key]              // lookup — returns V? (null if key absent)
+m[key] = value      // insert or update
+delete(m, key)      // remove key
+len(m)              // number of entries
+for key, value in m { ... }   // iteration (unordered)
+```
 
 **Tuples:** Anonymous tuples `(T, U)` are positional. Access fields with `.0`, `.1`
 notation (not yet implemented — use destructuring `let (a, b) = expr`).
@@ -692,23 +711,49 @@ func example() {
 Block scoping works at all pipeline levels: AST (`StmtBlock`), LIR (`LStmtBlock`),
 C backend (`{ }`).
 
-### No Ternary If-Expression
+### If-Expression
 
-Use `let mut` + if-else:
+`if/else` can be used as an expression (Rust/Kotlin-style). Both branches must
+produce a value of the same type:
 ```forge
-let mut result: i32 = 0
-if cond { result = a } else { result = b }
+let result = if cond { a } else { b }
+let msg = if count == 1 { "item" } else { "items" }
+```
+
+The `else` branch is required when `if` is used as an expression.
+
+### Variant Check: `is`
+
+The `is` operator checks whether an enum value is a specific variant, without
+destructuring:
+```forge
+if expr.kind is ExprCall {
+    // expr.kind is the Call variant
+}
+
+// Negation
+if not (node is Leaf) { ... }
+```
+
+`is` returns `bool`. It does not bind any variables — use `if let` for
+destructuring.
 ```
 
 ---
 
 ## Type Casts
 
-Angle-bracket prefix syntax:
+Postfix `as` syntax:
 ```forge
 let x: i32 = 42
-let y: i64 = <i64>(x)        // widen
-let z: i32 = <i32>(y)        // narrow (may truncate)
+let y: i64 = x as i64        // widen
+let z: i32 = y as i32        // narrow (may truncate)
+```
+
+The target can be a type literal or a variable/expression (cast to its type):
+```forge
+let template: i64 = 0
+let casted = x as template    // cast x to the type of template (i64)
 ```
 
 Only numeric ↔ numeric casts are supported. All casts are unchecked.
@@ -764,7 +809,7 @@ func divide(a: i32, b: i32) -> (i32, error) {
 Propagates errors from `(T, error)` returns:
 ```forge
 func compute(x: i32) -> (i32, error) {
-    let result = divide(x, 2)?    // early returns on error
+    let result = divide(x, 2)?    // early returns on error, result is i32
     return (result, null)
 }
 ```
@@ -773,8 +818,8 @@ func compute(x: i32) -> (i32, error) {
 - Operand must return `(T, error)`
 - Enclosing function must also return `(..., error)`
 - Statement-level only
-- After `let x = foo()?`, `x` is `T?` (not `T`) — use `x!` to unwrap.
-  This is a known ergonomic issue.
+- `?` unwraps the success value: after `let x = foo()?`, `x` is `T` (not `T?`).
+  If the error is non-nil, the function returns immediately with the error.
 
 **Implementation:** The lowerer desugars `?` via `hoistNestedTry()` which introduces
 SSA temps for nested try expressions.
@@ -860,8 +905,9 @@ for val in range(0, 10) {
 | `print(...)` | `any... -> unit` | Print without newline |
 | `eprintln(...)` | `any... -> unit` | Print to stderr with newline |
 | `eprint(...)` | `any... -> unit` | Print to stderr |
-| `len(x)` | `[T] \| string -> i32` | Length |
+| `len(x)` | `[T] \| string \| map[K]V -> i32` | Length / entry count |
 | `append(xs, elem)` | `([T], T) -> [T]` | Append element |
+| `delete(m, key)` | `(map[K]V, K) -> unit` | Remove map entry |
 | `isnull(x)` | `T? -> bool` | Check if optional is null |
 | `hash_string(s)` | `string -> u64` | FNV-1a hash |
 | `itoa(n)` | `int -> string` | Integer to string |
@@ -1237,10 +1283,6 @@ specialized bodies for transitive instantiations.
 
 ## Known Gotchas
 
-- **`?` returns optional** — after `let x = foo()?`, `x` is `T?`, not `T`.
-  Use `x!` to unwrap.
-- **No ternary** — use `let mut` + if-else.
-- **No `is` operator** — use helper functions with `match`.
 - **Enum construction is positional only** — `Variant(a, b)`, not `Variant(x: a)`.
 - **Struct literal ambiguity** — `Ident {` is ambiguous between struct literal
   and variable + block in statement context. Parser uses `exprDepth` counter:
@@ -1249,6 +1291,7 @@ specialized bodies for transitive instantiations.
 - **`append` vs `array_append`** — `append(slice, item)` for plain slices;
   `array_append<P,C>(parent, child)` for relation-owned lists.
 - **`forge fmt` bug** — keywords inside string literals tokenized as keywords.
+  Fix planned.
 - **Platform `int`/`uint`** — only for Go interop, not part of numeric tower.
 
 ---
