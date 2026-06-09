@@ -804,7 +804,7 @@ forge lowerer {
           let tag_ex = LExpr { kind: ExVariantTag, typ: tag_type, variant_tag: tag_data }
           let tag_val = self.emit_temp(tag_ex, out)
 
-          let lit_tag = make_lit_int(<i64>(tag_idx), 32)
+          let lit_tag = make_lit_int(tag_idx as i64, 32)
           let cmp_data = LBinOpData { op: BinEq, left: tag_val, right: lit_tag }
           let bool_type = LType { kind: TyBool }
           let cmp_ex = LExpr { kind: ExBinOp, typ: bool_type, bin_op: cmp_data }
@@ -1404,7 +1404,7 @@ forge lowerer {
   func is_name_exported(name: string) -> bool {
     if len(name) == 0 { return false }
     let first = name[0]
-    return first >= <u8>(65) && first <= <u8>(90)
+    return first >= 65 as u8 && first <= 90 as u8
   }
 
 }

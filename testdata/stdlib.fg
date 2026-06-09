@@ -9,13 +9,13 @@ forge stdlib_test {
 
     // String conversion — strconv.Itoa expects Go's int, so cast from i32
     let num = 42
-    let s = strconv.Itoa(<int>num)
+    let s = strconv.Itoa(num as int)
     println("The answer is " + s)
 
     // Numeric casts between Forge types
     let x: i32 = 100
-    let y: i64 = <i64>x
-    let z: i32 = <i32>y
+    let y: i64 = x as i64
+    let z: i32 = y as i32
     println(f"x={x}, y={y}, z={z}")
 
     // String methods

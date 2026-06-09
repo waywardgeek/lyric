@@ -589,8 +589,8 @@ func TestParseFString(t *testing.T) {
 func TestParseCastExpr(t *testing.T) {
 	input := `forge test {
   func f() {
-    let x = <i64>42
-    let y = <int>x
+    let x = 42 as i64
+    let y = x as int
   }
 }`
 	file, err := ParseString(input)
@@ -601,7 +601,7 @@ func TestParseCastExpr(t *testing.T) {
 	if fn.Body == nil || len(fn.Body.Stmts) != 2 {
 		t.Fatalf("expected 2 statements, got %d", len(fn.Body.Stmts))
 	}
-	// First: let x = <i64>42
+	// First: let x = 42 as i64
 	decl := fn.Body.Stmts[0].Data.(*ast.VarDeclStmt)
 	if decl.Value.Kind != ast.ExprCast {
 		t.Fatalf("expected ExprCast, got %v", decl.Value.Kind)

@@ -365,6 +365,21 @@ func (p *Parser) parsePostfixExpr() (*ast.Expr, error) {
 				Data: &ast.IsExpr{Operand: *expr, Variant: variantTok.Text},
 				Span: ast.Span{Start: expr.Span.Start, End: variantTok.Span.End},
 			}
+		case TAs:
+			// Postfix as — type cast: expr as Type
+			p.next() // consume 'as'
+			targetType, err := p.parseTypeExpr()
+			if err != nil {
+				return nil, err
+			}
+			expr = &ast.Expr{
+				Kind: ast.ExprCast,
+				Data: &ast.CastExpr{
+					TargetType: *targetType,
+					Operand:    *expr,
+				},
+				Span: ast.Span{Start: expr.Span.Start, End: targetType.Span.End},
+			}
 		default:
 			return expr, nil
 		}
@@ -553,9 +568,6 @@ func (p *Parser) parsePrimaryExpr() (*ast.Expr, error) {
 		return p.parseMatchExpr()
 	case TPipe:
 		return p.parseLambdaExpr()
-	case TLt:
-		// Cast expression: <Type>expr
-		return p.parseCastExpr()
 	default:
 		return nil, &ParseError{
 			Message: fmt.Sprintf("expected expression, got %s (%q)", tokenNames[tok.Kind], tok.Text),
@@ -641,30 +653,6 @@ func (p *Parser) parseMatchExpr() (*ast.Expr, error) {
 		Kind: ast.ExprMatch,
 		Data: &ast.MatchStmt{Value: *value, Arms: stmt},
 		Span: ast.Span{Start: start, End: end},
-	}, nil
-}
-
-// parseCastExpr parses <Type>expr — explicit type conversion.
-func (p *Parser) parseCastExpr() (*ast.Expr, error) {
-	start := p.next() // consume <
-	targetType, err := p.parseTypeExpr()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := p.expect(TGt); err != nil {
-		return nil, err
-	}
-	operand, err := p.parseUnaryExpr()
-	if err != nil {
-		return nil, err
-	}
-	return &ast.Expr{
-		Kind: ast.ExprCast,
-		Data: &ast.CastExpr{
-			TargetType: *targetType,
-			Operand:    *operand,
-		},
-		Span: ast.Span{Start: start.Span.Start, End: operand.Span.End},
 	}, nil
 }
 

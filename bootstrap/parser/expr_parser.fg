@@ -318,7 +318,7 @@ forge parser {
         self.next()
         let mut val: i32 = 0
         if len(tok.text) > 0 {
-          val = <i32>tok.text[0]
+          val = tok.text[0] as i32
         }
         return (Expr { IntLit(itoa(val), sym("u8")), span: tok.span }, null)
       }
@@ -714,7 +714,7 @@ forge parser {
     let tok = self.peek()
     if tok.kind != LIdent { return false }
     if len(tok.text) == 0 { return false }
-    let first = <i32>tok.text[0]
+    let first = tok.text[0] as i32
     if first < 65 || first > 90 { return false }  // Not uppercase A-Z
     // Save state and check for '(' after ident
     let saved = self.lex!.save_state()
@@ -939,7 +939,7 @@ forge parser {
       LCharLit => {
         self.next()
         let mut val: i32 = 0
-        if len(tok.text) > 0 { val = <i32>tok.text[0] }
+        if len(tok.text) > 0 { val = tok.text[0] as i32 }
         let expr = Expr { kind: IntLit(itoa(val), sym("u8")), span: tok.span }
         return (Pattern { Literal(expr), span: tok.span }, null)
       }

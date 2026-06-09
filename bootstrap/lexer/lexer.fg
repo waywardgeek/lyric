@@ -200,12 +200,12 @@ forge lexer {
       return ch - '0'
     }
     if ch >= 'a' && ch <= 'f' {
-      return ch - 'a' + <u8>(10)
+      return ch - 'a' + 10 as u8
     }
     if ch >= 'A' && ch <= 'F' {
-      return ch - 'A' + <u8>(10)
+      return ch - 'A' + 10 as u8
     }
-    return <u8>(0)
+    return 0 as u8
   }
 
   // ---- Token construction helpers ----
@@ -222,7 +222,7 @@ forge lexer {
 
   func Lexer.advance(self) -> u8 {
     if self.pos >= len(self.src) {
-      return <u8>(0)
+      return 0 as u8
     }
     let ch = self.src[self.pos]
     self.pos = self.pos + 1
@@ -237,7 +237,7 @@ forge lexer {
 
   func Lexer.peek_char(self) -> u8 {
     if self.pos >= len(self.src) {
-      return <u8>(0)
+      return 0 as u8
     }
     return self.src[self.pos]
   }
@@ -245,7 +245,7 @@ forge lexer {
   func Lexer.peek_at(self, offset: i32) -> u8 {
     let p = self.pos + offset
     if p >= len(self.src) {
-      return <u8>(0)
+      return 0 as u8
     }
     return self.src[p]
   }
@@ -288,11 +288,11 @@ forge lexer {
     } else if ch == '"' {
       buf.write_byte('"')
     } else if ch == '0' {
-      buf.write_byte(<u8>(0))
+      buf.write_byte(0 as u8)
     } else if ch == 'x' {
       let hi = self.advance()
       let lo = self.advance()
-      let val = hex_val(hi) * <u8>(16) + hex_val(lo)
+      let val = hex_val(hi) * 16 as u8 + hex_val(lo)
       buf.write_byte(val)
     } else {
       buf.write_byte('\\')
