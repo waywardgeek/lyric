@@ -852,6 +852,13 @@ func (p *Parser) parseVarDecl() (*ast.Stmt, error) {
 		}, nil
 	}
 
+	// Check for pattern let: let Variant(x, y) = expr else { ... }
+	// or let _ = expr else { ... }
+	// Detected by: Ident followed by '(' (variant pattern), or '_' (wildcard)
+	if p.isPatternLetAhead() {
+		return p.parseLetElse(start, isMut)
+	}
+
 	name, err := p.expectIdentLike()
 	if err != nil {
 		return nil, err
@@ -881,6 +888,55 @@ func (p *Parser) parseVarDecl() (*ast.Stmt, error) {
 	return &ast.Stmt{
 		Kind: ast.StmtVarDecl,
 		Data: decl,
+		Span: ast.Span{Start: start, End: p.peek().Span.Start},
+	}, nil
+}
+
+// isPatternLetAhead checks if the current position looks like a pattern in let context.
+// Detects: Ident( (variant pattern) or _ (wildcard pattern).
+func (p *Parser) isPatternLetAhead() bool {
+	tok := p.peek()
+	if tok.Kind == TIdent && len(tok.Text) > 0 && tok.Text[0] >= 'A' && tok.Text[0] <= 'Z' {
+		// Save state and check for '(' after ident
+		saved := *p.lex
+		pushedSaved := p.pushed
+		p.next() // consume ident
+		isVariant := p.peek().Kind == TLParen
+		*p.lex = saved
+		p.pushed = pushedSaved
+		return isVariant
+	}
+	return false
+}
+
+// parseLetElse parses: let Pattern = expr else { body }
+func (p *Parser) parseLetElse(start ast.Pos, isMut bool) (*ast.Stmt, error) {
+	pat, err := p.parsePattern()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TAssign); err != nil {
+		return nil, err
+	}
+	val, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TElse); err != nil {
+		return nil, p.newError(p.peek().Span, "let with pattern requires 'else' block")
+	}
+	elseBlock, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.Stmt{
+		Kind: ast.StmtVarDecl,
+		Data: &ast.VarDeclStmt{
+			IsMut:     isMut,
+			Value:     val,
+			Pattern:   pat,
+			ElseBlock: elseBlock,
+		},
 		Span: ast.Span{Start: start, End: p.peek().Span.Start},
 	}, nil
 }
@@ -921,6 +977,12 @@ func (p *Parser) parseYield() (*ast.Stmt, error) {
 func (p *Parser) parseIf() (*ast.Stmt, error) {
 	start := p.peek().Span.Start
 	p.next() // consume 'if'
+
+	// Check for 'if let Pattern = expr { ... }'
+	if p.peek().Kind == TLet {
+		return p.parseIfLet(start)
+	}
+
 	cond, err := p.parseExprNoStructLit()
 	if err != nil {
 		return nil, err
@@ -959,6 +1021,45 @@ func (p *Parser) parseIf() (*ast.Stmt, error) {
 		}
 	}
 
+	return &ast.Stmt{
+		Kind: ast.StmtIf,
+		Data: ifStmt,
+		Span: ast.Span{Start: start, End: p.peek().Span.Start},
+	}, nil
+}
+
+// parseIfLet parses: if let Pattern = expr { body } [else { body }]
+func (p *Parser) parseIfLet(start ast.Pos) (*ast.Stmt, error) {
+	p.next() // consume 'let'
+	pat, err := p.parsePattern()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TAssign); err != nil {
+		return nil, err
+	}
+	value, err := p.parseExprNoStructLit()
+	if err != nil {
+		return nil, err
+	}
+	then, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	ifStmt := &ast.IfStmt{
+		LetPattern: pat,
+		LetValue:   value,
+		Then:       *then,
+	}
+	// Optional else block
+	if p.peek().Kind == TElse {
+		p.next()
+		elseBody, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		ifStmt.Else = elseBody
+	}
 	return &ast.Stmt{
 		Kind: ast.StmtIf,
 		Data: ifStmt,

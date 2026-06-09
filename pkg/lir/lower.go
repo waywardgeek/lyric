@@ -1162,6 +1162,111 @@ func (l *Lowerer) lowerStmt(stmt *ast.Stmt) {
 func (l *Lowerer) lowerVarDeclStmt(stmt *ast.Stmt) {
 	vd := dataAs[ast.VarDeclStmt](stmt.Data)
 
+	// let..else: let Pattern = expr else { body }
+	// Bindings must escape to outer scope, so we can't use match lowering.
+	// Instead: evaluate expr, check tag, declare bindings in outer scope,
+	// else block runs if tag doesn't match (must diverge).
+	if vd.Pattern != nil {
+		val := l.lowerExpr(vd.Value)
+		if vd.Pattern.Kind == ast.PatVariant {
+			vp := vd.Pattern.Data.(*ast.VariantPattern)
+			// Find the variant tag index
+			variantIdx := -1
+			if val.Type != nil && val.Type.Kind == LTyTaggedUnion {
+				for i, v := range val.Type.Variants {
+					if v.Name == vp.Name {
+						variantIdx = i
+						break
+					}
+				}
+			}
+
+			// Declare binding variables in outer scope (before the if)
+			var bindingNames []string
+			for i := range vp.Bindings {
+				if vp.Bindings[i].Kind == ast.PatIdent {
+					id := vp.Bindings[i].Data.(*ast.IdentPattern)
+					var bindType *LType
+					if variantIdx >= 0 && i < len(val.Type.Variants[variantIdx].Fields) {
+						bindType = val.Type.Variants[variantIdx].Fields[i].Type
+					} else {
+						bindType = &LType{Kind: LTyAny}
+					}
+					l.varTypes[id.Name] = bindType
+					l.emit(LStmt{Kind: LStmtVarDecl, Data: &LVarDecl{
+						Name:    id.Name,
+						Type:    bindType,
+						Mutable: vd.IsMut,
+					}})
+					bindingNames = append(bindingNames, id.Name)
+				}
+			}
+
+			// Emit: if (tag == variantIdx) { extract bindings } else { elseBlock }
+			tagVal := l.emitTemp(LExpr{Kind: LExprStructField, Operand: &val,
+				Field: "tag", Type: &LType{Kind: LTyI32, Bits: 32}})
+			tagLit := l.emitTemp(LExpr{Kind: LExprIntLit, IntVal: int64(variantIdx),
+				Type: &LType{Kind: LTyI32, Bits: 32}})
+			cond := l.emitTemp(LExpr{Kind: LExprBinOp, Op: LBinEq,
+				Left: &tagVal, Right: &tagLit, Type: &LType{Kind: LTyBool}})
+
+			// Build "then" block: extract fields and assign to outer variables
+			savedStmts := l.stmts
+			l.stmts = nil
+			for i := range vp.Bindings {
+				if vp.Bindings[i].Kind == ast.PatIdent && variantIdx >= 0 {
+					id := vp.Bindings[i].Data.(*ast.IdentPattern)
+					if i < len(val.Type.Variants[variantIdx].Fields) {
+						fieldVal := l.emitTemp(LExpr{
+							Kind:    LExprClassGet,
+							Operand: &val,
+							Field:   val.Type.Variants[variantIdx].Fields[i].Name,
+							Type:    val.Type.Variants[variantIdx].Fields[i].Type,
+						})
+						l.emit(LStmt{Kind: LStmtAssign, Data: &LAssign{
+							Target: LValue{Kind: LValVar, Name: id.Name,
+								Type: val.Type.Variants[variantIdx].Fields[i].Type},
+							Value: fieldVal,
+						}})
+					}
+				}
+			}
+			thenBlock := l.stmts
+			l.stmts = nil
+
+			// Build "else" block
+			var elseBlock []LStmt
+			if vd.ElseBlock != nil {
+				for i := range vd.ElseBlock.Stmts {
+					l.lowerStmt(&vd.ElseBlock.Stmts[i])
+				}
+				elseBlock = l.stmts
+			}
+			l.stmts = savedStmts
+
+			l.emit(LStmt{Kind: LStmtIf, Data: &LIf{
+				Cond: cond,
+				Then: thenBlock,
+				Else: elseBlock,
+			}})
+			return
+		}
+		// Fallback for non-variant patterns: use match lowering
+		arms := []ast.MatchArm{{
+			Pattern: *vd.Pattern,
+			Body:    ast.Block{},
+		}}
+		if vd.ElseBlock != nil {
+			arms = append(arms, ast.MatchArm{
+				Pattern: ast.Pattern{Kind: ast.PatWildcard},
+				Body:    *vd.ElseBlock,
+			})
+		}
+		ms := &ast.MatchStmt{Value: *vd.Value, Arms: arms}
+		l.emitMatch(ms, nil)
+		return
+	}
+
 	// Tuple destructuring: let (a, b) = expr
 	if len(vd.Names) > 0 && vd.Value != nil {
 		val := l.lowerExpr(vd.Value)
@@ -1334,6 +1439,28 @@ func (l *Lowerer) lowerExprStmt(stmt *ast.Stmt) {
 
 func (l *Lowerer) lowerIfStmt(stmt *ast.Stmt) {
 	is := dataAs[ast.IfStmt](stmt.Data)
+
+	// if let Pattern = expr { then } [else { elseBody }]
+	// Lower as: match expr { Pattern => { then }  _ => { elseBody } }
+	if is.LetPattern != nil {
+		arms := []ast.MatchArm{{
+			Pattern: *is.LetPattern,
+			Body:    is.Then,
+		}}
+		if is.Else != nil {
+			arms = append(arms, ast.MatchArm{
+				Pattern: ast.Pattern{Kind: ast.PatWildcard},
+				Body:    *is.Else,
+			})
+		}
+		ms := &ast.MatchStmt{
+			Value: *is.LetValue,
+			Arms:  arms,
+		}
+		l.emitMatch(ms, nil)
+		return
+	}
+
 	cond := l.lowerExpr(&is.Condition)
 	then := l.lowerBlock(&is.Then)
 

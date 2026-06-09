@@ -227,11 +227,13 @@ type Block struct {
 }
 
 type VarDeclStmt struct {
-	Name  string
-	Names []string  // for tuple destructuring: let (a, b) = expr
-	Type  *TypeExpr // nil if inferred
-	IsMut bool
-	Value *Expr // nil if uninitialized
+	Name      string
+	Names     []string  // for tuple destructuring: let (a, b) = expr
+	Type      *TypeExpr // nil if inferred
+	IsMut     bool
+	Value     *Expr    // nil if uninitialized
+	Pattern   *Pattern // non-nil for let..else: let Variant(x) = expr else { ... }
+	ElseBlock *Block   // required when Pattern is set
 }
 
 type AssignStmt struct {
@@ -248,10 +250,12 @@ type ExprStmt struct {
 }
 
 type IfStmt struct {
-	Condition Expr
-	Then      Block
-	ElseIfs   []ElseIf
-	Else      *Block // nil if no else
+	Condition  Expr
+	Then       Block
+	ElseIfs    []ElseIf
+	Else       *Block // nil if no else
+	LetPattern *Pattern // non-nil for if let: if let Variant(x) = expr { ... }
+	LetValue   *Expr    // the expression being matched in if let
 }
 
 type ElseIf struct {

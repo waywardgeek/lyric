@@ -352,6 +352,9 @@ func collectFuncCallNamesStmt(stmt *Stmt, names map[string]bool) {
 			if d.Value != nil {
 				collectFuncCallNamesExpr(d.Value, names)
 			}
+			if d.ElseBlock != nil {
+				collectFuncCallNames(d.ElseBlock.Stmts, names)
+			}
 		}
 	case StmtReturn:
 		if d, ok := stmt.Data.(*ReturnStmt); ok {
@@ -361,7 +364,11 @@ func collectFuncCallNamesStmt(stmt *Stmt, names map[string]bool) {
 		}
 	case StmtIf:
 		if d, ok := stmt.Data.(*IfStmt); ok {
-			collectFuncCallNamesExpr(&d.Condition, names)
+			if d.LetValue != nil {
+				collectFuncCallNamesExpr(d.LetValue, names)
+			} else {
+				collectFuncCallNamesExpr(&d.Condition, names)
+			}
 			collectFuncCallNames(d.Then.Stmts, names)
 			if d.Else != nil {
 				collectFuncCallNames(d.Else.Stmts, names)

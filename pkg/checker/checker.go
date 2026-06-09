@@ -2071,6 +2071,16 @@ func (c *Checker) checkStmt(stmt *ast.Stmt) {
 func (c *Checker) checkVarDecl(stmt *ast.Stmt) {
 	decl := stmt.Data.(*ast.VarDeclStmt)
 
+	// let..else: let Pattern = expr else { ... }
+	if decl.Pattern != nil {
+		valType := c.checkExpr(decl.Value)
+		c.bindPattern(decl.Pattern, valType)
+		if decl.ElseBlock != nil {
+			c.checkBlock(decl.ElseBlock)
+		}
+		return
+	}
+
 	// Tuple destructuring: let (a, b) = expr
 	if len(decl.Names) > 0 {
 		if decl.Value != nil {
@@ -2177,6 +2187,20 @@ func (c *Checker) checkReturn(stmt *ast.Stmt) {
 
 func (c *Checker) checkIf(stmt *ast.Stmt) {
 	ifStmt := stmt.Data.(*ast.IfStmt)
+
+	// Handle 'if let Pattern = expr { ... }'
+	if ifStmt.LetPattern != nil {
+		valType := c.checkExpr(ifStmt.LetValue)
+		c.pushScope()
+		c.bindPattern(ifStmt.LetPattern, valType)
+		c.checkBlock(&ifStmt.Then)
+		c.popScope()
+		if ifStmt.Else != nil {
+			c.checkBlock(ifStmt.Else)
+		}
+		return
+	}
+
 	condType := c.checkExpr(&ifStmt.Condition)
 	if !condType.Equal(TypeBool) && condType.Kind != TyError {
 		c.error(stmt.Span, "if condition must be bool, got %s", condType)
@@ -2626,6 +2650,12 @@ func (c *Checker) walkStmt(stmt *ast.Stmt, ctx string) {
 		if d.Value != nil {
 			c.walkExpr(d.Value, ctx)
 		}
+		if d.Pattern != nil {
+			c.walkPattern(d.Pattern, ctx)
+		}
+		if d.ElseBlock != nil {
+			c.walkBlock(d.ElseBlock, ctx)
+		}
 	case ast.StmtAssign:
 		d := stmt.Data.(*ast.AssignStmt)
 		c.walkExpr(&d.Target, ctx)
@@ -2640,14 +2670,23 @@ func (c *Checker) walkStmt(stmt *ast.Stmt, ctx string) {
 		c.walkExpr(&d.Expr, ctx)
 	case ast.StmtIf:
 		d := stmt.Data.(*ast.IfStmt)
-		c.walkExpr(&d.Condition, ctx)
-		c.walkBlock(&d.Then, ctx)
-		for i := range d.ElseIfs {
-			c.walkExpr(&d.ElseIfs[i].Condition, ctx)
-			c.walkBlock(&d.ElseIfs[i].Body, ctx)
-		}
-		if d.Else != nil {
-			c.walkBlock(d.Else, ctx)
+		if d.LetPattern != nil {
+			c.walkExpr(d.LetValue, ctx)
+			c.walkPattern(d.LetPattern, ctx)
+			c.walkBlock(&d.Then, ctx)
+			if d.Else != nil {
+				c.walkBlock(d.Else, ctx)
+			}
+		} else {
+			c.walkExpr(&d.Condition, ctx)
+			c.walkBlock(&d.Then, ctx)
+			for i := range d.ElseIfs {
+				c.walkExpr(&d.ElseIfs[i].Condition, ctx)
+				c.walkBlock(&d.ElseIfs[i].Body, ctx)
+			}
+			if d.Else != nil {
+				c.walkBlock(d.Else, ctx)
+			}
 		}
 	case ast.StmtFor:
 		d := stmt.Data.(*ast.ForStmt)

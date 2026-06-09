@@ -370,6 +370,9 @@ func substituteTypeParamsInStmt(stmt *Stmt, typeMap map[string]string) {
 			if d.Value != nil {
 				substituteTypeParamsInExpr(d.Value, typeMap)
 			}
+			if d.ElseBlock != nil {
+				substituteTypeParamsInBlock(d.ElseBlock, typeMap)
+			}
 		}
 	case StmtReturn:
 		if d, ok := stmt.Data.(*ReturnStmt); ok {
@@ -379,7 +382,11 @@ func substituteTypeParamsInStmt(stmt *Stmt, typeMap map[string]string) {
 		}
 	case StmtIf:
 		if d, ok := stmt.Data.(*IfStmt); ok {
-			substituteTypeParamsInExpr(&d.Condition, typeMap)
+			if d.LetValue != nil {
+				substituteTypeParamsInExpr(d.LetValue, typeMap)
+			} else {
+				substituteTypeParamsInExpr(&d.Condition, typeMap)
+			}
 			substituteTypeParamsInBlock(&d.Then, typeMap)
 			for ei := range d.ElseIfs {
 				substituteTypeParamsInExpr(&d.ElseIfs[ei].Condition, typeMap)
@@ -510,6 +517,9 @@ func substituteTypeParamsRichInStmt(stmt *Stmt, typeMap map[string]TypeExpr) {
 			if d.Value != nil {
 				substituteTypeParamsRichInExpr(d.Value, typeMap)
 			}
+			if d.ElseBlock != nil {
+				substituteTypeParamsRichInBlock(d.ElseBlock, typeMap)
+			}
 		}
 	case StmtReturn:
 		if d, ok := stmt.Data.(*ReturnStmt); ok {
@@ -519,7 +529,11 @@ func substituteTypeParamsRichInStmt(stmt *Stmt, typeMap map[string]TypeExpr) {
 		}
 	case StmtIf:
 		if d, ok := stmt.Data.(*IfStmt); ok {
-			substituteTypeParamsRichInExpr(&d.Condition, typeMap)
+			if d.LetValue != nil {
+				substituteTypeParamsRichInExpr(d.LetValue, typeMap)
+			} else {
+				substituteTypeParamsRichInExpr(&d.Condition, typeMap)
+			}
 			substituteTypeParamsRichInBlock(&d.Then, typeMap)
 			for ei := range d.ElseIfs {
 				substituteTypeParamsRichInExpr(&d.ElseIfs[ei].Condition, typeMap)
