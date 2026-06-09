@@ -3078,7 +3078,7 @@ func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {
 		if fa.Field == "_0" && recv.Type.Elem != nil {
 			resultType = recv.Type.Elem
 		} else if fa.Field == "_1" {
-			resultType = &LType{Kind: LTyAny} // error field is const char* in C — keep as any to avoid forge_string mismatch
+			resultType = &LType{Kind: LTyError} // error field is const char* in C
 		}
 	}
 
