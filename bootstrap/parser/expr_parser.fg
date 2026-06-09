@@ -658,6 +658,12 @@ forge parser {
       self.next()
     }
 
+    // Check for pattern let: let Variant(x, y) = expr else { ... }
+    // Detected by: uppercase Ident followed by '('
+    if self.is_pattern_let_ahead() {
+      return self.parse_let_else(start, is_mut)
+    }
+
     // Tuple destructuring: let (a, b) = expr
     if self.peek().kind == PLParen {
       self.next()
@@ -702,6 +708,34 @@ forge parser {
     }, null)
   }
 
+  // ---- Pattern Let helpers ----
+
+  func Parser.is_pattern_let_ahead(self) -> bool {
+    let tok = self.peek()
+    if tok.kind != LIdent { return false }
+    if len(tok.text) == 0 { return false }
+    let first = <i32>tok.text[0]
+    if first < 65 || first > 90 { return false }  // Not uppercase A-Z
+    // Save state and check for '(' after ident
+    let saved = self.lex!.save_state()
+    self.next()  // consume ident
+    let is_variant = self.peek().kind == PLParen
+    self.lex!.restore_state(saved)
+    return is_variant
+  }
+
+  func Parser.parse_let_else(self, start: Pos, is_mut: bool) -> (Stmt?, error) {
+    let pat = self.parse_pattern()?
+    self.expect(OAssign)?
+    let val = self.parse_expr()?
+    self.expect(KElse)?
+    let else_block = self.parse_block()?
+    return (Stmt {
+      LetElse(pat!, val!, else_block!),
+      span: Span { start: start, end: self.peek().span.start }
+    }, null)
+  }
+
   // ---- Return ----
 
   func Parser.parse_return(self) -> (Stmt?, error) {
@@ -734,6 +768,12 @@ forge parser {
   func Parser.parse_if(self) -> (Stmt?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'if'
+
+    // Check for 'if let Pattern = expr { ... }'
+    if self.peek().kind == KLet {
+      return self.parse_if_let(start)
+    }
+
     let cond = self.parse_expr_no_struct_lit()?
     let then_block = self.parse_block()?
 
@@ -759,6 +799,27 @@ forge parser {
 
     return (Stmt {
       If(cond!, then_block!, else_ifs, else_block),
+      span: Span { start: start, end: self.peek().span.start }
+    }, null)
+  }
+
+  // ---- If Let ----
+
+  func Parser.parse_if_let(self, start: Pos) -> (Stmt?, error) {
+    self.next()  // consume 'let'
+    let pat = self.parse_pattern()?
+    self.expect(OAssign)?
+    let value = self.parse_expr_no_struct_lit()?
+    let then_block = self.parse_block()?
+
+    let mut else_block: Block? = null
+    if self.peek().kind == KElse {
+      self.next()
+      else_block = self.parse_block()?
+    }
+
+    return (Stmt {
+      IfLet(pat!, value!, then_block!, else_block),
       span: Span { start: start, end: self.peek().span.start }
     }, null)
   }

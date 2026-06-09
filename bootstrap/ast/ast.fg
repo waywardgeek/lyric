@@ -338,6 +338,8 @@ forge ast {
     Select(cases: [SelectCase])
     Yield(value: Expr?)
     Lock(mutex: Expr, body: Block)
+    IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?)
+    LetElse(pattern: Pattern, value: Expr, else_block: Block)
   }
 
   class Stmt {

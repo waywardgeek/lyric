@@ -760,6 +760,26 @@ forge lowerer {
         let mut out = stmts
         out = append(out, LStmt { kind: StBlock, block: block_data })
       }
+      IfLet(pattern, value, then_block, else_block) => {
+        // Lower if let as a match statement with 1-2 arms
+        let val = self.lower_expr(value, stmts)
+        let mut then_stmts: [LStmt?] = []
+        self.lower_block(then_block, then_stmts)
+        let mut else_stmts: [LStmt?] = []
+        if else_block != null {
+          self.lower_block(else_block!, else_stmts)
+        }
+        // TODO: proper match lowering for if let
+        let mut out = stmts
+      }
+      LetElse(pattern, value, else_block) => {
+        // Lower let..else: declare bindings in outer scope, match to extract
+        let val = self.lower_expr(value, stmts)
+        let mut else_stmts: [LStmt?] = []
+        self.lower_block(else_block, else_stmts)
+        // TODO: proper match lowering for let..else
+        let mut out = stmts
+      }
     }
   }
 

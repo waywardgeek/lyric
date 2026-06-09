@@ -1067,6 +1067,24 @@ forge checker {
         self.check_block(body, lock_scope)
       }
 
+      IfLet(pattern, value, then_block, else_block) => {
+        let val_type = self.check_expr(value, scope)
+        let then_scope = new_scope(scope)
+        self.bind_pattern(pattern, val_type, then_scope)
+        self.check_block(then_block, then_scope)
+        if else_block != null {
+          let else_scope = new_scope(scope)
+          self.check_block(else_block!, else_scope)
+        }
+      }
+
+      LetElse(pattern, value, else_block) => {
+        let val_type = self.check_expr(value, scope)
+        self.bind_pattern(pattern, val_type, scope)
+        let else_scope = new_scope(scope)
+        self.check_block(else_block, else_scope)
+      }
+
       Break => {}
       Continue => {}
     }

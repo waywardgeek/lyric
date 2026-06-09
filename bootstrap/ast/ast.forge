@@ -46,7 +46,7 @@ forge ast {
     TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice.
 
     StmtKind enum: VarDecl, Assign, Return, Expr, If, For, While, Match,
-    Block, Cascade, Break, Continue, Spawn, Select, Lock.
+    Block, Cascade, Break, Continue, Spawn, Select, Lock, IfLet, LetElse.
 
     PatternKind enum: Ident, Literal, Variant, Wildcard, Tuple.
 

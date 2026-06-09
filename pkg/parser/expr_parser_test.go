@@ -533,3 +533,74 @@ func TestFuncTypeSingleParam(t *testing.T) {
 		t.Errorf("expected 1 func param, got %d", len(ft.Params))
 	}
 }
+
+
+func TestIfLet(t *testing.T) {
+	fn := parseFuncBody(t, `func test(shape: Shape) {
+		if let Circle(r) = shape {
+			let _ = r
+		}
+	}`)
+	if fn.Body == nil || len(fn.Body.Stmts) < 1 {
+		t.Fatal("expected at least 1 statement")
+	}
+	stmt := fn.Body.Stmts[0]
+	if stmt.Kind != ast.StmtIf {
+		t.Fatalf("expected StmtIf, got %v", stmt.Kind)
+	}
+	ifStmt := stmt.Data.(*ast.IfStmt)
+	if ifStmt.LetPattern == nil {
+		t.Fatal("expected LetPattern to be non-nil")
+	}
+	if ifStmt.LetValue == nil {
+		t.Fatal("expected LetValue to be non-nil")
+	}
+	if ifStmt.LetPattern.Kind != ast.PatVariant {
+		t.Errorf("expected PatVariant, got %v", ifStmt.LetPattern.Kind)
+	}
+}
+
+func TestIfLetWithElse(t *testing.T) {
+	fn := parseFuncBody(t, `func test(shape: Shape) {
+		if let Circle(r) = shape {
+			let _ = r
+		} else {
+			let _ = 0
+		}
+	}`)
+	stmt := fn.Body.Stmts[0]
+	ifStmt := stmt.Data.(*ast.IfStmt)
+	if ifStmt.LetPattern == nil {
+		t.Fatal("expected LetPattern to be non-nil")
+	}
+	if ifStmt.Else == nil {
+		t.Fatal("expected Else block to be non-nil")
+	}
+}
+
+func TestLetElse(t *testing.T) {
+	fn := parseFuncBody(t, `func test(shape: Shape) -> i32 {
+		let Circle(r) = shape else { return 0 }
+		return r
+	}`)
+	if fn.Body == nil || len(fn.Body.Stmts) < 2 {
+		t.Fatal("expected at least 2 statements")
+	}
+	stmt := fn.Body.Stmts[0]
+	if stmt.Kind != ast.StmtVarDecl {
+		t.Fatalf("expected StmtVarDecl, got %v", stmt.Kind)
+	}
+	decl := stmt.Data.(*ast.VarDeclStmt)
+	if decl.Pattern == nil {
+		t.Fatal("expected Pattern to be non-nil")
+	}
+	if decl.ElseBlock == nil {
+		t.Fatal("expected ElseBlock to be non-nil")
+	}
+	if decl.Value == nil {
+		t.Fatal("expected Value to be non-nil")
+	}
+	if decl.Pattern.Kind != ast.PatVariant {
+		t.Errorf("expected PatVariant, got %v", decl.Pattern.Kind)
+	}
+}
