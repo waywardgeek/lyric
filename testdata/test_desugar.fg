@@ -56,7 +56,7 @@ forge desugar_tests {
   func test_embed_copies_destructors() {
     let src = """forge t {
       interface Closable<T> {
-        destroy T { print("closing") }
+        destructor T { print("closing") }
       }
       interface Resource<T> {
         embed Closable<T>
