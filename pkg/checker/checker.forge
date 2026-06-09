@@ -123,7 +123,9 @@ forge Checker {
 
     5. Call-Site Type Inference: inferTypeArgs walks parameter and argument types
     in parallel via matchTypeVars, binding type variable names to concrete
-    types (first match wins). Recursive through composite types. Inferred
+    types (first match wins). Recursive through composite types including
+    generic class/struct instances (e.g., Dict<V> matched against Dict<StructDecl>
+    infers V=StructDecl via TypeArgs comparison). Inferred
     args stored in CallExpr.InferredTypeArgs for the transpiler.
 
     substituteType is recursive: it walks the type structure replacing TyVar

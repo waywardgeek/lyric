@@ -1059,6 +1059,12 @@ func matchTypeVars(param, arg *Type, subst map[string]*Type) {
 		if arg.Kind == TyGenerator {
 			matchTypeVars(param.Elem, arg.Elem, subst)
 		}
+	case TyClass, TyStruct:
+		if (arg.Kind == TyClass || arg.Kind == TyStruct) && param.Name == arg.Name && len(param.TypeArgs) == len(arg.TypeArgs) {
+			for i := range param.TypeArgs {
+				matchTypeVars(param.TypeArgs[i], arg.TypeArgs[i], subst)
+			}
+		}
 	}
 }
 

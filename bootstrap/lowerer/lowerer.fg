@@ -12,9 +12,9 @@ forge lowerer {
   //   1. Register phase: collect all struct/class/enum/interface declarations
   //   2. Lower phase: walk AST functions, lower bodies to LIR statements
   //
-  // Key invariant: AST Expr is a VALUE TYPE in Go. The bootstrap uses classes
-  // for AST nodes, so pointer stability is preserved. But any code that copies
-  // Expr nodes by value will lose checker annotations (ResolvedType).
+  // Key invariant: AST uses enums with associated data (ExprKind, StmtKind,
+  // TypeExprKind). All variant data must be extracted via match bindings or
+  // if let / let..else patterns.
   // ==========================================================================
 
   class Lowerer {
@@ -44,13 +44,16 @@ forge lowerer {
 
   func Lowerer.define_var(self, name: string, typ: LType?) {
     if !isnull(self.scope) {
-      dict_set(self.scope!, sym(name), typ)
+      dict_set(self.scope!, name, typ)
     }
   }
 
   func Lowerer.lookup_var(self, name: string) -> LType? {
     if !isnull(self.scope) {
-      return dict_get(self.scope!, sym(name))
+      let entry = dict_get(self.scope!, name)
+      if !isnull(entry) {
+        return entry!.value
+      }
     }
     return null
   }
@@ -100,8 +103,18 @@ forge lowerer {
     }
     let td = LTempDef { id: id, expr: expr }
     let s = LStmt { kind: StTempDef, temp_def: td }
-    stmts = append(stmts, s)
+    let mut out = stmts
+    out = append(out, s)
     return make_temp(id, typ)
+  }
+
+  // ==========================================================================
+  // Helper: extract Sym name as string
+  // ==========================================================================
+
+  func sym_str(s: Sym?) -> string {
+    if isnull(s) { return "" }
+    return s!.name
   }
 
   // ==========================================================================
@@ -114,8 +127,8 @@ forge lowerer {
     }
     let t = te!
     match t.kind {
-      TEIdent => {
-        let name = t.name
+      Named(name_sym, args) => {
+        let name = sym_str(name_sym)
         if name == "bool" { return LType { kind: TyBool } }
         if name == "string" { return LType { kind: TyString } }
         if name == "error" { return LType { kind: TyError } }
@@ -134,71 +147,71 @@ forge lowerer {
         if name == "uint" { return LType { kind: TyPlatformUint, bits: -1 } }
         // Known struct?
         if !isnull(self.structs) {
-          let found = dict_get(self.structs!, sym(name))
+          let found = dict_get(self.structs!, name)
           if !isnull(found) {
-            return LType { kind: TyStruct, name: name, is_exported: found!.is_public }
+            return LType { kind: TyStruct, name: name, is_exported: found!.value.is_public }
           }
         }
         // Known class?
         if !isnull(self.classes) {
-          let found = dict_get(self.classes!, sym(name))
+          let found = dict_get(self.classes!, name)
           if !isnull(found) {
-            return LType { kind: TyClassHandle, name: name, is_exported: found!.is_public }
+            return LType { kind: TyClassHandle, name: name, is_exported: found!.value.is_public }
           }
         }
         // Known enum?
         if !isnull(self.enums) {
-          let found = dict_get(self.enums!, sym(name))
+          let found = dict_get(self.enums!, name)
           if !isnull(found) {
-            return LType { kind: TyTaggedUnion, name: name, is_exported: found!.is_public }
+            return LType { kind: TyTaggedUnion, name: name, is_exported: found!.value.is_public }
           }
         }
         // Type alias?
         if !isnull(self.type_aliases) {
-          let found = dict_get(self.type_aliases!, sym(name))
+          let found = dict_get(self.type_aliases!, name)
           if !isnull(found) {
-            return self.lower_type(found)
+            return self.lower_type(found!.value)
           }
         }
         // Assume type variable
         return LType { kind: TyTypeVar, name: name }
       }
-      TEOptional => {
-        let inner = self.lower_type(t.inner)
-        return LType { kind: TyOptional, elem: inner }
+      Optional(inner) => {
+        let lowered = self.lower_type(inner)
+        return LType { kind: TyOptional, elem: lowered }
       }
-      TESlice => {
-        let inner = self.lower_type(t.inner)
-        return LType { kind: TySlice, elem: inner }
+      Sequence(elem) => {
+        let lowered = self.lower_type(elem)
+        return LType { kind: TySlice, elem: lowered }
       }
-      TETuple => {
-        let mut fields: [LField] = []
-        for el, idx in t.elements {
-          let ft = self.lower_type(el)
-          fields = append(fields, LField { name: f"_{idx}", typ: ft })
+      Tuple(fields) => {
+        let mut lfields: [LField] = []
+        for idx, el in fields {
+          let ft = self.lower_type(el.type_expr)
+          lfields = append(lfields, LField { name: f"_{idx}", typ: ft })
         }
-        return LType { kind: TyTuple, fields: fields }
+        return LType { kind: TyTuple, fields: lfields }
       }
-      TEMap => {
-        let k = self.lower_type(t.key_type)
-        let v = self.lower_type(t.value_type)
+      Map(key_te, value_te) => {
+        let k = self.lower_type(key_te)
+        let v = self.lower_type(value_te)
         return LType { kind: TyMap, key: k, elem: v }
       }
-      TEFunc => {
+      Func(param_types, ret_te) => {
         let mut params: [LType?] = []
-        for pt in t.param_types {
+        for pt in param_types {
           params = append(params, self.lower_type(pt))
         }
-        let ret = self.lower_type(t.return_type)
+        let ret = self.lower_type(ret_te)
         return LType { kind: TyFuncPtr, params: params, ret: ret }
       }
-      TEChannel => {
-        let inner = self.lower_type(t.inner)
-        return LType { kind: TyChannel, elem: inner }
+      Channel(elem) => {
+        let lowered = self.lower_type(elem)
+        return LType { kind: TyChannel, elem: lowered }
       }
-      TEGenerator => {
-        let inner = self.lower_type(t.inner)
-        return LType { kind: TyGenerator, elem: inner }
+      Generator(elem) => {
+        let lowered = self.lower_type(elem)
+        return LType { kind: TyGenerator, elem: lowered }
       }
       _ => {
         return LType { kind: TyAny }
@@ -226,60 +239,57 @@ forge lowerer {
     }
     let expr = e!
     match expr.kind {
-      EIdent => {
-        let name = expr.name
+      Ident(name_sym) => {
+        let name = sym_str(name_sym)
         let typ = self.lookup_var(name)
         return make_var(name, typ)
       }
-      EIntLit => {
-        return make_lit_int(expr.int_val, 32)
+      IntLit(value, type_hint) => {
+        let result = atoi(value)
+        return make_lit_int(result._0, 32)
       }
-      EFloatLit => {
+      FloatLit(value) => {
         let ty = LType { kind: TyF64, bits: 64 }
-        let v = LValue { kind: ValLitFloat, float_val: expr.float_val, typ: ty }
+        let result = parse_float(value)
+        let v = LValue { kind: ValLitFloat, float_val: result._0, typ: ty }
         return v
       }
-      EStringLit => {
-        return make_lit_string(expr.str_val)
+      StringLit(value) => {
+        return make_lit_string(value)
       }
-      EBoolLit => {
-        return make_lit_bool(expr.bool_val)
+      BoolLit(value) => {
+        return make_lit_bool(value)
       }
-      ECharLit => {
-        let ty = LType { kind: TyU8, bits: 8 }
-        let v = LValue { kind: ValLitInt, int_val: <i64>(expr.char_val), typ: ty }
-        return v
-      }
-      ENullLit => {
+      Nil => {
         return make_lit_null()
       }
-      EBinOp => {
-        let left = self.lower_expr(expr.left, stmts)
-        let right = self.lower_expr(expr.right, stmts)
-        let op = lower_bin_op(expr.op)
+      Binary(left_expr, op, right_expr) => {
+        let left = self.lower_expr(left_expr, stmts)
+        let right = self.lower_expr(right_expr, stmts)
+        let lop = lower_bin_op(op)
         let result_type = self.resolve_expr_type(e)
-        let data = LBinOpData { op: op, left: left, right: right }
+        let data = LBinOpData { op: lop, left: left, right: right }
         let ex = LExpr { kind: ExBinOp, typ: result_type, bin_op: data }
         return self.emit_temp(ex, stmts)
       }
-      EUnaryOp => {
-        let operand = self.lower_expr(expr.operand, stmts)
-        let op = lower_un_op(expr.op)
+      Unary(op, operand_expr) => {
+        let operand = self.lower_expr(operand_expr, stmts)
+        let lop = lower_un_op(op)
         let result_type = self.resolve_expr_type(e)
-        let data = LUnOpData { op: op, operand: operand }
+        let data = LUnOpData { op: lop, operand: operand }
         let ex = LExpr { kind: ExUnOp, typ: result_type, un_op: data }
         return self.emit_temp(ex, stmts)
       }
-      ECast => {
-        let operand = self.lower_expr(expr.operand, stmts)
-        let target = self.lower_type(expr.cast_type)
+      Cast(target_type, operand_expr) => {
+        let operand = self.lower_expr(operand_expr, stmts)
+        let target = self.lower_type(target_type)
         let data = LCastData { target: target, operand: operand }
         let ex = LExpr { kind: ExCast, typ: target, cast: data }
         return self.emit_temp(ex, stmts)
       }
-      EFieldAccess => {
-        let recv = self.lower_expr(expr.object, stmts)
-        let field = expr.field_name
+      FieldAccess(receiver_expr, field_sym) => {
+        let recv = self.lower_expr(receiver_expr, stmts)
+        let field = sym_str(field_sym)
         let mut recv_type: LType? = null
         if !isnull(recv) {
           recv_type = recv!.typ
@@ -304,46 +314,46 @@ forge lowerer {
         let ex = LExpr { kind: ExStructField, typ: result_type, struct_field: data }
         return self.emit_temp(ex, stmts)
       }
-      EIndex => {
-        let collection = self.lower_expr(expr.object, stmts)
-        let index = self.lower_expr(expr.index_expr, stmts)
+      Index(receiver_expr, index_expr) => {
+        let collection = self.lower_expr(receiver_expr, stmts)
+        let index = self.lower_expr(index_expr, stmts)
         let result_type = self.resolve_expr_type(e)
         let data = LIndexGetData { collection: collection, index: index }
         let ex = LExpr { kind: ExIndexGet, typ: result_type, index_get: data }
         return self.emit_temp(ex, stmts)
       }
-      ESlice => {
-        let collection = self.lower_expr(expr.object, stmts)
+      Slice(receiver_expr, low_expr, high_expr) => {
+        let collection = self.lower_expr(receiver_expr, stmts)
         let mut low: LValue? = null
-        if !isnull(expr.slice_low) {
-          low = self.lower_expr(expr.slice_low, stmts)
+        if !isnull(low_expr) {
+          low = self.lower_expr(low_expr, stmts)
         }
         let mut high: LValue? = null
-        if !isnull(expr.slice_high) {
-          high = self.lower_expr(expr.slice_high, stmts)
+        if !isnull(high_expr) {
+          high = self.lower_expr(high_expr, stmts)
         }
         let result_type = self.resolve_expr_type(e)
         let data = LSliceData { collection: collection, low: low, high: high }
         let ex = LExpr { kind: ExSlice, typ: result_type, slice_data: data }
         return self.emit_temp(ex, stmts)
       }
-      ECall => {
-        return self.lower_call(expr, stmts)
+      Call(func_expr, type_args, call_args) => {
+        return self.lower_call(e, func_expr, type_args, call_args, stmts)
       }
-      EMethodCall => {
-        return self.lower_method_call(expr, stmts)
+      MethodCall(receiver_expr, method_sym, type_args, method_args) => {
+        return self.lower_method_call(e, receiver_expr, method_sym, type_args, method_args, stmts)
       }
-      EStructLit => {
-        return self.lower_struct_lit(expr, stmts)
+      StructLit(type_name_sym, type_args, field_inits) => {
+        return self.lower_struct_lit(e, type_name_sym, type_args, field_inits, stmts)
       }
-      EListLit => {
+      ListLit(elems) => {
         let result_type = self.resolve_expr_type(e)
-        if len(expr.elements) == 0 {
+        if len(elems) == 0 {
           let ex = LExpr { kind: ExMakeSlice, typ: result_type }
           return self.emit_temp(ex, stmts)
         }
         let mut slice_val = make_lit_null()
-        for elem_expr in expr.elements {
+        for elem_expr in elems {
           let elem = self.lower_expr(elem_expr, stmts)
           let builtin_data = LBuiltinData { name: "append", args: [slice_val, elem] }
           let ex = LExpr { kind: ExBuiltin, typ: result_type, builtin: builtin_data }
@@ -351,9 +361,9 @@ forge lowerer {
         }
         return slice_val
       }
-      ETupleLit => {
+      TupleLit(elems) => {
         let mut fields: [LFieldInit] = []
-        for elem_expr, idx in expr.elements {
+        for idx, elem_expr in elems {
           let val = self.lower_expr(elem_expr, stmts)
           fields = append(fields, LFieldInit { name: f"_{idx}", value: val })
         }
@@ -362,26 +372,27 @@ forge lowerer {
         let ex = LExpr { kind: ExStructLit, typ: result_type, struct_lit: data }
         return self.emit_temp(ex, stmts)
       }
-      EFString => {
-        return self.lower_fstring(expr, stmts)
+      StringInterp(parts) => {
+        return self.lower_fstring(e, parts, stmts)
       }
-      EUnwrap => {
-        let inner = self.lower_expr(expr.operand, stmts)
+      Unwrap(operand_expr) => {
+        let inner = self.lower_expr(operand_expr, stmts)
         let result_type = self.resolve_expr_type(e)
         let data = LUnwrapOptionalData { value: inner }
         let ex = LExpr { kind: ExUnwrapOptional, typ: result_type, unwrap_opt: data }
         return self.emit_temp(ex, stmts)
       }
-      ELambda => {
-        return self.lower_lambda(expr, stmts)
+      Lambda(params, return_type, body) => {
+        return self.lower_lambda(e, params, return_type, body, stmts)
       }
-      EMatch => {
-        return self.lower_match_expr(expr, stmts)
+      Match(match_val, arms) => {
+        return self.lower_match_expr(e, match_val, arms, stmts)
       }
-      ETry => {
-        return self.lower_try(expr, stmts)
+      Try(operand_expr) => {
+        return self.lower_try(e, operand_expr, stmts)
       }
-      _ => {
+      MapLit(keys, values) => {
+        // TODO: implement map literal lowering
         return make_lit_null()
       }
     }
@@ -391,19 +402,27 @@ forge lowerer {
   // Call Lowering
   // ==========================================================================
 
-  func Lowerer.lower_call(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let func_name = e.name
+  func Lowerer.lower_call(
+    self, orig: Expr?, func_expr: Expr?,
+    type_args: [TypeExpr], call_args: [Expr],
+    stmts: [LStmt?]
+  ) -> LValue? {
+    // Get function name from func_expr (should be an Ident)
+    let mut func_name = ""
+    if !isnull(func_expr) {
+      if let Ident(name_sym) = func_expr!.kind {
+        func_name = sym_str(name_sym)
+      }
+    }
 
     // Builtins
     let is_builtin = is_builtin_name(func_name)
     if is_builtin {
       let mut args: [LValue?] = []
-      for arg_expr in e.args {
+      for arg_expr in call_args {
         args = append(args, self.lower_expr(arg_expr, stmts))
       }
-      let result_type = self.resolve_expr_type(expr)
+      let result_type = self.resolve_expr_type(orig)
       let data = LBuiltinData { name: func_name, args: args }
       let ex = LExpr { kind: ExBuiltin, typ: result_type, builtin: data }
       return self.emit_temp(ex, stmts)
@@ -411,18 +430,18 @@ forge lowerer {
 
     // Class constructor?
     if !isnull(self.classes) {
-      let found = dict_get(self.classes!, sym(func_name))
+      let found = dict_get(self.classes!, func_name)
       if !isnull(found) {
         let mut args: [LValue?] = []
-        for arg_expr in e.args {
+        for arg_expr in call_args {
           args = append(args, self.lower_expr(arg_expr, stmts))
         }
-        let mut type_args: [LType?] = []
-        for ta in e.type_args {
-          type_args = append(type_args, self.lower_type(ta))
+        let mut ltype_args: [LType?] = []
+        for ta in type_args {
+          ltype_args = append(ltype_args, self.lower_type(ta))
         }
         let result_type = LType { kind: TyClassHandle, name: func_name }
-        let data = LClassAllocData { class_name: func_name, fields: [], type_args: type_args }
+        let data = LClassAllocData { class_name: func_name, fields: [], type_args: ltype_args }
         let ex = LExpr { kind: ExClassAlloc, typ: result_type, class_alloc: data }
         return self.emit_temp(ex, stmts)
       }
@@ -430,40 +449,42 @@ forge lowerer {
 
     // Regular function call
     let mut args: [LValue?] = []
-    for arg_expr in e.args {
+    for arg_expr in call_args {
       args = append(args, self.lower_expr(arg_expr, stmts))
     }
-    let mut type_args: [LType?] = []
-    for ta in e.type_args {
-      type_args = append(type_args, self.lower_type(ta))
+    let mut ltype_args: [LType?] = []
+    for ta in type_args {
+      ltype_args = append(ltype_args, self.lower_type(ta))
     }
-    let result_type = self.resolve_expr_type(expr)
+    let result_type = self.resolve_expr_type(orig)
     let is_exported = is_name_exported(func_name)
-    let data = LCallData { func_name: func_name, args: args, type_args: type_args, is_exported: is_exported }
+    let data = LCallData { func_name: func_name, args: args, type_args: ltype_args, is_exported: is_exported }
     let ex = LExpr { kind: ExCall, typ: result_type, call: data }
     return self.emit_temp(ex, stmts)
   }
 
-  func Lowerer.lower_method_call(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let recv = self.lower_expr(e.object, stmts)
-    let method = e.method_name
+  func Lowerer.lower_method_call(
+    self, orig: Expr?, receiver_expr: Expr?,
+    method_sym: Sym?, type_args: [TypeExpr],
+    method_args: [Expr], stmts: [LStmt?]
+  ) -> LValue? {
+    let recv = self.lower_expr(receiver_expr, stmts)
+    let method = sym_str(method_sym)
 
     let mut args: [LValue?] = []
-    for arg_expr in e.args {
+    for arg_expr in method_args {
       args = append(args, self.lower_expr(arg_expr, stmts))
     }
-    let mut type_args: [LType?] = []
-    for ta in e.type_args {
-      type_args = append(type_args, self.lower_type(ta))
+    let mut ltype_args: [LType?] = []
+    for ta in type_args {
+      ltype_args = append(ltype_args, self.lower_type(ta))
     }
 
-    let result_type = self.resolve_expr_type(expr)
+    let result_type = self.resolve_expr_type(orig)
     let is_exported = is_name_exported(method)
     let data = LMethodCallData {
       receiver: recv, method: method, args: args,
-      type_args: type_args, is_exported: is_exported
+      type_args: ltype_args, is_exported: is_exported
     }
     let ex = LExpr { kind: ExMethodCall, typ: result_type, method_call: data }
     return self.emit_temp(ex, stmts)
@@ -473,34 +494,36 @@ forge lowerer {
   // Struct/Class Literal Lowering
   // ==========================================================================
 
-  func Lowerer.lower_struct_lit(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let name = e.name
+  func Lowerer.lower_struct_lit(
+    self, orig: Expr?, type_name_sym: Sym?,
+    type_args: [TypeExpr], field_inits: [StructLitField],
+    stmts: [LStmt?]
+  ) -> LValue? {
+    let name = sym_str(type_name_sym)
 
     let mut fields: [LFieldInit] = []
-    for fi in e.field_inits {
+    for fi in field_inits {
       let val = self.lower_expr(fi.value, stmts)
-      fields = append(fields, LFieldInit { name: fi.name, value: val })
+      fields = append(fields, LFieldInit { name: sym_str(fi.name), value: val })
     }
 
     // Class?
     if !isnull(self.classes) {
-      let found = dict_get(self.classes!, sym(name))
+      let found = dict_get(self.classes!, name)
       if !isnull(found) {
-        let mut type_args: [LType?] = []
-        for ta in e.type_args {
-          type_args = append(type_args, self.lower_type(ta))
+        let mut ltype_args: [LType?] = []
+        for ta in type_args {
+          ltype_args = append(ltype_args, self.lower_type(ta))
         }
         let result_type = LType { kind: TyClassHandle, name: name }
-        let data = LClassAllocData { class_name: name, fields: fields, type_args: type_args }
+        let data = LClassAllocData { class_name: name, fields: fields, type_args: ltype_args }
         let ex = LExpr { kind: ExClassAlloc, typ: result_type, class_alloc: data }
         return self.emit_temp(ex, stmts)
       }
     }
 
     // Struct literal
-    let result_type = self.resolve_expr_type(expr)
+    let result_type = self.resolve_expr_type(orig)
     let data = LStructLitData { fields: fields }
     let ex = LExpr { kind: ExStructLit, typ: result_type, struct_lit: data }
     return self.emit_temp(ex, stmts)
@@ -510,20 +533,24 @@ forge lowerer {
   // F-string Lowering
   // ==========================================================================
 
-  func Lowerer.lower_fstring(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let mut parts: [LFormatPart] = []
-    for part in e.fstring_parts {
-      if part.is_literal {
-        parts = append(parts, LFormatPart { is_literal: true, text: part.text })
+  func Lowerer.lower_fstring(self, orig: Expr?, parts: [Expr], stmts: [LStmt?]) -> LValue? {
+    let mut fparts: [LFormatPart] = []
+    for idx, part in parts {
+      // Even indices are literal string parts, odd indices are interpolations
+      if idx % 2 == 0 {
+        // String literal part — extract value
+        if let StringLit(text) = part.kind {
+          fparts = append(fparts, LFormatPart { is_literal: true, text: text })
+        } else {
+          fparts = append(fparts, LFormatPart { is_literal: true, text: "" })
+        }
       } else {
-        let val = self.lower_expr(part.expr, stmts)
-        parts = append(parts, LFormatPart { is_literal: false, value: val, format: "%v" })
+        let val = self.lower_expr(part, stmts)
+        fparts = append(fparts, LFormatPart { is_literal: false, value: val, format: "%v" })
       }
     }
     let ty = LType { kind: TyString }
-    let data = LFormatData { parts: parts }
+    let data = LFormatData { parts: fparts }
     let ex = LExpr { kind: ExFormat, typ: ty, format: data }
     return self.emit_temp(ex, stmts)
   }
@@ -532,23 +559,25 @@ forge lowerer {
   // Lambda Lowering
   // ==========================================================================
 
-  func Lowerer.lower_lambda(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let mut params: [LParam] = []
-    for p in e.params {
-      let pt = self.lower_type(p.typ)
-      params = append(params, LParam { name: p.name, typ: pt })
+  func Lowerer.lower_lambda(
+    self, orig: Expr?, params: [Param],
+    return_type: TypeExpr?, body: Block?,
+    stmts: [LStmt?]
+  ) -> LValue? {
+    let mut lparams: [LParam] = []
+    for p in params {
+      let pt = self.lower_type(p.type_expr)
+      lparams = append(lparams, LParam { name: sym_str(p.name), typ: pt })
     }
-    let ret = self.lower_type(e.return_type)
+    let ret = self.lower_type(return_type)
 
-    let mut body: [LStmt?] = []
-    if !isnull(e.body) {
-      self.lower_block(e.body!, body)
+    let mut lbody: [LStmt?] = []
+    if !isnull(body) {
+      self.lower_block(body!, lbody)
     }
 
-    let data = LFuncLitData { params: params, return_type: ret, body: body }
-    let result_type = self.resolve_expr_type(expr)
+    let data = LFuncLitData { params: lparams, return_type: ret, body: lbody }
+    let result_type = self.resolve_expr_type(orig)
     let ex = LExpr { kind: ExFuncLit, typ: result_type, func_lit: data }
     return self.emit_temp(ex, stmts)
   }
@@ -557,62 +586,63 @@ forge lowerer {
   // Try Operator Lowering
   // ==========================================================================
 
-  func Lowerer.lower_try(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let inner = self.lower_expr(e.operand, stmts)
+  func Lowerer.lower_try(self, orig: Expr?, operand_expr: Expr?, stmts: [LStmt?]) -> LValue? {
+    let mut out = stmts
+    let inner = self.lower_expr(operand_expr, out)
 
     // Extract error
     let err_data = LExtractErrorData { value: inner }
     let err_type = LType { kind: TyError }
     let err_ex = LExpr { kind: ExExtractError, typ: err_type, extract_error: err_data }
-    let err_val = self.emit_temp(err_ex, stmts)
+    let err_val = self.emit_temp(err_ex, out)
 
     // Check if error is non-null
     let check_data = LIsNullData { value: err_val }
     let bool_type = LType { kind: TyBool }
     let check_ex = LExpr { kind: ExIsNull, typ: bool_type, is_null: check_data }
-    let is_null_val = self.emit_temp(check_ex, stmts)
+    let is_null_val = self.emit_temp(check_ex, out)
 
     // Negate: if NOT null, return early with error
     let neg_data = LUnOpData { op: UnNot, operand: is_null_val }
     let neg_ex = LExpr { kind: ExUnOp, typ: bool_type, un_op: neg_data }
-    let has_err = self.emit_temp(neg_ex, stmts)
+    let has_err = self.emit_temp(neg_ex, out)
 
     // If has_err { return (zero, err) }
     let zero = make_lit_null()
     let ret_data = LMakeResultData { value: zero, err: err_val }
     let ret_type = self.current_func_return
     let ret_ex = LExpr { kind: ExMakeResult, typ: ret_type, make_result: ret_data }
-    let ret_val = self.emit_temp(ret_ex, stmts)
+    let ret_val = self.emit_temp(ret_ex, out)
 
     let ret_stmt = LStmt { kind: StReturn, ret: LReturnData { values: [ret_val] } }
     let if_data = LIfData { cond: has_err, then_body: [ret_stmt], else_body: [] }
     let if_stmt = LStmt { kind: StIf, if_data: if_data }
-    stmts = append(stmts, if_stmt)
+    out = append(out, if_stmt)
 
     // Extract value (success path)
     let val_data = LExtractValueData { value: inner }
-    let result_type = self.resolve_expr_type(expr)
+    let result_type = self.resolve_expr_type(orig)
     let val_ex = LExpr { kind: ExExtractValue, typ: result_type, extract_value: val_data }
-    return self.emit_temp(val_ex, stmts)
+    return self.emit_temp(val_ex, out)
   }
 
   // ==========================================================================
   // Match Expression Lowering
   // ==========================================================================
 
-  func Lowerer.lower_match_expr(self, expr: Expr?, stmts: [LStmt?]) -> LValue? {
-    if isnull(expr) { return make_lit_null() }
-    let e = expr!
-    let result_type = self.resolve_expr_type(expr)
+  func Lowerer.lower_match_expr(
+    self, orig: Expr?, match_val: Expr?,
+    arms: [MatchArm], stmts: [LStmt?]
+  ) -> LValue? {
+    let mut out = stmts
+    let result_type = self.resolve_expr_type(orig)
 
     let result_name = f"_match_result_{self.next_temp()}"
     let decl = LVarDeclData { name: result_name, typ: result_type, mutable: true }
     let decl_stmt = LStmt { kind: StVarDecl, var_decl: decl }
-    stmts = append(stmts, decl_stmt)
+    out = append(out, decl_stmt)
 
-    self.lower_match_stmt_into(e, result_name, stmts)
+    self.lower_match_into(match_val, arms, result_name, out)
     return make_var(result_name, result_type)
   }
 
@@ -620,36 +650,33 @@ forge lowerer {
   // Operator Lowering
   // ==========================================================================
 
-  func lower_bin_op(op: OpKind) -> LBinOpKind {
+  func lower_bin_op(op: BinaryOp) -> LBinOpKind {
     match op {
-      OPlus => { return BinAdd }
-      OMinus => { return BinSub }
-      OStar => { return BinMul }
-      OSlash => { return BinDiv }
-      OPercent => { return BinMod }
-      OEqEq => { return BinEq }
-      OBangEq => { return BinNe }
-      OLt => { return BinLt }
-      OLtEq => { return BinLe }
-      OGt => { return BinGt }
-      OGtEq => { return BinGe }
-      OAmpAmp => { return BinAnd }
-      OPipePipe => { return BinOr }
-      OAmp => { return BinBitAnd }
-      OPipe => { return BinBitOr }
-      OCaret => { return BinBitXor }
-      OLtLt => { return BinShl }
-      OGtGt => { return BinShr }
-      _ => { return BinAdd }
+      Add => { return BinAdd }
+      Sub => { return BinSub }
+      Mul => { return BinMul }
+      Div => { return BinDiv }
+      Mod => { return BinMod }
+      Eq => { return BinEq }
+      Neq => { return BinNe }
+      Lt => { return BinLt }
+      Le => { return BinLe }
+      Gt => { return BinGt }
+      Ge => { return BinGe }
+      And => { return BinAnd }
+      Or => { return BinOr }
+      BitAnd => { return BinBitAnd }
+      BitOr => { return BinBitOr }
+      BitXor => { return BinBitXor }
+      Shl => { return BinShl }
+      Shr => { return BinShr }
     }
   }
 
-  func lower_un_op(op: OpKind) -> LUnOpKind {
+  func lower_un_op(op: UnaryOp) -> LUnOpKind {
     match op {
-      OMinus => { return UnNeg }
-      OBang => { return UnNot }
-      OTilde => { return UnBitNot }
-      _ => { return UnNeg }
+      Neg => { return UnNeg }
+      Not => { return UnNot }
     }
   }
 
@@ -661,77 +688,78 @@ forge lowerer {
     if isnull(s) { return }
     let stmt = s!
     match stmt.kind {
-      SVarDecl => {
-        self.lower_var_decl(s, stmts)
+      VarDecl(name_sym, names, type_expr, is_mut, value) => {
+        self.lower_var_decl(sym_str(name_sym), type_expr, is_mut, value, stmts)
       }
-      SAssign => {
-        self.lower_assign(s, stmts)
+      Assign(target, value) => {
+        self.lower_assign(target, value, stmts)
       }
-      SReturn => {
-        self.lower_return(s, stmts)
+      Return(value) => {
+        self.lower_return(value, stmts)
       }
-      SIf => {
-        self.lower_if(s, stmts)
+      If(condition, then_block, else_ifs, else_block) => {
+        self.lower_if(condition, then_block, else_ifs, else_block, stmts)
       }
-      SWhile => {
-        self.lower_while(s, stmts)
+      While(condition, body) => {
+        self.lower_while(condition, body, stmts)
       }
-      SFor => {
-        self.lower_for(s, stmts)
+      For(var_name_sym, index_var_sym, collection, body) => {
+        self.lower_for(sym_str(var_name_sym), index_var_sym, collection, body, stmts)
       }
-      SMatch => {
-        self.lower_match_stmt(s, stmts)
+      Match(match_val, arms) => {
+        self.lower_match_into(match_val, arms, "", stmts)
       }
-      SExpr => {
-        self.lower_expr(stmt.expr, stmts)
+      ExprStmt(expr) => {
+        self.lower_expr(expr, stmts)
       }
-      SBlock => {
+      BlockStmt(block) => {
         let mut block_stmts: [LStmt?] = []
-        self.lower_block(stmt.block, block_stmts)
+        self.lower_block(block, block_stmts)
         let block_data = LBlockData { stmts: block_stmts }
         let bs = LStmt { kind: StBlock, block: block_data }
-        stmts = append(stmts, bs)
+        let mut out = stmts
+        out = append(out, bs)
       }
-      SBreak => {
-        stmts = append(stmts, LStmt { kind: StBreak })
+      Break => {
+        let mut out = stmts
+        out = append(out, LStmt { kind: StBreak })
       }
-      SContinue => {
-        stmts = append(stmts, LStmt { kind: StContinue })
+      Continue => {
+        let mut out = stmts
+        out = append(out, LStmt { kind: StContinue })
       }
-      SDefer => {
-        let mut defer_body: [LStmt?] = []
-        self.lower_block(stmt.block, defer_body)
-        let dd = LDeferData { body: defer_body }
-        stmts = append(stmts, LStmt { kind: StDefer, defer_data: dd })
-      }
-      SSpawn => {
+      Spawn(body) => {
         let mut spawn_body: [LStmt?] = []
-        self.lower_block(stmt.block, spawn_body)
+        self.lower_block(body, spawn_body)
         let sd = LSpawnData { body: spawn_body, captures: [] }
-        stmts = append(stmts, LStmt { kind: StSpawn, spawn_data: sd })
+        let mut out = stmts
+        out = append(out, LStmt { kind: StSpawn, spawn_data: sd })
       }
-      SYield => {
-        let val = self.lower_expr(stmt.expr, stmts)
+      Yield(value) => {
+        let val = self.lower_expr(value, stmts)
         let yd = LYieldData { value: val }
-        stmts = append(stmts, LStmt { kind: StYield, yield_data: yd })
+        let mut out = stmts
+        out = append(out, LStmt { kind: StYield, yield_data: yd })
       }
-      SSend => {
-        let ch = self.lower_expr(stmt.channel, stmts)
-        let val = self.lower_expr(stmt.expr, stmts)
-        let sd = LSendData { channel: ch, value: val }
-        stmts = append(stmts, LStmt { kind: StSend, send_data: sd })
+      Select(cases) => {
+        self.lower_select(cases, stmts)
       }
-      SSelect => {
-        self.lower_select(s, stmts)
-      }
-      SLock => {
-        let mutex = self.lower_expr(stmt.lock_expr, stmts)
+      Lock(mutex, body) => {
+        let mutex_val = self.lower_expr(mutex, stmts)
         let mut lock_body: [LStmt?] = []
-        self.lower_block(stmt.block, lock_body)
-        let ld = LLockData { mutex: mutex, body: lock_body }
-        stmts = append(stmts, LStmt { kind: StLock, lock_data: ld })
+        self.lower_block(body, lock_body)
+        let ld = LLockData { mutex: mutex_val, body: lock_body }
+        let mut out = stmts
+        out = append(out, LStmt { kind: StLock, lock_data: ld })
       }
-      _ => {}
+      Cascade(body) => {
+        // Lower cascade as a plain block
+        let mut cascade_body: [LStmt?] = []
+        self.lower_block(body, cascade_body)
+        let block_data = LBlockData { stmts: cascade_body }
+        let mut out = stmts
+        out = append(out, LStmt { kind: StBlock, block: block_data })
+      }
     }
   }
 
@@ -739,15 +767,16 @@ forge lowerer {
   // Variable Declaration Lowering
   // ==========================================================================
 
-  func Lowerer.lower_var_decl(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
-    let name = s.var_name
-    let typ = self.lower_type(s.var_type)
+  func Lowerer.lower_var_decl(
+    self, name: string, type_expr: TypeExpr?,
+    is_mutable: bool, value: Expr?, stmts: [LStmt?]
+  ) {
+    let mut out = stmts
+    let typ = self.lower_type(type_expr)
 
     let mut init: LValue? = null
-    if !isnull(s.var_init) {
-      init = self.lower_expr(s.var_init, stmts)
+    if !isnull(value) {
+      init = self.lower_expr(value, out)
     }
 
     // Use init's type if no declared type
@@ -758,163 +787,166 @@ forge lowerer {
 
     self.define_var(name, final_type)
 
-    let data = LVarDeclData { name: name, typ: final_type, init: init, mutable: s.is_mutable }
-    stmts = append(stmts, LStmt { kind: StVarDecl, var_decl: data })
+    let data = LVarDeclData { name: name, typ: final_type, init: init, mutable: is_mutable }
+    out = append(out, LStmt { kind: StVarDecl, var_decl: data })
   }
 
   // ==========================================================================
   // Assignment Lowering
   // ==========================================================================
 
-  func Lowerer.lower_assign(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
-    let val = self.lower_expr(s.assign_value, stmts)
+  func Lowerer.lower_assign(self, target: Expr?, value: Expr?, stmts: [LStmt?]) {
+    let mut out = stmts
+    let val = self.lower_expr(value, out)
 
-    if !isnull(s.assign_target) {
-      let target = s.assign_target!
-      if target.kind == EFieldAccess {
-        let recv = self.lower_expr(target.object, stmts)
-        let field = target.field_name
-        let mut recv_type: LType? = null
-        if !isnull(recv) {
-          recv_type = recv!.typ
-        }
+    if !isnull(target) {
+      let tgt = target!
+      match tgt.kind {
+        FieldAccess(receiver_expr, field_sym) => {
+          let recv = self.lower_expr(receiver_expr, out)
+          let field = sym_str(field_sym)
+          let mut recv_type: LType? = null
+          if !isnull(recv) {
+            recv_type = recv!.typ
+          }
 
-        if !isnull(recv_type) && recv_type!.kind == TyClassHandle {
-          let data = LClassSetData { handle: recv, class_name: recv_type!.name, field: field, value: val }
-          stmts = append(stmts, LStmt { kind: StClassSet, class_set: data })
+          if !isnull(recv_type) && recv_type!.kind == TyClassHandle {
+            let data = LClassSetData { handle: recv, class_name: recv_type!.name, field: field, value: val }
+            out = append(out, LStmt { kind: StClassSet, class_set: data })
+            return
+          }
+          // Struct set
+          let data = LStructSetData { receiver: recv, field: field, value: val }
+          out = append(out, LStmt { kind: StStructSet, struct_set: data })
           return
         }
-        // Struct set
-        let data = LStructSetData { receiver: recv, field: field, value: val }
-        stmts = append(stmts, LStmt { kind: StStructSet, struct_set: data })
-        return
-      }
-      if target.kind == EIndex {
-        let collection = self.lower_expr(target.object, stmts)
-        let index = self.lower_expr(target.index_expr, stmts)
-        let data = LIndexSetData { collection: collection, index: index, value: val }
-        stmts = append(stmts, LStmt { kind: StIndexSet, index_set: data })
-        return
+        Index(receiver_expr, index_expr) => {
+          let collection = self.lower_expr(receiver_expr, out)
+          let index = self.lower_expr(index_expr, out)
+          let data = LIndexSetData { collection: collection, index: index, value: val }
+          out = append(out, LStmt { kind: StIndexSet, index_set: data })
+          return
+        }
+        Ident(name_sym) => {
+          let data = LAssignData { target: sym_str(name_sym), value: val }
+          out = append(out, LStmt { kind: StAssign, assign: data })
+          return
+        }
+        _ => {}
       }
     }
 
-    // Simple variable assignment
-    let mut target_name = ""
-    if !isnull(s.assign_target) {
-      target_name = s.assign_target!.name
-    }
-    let data = LAssignData { target: target_name, value: val }
-    stmts = append(stmts, LStmt { kind: StAssign, assign: data })
+    // Fallback: simple variable assignment
+    let data = LAssignData { target: "", value: val }
+    out = append(out, LStmt { kind: StAssign, assign: data })
   }
 
   // ==========================================================================
   // Return Lowering
   // ==========================================================================
 
-  func Lowerer.lower_return(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
+  func Lowerer.lower_return(self, value: Expr?, stmts: [LStmt?]) {
+    let mut out = stmts
     let mut values: [LValue?] = []
-    if !isnull(s.return_value) {
-      values = append(values, self.lower_expr(s.return_value, stmts))
+    if !isnull(value) {
+      values = append(values, self.lower_expr(value, out))
     }
     let rd = LReturnData { values: values }
-    stmts = append(stmts, LStmt { kind: StReturn, ret: rd })
+    out = append(out, LStmt { kind: StReturn, ret: rd })
   }
 
   // ==========================================================================
   // If Statement Lowering
   // ==========================================================================
 
-  func Lowerer.lower_if(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
-    let cond = self.lower_expr(s.if_cond, stmts)
+  func Lowerer.lower_if(
+    self, condition: Expr?, then_block: Block?,
+    else_ifs: [ElseIf], else_block: Block?,
+    stmts: [LStmt?]
+  ) {
+    let mut out = stmts
+    let cond = self.lower_expr(condition, out)
 
     let mut then_body: [LStmt?] = []
-    if !isnull(s.if_then) {
-      self.lower_block(s.if_then, then_body)
+    if !isnull(then_block) {
+      self.lower_block(then_block!, then_body)
     }
 
     let mut else_body: [LStmt?] = []
-    if !isnull(s.if_else) {
-      self.lower_block(s.if_else, else_body)
-    } else if !isnull(s.else_if) {
-      self.lower_if(s.else_if, else_body)
+    if !isnull(else_block) {
+      self.lower_block(else_block!, else_body)
+    } else if len(else_ifs) > 0 {
+      // Lower first else-if as nested if in the else body
+      let ei = else_ifs[0]
+      self.lower_if(ei.condition, ei.body, [], null, else_body)
     }
 
     let data = LIfData { cond: cond, then_body: then_body, else_body: else_body }
-    stmts = append(stmts, LStmt { kind: StIf, if_data: data })
+    out = append(out, LStmt { kind: StIf, if_data: data })
   }
 
   // ==========================================================================
   // While Loop Lowering
   // ==========================================================================
 
-  func Lowerer.lower_while(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
+  func Lowerer.lower_while(self, condition: Expr?, body: Block?, stmts: [LStmt?]) {
+    let mut out = stmts
 
     let mut cond_block: [LStmt?] = []
-    let cond_val = self.lower_expr(s.while_cond, cond_block)
+    let cond_val = self.lower_expr(condition, cond_block)
 
-    let mut body: [LStmt?] = []
-    if !isnull(s.while_body) {
-      self.lower_block(s.while_body, body)
+    let mut lbody: [LStmt?] = []
+    if !isnull(body) {
+      self.lower_block(body!, lbody)
     }
 
-    let data = LWhileData { cond_block: cond_block, cond_var: cond_val, body: body }
-    stmts = append(stmts, LStmt { kind: StWhile, while_data: data })
+    let data = LWhileData { cond_block: cond_block, cond_var: cond_val, body: lbody }
+    out = append(out, LStmt { kind: StWhile, while_data: data })
   }
 
   // ==========================================================================
   // For Loop Lowering
   // ==========================================================================
 
-  func Lowerer.lower_for(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
-    let collection = self.lower_expr(s.for_collection, stmts)
+  func Lowerer.lower_for(
+    self, var_name: string, index_var_sym: Sym?,
+    collection: Expr?, body: Block?,
+    stmts: [LStmt?]
+  ) {
+    let mut out = stmts
+    let coll = self.lower_expr(collection, out)
 
-    let var_type = self.resolve_expr_type(s.for_collection)
+    let var_type = self.resolve_expr_type(collection)
     let mut elem_type: LType? = null
     if !isnull(var_type) {
       elem_type = var_type!.elem
     }
 
-    let mut body: [LStmt?] = []
-    if !isnull(s.for_body) {
-      self.lower_block(s.for_body, body)
+    let mut lbody: [LStmt?] = []
+    if !isnull(body) {
+      self.lower_block(body!, lbody)
     }
 
-    let mut index_var = ""
-    if !isnull(s.for_index) {
-      index_var = s.for_index!.name
-    }
+    let index_var = sym_str(index_var_sym)
 
     let data = LForData {
-      var_name: s.for_var, var_type: elem_type,
-      index_var: index_var, collection: collection, body: body
+      var_name: var_name, var_type: elem_type,
+      index_var: index_var, collection: coll, body: lbody
     }
-    stmts = append(stmts, LStmt { kind: StFor, for_data: data })
+    out = append(out, LStmt { kind: StFor, for_data: data })
   }
 
   // ==========================================================================
   // Match Statement Lowering
   // ==========================================================================
 
-  func Lowerer.lower_match_stmt(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    self.lower_match_stmt_into(stmt!, "", stmts)
-  }
+  func Lowerer.lower_match_into(
+    self, match_val: Expr?, arms: [MatchArm],
+    result_var: string, stmts: [LStmt?]
+  ) {
+    let mut out = stmts
 
-  func Lowerer.lower_match_stmt_into(self, s: Stmt?, result_var: string, stmts: [LStmt?]) {
-    if isnull(s) { return }
-    let stmt = s!
-
-    let subject = self.lower_expr(stmt.match_subject, stmts)
+    let subject = self.lower_expr(match_val, out)
     let mut subject_type: LType? = null
     if !isnull(subject) {
       subject_type = subject!.typ
@@ -926,67 +958,91 @@ forge lowerer {
       let tag_data = LVariantTagData { value: subject }
       let tag_type = LType { kind: TyI32, bits: 32 }
       let tag_ex = LExpr { kind: ExVariantTag, typ: tag_type, variant_tag: tag_data }
-      let tag_val = self.emit_temp(tag_ex, stmts)
+      let tag_val = self.emit_temp(tag_ex, out)
 
       let mut cases: [LSwitchCase] = []
-      for arm in stmt.match_arms {
+      for arm in arms {
         let mut case_body: [LStmt?] = []
         if !isnull(arm.body) {
-          self.lower_block(arm.body, case_body)
+          self.lower_block(arm.body!, case_body)
         }
 
-        let mut tag: i32 = arm.tag
-        if arm.is_default {
-          tag = -1
+        // Determine tag and binding from pattern
+        let mut tag: i32 = -1
+        let mut binding = ""
+        if !isnull(arm.pattern) {
+          match arm.pattern!.kind {
+            Variant(name_sym, bindings) => {
+              binding = sym_str(name_sym)
+              tag = self.find_variant_tag(subject_type!.name, binding)
+            }
+            Wildcard => {
+              tag = -1
+            }
+            _ => {
+              tag = -1
+            }
+          }
         }
-        cases = append(cases, LSwitchCase { tag: tag, binding: arm.binding, body: case_body })
+        cases = append(cases, LSwitchCase { tag: tag, binding: binding, body: case_body })
       }
 
       let sw_data = LSwitchData { tag: tag_val, cases: cases, enum_name: subject_type!.name }
-      stmts = append(stmts, LStmt { kind: StSwitch, switch_data: sw_data })
+      out = append(out, LStmt { kind: StSwitch, switch_data: sw_data })
     } else {
       // Non-enum match: lower to if-else chain
-      for arm in stmt.match_arms {
-        if arm.is_default {
-          let mut body: [LStmt?] = []
-          if !isnull(arm.body) {
-            self.lower_block(arm.body, body)
+      for arm in arms {
+        let mut body: [LStmt?] = []
+        if !isnull(arm.body) {
+          self.lower_block(arm.body!, body)
+        }
+        let block_data = LBlockData { stmts: body }
+        out = append(out, LStmt { kind: StBlock, block: block_data })
+      }
+    }
+  }
+
+  // Helper: look up variant tag by name in a registered enum
+  func Lowerer.find_variant_tag(self, enum_name: string, variant_name: string) -> i32 {
+    if !isnull(self.enums) {
+      let found = dict_get(self.enums!, enum_name)
+      if !isnull(found) {
+        let mut tag: i32 = 0
+        for v in found!.value.ev_children() {
+          if sym_str(v.name) == variant_name {
+            return tag
           }
-          let block_data = LBlockData { stmts: body }
-          stmts = append(stmts, LStmt { kind: StBlock, block: block_data })
+          tag = tag + 1
         }
       }
     }
+    return -1
   }
 
   // ==========================================================================
   // Select Statement Lowering
   // ==========================================================================
 
-  func Lowerer.lower_select(self, stmt: Stmt?, stmts: [LStmt?]) {
-    if isnull(stmt) { return }
-    let s = stmt!
-    let mut cases: [LSelectCase] = []
-    for sc in s.select_cases {
+  func Lowerer.lower_select(self, cases: [SelectCase], stmts: [LStmt?]) {
+    let mut out = stmts
+    let mut lcases: [LSelectCase] = []
+    for sc in cases {
       let mut case_body: [LStmt?] = []
       if !isnull(sc.body) {
-        self.lower_block(sc.body, case_body)
+        self.lower_block(sc.body!, case_body)
       }
-      let ch = self.lower_expr(sc.channel, stmts)
-      let val = self.lower_expr(sc.value, stmts)
+      let ch = self.lower_expr(sc.expr, out)
       let mut kind = SelRecv
       if sc.is_default {
         kind = SelDefault
-      } else if sc.is_send {
-        kind = SelSend
       }
-      cases = append(cases, LSelectCase {
-        kind: kind, channel: ch, value: val,
-        binding: sc.binding, body: case_body
+      lcases = append(lcases, LSelectCase {
+        kind: kind, channel: ch, value: null,
+        binding: sym_str(sc.bind_var), body: case_body
       })
     }
-    let sel_data = LSelectData { cases: cases }
-    stmts = append(stmts, LStmt { kind: StSelect, select_data: sel_data })
+    let sel_data = LSelectData { cases: lcases }
+    out = append(out, LStmt { kind: StSelect, select_data: sel_data })
   }
 
   // ==========================================================================
@@ -996,7 +1052,7 @@ forge lowerer {
   func Lowerer.lower_block(self, block: Block?, stmts: [LStmt?]) {
     if isnull(block) { return }
     let b = block!
-    for s in b.stmts {
+    for s in b.bs_children() {
       self.lower_stmt(s, stmts)
     }
   }
@@ -1010,24 +1066,25 @@ forge lowerer {
     let f = fn_decl!
 
     let mut params: [LParam] = []
-    for p in f.params {
-      let pt = self.lower_type(p.typ)
-      params = append(params, LParam { name: p.name, typ: pt })
-      self.define_var(p.name, pt)
+    for p in f.param_children() {
+      let pt = self.lower_type(p.type_expr)
+      let pname = sym_str(p.name)
+      params = append(params, LParam { name: pname, typ: pt })
+      self.define_var(pname, pt)
     }
 
     let ret = self.lower_type(f.return_type)
     self.current_func_return = ret
 
     let mut type_params: [LTypeParam] = []
-    for tp in f.type_params {
-      type_params = append(type_params, LTypeParam { name: tp.name, constraint: "" })
+    for tp in f.fp_children() {
+      type_params = append(type_params, LTypeParam { name: sym_str(tp.name), constraint: "" })
     }
 
     // Receiver
     let mut receiver = ""
     if !isnull(f.receiver_type) {
-      receiver = f.receiver_type!.name
+      receiver = sym_str(f.receiver_type)
       let recv_type = LType { kind: TyClassHandle, name: receiver }
       self.define_var("self", recv_type)
     }
@@ -1040,18 +1097,24 @@ forge lowerer {
 
     // Relational constraints
     let mut constraints: [LRelationalConstraint] = []
-    for wc in f.where_clauses {
-      let mut type_args: [string] = []
-      for ta in wc.type_args {
-        type_args = append(type_args, ta.name)
+    for wc in f.where_children() {
+      let mut wc_type_args: [string] = []
+      for ta in wc.wc_arg_children() {
+        // Extract name from TypeExpr
+        match ta.kind {
+          Named(name_sym, args) => {
+            wc_type_args = append(wc_type_args, sym_str(name_sym))
+          }
+          _ => {}
+        }
       }
       constraints = append(constraints, LRelationalConstraint {
-        interface_name: wc.interface_name, type_args: type_args
+        interface_name: sym_str(wc.constraint), type_args: wc_type_args
       })
     }
 
     return LFuncDecl {
-      name: f.name,
+      name: sym_str(f.name),
       type_params: type_params,
       params: params,
       return_type: ret,
@@ -1070,49 +1133,49 @@ forge lowerer {
     if isnull(block) { return }
     let b = block!
 
-    for s in b.structs {
+    for s in b.sd_children() {
       if !isnull(self.structs) {
-        dict_set(self.structs!, sym(s.name), s)
+        dict_set(self.structs!, sym_str(s.name), s)
       }
     }
 
-    for c in b.classes {
+    for c in b.cd_children() {
       if !isnull(self.classes) {
-        dict_set(self.classes!, sym(c.name), c)
+        dict_set(self.classes!, sym_str(c.name), c)
       }
       if !isnull(self.class_fields) {
         let field_map = Dict<LType> {}
-        for fld in c.fields {
-          let ft = self.lower_type(fld.typ)
+        for fld in c.cf_children() {
+          let ft = self.lower_type(fld.type_expr)
           if !isnull(ft) {
-            dict_set(field_map, sym(fld.name), ft!)
+            dict_set(field_map, sym_str(fld.name), ft!)
           }
         }
-        dict_set(self.class_fields!, sym(c.name), field_map)
+        dict_set(self.class_fields!, sym_str(c.name), field_map)
       }
     }
 
-    for e in b.enums {
+    for e in b.ed_children() {
       if !isnull(self.enums) {
-        dict_set(self.enums!, sym(e.name), e)
+        dict_set(self.enums!, sym_str(e.name), e)
       }
     }
 
-    for iface in b.interfaces {
+    for iface in b.id_children() {
       if !isnull(self.interfaces) {
-        dict_set(self.interfaces!, sym(iface.name), iface)
+        dict_set(self.interfaces!, sym_str(iface.name), iface)
       }
     }
 
-    for ta in b.type_aliases {
+    for ta in b.ta_children() {
       if !isnull(self.type_aliases) {
-        dict_set(self.type_aliases!, sym(ta.name), ta.typ)
+        dict_set(self.type_aliases!, sym_str(ta.name), ta.type_expr)
       }
     }
 
-    for f in b.functions {
+    for fd in b.fd_children() {
       if !isnull(self.func_sigs) {
-        dict_set(self.func_sigs!, sym(f.name), f)
+        dict_set(self.func_sigs!, sym_str(fd.name), fd)
       }
     }
   }
@@ -1146,88 +1209,77 @@ forge lowerer {
     lowerer.program = prog
 
     // Phase 1: Register all declarations
-    for block in f.blocks {
+    for block in f.fb_children() {
       lowerer.register_block(block)
     }
 
     // Phase 2: Lower all declarations
-    for block in f.blocks {
-      if isnull(block) {
-        continue
-      }
-      let b = block!
+    for block in f.fb_children() {
+      let b = block
 
       // Lower structs
-      for s in b.structs {
+      for s in b.sd_children() {
         let mut fields: [LField] = []
-        for fld in s.fields {
-          let ft = lowerer.lower_type(fld.typ)
-          fields = append(fields, LField { name: fld.name, typ: ft })
+        for fld in s.sf_children() {
+          let ft = lowerer.lower_type(fld.type_expr)
+          fields = append(fields, LField { name: sym_str(fld.name), typ: ft })
         }
         let mut tps: [LTypeParam] = []
-        for tp in s.type_params {
-          tps = append(tps, LTypeParam { name: tp.name, constraint: "" })
+        for tp in s.stp_children() {
+          tps = append(tps, LTypeParam { name: sym_str(tp.name), constraint: "" })
         }
         prog.structs = append(prog.structs, LStructDecl {
-          name: s.name, fields: fields, type_params: tps, is_exported: s.is_public
+          name: sym_str(s.name), fields: fields, type_params: tps, is_exported: s.is_public
         })
       }
 
       // Lower classes
-      for c in b.classes {
+      for c in b.cd_children() {
         let mut fields: [LField] = []
-        for fld in c.fields {
-          let ft = lowerer.lower_type(fld.typ)
-          fields = append(fields, LField { name: fld.name, typ: ft })
+        for fld in c.cf_children() {
+          let ft = lowerer.lower_type(fld.type_expr)
+          fields = append(fields, LField { name: sym_str(fld.name), typ: ft })
         }
         let mut tps: [LTypeParam] = []
-        for tp in c.type_params {
-          tps = append(tps, LTypeParam { name: tp.name, constraint: "" })
+        for tp in c.ctp_children() {
+          tps = append(tps, LTypeParam { name: sym_str(tp.name), constraint: "" })
         }
         prog.classes = append(prog.classes, LClassDecl {
-          name: c.name, fields: fields, type_params: tps, is_exported: c.is_public
+          name: sym_str(c.name), fields: fields, type_params: tps, is_exported: c.is_public
         })
       }
 
       // Lower enums
-      for e, enum_idx in b.enums {
+      for e in b.ed_children() {
         let mut variants: [LVariant] = []
-        for v, vi in e.variants {
+        let mut vi: i32 = 0
+        for v in e.ev_children() {
           let mut vfields: [LField] = []
-          for vf in v.fields {
-            let vft = lowerer.lower_type(vf.typ)
-            vfields = append(vfields, LField { name: vf.name, typ: vft })
+          for vf in v.evf_children() {
+            let vft = lowerer.lower_type(vf.type_expr)
+            vfields = append(vfields, LField { name: sym_str(vf.name), typ: vft })
           }
-          variants = append(variants, LVariant { name: v.name, tag: vi, fields: vfields })
+          variants = append(variants, LVariant { name: sym_str(v.name), tag: vi, fields: vfields })
+          vi = vi + 1
         }
         prog.enums = append(prog.enums, LEnumDecl {
-          name: e.name, variants: variants, is_exported: e.is_public
+          name: sym_str(e.name), variants: variants, is_exported: e.is_public
         })
       }
 
       // Lower functions
-      for fd in b.functions {
+      for fd in b.fd_children() {
         let lowered = lowerer.lower_func(fd)
         if !isnull(lowered) {
           prog.functions = append(prog.functions, lowered!)
         }
       }
 
-      // Lower constants as globals
-      for c in b.constants {
-        let typ = lowerer.lower_type(c.typ)
-        let mut init_stmts: [LStmt?] = []
-        let init_val = lowerer.lower_expr(c.value, init_stmts)
-        prog.globals = append(prog.globals, LVarDeclData {
-          name: c.name, typ: typ, init: init_val, mutable: false
-        })
-      }
-
       // Lower type aliases
-      for ta in b.type_aliases {
-        let tt = lowerer.lower_type(ta.typ)
+      for ta in b.ta_children() {
+        let tt = lowerer.lower_type(ta.type_expr)
         prog.type_defs = append(prog.type_defs, LTypeDef {
-          name: ta.name, typ: tt, is_exported: ta.is_public
+          name: sym_str(ta.name), typ: tt, is_exported: ta.is_public
         })
       }
     }
