@@ -411,7 +411,8 @@ func cmdTest(args []string) error {
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	//defer os.RemoveAll(tmpDir) // DEBUG: keep for inspection
+	fmt.Fprintf(os.Stderr, "DEBUG: temp dir: %s\n", tmpDir)
 
 	cFile := filepath.Join(tmpDir, "test.c")
 	binFile := filepath.Join(tmpDir, "test")

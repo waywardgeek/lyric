@@ -8,7 +8,7 @@ import (
 // Monomorphize performs a LIR→LIR pass that replaces all generic declarations
 // with specialized copies for each unique set of concrete type arguments found
 // at call sites. After this pass, no LTyTypeVar remains in the program.
-//
+
 // This is required for backends that don't support generics natively (e.g. C).
 // Monomorphize specializes all generic types and functions into concrete versions.
 // Required for the C backend since C has no native generics.
@@ -123,7 +123,7 @@ func Monomorphize(prog *LProgram) {
 						methSubst[k] = v
 					}
 					specMethod := m.specializeFunc(method, methSubst, method.Name, mangledName)
-					newFuncs = append(newFuncs, specMethod)
+				newFuncs = append(newFuncs, specMethod)
 					m.collectFromStmts(specMethod.Body)
 				}
 			}
@@ -1557,7 +1557,10 @@ func filterFuncs(funcs []LFuncDecl, funcInst map[string]map[string][]*LType, cla
 				continue
 			}
 		}
-		if f.Receiver != "" && len(f.ReceiverTypeParams) > 0 {
+		if f.Receiver != "" {
+			// Filter methods on generic classes being monomorphized.
+			// Check both ReceiverTypeParams (direct methods) and classInst lookup
+			// (impl wrapper methods that don't set ReceiverTypeParams).
 			if _, ok := classInst[f.Receiver]; ok {
 				continue
 			}

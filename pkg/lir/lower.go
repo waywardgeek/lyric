@@ -714,15 +714,60 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 		return nil
 	}
 
-	// Build type param → concrete type mapping from impl block type args
+	// Build type param → concrete type mapping from impl block type args.
+	// typeArgMap maps to names (for Receiver/className lookups).
+	// typeArgLTypeMap maps to full LTypes (for substImplType, preserving TypeArgs).
+	//
+	// CRITICAL: Set typeParamsInScope from the ForType class so that type
+	// variables like V in Dict<V> are lowered as LTyTypeVar (not LTyStruct).
+	// Without this, substType in the monomorphizer can't substitute them.
+	savedTypeParams := l.typeParamsInScope
+	// Discover type params in scope from impl block type args.
+	// Scan for NamedType args that are known class type params.
+	// E.g., impl HashedList<Dict<V>, DictEntry<V>, string> → V is in scope.
+	{
+		inScope := make(map[string]bool)
+		for k, v := range savedTypeParams {
+			inScope[k] = v
+		}
+		var collectTypeVarsFromTypeExpr func(te *ast.TypeExpr)
+		collectTypeVarsFromTypeExpr = func(te *ast.TypeExpr) {
+			if te == nil {
+				return
+			}
+			if nt, ok := te.Data.(ast.NamedType); ok {
+				// Check if this name is a class type param
+				for _, tps := range l.classTypeParams {
+					for _, tp := range tps {
+						if tp.Name == nt.Name {
+							inScope[nt.Name] = true
+						}
+					}
+				}
+				for i := range nt.Args {
+					collectTypeVarsFromTypeExpr(&nt.Args[i])
+				}
+			}
+		}
+		for i := range impl.TypeArgs {
+			collectTypeVarsFromTypeExpr(&impl.TypeArgs[i])
+		}
+		if len(inScope) > 0 {
+			l.typeParamsInScope = inScope
+		}
+	}
 	typeArgMap := make(map[string]string)
+	typeArgLTypeMap := make(map[string]*LType)
 	for i, tp := range iface.TypeParams {
 		if i < len(impl.TypeArgs) {
+			lt := l.lowerTypeExpr(&impl.TypeArgs[i])
+			typeArgLTypeMap[tp.Name] = lt
 			if nt, ok := impl.TypeArgs[i].Data.(ast.NamedType); ok {
 				typeArgMap[tp.Name] = nt.Name
 			}
 		}
 	}
+	l.typeParamsInScope = savedTypeParams
 
 	var wrappers []LFuncDecl
 
@@ -744,10 +789,12 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 			if className == "" {
 				continue
 			}
+			// Full LType for self (preserves TypeArgs for generic classes)
+			selfType := typeArgLTypeMap[mapping.TypeParam]
 
 			// Substitute type vars with concrete types
-			params := l.substImplParams(ifaceMethod.Params, typeArgMap)
-			retType := l.substImplType(ifaceMethod.ReturnType, typeArgMap)
+			params := l.substImplParams(ifaceMethod.Params, typeArgLTypeMap)
+			retType := l.substImplType(ifaceMethod.ReturnType, typeArgLTypeMap)
 
 			// Build forwarding body using proper LIR temps
 			var body []LStmt
@@ -762,7 +809,7 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 			callExpr := LExpr{
 				Kind: LExprMethodCall,
 				Data: &LMethodCallData{
-					Receiver:   LValue{Kind: LValVar, Name: "self", Type: &LType{Kind: LTyClassHandle, Name: className}},
+					Receiver:   LValue{Kind: LValVar, Name: "self", Type: selfType},
 					Method:     mapping.TargetMember,
 					Args:       callArgs,
 					IsExported: l.exported[mapping.TargetMember],
@@ -806,6 +853,8 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 			if className == "" {
 				continue
 			}
+			// Full LType for self (preserves TypeArgs for generic classes)
+			selfType := typeArgLTypeMap[mapping.TypeParam]
 
 			// Concrete method name from target member (label-prefixed).
 			// "parent" → "fp_parent"; "set_parent" → "set_fp_parent"
@@ -829,10 +878,10 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 			l.prog.ImplMethodRenames[renameKey] = concreteName
 
 			if isSetter {
-				valType := l.substImplType(ifaceMethod.Params[0].Type, typeArgMap)
+				valType := l.substImplType(ifaceMethod.Params[0].Type, typeArgLTypeMap)
 				var body []LStmt
 				body = append(body, LStmt{Kind: LStmtClassSet, Data: &LClassSet{
-					Handle: LValue{Kind: LValVar, Name: "self", Type: &LType{Kind: LTyClassHandle, Name: className}},
+					Handle: LValue{Kind: LValVar, Name: "self", Type: selfType},
 					Class:  className,
 					Field:  mapping.TargetMember,
 					Value:  LValue{Kind: LValVar, Name: "val", Type: valType},
@@ -847,12 +896,12 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 					IsExported: true,
 				})
 			} else {
-				retType := l.substImplType(ifaceMethod.ReturnType, typeArgMap)
+				retType := l.substImplType(ifaceMethod.ReturnType, typeArgLTypeMap)
 				var body []LStmt
 				fieldAccess := LExpr{
 					Kind: LExprClassGet,
 					Data: &LClassGetData{
-						Handle: LValue{Kind: LValVar, Name: "self", Type: &LType{Kind: LTyClassHandle, Name: className}},
+						Handle: LValue{Kind: LValVar, Name: "self", Type: selfType},
 						Class:  className,
 						Field:  mapping.TargetMember,
 					},
@@ -878,7 +927,7 @@ func (l *Lowerer) lowerImplBlock(impl *ast.ImplBlock) []LFuncDecl {
 }
 
 // substImplParams substitutes type variables in method params with concrete types.
-func (l *Lowerer) substImplParams(params []LParam, typeArgMap map[string]string) []LParam {
+func (l *Lowerer) substImplParams(params []LParam, typeArgMap map[string]*LType) []LParam {
 	result := make([]LParam, len(params))
 	for i, p := range params {
 		result[i] = LParam{Name: p.Name, Type: l.substImplType(p.Type, typeArgMap)}
@@ -887,17 +936,14 @@ func (l *Lowerer) substImplParams(params []LParam, typeArgMap map[string]string)
 }
 
 // substImplType replaces type variables with their concrete types from the impl block.
-func (l *Lowerer) substImplType(t *LType, typeArgMap map[string]string) *LType {
+func (l *Lowerer) substImplType(t *LType, typeArgMap map[string]*LType) *LType {
 	if t == nil {
 		return nil
 	}
 	switch t.Kind {
 	case LTyTypeVar:
 		if concrete, ok := typeArgMap[t.Name]; ok {
-			if _, isClass := l.classFields[concrete]; isClass {
-				return &LType{Kind: LTyClassHandle, Name: concrete}
-			}
-			return &LType{Kind: LTyStruct, Name: concrete}
+			return concrete
 		}
 		return t
 	case LTySlice:

@@ -308,15 +308,20 @@ func DesugarRelations(file *File) {
 						}
 					}
 				} else {
+					// Build TypeArgs with type parameters from the relation sides
+					buildTypeExpr := func(side RelationSide) TypeExpr {
+						nt := NamedType{Name: side.TypeName}
+						for _, ta := range side.TypeArgs {
+							nt.Args = append(nt.Args, TypeExpr{
+								Kind: TypeNamed,
+								Data: NamedType{Name: ta},
+							})
+						}
+						return TypeExpr{Kind: TypeNamed, Data: nt}
+					}
 					var typeArgs []TypeExpr
-					typeArgs = append(typeArgs, TypeExpr{
-						Kind: TypeNamed,
-						Data: NamedType{Name: parentName},
-					})
-					typeArgs = append(typeArgs, TypeExpr{
-						Kind: TypeNamed,
-						Data: NamedType{Name: childName},
-					})
+					typeArgs = append(typeArgs, buildTypeExpr(rel.Parent))
+					typeArgs = append(typeArgs, buildTypeExpr(rel.Child))
 
 					block.ImplBlocks = append(block.ImplBlocks, ImplBlock{
 						InterfaceName: rel.Hint,
@@ -477,6 +482,152 @@ func substituteTypeParamsInTypeExpr(te *TypeExpr, typeMap map[string]string) {
 	}
 }
 
+// substituteTypeParamsRich* variants use map[string]TypeExpr for rich substitution.
+// When replacing type param P with Dict<V>, the replacement carries Args so that
+// hash_remove<P, C>() becomes hash_remove<Dict<V>, DictEntry<V>>() not hash_remove<Dict, DictEntry>().
+
+func substituteTypeParamsRichInBlock(block *Block, typeMap map[string]TypeExpr) {
+	for i := range block.Stmts {
+		substituteTypeParamsRichInStmt(&block.Stmts[i], typeMap)
+	}
+}
+
+func substituteTypeParamsRichInStmt(stmt *Stmt, typeMap map[string]TypeExpr) {
+	switch stmt.Kind {
+	case StmtExpr:
+		if d, ok := stmt.Data.(*ExprStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Expr, typeMap)
+		}
+	case StmtAssign:
+		if d, ok := stmt.Data.(*AssignStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Value, typeMap)
+		} else if d, ok := stmt.Data.(AssignStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Value, typeMap)
+			stmt.Data = d
+		}
+	case StmtVarDecl:
+		if d, ok := stmt.Data.(*VarDeclStmt); ok {
+			if d.Value != nil {
+				substituteTypeParamsRichInExpr(d.Value, typeMap)
+			}
+		}
+	case StmtReturn:
+		if d, ok := stmt.Data.(*ReturnStmt); ok {
+			if d.Value != nil {
+				substituteTypeParamsRichInExpr(d.Value, typeMap)
+			}
+		}
+	case StmtIf:
+		if d, ok := stmt.Data.(*IfStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Condition, typeMap)
+			substituteTypeParamsRichInBlock(&d.Then, typeMap)
+			for ei := range d.ElseIfs {
+				substituteTypeParamsRichInExpr(&d.ElseIfs[ei].Condition, typeMap)
+				substituteTypeParamsRichInBlock(&d.ElseIfs[ei].Body, typeMap)
+			}
+			if d.Else != nil {
+				substituteTypeParamsRichInBlock(d.Else, typeMap)
+			}
+		}
+	case StmtWhile:
+		if d, ok := stmt.Data.(*WhileStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Condition, typeMap)
+			substituteTypeParamsRichInBlock(&d.Body, typeMap)
+		}
+	case StmtFor:
+		if d, ok := stmt.Data.(*ForStmt); ok {
+			substituteTypeParamsRichInExpr(&d.Collection, typeMap)
+			substituteTypeParamsRichInBlock(&d.Body, typeMap)
+		}
+	case StmtBlock:
+		if d, ok := stmt.Data.(*Block); ok {
+			substituteTypeParamsRichInBlock(d, typeMap)
+		}
+	}
+}
+
+func substituteTypeParamsRichInExpr(expr *Expr, typeMap map[string]TypeExpr) {
+	if expr == nil {
+		return
+	}
+	switch d := expr.Data.(type) {
+	case *CallExpr:
+		for i := range d.TypeArgs {
+			substituteTypeParamsRichInTypeExpr(&d.TypeArgs[i], typeMap)
+		}
+		substituteTypeParamsRichInExpr(&d.Func, typeMap)
+		for i := range d.Args {
+			substituteTypeParamsRichInExpr(&d.Args[i], typeMap)
+		}
+	case CallExpr:
+		for i := range d.TypeArgs {
+			substituteTypeParamsRichInTypeExpr(&d.TypeArgs[i], typeMap)
+		}
+		substituteTypeParamsRichInExpr(&d.Func, typeMap)
+		for i := range d.Args {
+			substituteTypeParamsRichInExpr(&d.Args[i], typeMap)
+		}
+		expr.Data = d
+	case *MethodCallExpr:
+		for i := range d.TypeArgs {
+			substituteTypeParamsRichInTypeExpr(&d.TypeArgs[i], typeMap)
+		}
+		substituteTypeParamsRichInExpr(&d.Receiver, typeMap)
+		for i := range d.Args {
+			substituteTypeParamsRichInExpr(&d.Args[i], typeMap)
+		}
+	case MethodCallExpr:
+		for i := range d.TypeArgs {
+			substituteTypeParamsRichInTypeExpr(&d.TypeArgs[i], typeMap)
+		}
+		substituteTypeParamsRichInExpr(&d.Receiver, typeMap)
+		for i := range d.Args {
+			substituteTypeParamsRichInExpr(&d.Args[i], typeMap)
+		}
+		expr.Data = d
+	case UnaryExpr:
+		substituteTypeParamsRichInExpr(&d.Operand, typeMap)
+		expr.Data = d
+	case BinaryExpr:
+		substituteTypeParamsRichInExpr(&d.Left, typeMap)
+		substituteTypeParamsRichInExpr(&d.Right, typeMap)
+		expr.Data = d
+	case FieldAccessExpr:
+		substituteTypeParamsRichInExpr(&d.Receiver, typeMap)
+		expr.Data = d
+	case IndexExpr:
+		substituteTypeParamsRichInExpr(&d.Receiver, typeMap)
+		substituteTypeParamsRichInExpr(&d.Index, typeMap)
+		expr.Data = d
+	}
+}
+
+func substituteTypeParamsRichInTypeExpr(te *TypeExpr, typeMap map[string]TypeExpr) {
+	if te == nil || te.Data == nil {
+		return
+	}
+	switch te.Kind {
+	case TypeNamed:
+		nt := te.Data.(NamedType)
+		if replacement, ok := typeMap[nt.Name]; ok {
+			// Replace entirely with the rich TypeExpr (which carries Args)
+			*te = replacement
+			return
+		}
+		for i := range nt.Args {
+			substituteTypeParamsRichInTypeExpr(&nt.Args[i], typeMap)
+		}
+	case TypeOptional:
+		if inner, ok := te.Data.(*TypeExpr); ok {
+			substituteTypeParamsRichInTypeExpr(inner, typeMap)
+		}
+	case TypeSequence:
+		if inner, ok := te.Data.(*TypeExpr); ok {
+			substituteTypeParamsRichInTypeExpr(inner, typeMap)
+		}
+	}
+}
+
 // DesugarDestructors generates destroy methods on classes involved in relations.
 // For each relation with destructors, copies the interface's destructor blocks to the
 // concrete classes as `destroy` methods. Must run after DesugarInterfaceFields and DesugarRelations.
@@ -509,10 +660,25 @@ func DesugarDestructors(file *File) {
 				continue
 			}
 
-			// Map type params to concrete class names
+			// Map type params to concrete class names (simple, for class-name lookups)
 			typeParamToClass := make(map[string]string)
 			typeParamToClass[iface.TypeParams[0].Name] = rel.Parent.TypeName
 			typeParamToClass[iface.TypeParams[1].Name] = rel.Child.TypeName
+
+			// Rich map for type substitution: includes TypeArgs (e.g., P → Dict<V>)
+			typeParamToTypeExpr := make(map[string]TypeExpr)
+			buildRichTypeExpr := func(side RelationSide) TypeExpr {
+				nt := NamedType{Name: side.TypeName}
+				for _, ta := range side.TypeArgs {
+					nt.Args = append(nt.Args, TypeExpr{
+						Kind: TypeNamed,
+						Data: NamedType{Name: ta},
+					})
+				}
+				return TypeExpr{Kind: TypeNamed, Data: nt}
+			}
+			typeParamToTypeExpr[iface.TypeParams[0].Name] = buildRichTypeExpr(rel.Parent)
+			typeParamToTypeExpr[iface.TypeParams[1].Name] = buildRichTypeExpr(rel.Child)
 
 			for _, db := range iface.Destructors {
 				className, ok := typeParamToClass[db.TypeParam]
@@ -524,7 +690,7 @@ func DesugarDestructors(file *File) {
 				}
 				// Deep copy and substitute type params in the body
 				bodyCopy := deepCopyBlock(db.Body)
-				substituteTypeParamsInBlock(&bodyCopy, typeParamToClass)
+				substituteTypeParamsRichInBlock(&bodyCopy, typeParamToTypeExpr)
 				destructorBodies[className] = append(destructorBodies[className], bodyCopy)
 			}
 		}
