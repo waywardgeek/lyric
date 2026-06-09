@@ -204,8 +204,17 @@ func Monomorphize(prog *LProgram) {
 		}
 	}
 
-	// Export rename map for C backend
+	// Export rename map for C backend (legacy — to be removed once pre-pass handles all cases)
 	prog.ClassRenames = m.classRenames
+
+	// Phase 6: Resolve bare generic class names in specialized function bodies.
+	// After monomorphization, specialized functions may still contain bare class
+	// names (e.g., LTyClassHandle{Name: "Dict"}) where the lowerer created types
+	// without TypeArgs. substType couldn't substitute these since there were no
+	// type variables to trigger substitution. Each specialized function carries a
+	// ClassRenameMap (generic name → mangled name) built from its type substitution.
+	// This pass applies those maps to all types, params, and bodies.
+	ResolveClassNames(prog)
 }
 
 // monoPass holds state for the monomorphization pass.
@@ -405,16 +414,244 @@ func (m *monoPass) specializeFunc(orig *LFuncDecl, subst map[string]*LType, newN
 		}
 	}
 
+	// Build class rename map: for each generic class/struct, compute what its
+	// mangled name would be given this function's type substitution.
+	// This is stored on the function and applied by ResolveClassNames().
+	renameMap := m.buildClassRenameMap(subst)
+	if len(renameMap) > 0 {
+		spec.ClassRenameMap = renameMap
+	}
+
 	// Rewrite method calls based on ImplMethodRenames.
-	// When a default interface method like array_append<P, C> is specialized,
-	// calls like child.set_parent(val) must resolve to the label-prefixed
-	// accessor (e.g., set_fp_parent) for the specific relation instantiation.
 	if len(orig.RelationalConstraints) > 0 && m.prog.ImplMethodRenames != nil {
 		m.rewriteImplMethodCalls(&spec, orig.RelationalConstraints, subst)
 	}
 
 	return spec
 }
+
+// buildClassRenameMap builds a map from generic class/struct names to their
+// mangled names based on the given type substitution. For each generic class
+// with type params that appear in subst, compute the concrete type args and
+// mangle the name.
+func (m *monoPass) buildClassRenameMap(subst map[string]*LType) map[string]string {
+	renames := map[string]string{}
+	for name, cls := range m.classByName {
+		if len(cls.TypeParams) == 0 {
+			continue
+		}
+		types := make([]*LType, 0, len(cls.TypeParams))
+		allResolved := true
+		for _, tp := range cls.TypeParams {
+			if concrete, ok := subst[tp.Name]; ok {
+				types = append(types, concrete)
+			} else {
+				allResolved = false
+				break
+			}
+		}
+		if allResolved && len(types) == len(cls.TypeParams) {
+			renames[name] = mangleName(name, types)
+		}
+	}
+	for name, st := range m.structByName {
+		if len(st.TypeParams) == 0 {
+			continue
+		}
+		types := make([]*LType, 0, len(st.TypeParams))
+		allResolved := true
+		for _, tp := range st.TypeParams {
+			if concrete, ok := subst[tp.Name]; ok {
+				types = append(types, concrete)
+			} else {
+				allResolved = false
+				break
+			}
+		}
+		if allResolved && len(types) == len(st.TypeParams) {
+			renames[name] = mangleName(name, types)
+		}
+	}
+	return renames
+}
+
+// ResolveClassNames is a pre-pass that runs after monomorphization but before
+// C emission. It resolves bare generic class names (e.g., LTyClassHandle{Name: "Dict"})
+// to their monomorphized names (e.g., "Dict_CType") using the per-function
+// ClassRenameMap built during specialization.
+//
+// Post-condition: no LTyClassHandle in any function should reference a generic
+// class name. All class names should be concrete (either non-generic or mangled).
+func ResolveClassNames(prog *LProgram) {
+	for i := range prog.Functions {
+		f := &prog.Functions[i]
+		if len(f.ClassRenameMap) == 0 {
+			continue
+		}
+		// Rewrite params
+		for j := range f.Params {
+			resolveClassType(f.Params[j].Type, f.ClassRenameMap)
+		}
+		// Rewrite return type
+		resolveClassType(f.ReturnType, f.ClassRenameMap)
+		// Rewrite body
+		resolveClassStmts(f.Body, f.ClassRenameMap)
+	}
+}
+
+func resolveClassStmts(stmts []LStmt, renames map[string]string) {
+	for i := range stmts {
+		resolveClassStmt(&stmts[i], renames)
+	}
+}
+
+func resolveClassStmt(s *LStmt, renames map[string]string) {
+	switch s.Kind {
+	case LStmtTempDef:
+		d := s.Data.(*LTempDef)
+		resolveClassExpr(&d.Expr, renames)
+	case LStmtVarDecl:
+		d := s.Data.(*LVarDecl)
+		resolveClassType(d.Type, renames)
+		if d.Init != nil {
+			resolveClassValue(d.Init, renames)
+		}
+	case LStmtAssign:
+		d := s.Data.(*LAssign)
+		resolveClassValue(&d.Value, renames)
+	case LStmtReturn:
+		d := s.Data.(*LReturn)
+		if d != nil {
+			for i := range d.Values {
+				resolveClassValue(&d.Values[i], renames)
+			}
+		}
+	case LStmtIf:
+		d := s.Data.(*LIf)
+		resolveClassValue(&d.Cond, renames)
+		resolveClassStmts(d.Then, renames)
+		resolveClassStmts(d.Else, renames)
+	case LStmtWhile:
+		d := s.Data.(*LWhile)
+		resolveClassStmts(d.CondBlock, renames)
+		resolveClassValue(&d.CondVar, renames)
+		resolveClassStmts(d.Body, renames)
+	case LStmtFor:
+		d := s.Data.(*LFor)
+		resolveClassType(d.VarType, renames)
+		resolveClassValue(&d.Collection, renames)
+		resolveClassStmts(d.Body, renames)
+	case LStmtSwitch:
+		d := s.Data.(*LSwitch)
+		resolveClassValue(&d.Tag, renames)
+		for j := range d.Cases {
+			resolveClassStmts(d.Cases[j].Body, renames)
+		}
+	case LStmtTypeSwitch:
+		d := s.Data.(*LTypeSwitch)
+		resolveClassValue(&d.Value, renames)
+		for j := range d.Cases {
+			resolveClassStmts(d.Cases[j].Body, renames)
+		}
+	case LStmtClassSet:
+		d := s.Data.(*LClassSet)
+		if newName, ok := renames[d.Class]; ok {
+			d.Class = newName
+		}
+		resolveClassValue(&d.Handle, renames)
+		resolveClassValue(&d.Value, renames)
+	case LStmtSideEffect:
+		d := s.Data.(*LSideEffect)
+		resolveClassExpr(&d.Expr, renames)
+	case LStmtBlock:
+		d := s.Data.(*LBlock)
+		resolveClassStmts(d.Stmts, renames)
+	}
+}
+
+func resolveClassExpr(e *LExpr, renames map[string]string) {
+	resolveClassType(e.Type, renames)
+	switch e.Kind {
+	case LExprCall:
+		d := e.Data.(*LCallData)
+		for i := range d.Args {
+			resolveClassValue(&d.Args[i], renames)
+		}
+	case LExprMethodCall:
+		d := e.Data.(*LMethodCallData)
+		resolveClassValue(&d.Receiver, renames)
+		for i := range d.Args {
+			resolveClassValue(&d.Args[i], renames)
+		}
+	case LExprClassGet:
+		d := e.Data.(*LClassGetData)
+		if newName, ok := renames[d.Class]; ok {
+			d.Class = newName
+		}
+		resolveClassValue(&d.Handle, renames)
+	case LExprClassAlloc:
+		d := e.Data.(*LClassAllocData)
+		if newName, ok := renames[d.Class]; ok {
+			d.Class = newName
+		}
+		for i := range d.Fields {
+			resolveClassValue(&d.Fields[i].Value, renames)
+		}
+	case LExprBinOp:
+		d := e.Data.(*LBinOpData)
+		resolveClassValue(&d.Left, renames)
+		resolveClassValue(&d.Right, renames)
+	case LExprCast:
+		d := e.Data.(*LCastData)
+		resolveClassValue(&d.Operand, renames)
+		resolveClassType(d.Target, renames)
+	case LExprStructField:
+		d := e.Data.(*LStructFieldData)
+		resolveClassValue(&d.Receiver, renames)
+	case LExprFormat:
+		d := e.Data.(*LFormatData)
+		for i := range d.Parts {
+			if !d.Parts[i].IsLiteral {
+				resolveClassValue(&d.Parts[i].Value, renames)
+			}
+		}
+	case LExprFuncLit:
+		d := e.Data.(*LFuncLitData)
+		for i := range d.Params {
+			resolveClassType(d.Params[i].Type, renames)
+		}
+		resolveClassType(d.ReturnType, renames)
+		resolveClassStmts(d.Body, renames)
+	}
+}
+
+func resolveClassValue(v *LValue, renames map[string]string) {
+	resolveClassType(v.Type, renames)
+}
+
+func resolveClassType(t *LType, renames map[string]string) {
+	if t == nil {
+		return
+	}
+	if t.Kind == LTyClassHandle {
+		if newName, ok := renames[t.Name]; ok {
+			t.Name = newName
+		}
+	}
+	resolveClassType(t.Elem, renames)
+	resolveClassType(t.Key, renames)
+	resolveClassType(t.Return, renames)
+	for i := range t.TypeArgs {
+		resolveClassType(t.TypeArgs[i], renames)
+	}
+	for i := range t.Fields {
+		resolveClassType(t.Fields[i].Type, renames)
+	}
+	for i := range t.Params {
+		resolveClassType(t.Params[i], renames)
+	}
+}
+
 
 // implRenameEntry maps a (className, oldMethod) to a new method name
 // for impl block method rewriting during monomorphization.

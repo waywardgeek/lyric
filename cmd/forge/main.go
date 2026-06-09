@@ -253,6 +253,17 @@ func cmdCompile(args []string) error {
 	lir.Optimize(prog)
 	lir.Monomorphize(prog)
 	lir.RewriteImplRenames(prog)
+
+	if checkInvariants {
+		violations := lir.ValidatePostMono(prog)
+		for _, v := range violations {
+			fmt.Fprintf(os.Stderr, "INVARIANT: %s\n", v)
+		}
+		if len(violations) > 0 {
+			fmt.Fprintf(os.Stderr, "  %d post-mono violations\n", len(violations))
+		}
+	}
+
 	src := lir.EmitC(prog)
 
 	if err := os.WriteFile(out, []byte(src), 0644); err != nil {
@@ -384,6 +395,16 @@ func cmdTest(args []string) error {
 	lir.Optimize(prog)
 	lir.Monomorphize(prog)
 	lir.RewriteImplRenames(prog)
+
+	if checkInvariants {
+		violations := lir.ValidatePostMono(prog)
+		for _, v := range violations {
+			fmt.Fprintf(os.Stderr, "INVARIANT: %s\n", v)
+		}
+		if len(violations) > 0 {
+			fmt.Fprintf(os.Stderr, "  %d post-mono violations\n", len(violations))
+		}
+	}
 
 	// Discover test_* functions
 	var testFuncs []string

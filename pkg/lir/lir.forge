@@ -144,16 +144,32 @@ forge Lir {
     Struct defaults are NOT yet implemented — only classes.
   """
 
-  doc "Invariants — C Backend ClassRenames": """
-    After monomorphization, LIR expressions (ClassGet, MethodCall, etc.) still
-    carry the ORIGINAL generic class names (e.g., 'DictEntry', 'Dict'). The
-    program's class list contains only MONOMORPHIZED names ('DictEntry_i32',
-    'Dict_i32'). ClassRenames maps original→monomorphized names.
+  doc "Invariants — ResolveClassNames Pre-Pass": """
+    After monomorphization, specialized function bodies may still contain bare
+    generic class names (e.g., LTyClassHandle{Name: "Dict"}) because the lowerer
+    sometimes creates class handle types WITHOUT TypeArgs. substType only
+    substitutes LTyTypeVar nodes — bare class names pass through unchanged.
 
-    CRITICAL: ANY function that looks up class/struct fields by name MUST check
-    ClassRenames first. resolveFieldType, cType, emitMethodCall all need this.
-    Without it, field lookups fail silently and types fall back to void*/LTyAny.
-    This was the root cause of all Dict<V> C backend errors (2026-06-07).
+    The old ClassRenames map (generic→mangled) was global and last-writer-wins:
+    when Dict<V> is instantiated as Dict_CType, Dict_CSym, Dict_CFuncDecl etc.,
+    only the LAST instantiation's name was stored. This caused all Dict references
+    in destroy methods to resolve to the wrong type.
+
+    ResolveClassNames() runs after monomorphization as Phase 6. Each specialized
+    function carries a ClassRenameMap (built during specialization from the subst
+    map) that maps ALL generic class/struct names to their mangled names for that
+    specific instantiation. The pre-pass applies these maps to all types, params,
+    class field accesses (ClassGet.Class, ClassSet.Class, ClassAlloc.Class), and
+    bodies.
+
+    POST-CONDITION (checked by ValidatePostMono):
+    - No LTyTypeVar nodes remain in any function (all generics resolved)
+    - No LTyClassHandle references a generic class name (all bare names resolved)
+    - No ClassGet/ClassSet/ClassAlloc references a generic class name
+
+    The legacy ClassRenames map on LProgram is still exported for any remaining
+    C backend fallback lookups but should be eliminated once all cases are handled
+    by the pre-pass.
   """
 
   doc "Invariants — TypeArgs Propagation": """
@@ -234,14 +250,20 @@ forge Lir {
 
   doc "Invariants — Monomorphization": """
     Monomorphize() is LIR→LIR: it transforms an LProgram in place.
-    Phase 2 (collection) is ITERATIVE: after specializing functions, it
-    re-collects from specialized bodies to discover transitive instantiations.
-    E.g., hash_insert<Dict,DictEntry> body calls hash_init<P,C> which after
-    substitution becomes hash_init<Dict,DictEntry> — a new instantiation.
-    Dedup maps (generatedFuncs/Classes/Structs) prevent double generation.
 
-    ClassRenames tracks monomorphized class name mappings — applied ONLY in
-    C backend's cType(), not in Go backend (which uses native generics).
+    Phase 1: Collection — iteratively discovers all generic instantiations.
+    Phase 2: Specialization — creates concrete versions of generic functions,
+      classes, and structs. Each specialized function gets a ClassRenameMap.
+    Phase 3: Filtering — removes all generic declarations. After this phase,
+      NO generic functions, classes, or structs remain in the program.
+    Phase 4: Rewrite call sites in all function bodies.
+    Phase 5: Rewrite function signatures, class fields, struct fields via
+      substTypeRemoveVars (mangles names with TypeArgs).
+    Phase 6: ResolveClassNames — applies per-function ClassRenameMap to fix
+      bare generic class names that substType couldn't resolve.
+
+    After Phase 3, no generic declarations exist. After Phase 6, no generic
+    class REFERENCES should exist either. ValidatePostMono checks both.
 
     ImplMethodRenames tracks interface→concrete method name mappings for
     impl blocks. RewriteImplRenames() must run AFTER Monomorphize() to

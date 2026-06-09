@@ -672,6 +672,7 @@ type LFuncDecl struct {
 	Receiver              string       // non-empty for methods: the receiver type name
 	ReceiverTypeParams    []LTypeParam // type params on the receiver (for generic class methods)
 	RelationalConstraints []LRelationalConstraint // from where Graph<G, N, E>
+	ClassRenameMap        map[string]string // populated by monomorphizer: generic class name → mangled name
 }
 
 // LParam: a function parameter.
