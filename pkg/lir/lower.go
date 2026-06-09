@@ -35,7 +35,7 @@ type Lowerer struct {
 
 	// Enum variant info (populated during registration)
 	variantCtors map[string]*variantCtorInfo // variant name → ctor info
-	unitVariants map[string]string           // variant name → enum name
+	unitVariants map[string]map[string]bool // variant name → set of enum names
 	enumVariants map[string][]LVariant       // enum name → variants
 
 	// Class info
@@ -77,7 +77,7 @@ type variantCtorInfo struct {
 func NewLowerer() *Lowerer {
 	return &Lowerer{
 		variantCtors:    make(map[string]*variantCtorInfo),
-		unitVariants:    make(map[string]string),
+		unitVariants:    make(map[string]map[string]bool),
 		enumVariants:    make(map[string][]LVariant),
 		classCtorFields: make(map[string][]string),
 		classFields:     make(map[string][]LField),
@@ -294,7 +294,10 @@ func (l *Lowerer) registerTypes(block *ast.ForgeBlock) {
 					tag:        i,
 				}
 			} else {
-				l.unitVariants[v.Name] = e.Name
+				if l.unitVariants[v.Name] == nil {
+					l.unitVariants[v.Name] = make(map[string]bool)
+				}
+				l.unitVariants[v.Name][e.Name] = true
 			}
 		}
 		l.enumVariants[e.Name] = variants
@@ -1928,7 +1931,7 @@ func (l *Lowerer) lowerMatchArm(arm *ast.MatchArm, matchVal LValue, enumName str
 	case ast.PatIdent:
 		ip := dataAs[ast.IdentPattern](arm.Pattern.Data)
 		// Check if this is a unit variant
-		if en, ok := l.unitVariants[ip.Name]; ok && en == enumName {
+		if enums, ok := l.unitVariants[ip.Name]; ok && enums[enumName] {
 			tag := l.findVariantTag(enumName, ip.Name)
 			body := l.lowerArmBody(&arm.Body, result)
 			return LSwitchCase{Tag: tag, Body: body}
@@ -2371,7 +2374,13 @@ func (l *Lowerer) lowerIdent(expr *ast.Expr) LValue {
 	ie := dataAs[ast.IdentExpr](expr.Data)
 
 	// Check if it's a unit variant
-	if enumName, ok := l.unitVariants[ie.Name]; ok {
+	if enumNames, ok := l.unitVariants[ie.Name]; ok {
+		// Pick default enum name from set; checker's resolved type overrides
+		var enumName string
+		for en := range enumNames {
+			enumName = en
+			break
+		}
 		// Use checker's resolved type to disambiguate collisions
 		resultType := l.exprType(expr)
 		if resultType != nil && resultType.Kind == LTyTaggedUnion && resultType.Name != "" {
