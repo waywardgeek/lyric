@@ -225,6 +225,9 @@ forge parser {
         if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to fake")) }
         return (true, null)
       }
+      _ => {
+        return (false, self.make_error(tok.span, f"unexpected token in forge block"))
+      }
     }
 
     return (false, self.make_error(tok.span, f"unexpected token {tok.kind} ({tok.text}) in forge block"))

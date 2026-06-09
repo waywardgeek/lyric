@@ -171,11 +171,14 @@ forge Checker {
     TyVar operands pass through (see Generics doc). Arithmetic for numerics
     with coercion, comparison returns bool, logical for bools, equality for
     any matching pair with numeric widening, bitwise/shift for integers.
+    For == and !=, if one side is TyNil the other side's type is propagated
+    to the nil operand's ResolvedType (so lowerer/C backend know the type).
     - Unary: neg requires numeric, not requires bool
     - Call: looks up function, checks arg count and types. For generic calls with
     TypeArgs, builds substitution map and checks against substituted types.
     - Method call: resolves receiver type, finds method, checks args
-    - Field access: resolves receiver type, finds field by name
+    - Field access: resolves receiver type, finds field by name. For TyTuple,
+    supports _0, _1, etc. positional field access returning the element type.
     - Index: validates receiver is list/map/string, returns element type
     - Slice (expr[low:high]): validates receiver is list or string, checks
     bounds are integer types, returns same type as receiver

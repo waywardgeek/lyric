@@ -295,7 +295,7 @@ forge desugar {
             for m in mappings {
               let mut found = false
               for em in existing_mappings {
-                if sym_eq(em.type_param, m.type_param) && sym_eq(em.method_name, m.method_name) {
+                if sym_eq(em.type_param!, m.type_param!) && sym_eq(em.method_name!, m.method_name!) {
                   found = true
                 }
               }

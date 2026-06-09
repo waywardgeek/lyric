@@ -1216,6 +1216,15 @@ func (c *Checker) checkBinary(expr *ast.Expr) *Type {
 		return TypeError
 
 	case ast.OpEq, ast.OpNeq:
+		// Optional/class/interface compared with nil is always valid
+		if left.Kind == TyNil && right.Kind != TyNil {
+			b.Left.ResolvedType = right
+			return TypeBool
+		}
+		if right.Kind == TyNil && left.Kind != TyNil {
+			b.Right.ResolvedType = left
+			return TypeBool
+		}
 		// Any two compatible types can be compared for equality
 		if !left.Equal(right) && left.Kind != TyError && right.Kind != TyError {
 			if numericWidens(left, right) || numericWidens(right, left) {
@@ -1687,6 +1696,26 @@ func (c *Checker) checkFieldAccess(expr *ast.Expr) *Type {
 			c.error(expr.Span, "type %s has no field %q", recvType.Name, fa.Field)
 			return TypeError
 		}
+	}
+	if recvType.Kind == TyTuple {
+		// Tuple field access: _0, _1, etc.
+		if strings.HasPrefix(fa.Field, "_") {
+			idxStr := fa.Field[1:]
+			idx := 0
+			valid := len(idxStr) > 0
+			for _, ch := range idxStr {
+				if ch < '0' || ch > '9' {
+					valid = false
+					break
+				}
+				idx = idx*10 + int(ch-'0')
+			}
+			if valid && idx < len(recvType.Fields) {
+				return recvType.Fields[idx].Type
+			}
+		}
+		c.error(expr.Span, "cannot access field %q on tuple type %s", fa.Field, recvType)
+		return TypeError
 	}
 	if recvType.Kind == TyModule {
 		if info := c.registry.Lookup(recvType.Name); info != nil {
@@ -2563,6 +2592,10 @@ func (c *Checker) validateAllExprsResolved(file *ast.File) {
 				}
 			}
 		}
+		// Check constant values
+		for i := range block.Constants {
+			c.walkExpr(&block.Constants[i].Value, "const:"+block.Constants[i].Name)
+		}
 		// Check function bodies
 		for i := range block.Functions {
 			fn := &block.Functions[i]
@@ -2898,6 +2931,7 @@ func (c *Checker) registerForgeBlock(block *ast.ForgeBlock) {
 		var typ *Type
 		if con.Type != nil {
 			typ = c.resolveTypeExpr(con.Type)
+			c.checkExpr(&con.Value) // ensure Value gets ResolvedType
 		} else {
 			typ = c.checkExpr(&con.Value)
 		}
