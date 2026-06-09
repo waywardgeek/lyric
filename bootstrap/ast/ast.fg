@@ -294,7 +294,7 @@ forge ast {
   class Expr {
     kind: ExprKind
     span: Span
-    resolved_type: any  // Set by checker — used by lowerer to determine expression types
+    resolved_type: TypeExpr?  // Set by checker — used by lowerer to determine expression types
   }
 
   // ---- Patterns ----
