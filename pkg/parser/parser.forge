@@ -537,7 +537,7 @@ forge Parser {
 //
 // func (p *Parser) parsePostfixExpr() (*ast.Expr, error)    :168
 //
-// func (p *Parser) parseArgList() ([]ast.Expr, ast.Pos, error)    :362
+// func (p *Parser) parseArgList() ([]ast.Expr, []bool, ast.Pos, error)    :362
 //
 // func (p *Parser) parsePrimaryExpr() (*ast.Expr, error)    :385
 //

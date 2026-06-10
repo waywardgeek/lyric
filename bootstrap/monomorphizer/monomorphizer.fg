@@ -338,7 +338,6 @@ func MonoPass.collect_from_expr(self, e: LExpr) {
   match e.kind {
     ExCall => {
       if !isnull(e.call) {
-        eprintln(f"MONO COLLECT call {e.call!.func_name} type_args={len(e.call!.type_args)}")
         if len(e.call!.type_args) > 0 {
           if !has_type_vars(e.call!.type_args) {
             self.record_func_instance(e.call!.func_name, e.call!.type_args)
@@ -730,11 +729,9 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
   match e.kind {
     ExCall => {
       if !isnull(e.call) {
-        eprintln(f"MONO REWRITE call {e.call!.func_name} type_args={len(e.call!.type_args)}")
         if len(e.call!.type_args) > 0 {
           if !has_type_vars(e.call!.type_args) {
             let mangled = mangle_name(e.call!.func_name, e.call!.type_args)
-            eprintln(f"MONO REWRITE: {e.call!.func_name} -> {mangled}")
             e.call!.func_name = mangled
             e.call!.type_args = []
           }
