@@ -1209,15 +1209,33 @@ forge parser {
   }
 
   func Parser.parse_relation_side(self, first: Token) -> RelationSide {
+    // Collect optional type parameters: <V>, <K, V>, etc.
+    let mut type_args: [Sym] = []
+    if self.peek().kind == PLt {
+      self.next()  // consume '<'
+      while self.peek().kind != PGt && self.peek().kind != SEOF {
+        let tok = self.next()
+        if tok.kind == LIdent {
+          type_args = append(type_args, sym(tok.text))
+        }
+        if self.peek().kind == PComma {
+          self.next()
+        }
+      }
+      if self.peek().kind == PGt {
+        self.next()  // consume '>'
+      }
+    }
+    // Check for :label — label can be an ident or a contextual keyword used as name
     let mut label: Sym? = null
     if self.peek().kind == PColon {
       self.next()
       let tok = self.peek()
-      if tok.kind == LIdent {
+      if tok.kind != PLBrace && tok.kind != PRBrace && tok.kind != PLBracket && tok.kind != PRBracket && tok.kind != SEOF && tok.kind != SNewline && tok.text != "" {
         label = sym(self.next().text)
       }
     }
-    return RelationSide { type_name: sym(first.text), label: label }
+    return RelationSide { type_name: sym(first.text), label: label, type_args: type_args }
   }
 
   // ---- Type expressions ----
