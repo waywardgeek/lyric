@@ -369,13 +369,52 @@ forge desugar {
         let iface_tps = iface.itp_children()
         if len(iface_tps) < 2 { continue }
 
-        // Map type params to concrete class names
+        // Map type params to concrete class names (simple string map)
         let type_map = dict_new<string>()
         if !isnull(iface_tps[0].name) && !isnull(rel.parent.type_name) {
           dict_set<string>(type_map, iface_tps[0].name!.name, rel.parent.type_name!.name)
         }
         if !isnull(iface_tps[1].name) && !isnull(rel.child.type_name) {
           dict_set<string>(type_map, iface_tps[1].name!.name, rel.child.type_name!.name)
+        }
+
+        // Rich type map (preserves TypeArgs for generic instantiation)
+        let rich_type_map = dict_new<TypeExpr>()
+        if !isnull(iface_tps[0].name) && !isnull(rel.parent.type_name) {
+          let mut parent_args: [TypeExpr] = []
+          for ta in rel.parent.type_args {
+            append(parent_args, TypeExpr { kind: Named(ta, []), span: rel.span })
+          }
+          let te = TypeExpr { kind: Named(rel.parent.type_name!, parent_args), span: rel.span }
+          dict_set<TypeExpr>(rich_type_map, iface_tps[0].name!.name, te)
+        }
+        if !isnull(iface_tps[1].name) && !isnull(rel.child.type_name) {
+          let mut child_args: [TypeExpr] = []
+          for ta in rel.child.type_args {
+            append(child_args, TypeExpr { kind: Named(ta, []), span: rel.span })
+          }
+          let te = TypeExpr { kind: Named(rel.child.type_name!, child_args), span: rel.span }
+          dict_set<TypeExpr>(rich_type_map, iface_tps[1].name!.name, te)
+        }
+
+        // Build method rename map for label-prefixed fields
+        let method_renames = dict_new<string>()
+        let type_param_to_label = dict_new<string>()
+        if !isnull(iface_tps[0].name) && !isnull(rel.parent.label) {
+          dict_set<string>(type_param_to_label, iface_tps[0].name!.name, rel.parent.label!.name)
+        }
+        if !isnull(iface_tps[1].name) && !isnull(rel.child.label) {
+          dict_set<string>(type_param_to_label, iface_tps[1].name!.name, rel.child.label!.name)
+        }
+        for ifield in iface.ifd_children() {
+          if isnull(ifield.type_param) { continue }
+          let label_entry = dict_get<string>(type_param_to_label, ifield.type_param!.name)
+          if !isnull(label_entry) && !isnull(ifield.name) {
+            let label = label_entry!.value
+            let fname = ifield.name!.name
+            dict_set<string>(method_renames, fname, label + "_" + fname)
+            dict_set<string>(method_renames, "set_" + fname, "set_" + label + "_" + fname)
+          }
         }
 
         for db in destructors {
@@ -388,10 +427,12 @@ forge desugar {
           let cls_entry = dict_get<ClassDecl>(class_map, class_name)
           if isnull(cls_entry) { continue }
 
-          // Deep copy and substitute type params
+          // Deep copy and substitute type params (rich, preserving type args)
           let body_copy = deep_copy_block(db.body)
           if isnull(body_copy) { continue }
-          substitute_type_params_in_block(body_copy!, type_map)
+          substitute_type_params_rich_in_block(body_copy!, rich_type_map)
+          // Rename generic interface method calls to label-prefixed versions
+          rename_method_calls_in_block(body_copy!, method_renames)
 
           // Get or create destroy method for this class
           let method_entry = dict_get<FuncDecl>(destroy_methods, class_name)
