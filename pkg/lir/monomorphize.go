@@ -40,7 +40,21 @@ func Monomorphize(prog *LProgram) {
 		m.structByName[prog.Structs[i].Name] = &prog.Structs[i]
 	}
 
-	// Phase 1: Collect all instantiations by walking all function bodies
+	// Phase 1a: Collect instantiations from class/struct field types.
+	// Without this, generic types used only as fields (e.g., Dict<bool> in a class)
+	// are never discovered and never get monomorphized copies generated.
+	for i := range prog.Classes {
+		for _, f := range prog.Classes[i].Fields {
+			m.collectFromType(f.Type)
+		}
+	}
+	for i := range prog.Structs {
+		for _, f := range prog.Structs[i].Fields {
+			m.collectFromType(f.Type)
+		}
+	}
+
+	// Phase 1b: Collect all instantiations by walking all function bodies
 	for i := range prog.Functions {
 		m.collectFromStmts(prog.Functions[i].Body)
 	}
@@ -110,6 +124,10 @@ func Monomorphize(prog *LProgram) {
 				m.classRenames[orig.Name] = mangledName
 				spec := m.specializeClass(orig, subst, mangledName)
 				newClasses = append(newClasses, spec)
+				// Collect from specialized field types to discover transitive instantiations
+				for _, f := range spec.Fields {
+					m.collectFromType(f.Type)
+				}
 
 				// Specialize all methods of this class
 				for _, method := range m.methodsByClass[className] {
@@ -152,6 +170,10 @@ func Monomorphize(prog *LProgram) {
 				mangledName := mangleName(orig.Name, types)
 				spec := m.specializeStruct(orig, subst, mangledName)
 				newStructs = append(newStructs, spec)
+				// Collect from specialized field types to discover transitive instantiations
+				for _, f := range spec.Fields {
+					m.collectFromType(f.Type)
+				}
 			}
 		}
 
@@ -272,9 +294,59 @@ func (m *monoPass) recordClassInstance(name string, types []*LType) {
 	}
 }
 
+// recordStructInstance records a struct instantiation with its actual type pointers.
+func (m *monoPass) recordStructInstance(name string, types []*LType) {
+	key := typeKey(types)
+	if m.structInstances[name] == nil {
+		m.structInstances[name] = map[string][]*LType{}
+	}
+	if _, exists := m.structInstances[name][key]; !exists {
+		m.structInstances[name][key] = types
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Phase 1: Collect instantiations
 // ---------------------------------------------------------------------------
+
+// collectFromType walks an LType to discover generic class/struct instantiations
+// embedded in field types (e.g., Dict<bool> as a class field, or Optional<Dict<i32>>).
+func (m *monoPass) collectFromType(t *LType) {
+	if t == nil {
+		return
+	}
+	switch t.Kind {
+	case LTyClassHandle:
+		if len(t.TypeArgs) > 0 && !hasTypeVars(t.TypeArgs) {
+			m.recordClassInstance(t.Name, t.TypeArgs)
+		}
+		for _, arg := range t.TypeArgs {
+			m.collectFromType(arg)
+		}
+	case LTyStruct:
+		if len(t.TypeArgs) > 0 && !hasTypeVars(t.TypeArgs) {
+			m.recordStructInstance(t.Name, t.TypeArgs)
+		}
+		for _, arg := range t.TypeArgs {
+			m.collectFromType(arg)
+		}
+	case LTyOptional:
+		m.collectFromType(t.Elem)
+	case LTySlice:
+		m.collectFromType(t.Elem)
+	case LTyFuncPtr:
+		for _, p := range t.Params {
+			m.collectFromType(p)
+		}
+		m.collectFromType(t.Return)
+	case LTyTaggedUnion:
+		for _, v := range t.Variants {
+			for _, f := range v.Fields {
+				m.collectFromType(f.Type)
+			}
+		}
+	}
+}
 
 func (m *monoPass) collectFromStmts(stmts []LStmt) {
 	for i := range stmts {

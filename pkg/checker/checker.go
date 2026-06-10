@@ -2051,14 +2051,65 @@ func (c *Checker) checkIfElseExpr(expr *ast.Expr) *Type {
 	// Check else branch
 	elseType := c.checkBlockExprType(&ie.Else)
 	if thenType != TypeError && elseType != TypeError && !c.assignableTo(elseType, thenType) {
+		// Special case: if one branch is nil and the other is T, result is T?
+		if elseType.Kind == TyNil {
+			return &Type{Kind: TyOptional, Elem: thenType}
+		}
+		if thenType.Kind == TyNil {
+			return &Type{Kind: TyOptional, Elem: elseType}
+		}
 		c.error(ie.Else.Stmts[len(ie.Else.Stmts)-1].Span,
 			"else branch type %s doesn't match then branch type %s", elseType, thenType)
 	}
 
+	// If one branch is nil even when assignable, wrap in optional
+	if thenType != TypeError && elseType != TypeError {
+		if elseType.Kind == TyNil && thenType.Kind != TyOptional && thenType.Kind != TyNil {
+			return &Type{Kind: TyOptional, Elem: thenType}
+		}
+		if thenType.Kind == TyNil && elseType.Kind != TyOptional && elseType.Kind != TyNil {
+			return &Type{Kind: TyOptional, Elem: elseType}
+		}
+	}
+
 	if thenType == TypeError {
+		c.propagateIfExprBranchType(elseType, &ie.Then)
+		c.propagateIfExprBranchType(elseType, &ie.Else)
+		for i := range ie.ElseIfs {
+			c.propagateIfExprBranchType(elseType, &ie.ElseIfs[i].Body)
+		}
 		return elseType
 	}
+	c.propagateIfExprBranchType(thenType, &ie.Then)
+	c.propagateIfExprBranchType(thenType, &ie.Else)
+	for i := range ie.ElseIfs {
+		c.propagateIfExprBranchType(thenType, &ie.ElseIfs[i].Body)
+	}
 	return thenType
+}
+
+// propagateIfExprBranchType fixes up empty list/map literals in an if-expression branch
+// so they get the resolved result type instead of List(Unit)/Map(Unit,Unit).
+func (c *Checker) propagateIfExprBranchType(resultType *Type, block *ast.Block) {
+	if resultType == nil || resultType == TypeError || block == nil || len(block.Stmts) == 0 {
+		return
+	}
+	last := &block.Stmts[len(block.Stmts)-1]
+	if last.Kind != ast.StmtExpr {
+		return
+	}
+	expr := &last.Data.(*ast.ExprStmt).Expr
+	if expr.Kind == ast.ExprListLit {
+		lit := expr.Data.(*ast.ListLitExpr)
+		if len(lit.Elems) == 0 {
+			expr.ResolvedType = resultType
+		}
+	} else if expr.Kind == ast.ExprMapLit {
+		lit := expr.Data.(*ast.MapLitExpr)
+		if len(lit.Entries) == 0 {
+			expr.ResolvedType = resultType
+		}
+	}
 }
 
 // checkBlockExprType checks all statements in a block and returns the type of the last expression.
@@ -2288,6 +2339,20 @@ func (c *Checker) checkAssign(stmt *ast.Stmt) {
 	if !c.assignableTo(valueType, targetType) && targetType.Kind != TyError && valueType.Kind != TyError {
 		c.error(stmt.Span, "cannot assign %s to %s", valueType, targetType)
 	}
+	// Propagate target type to empty list/map literals so the lowerer gets the right element type
+	if targetType.Kind != TyError {
+		if assign.Value.Kind == ast.ExprListLit {
+			lit := assign.Value.Data.(*ast.ListLitExpr)
+			if len(lit.Elems) == 0 {
+				assign.Value.ResolvedType = targetType
+			}
+		} else if assign.Value.Kind == ast.ExprMapLit {
+			lit := assign.Value.Data.(*ast.MapLitExpr)
+			if len(lit.Entries) == 0 {
+				assign.Value.ResolvedType = targetType
+			}
+		}
+	}
 }
 
 func (c *Checker) checkReturn(stmt *ast.Stmt) {
@@ -2297,6 +2362,18 @@ func (c *Checker) checkReturn(stmt *ast.Stmt) {
 		if c.currentReturn != nil {
 			if !c.assignableTo(valType, c.currentReturn) && valType.Kind != TyError && c.currentReturn.Kind != TyError {
 				c.error(stmt.Span, "return type mismatch: expected %s, got %s", c.currentReturn, valType)
+			}
+			// Propagate return type to empty list/map literals
+			if ret.Value.Kind == ast.ExprListLit {
+				lit := ret.Value.Data.(*ast.ListLitExpr)
+				if len(lit.Elems) == 0 {
+					ret.Value.ResolvedType = c.currentReturn
+				}
+			} else if ret.Value.Kind == ast.ExprMapLit {
+				lit := ret.Value.Data.(*ast.MapLitExpr)
+				if len(lit.Entries) == 0 {
+					ret.Value.ResolvedType = c.currentReturn
+				}
 			}
 		}
 	} else {

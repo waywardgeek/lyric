@@ -470,6 +470,68 @@ forge std {
     return hash_remove<Dict<V>, DictEntry<V>>(d, h)
   }
 
+  // Return all keys in the dictionary as a list of strings.
+  pub func dict_keys<V>(d: Dict<V>) -> [string] {
+    let mut keys: [string] = []
+    for entry in d.d_children() {
+      if !isnull(entry.key) {
+        append(keys, entry.key!.get_name())
+      }
+    }
+    return keys
+  }
+
+  // --- Parsing ---
+
+  // Parse a string as an integer. Returns 0 on failure.
+  pub func parse_int(s: string) -> i64 {
+    let mut result: i64 = 0
+    let mut neg = false
+    let mut i = 0
+    if len(s) > 0 && s[0] == 45 as u8 {
+      neg = true
+      i = 1
+    }
+    while i < len(s) {
+      let c = s[i]
+      if c >= 48 as u8 && c <= 57 as u8 {
+        result = result * 10 + (c - 48 as u8) as i64
+      }
+      i = i + 1
+    }
+    if neg { return -result }
+    return result
+  }
+
+  // Parse a string as a float. Returns 0.0 on failure.
+  // Named str_to_float to avoid collision with C backend builtin parse_float.
+  pub func str_to_float(s: string) -> f64 {
+    let mut result: f64 = 0.0
+    let mut neg = false
+    let mut i = 0
+    if len(s) > 0 && s[0] == 45 as u8 {
+      neg = true
+      i = 1
+    }
+    // Integer part
+    while i < len(s) && s[i] >= 48 as u8 && s[i] <= 57 as u8 {
+      result = result * 10.0 + (s[i] - 48 as u8) as f64
+      i = i + 1
+    }
+    // Fractional part
+    if i < len(s) && s[i] == 46 as u8 {
+      i = i + 1
+      let mut frac: f64 = 0.1
+      while i < len(s) && s[i] >= 48 as u8 && s[i] <= 57 as u8 {
+        result = result + (s[i] - 48 as u8) as f64 * frac
+        frac = frac * 0.1
+        i = i + 1
+      }
+    }
+    if neg { return -result }
+    return result
+  }
+
   // error: interface for (T, error) returns and ? operator.
   // Any class with message(self) -> string satisfies error.
   interface error {
