@@ -2823,13 +2823,7 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 	// Extract type arguments (explicit or inferred)
 	typeArgs := l.extractTypeArgs(ce)
 
-	// Lower arguments
-	var args []LValue
-	for i := range ce.Args {
-		args = append(args, l.lowerExpr(&ce.Args[i]))
-	}
-
-	// Get function name
+	// Get function name early (before lowering args) to handle append specially
 	var funcName string
 	if ce.Func.Kind == ast.ExprIdent {
 		funcName = dataAs[ast.IdentExpr](ce.Func.Data).Name
@@ -2840,9 +2834,22 @@ func (l *Lowerer) lowerCall(expr *ast.Expr) LValue {
 		}
 	}
 
+	// Handle append specially: when the first arg is a field access, we need
+	// to write back the modified slice after forge_push. We must lower the
+	// receiver once and reuse it for both the ClassGet and ClassSet.
+	if funcName == "append" && len(ce.Args) >= 2 {
+		return l.lowerAppendBuiltin(expr, *ce)
+	}
+
+	// Lower arguments
+	var args []LValue
+	for i := range ce.Args {
+		args = append(args, l.lowerExpr(&ce.Args[i]))
+	}
+
 	// Check for built-in functions
 	switch funcName {
-	case "println", "print", "eprint", "eprintln", "len", "append", "isnull", "hash_string",
+	case "println", "print", "eprint", "eprintln", "len", "isnull", "hash_string",
 		"read_file", "write_file", "os_args", "os_exit", "os_getwd", "exec_command",
 		"path_join", "path_dir", "path_base", "path_ext",
 		"list_dir", "file_exists", "mkdtemp",
@@ -3147,6 +3154,77 @@ func (l *Lowerer) lowerChannelMethod(recv LValue, method string, args []LValue, 
 		})
 	}
 	return LValue{Kind: LValLitNull, Type: &LType{Kind: LTyUnit}}
+}
+
+// lowerAppendBuiltin handles append(target, elem) with write-back for field access targets.
+// forge_push modifies the slice header in place, but if the slice was copied from a
+// struct/class field into a temp, the original field is stale. This lowers the receiver
+// once and reuses it for both the read (ClassGet) and write-back (ClassSet).
+func (l *Lowerer) lowerAppendBuiltin(expr *ast.Expr, ce ast.CallExpr) LValue {
+	firstArg := &ce.Args[0]
+
+	// Check if first arg is a field access on a class/struct
+	var recv LValue
+	var fieldName string
+	var isClassField, isStructField bool
+	var sliceVal LValue
+
+	if firstArg.Kind == ast.ExprFieldAccess {
+		fa := dataAs[ast.FieldAccessExpr](firstArg.Data)
+		recv = l.lowerExpr(&fa.Receiver)
+		fieldName = fa.Field
+		resultType := l.exprType(firstArg)
+
+		if recv.Type != nil && recv.Type.Kind == LTyClassHandle {
+			isClassField = true
+			sliceVal = l.emitTemp(LExpr{
+				Kind: LExprClassGet,
+				Type: resultType,
+				Data: &LClassGetData{Handle: recv, Class: recv.Type.Name, Field: fa.Field},
+			})
+		} else {
+			isStructField = true
+			sliceVal = l.emitTemp(LExpr{
+				Kind: LExprStructField,
+				Type: resultType,
+				Data: &LStructFieldData{Receiver: recv, Field: fa.Field},
+			})
+		}
+	} else {
+		sliceVal = l.lowerExpr(firstArg)
+	}
+
+	// Lower remaining args
+	var args []LValue
+	args = append(args, sliceVal)
+	for i := 1; i < len(ce.Args); i++ {
+		args = append(args, l.lowerExpr(&ce.Args[i]))
+	}
+
+	// Emit the builtin
+	result := l.emitTemp(LExpr{
+		Kind: LExprBuiltin,
+		Type: l.exprType(expr),
+		Data: &LBuiltinData{Name: "append", Args: args},
+	})
+
+	// Write back the modified slice to the original field
+	if isClassField {
+		l.emit(LStmt{Kind: LStmtClassSet, Data: &LClassSet{
+			Handle: recv,
+			Class:  recv.Type.Name,
+			Field:  fieldName,
+			Value:  sliceVal,
+		}})
+	} else if isStructField {
+		l.emit(LStmt{Kind: LStmtStructSet, Data: &LStructSet{
+			Receiver: recv,
+			Field:    fieldName,
+			Value:    sliceVal,
+		}})
+	}
+
+	return result
 }
 
 func (l *Lowerer) lowerFieldAccess(expr *ast.Expr) LValue {

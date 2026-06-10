@@ -88,26 +88,73 @@ for fg in testdata/*.fg; do
     continue
   fi
 
-  # Step 3: Run if it has test functions (use bootstrap test command)
-  if grep -q 'func test_' "$fg"; then
-    if ! timeout 10 "$bs_out" >"$TMPDIR/out" 2>&1; then
-      # Check if Go compiler also fails
-      go_c="$TMPDIR/go_${name%.fg}.c"
-      go_out="$TMPDIR/go_${name%.fg}"
-      if $FORGE compile "$fg" -o "$go_c" 2>/dev/null && \
-         gcc -std=gnu11 -O2 -o "$go_out" "$go_c" -I "$RUNTIME_DIR" 2>/dev/null && \
-         ! timeout 10 "$go_out" >/dev/null 2>&1; then
-        SKIP=$((SKIP + 1))
-        echo "SKIP  $name (Go compiler also fails)"
-        continue
-      fi
-      FAIL=$((FAIL + 1))
-      err=$(tail -5 "$TMPDIR/out")
-      FAILURES="$FAILURES\nFAIL  $name  (test run: $err)"
-      echo "FAIL  $name  (test run)"
-      if $VERBOSE; then tail -10 "$TMPDIR/out"; fi
-      continue
+  # Step 3: Run both bootstrap and Go compiler binaries, compare output
+  # First, build and run Go compiler version as reference
+  go_c="$TMPDIR/go_${name%.fg}.c"
+  go_out="$TMPDIR/go_${name%.fg}"
+  if ! $FORGE compile "$fg" -o "$go_c" 2>/dev/null; then
+    # Go compiler can't compile it either — skip
+    SKIP=$((SKIP + 1))
+    echo "SKIP  $name (Go compiler also fails to compile)"
+    continue
+  fi
+  if ! gcc -std=gnu11 -O2 -o "$go_out" "$go_c" -I "$RUNTIME_DIR" 2>/dev/null; then
+    # Go compiler output doesn't link — skip
+    SKIP=$((SKIP + 1))
+    echo "SKIP  $name (Go compiler output doesn't link)"
+    continue
+  fi
+
+  # Run Go compiler binary as reference
+  go_run_ok=true
+  if ! timeout 10 "$go_out" >"$TMPDIR/go_stdout" 2>"$TMPDIR/go_stderr"; then
+    go_run_ok=false
+  fi
+
+  # Run bootstrap binary
+  bs_run_ok=true
+  if ! timeout 10 "$bs_out" >"$TMPDIR/bs_stdout" 2>"$TMPDIR/bs_stderr"; then
+    bs_run_ok=false
+  fi
+
+  # Compare results
+  if ! $go_run_ok && ! $bs_run_ok; then
+    # Both fail — that's fine, skip
+    SKIP=$((SKIP + 1))
+    echo "SKIP  $name (both compilers fail at runtime)"
+    continue
+  fi
+
+  if $go_run_ok && ! $bs_run_ok; then
+    FAIL=$((FAIL + 1))
+    err=$(tail -5 "$TMPDIR/bs_stderr")
+    FAILURES="$FAILURES\nFAIL  $name  (runtime crash: $err)"
+    echo "FAIL  $name  (runtime crash)"
+    if $VERBOSE; then echo "--- bs stderr ---"; tail -10 "$TMPDIR/bs_stderr"; fi
+    continue
+  fi
+
+  if ! $go_run_ok && $bs_run_ok; then
+    # Bootstrap works but Go doesn't — unusual but count as pass
+    PASS=$((PASS + 1))
+    echo "PASS  $name (bootstrap succeeds where Go fails)"
+    continue
+  fi
+
+  # Both ran — compare stdout (ignore stderr which has debug output)
+  if ! diff -q "$TMPDIR/go_stdout" "$TMPDIR/bs_stdout" >/dev/null 2>&1; then
+    FAIL=$((FAIL + 1))
+    FAILURES="$FAILURES\nFAIL  $name  (output mismatch)"
+    echo "FAIL  $name  (output mismatch)"
+    if $VERBOSE; then
+      echo "--- expected (Go compiler) ---"
+      head -10 "$TMPDIR/go_stdout"
+      echo "--- got (bootstrap) ---"
+      head -10 "$TMPDIR/bs_stdout"
+      echo "--- diff ---"
+      diff "$TMPDIR/go_stdout" "$TMPDIR/bs_stdout" | head -20
     fi
+    continue
   fi
 
   PASS=$((PASS + 1))
