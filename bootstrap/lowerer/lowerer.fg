@@ -1088,6 +1088,33 @@ forge lowerer {
 
     let init = if !isnull(value) { self.lower_expr(value) } else { make_null_val(typ) }
 
+    // Propagate declared type to empty/untyped slice init (e.g. let x: [Token] = [])
+    if !isnull(init) && !isnull(typ) && typ!.kind is TySlice {
+      if !isnull(init!.typ) && init!.typ!.kind is TySlice {
+        let elem_bad = isnull(init!.typ!.elem) || init!.typ!.elem!.kind is TyAny || init!.typ!.elem!.kind is TyUnit
+        if elem_bad {
+          init!.typ = typ
+          // Also update the underlying temp's expression type
+          if init!.kind is ValTemp {
+            let mut si = len(self.stmts) - 1
+            while si >= 0 {
+              if self.stmts[si]!.kind is StTempDef {
+                let td = self.stmts[si]!.temp_def!
+                if td.id == init!.temp_id {
+                  td.expr!.typ = typ
+                  si = -1
+                } else {
+                  si = si - 1
+                }
+              } else {
+                si = si - 1
+              }
+            }
+          }
+        }
+      }
+    }
+
     self.emit(LStmt {
       kind: StVarDecl,
       var_decl: LVarDeclData { name: name.name, typ: typ, init: init, mutable: is_mut }
@@ -2041,7 +2068,7 @@ forge lowerer {
 
     // Slice/list methods
     if !isnull(recv_type) && recv_type!.kind is TySlice {
-      if method_name == "len" || method_name == "append" || method_name == "pop" || method_name == "clear" {
+      if method_name == "len" || method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "contains" || method_name == "reverse" || method_name == "join" {
         let mut bargs: [LValue?] = [recv]
         for a in args {
           append(bargs, self.lower_expr(a))
@@ -2476,7 +2503,32 @@ forge lowerer {
     let old_return = self.current_func_return
     self.current_func_return = rt
 
-    let body_stmts = self.lower_block_as_stmts(body)
+    // Lower lambda body with implicit return for last expression
+    let saved_stmts = self.save_stmts()
+    if !isnull(body) {
+      let stmts = body!.bs_children()
+      let mut i = 0
+      while i < len(stmts) {
+        if !isnull(rt) && i == len(stmts) - 1 && stmts[i].kind is ExprStmt {
+          // Last statement is an expression and we have a return type — emit as return
+          match stmts[i].kind {
+            ExprStmt(expr) => {
+              let val = self.lower_expr(expr)
+              self.emit(LStmt {
+                kind: StReturn,
+                ret: LReturnData { values: [val] }
+              })
+            }
+            _ => { self.lower_stmt(stmts[i]) }
+          }
+        } else {
+          self.lower_stmt(stmts[i])
+        }
+        i = i + 1
+      }
+    }
+    let body_stmts = self.stmts
+    self.restore_stmts(saved_stmts)
 
     self.scope = old_scope
     self.current_func_return = old_return
