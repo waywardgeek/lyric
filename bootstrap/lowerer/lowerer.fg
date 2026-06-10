@@ -192,6 +192,24 @@ forge lowerer {
           append(lfields, LField { name: fname, typ: ft })
           i = i + 1
         }
+        // Special case: (T, error) → ErrorResult
+        if len(lfields) == 2 && !isnull(lfields[1].typ) && lfields[1].typ!.kind is TyError {
+          return LType { kind: TyErrorResult, name: "", elem: lfields[0].typ, bits: 0, is_exported: false }
+        }
+        // Also check by AST type name — "error" interface may resolve to TyAny
+        if len(lfields) == 2 && len(fields) >= 2 {
+          let f1_te = fields[1].type_expr
+          if !isnull(f1_te) && f1_te!.kind is Named {
+            match f1_te!.kind {
+              Named(name, args) => {
+                if name.name == "error" {
+                  return LType { kind: TyErrorResult, name: "", elem: lfields[0].typ, bits: 0, is_exported: false }
+                }
+              }
+              _ => {}
+            }
+          }
+        }
         return LType { kind: TyTuple, name: "", fields: lfields, bits: 0, is_exported: false }
       }
       Func(params, ret) => {

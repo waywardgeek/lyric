@@ -1195,7 +1195,8 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
           arg_type!.kind is TyOptional
           && !isnull(arg_type!.elem) && arg_type!.elem!.kind is TyClassHandle
         )
-        if is_class || is_any || is_opt_class {
+        let is_error = arg_type!.kind is TyError
+        if is_class || is_any || is_opt_class || is_error {
           return f"({self.emit_value(args[0])} == NULL)"
         }
       }
@@ -1461,6 +1462,10 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExCast => {
       let d = e!.cast!
+      // Special case: cast to error (const char*) — use emit_value_as_cstr
+      if !isnull(d.target) && d.target!.kind is TyError {
+        return self.emit_value_as_cstr(d.operand)
+      }
       return f"(({self.c_type(d.target)}){self.emit_value(d.operand)})"
     }
     ExBuiltin => {
@@ -1515,7 +1520,8 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
           val_type!.kind is TyOptional
           && !isnull(val_type!.elem) && val_type!.elem!.kind is TyClassHandle
         )
-        if is_class || is_any || is_opt_class {
+        let is_error = val_type!.kind is TyError
+        if is_class || is_any || is_opt_class || is_error {
           return f"({self.emit_value(d.value)} == NULL)"
         }
       }
@@ -1609,7 +1615,7 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
   }
   if name == "fmt.Errorf" || name == "errors.New" {
     if len(d.args) > 0 {
-      return f"(const char*){self.emit_value(d.args[0])}"
+      return self.emit_value_as_cstr(d.args[0])
     }
   }
   if name == "fmt.Print" {
@@ -2030,6 +2036,22 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
     let is_err = types[1]!.kind is TyError || types[1]!.kind is TyString
     if is_err {
       is_error_result = true
+    }
+  }
+  // Also check if the call is to a function that returns ErrorResult
+  if !is_error_result && !isnull(expr) && expr!.kind is ExCall && !isnull(expr!.call) {
+    let call_name = expr!.call!.func_name
+    let funcs = self.prog!.functions
+    let mut fi = 0
+    while fi < len(funcs) {
+      if self.func_name(funcs[fi]) == call_name && !isnull(funcs[fi].return_type) && funcs[fi].return_type!.kind is TyErrorResult {
+        is_error_result = true
+        if !isnull(funcs[fi].return_type!.elem) {
+          expr!.typ = funcs[fi].return_type
+        }
+        fi = len(funcs)  // break
+      }
+      fi = fi + 1
     }
   }
   if len(names) == 2 && is_error_result {
