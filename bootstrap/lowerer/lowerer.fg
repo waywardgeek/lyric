@@ -1041,13 +1041,30 @@ forge lowerer {
       for n in names {
         let ft = if !isnull(v) && v!.typ!.kind is TyTuple && i < len(v!.typ!.fields) {
           v!.typ!.fields[i].typ
+        } else if !isnull(v) && v!.typ!.kind is TyErrorResult && i == 0 {
+          v!.typ!.elem
+        } else if !isnull(v) && v!.typ!.kind is TyErrorResult && i == 1 {
+          LType { kind: TyError, name: "", bits: 0, is_exported: false }
         } else {
           LType { kind: TyAny, name: "", bits: 0, is_exported: false }
         }
-        let extract = LExpr {
-          kind: ExExtractValue,
-          typ: ft,
-          extract_value: LExtractValueData { value: v }
+        let extract_kind = if !isnull(v) && v!.typ!.kind is TyErrorResult && i == 1 {
+          ExExtractError
+        } else {
+          ExExtractValue
+        }
+        let extract = if extract_kind is ExExtractError {
+          LExpr {
+            kind: ExExtractError,
+            typ: ft,
+            extract_error: LExtractErrorData { value: v }
+          }
+        } else {
+          LExpr {
+            kind: ExExtractValue,
+            typ: ft,
+            extract_value: LExtractValueData { value: v }
+          }
         }
         let tv = self.emit_temp(extract)
         self.emit(LStmt {
