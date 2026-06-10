@@ -1,0 +1,34 @@
+forge optimizer {
+
+  doc "Purpose" {
+    Post-lowering LIR→LIR optimization pass. Fixes semantic issues that
+    are easier to handle as transforms on the flat LIR representation
+    than during initial lowering.
+
+    Passes (in order):
+    1. Side-effect temp elimination: fuse void-context builtins into bare statements
+    2. Multi-return destructuring: split single-temp multi-return into tuple VarDecls
+    3. Extract pair destructuring: rewrite extractValue/extractError patterns
+    4. Nil zero value fixing: replace nil with proper zero values for value types
+    5. For-range index coercion (stub)
+    6. Optional return wrapping (stub)
+    7. Append reassign rewriting (stub)
+    Then: recursive nested block optimization
+    Then: collect used temps/vars, eliminate unused, blank unused multi-assign names
+  }
+
+  doc "Invariants" {
+    // PROCEDURAL — structural transforms run BEFORE elimination
+    // Elimination runs on transformed stmts, then re-collects after
+    // elimination to catch names freed by VarDecl removal.
+    //
+    // collectUsedTemps and collectUsedVarNames must walk ALL stmt/expr/value
+    // variants exhaustively — missing a variant silently drops live references.
+    //
+    // parseTempID strips _val/_err suffixes to map multi-assign names
+    // back to their source temp IDs.
+  }
+
+  // Uses LIR types from bootstrap/lir/lir.fg
+  // Uses Dict from stdlib
+}
