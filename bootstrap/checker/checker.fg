@@ -962,7 +962,7 @@ forge checker {
         return make_func_type(param_types, self.resolve_type_expr(ret), [])
       }
       Union(variants) => {
-        if len(variants) == 0 { return make_any_type() }
+        if len(variants) == 0 { return make_void_type() }
         // For now, return first variant type
         return self.resolve_type_expr(variants[0])
       }
@@ -979,8 +979,15 @@ forge checker {
         return make_void_type()
       }
     }
-    return make_any_type()
+    // All TypeExprKind variants handled above — this is unreachable
+    eprintln("checker: resolve_type_expr: unreachable — unknown TypeExprKind")
+    os_exit(1)
+    return make_void_type()
   }
+
+  // =====================================================================
+  // Individual expression checkers
+  // =====================================================================
 
   func Checker.resolve_named_type(self, name: string, args: [TypeExpr], span: Span) -> Type {
     // Check scope first (type vars, aliases)
@@ -1010,7 +1017,7 @@ forge checker {
     }
 
     self.error_at(span, "unknown type: " + name)
-    return make_any_type()
+    return make_error_type()
   }
 
   // =====================================================================
@@ -1988,7 +1995,8 @@ forge checker {
         // Check registry for type names (for module access etc.)
         let info = self.registry.lookup(name_str)
         if info != nil { return info!.type_val }
-        return make_any_type()
+        self.error_at(expr.span, "undefined variable: " + name_str)
+        return make_error_type()
       }
       IntLit(_, type_hint) => {
         if type_hint != nil {
@@ -2064,12 +2072,10 @@ forge checker {
         return self.check_if_else_expr(cond, then_block, else_ifs, else_block)
       }
     }
-    return make_any_type()
+    eprintln("checker: check_expr: unreachable — unknown ExprKind")
+    os_exit(1)
+    return make_void_type()
   }
-
-  // =====================================================================
-  // Individual expression checkers
-  // =====================================================================
 
   func Checker.check_unary(self, op: UnaryOp, operand: Expr) -> Type {
     let ot = self.check_expr(operand)
@@ -2103,7 +2109,9 @@ forge checker {
         return coerce_numeric(lt, rt)
       }
     }
-    return make_any_type()
+    eprintln("checker: check_binary: unreachable")
+    os_exit(1)
+    return make_void_type()
   }
 
   func Checker.check_index(self, receiver: Expr, index: Expr) -> Type {
@@ -2113,7 +2121,10 @@ forge checker {
       Sequence(elem) => { return elem }
       String => { return make_string_type() }
       Map(_, value) => { return make_optional_type(value) }
-      _ => { return make_any_type() }
+      _ => {
+        self.error_at(receiver.span, "cannot index into this type")
+        return make_error_type()
+      }
     }
   }
 
@@ -2150,7 +2161,8 @@ forge checker {
         if len(fields) >= 1 && fields[0].type_val != nil {
           return fields[0].type_val!
         }
-        return make_any_type()
+        self.error_at(operand.span, "cannot apply ? to this tuple type")
+        return make_error_type()
       }
       _ => { return ot }
     }
@@ -2220,7 +2232,7 @@ forge checker {
       }
       return make_sequence_type(elem_type)
     }
-    return make_sequence_type(make_any_type())
+    return make_sequence_type(make_void_type())
   }
 
   func Checker.check_map_lit(self, keys: [Expr], values: [Expr]) -> Type {
@@ -2233,7 +2245,7 @@ forge checker {
       }
       return make_map_type(key_type, val_type)
     }
-    return make_map_type(make_any_type(), make_any_type())
+    return make_map_type(make_void_type(), make_void_type())
   }
 
   func Checker.check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type {
@@ -2265,7 +2277,8 @@ forge checker {
       return info!.type_val
     }
 
-    return make_any_type()
+    self.error("unknown struct/class: " + name_str)
+    return make_error_type()
   }
 
   func Checker.check_lambda(self, params: [Param], return_type: TypeExpr?, body: Block) -> Type {
@@ -2292,7 +2305,7 @@ forge checker {
 
   func Checker.check_match_expr(self, value: Expr, arms: [MatchArm]) -> Type {
     let val_type = self.check_expr(value)
-    let mut result_type = make_any_type()
+    let mut result_type = make_void_type()
     let mut first = true
     for arm in arms {
       self.push_scope()
@@ -2375,8 +2388,8 @@ forge checker {
         }
 
         self.error("unknown function: " + name_str)
-        annotate(func_expr, make_any_type())
-        return make_any_type()
+        annotate(func_expr, make_error_type())
+        return make_error_type()
       }
       FieldAccess(receiver, field) => {
         // Module.function() call
@@ -2385,8 +2398,9 @@ forge checker {
         match recv_type.kind {
           Module(_) | Enum(_) => {
             // Module function or enum variant constructor
-            annotate(func_expr, make_any_type())
-            return make_any_type()
+            // TODO: resolve actual return type from module/enum registry
+            annotate(func_expr, recv_type)
+            return recv_type
           }
           _ => {
             // Regular field that's callable
@@ -2394,7 +2408,7 @@ forge checker {
             annotate(func_expr, ft)
             match ft.kind {
               Func(_, ret, _) => { return ret }
-              _ => { return make_any_type() }
+              _ => { return ft }
             }
           }
         }
@@ -2403,11 +2417,13 @@ forge checker {
         let ft = self.check_expr(func_expr)
         match ft.kind {
           Func(_, ret, _) => { return ret }
-          _ => { return make_any_type() }
+          _ => { return ft }
         }
       }
     }
-    return make_any_type()
+    eprintln("checker: check_call: unreachable")
+    os_exit(1)
+    return make_void_type()
   }
 
   // check_builtin_call handles built-in functions. Returns nil if not a builtin.
@@ -2447,7 +2463,7 @@ forge checker {
     if name == "sym" {
       let info = self.registry.lookup("Sym")
       if info != nil { return info!.type_val }
-      return make_any_type()
+      self.error("stdlib type Sym not found"); return make_error_type()
     }
     if name == "hash_string" { return make_uint_type(64) }
     if name == "os_args" { return make_sequence_type(make_string_type()) }
@@ -2464,7 +2480,7 @@ forge checker {
     if name == "new_string_builder" {
       let info = self.registry.lookup("StringBuilder")
       if info != nil { return info!.type_val }
-      return make_any_type()
+      self.error("stdlib type StringBuilder not found"); return make_error_type()
     }
     if name == "new_error" { return make_error_type() }
 
@@ -2485,13 +2501,13 @@ forge checker {
     if name == "dict_new" {
       let info = self.registry.lookup("Dict")
       if info != nil { return info!.type_val }
-      return make_any_type()
+      self.error("stdlib type Dict not found"); return make_error_type()
     }
     if name == "dict_set" { return make_void_type() }
     if name == "dict_get" {
       let info = self.registry.lookup("DictEntry")
       if info != nil { return make_optional_type(info!.type_val) }
-      return make_any_type()
+      self.error("stdlib type DictEntry not found"); return make_error_type()
     }
     if name == "dict_has" { return make_bool_type() }
     if name == "dict_remove" { return make_bool_type() }
@@ -2506,8 +2522,9 @@ forge checker {
     }
     if name == "hash_find_slot" { return make_int_type(32) }
     if name == "hash_lookup" {
-      if len(arg_types) >= 1 { return make_optional_type(make_any_type()) }
-      return make_any_type()
+      if len(arg_types) >= 1 { return make_optional_type(arg_types[0]) }
+      self.error("hash_lookup requires at least one argument")
+      return make_error_type()
     }
 
     // Not a builtin
@@ -2586,7 +2603,8 @@ forge checker {
     // Universal methods
     if method_str == "to_string" { return make_string_type() }
 
-    return make_any_type()
+    self.error("unknown method: " + method_str)
+    return make_error_type()
   }
 
   func Checker.check_builtin_method(self, recv_type: Type, method: string, arg_types: [Type]) -> Type? {
@@ -2705,12 +2723,14 @@ forge checker {
       }
       Module(mod_name) => {
         // Module field/function access
-        return make_any_type()
+        // TODO: resolve actual field type from module registry
+        return make_void_type()
       }
       _ => {}
     }
 
-    return make_any_type()
+    self.error("field not found on type")
+    return make_error_type()
   }
 
   // =====================================================================
@@ -2728,7 +2748,8 @@ forge checker {
       String => { return make_string_type() }
       _ => {}
     }
-    return make_any_type()
+    // Non-numeric, non-string binary op — return first operand type
+    return a
   }
 
   // =====================================================================
