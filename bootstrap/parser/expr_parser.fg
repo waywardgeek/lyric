@@ -578,8 +578,8 @@ forge parser {
   // ---- Paren-lambda: (params) -> RetType { body } ----
 
   func Parser.is_paren_lambda_ahead(self) -> bool {
-    // Save state, try to scan (ident: type, ...) -> pattern
     let saved = self.lex!.save_state()
+    let pushed_saved = self.pushed
     self.next()  // consume (
     self.skip_newlines()
     let mut looks_like_lambda = false
@@ -608,6 +608,7 @@ forge parser {
       }
     }
     self.lex!.restore_state(saved)
+    self.pushed = pushed_saved
     return looks_like_lambda
   }
 
@@ -756,9 +757,11 @@ forge parser {
     if first < 65 || first > 90 { return false }  // Not uppercase A-Z
     // Save state and check for '(' after ident
     let saved = self.lex!.save_state()
+    let pushed_saved = self.pushed
     self.next()  // consume ident
     let is_variant = self.peek().kind == PLParen
     self.lex!.restore_state(saved)
+    self.pushed = pushed_saved
     return is_variant
   }
 
@@ -1195,6 +1198,7 @@ forge parser {
       return false
     }
     let saved = self.lex!.save_state()
+    let pushed_saved = self.pushed
     self.next()  // consume {
     self.skip_newlines()
     let mut result = false
@@ -1207,6 +1211,7 @@ forge parser {
       }
     }
     self.lex!.restore_state(saved)
+    self.pushed = pushed_saved
     return result
   }
 
@@ -1284,7 +1289,7 @@ forge parser {
   func Parser.try_parse_type_args(self) -> [TypeExpr]? {
     self.next()  // consume <
     let mut type_args: [TypeExpr] = []
-    while self.peek().kind != PGt && self.peek().kind != SEOF {
+    while self.peek().kind != PGt && self.peek().kind != OShr && self.peek().kind != SEOF {
       let te = self.parse_type_expr()
       if te._1 != null {
         return null
@@ -1293,6 +1298,19 @@ forge parser {
       if self.peek().kind == PComma {
         self.next()
       }
+    }
+    if self.peek().kind == OShr {
+      // >> is two > tokens — consume one, push back the other
+      let tok = self.next()
+      self.push_back(Token {
+        kind: PGt,
+        text: ">",
+        span: Span {
+          start: Pos { file: tok.span.start.file, line: tok.span.start.line, column: tok.span.start.column + 1 },
+          end: tok.span.end
+        }
+      })
+      return type_args
     }
     if self.peek().kind != PGt {
       return null

@@ -13,6 +13,7 @@ forge parser {
   class Parser {
     lex: Lexer?
     no_struct_lit: bool
+    pushed: Token?
   }
 
   func new_parser(src_text: string, filename: string) -> Parser {
@@ -28,11 +29,23 @@ forge parser {
   // ---- Helpers ----
 
   func Parser.peek(self) -> Token {
+    if self.pushed != null {
+      return self.pushed!
+    }
     return self.lex!.peek()
   }
 
   func Parser.next(self) -> Token {
+    if self.pushed != null {
+      let t = self.pushed!
+      self.pushed = null
+      return t
+    }
     return self.lex!.next()
+  }
+
+  func Parser.push_back(self, t: Token) {
+    self.pushed = t
   }
 
   func Parser.skip_newlines(self) {
@@ -90,10 +103,12 @@ forge parser {
 
   func Parser.is_why_annotation(self) -> bool {
     let saved = self.lex!.save_state()
+    let pushed_saved = self.pushed
     self.next()  // consume 'why'
     self.next()  // consume ':'
     let tok = self.peek()
     self.lex!.restore_state(saved)
+    self.pushed = pushed_saved
     return tok.kind == LStringLit || tok.kind == LTripleString
   }
 
@@ -1223,14 +1238,27 @@ forge parser {
       let mut args: [TypeExpr] = []
       if self.peek().kind == PLt {
         self.next()
-        while self.peek().kind != PGt && self.peek().kind != SEOF {
+        while self.peek().kind != PGt && self.peek().kind != OShr && self.peek().kind != SEOF {
           let arg = self.parse_type_expr()?
           args = append(args, arg!)
           if self.peek().kind == PComma {
             self.next()
           }
         }
-        self.expect(PGt)?
+        if self.peek().kind == OShr {
+          // >> is two > tokens — consume one, push back the other
+          let shr_tok = self.next()
+          self.push_back(Token {
+            kind: PGt,
+            text: ">",
+            span: Span {
+              start: Pos { file: shr_tok.span.start.file, line: shr_tok.span.start.line, column: shr_tok.span.start.column + 1 },
+              end: shr_tok.span.end
+            }
+          })
+        } else {
+          self.expect(PGt)?
+        }
       }
 
       return (TypeExpr {
