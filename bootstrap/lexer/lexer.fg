@@ -547,12 +547,24 @@ forge lexer {
     // Punctuation and operators
     self.advance()
 
-    if ch == '(' { self.bracket_depth = self.bracket_depth + 1; return make_token(PLParen, "(", start, self.current_pos()) }
-    if ch == ')' { self.bracket_depth = self.bracket_depth - 1; return make_token(PRParen, ")", start, self.current_pos()) }
+    if ch == '(' {
+      self.bracket_depth = self.bracket_depth + 1
+      return make_token(PLParen, "(", start, self.current_pos())
+    }
+    if ch == ')' {
+      self.bracket_depth = self.bracket_depth - 1
+      return make_token(PRParen, ")", start, self.current_pos())
+    }
     if ch == '{' { return make_token(PLBrace, "{", start, self.current_pos()) }
     if ch == '}' { return make_token(PRBrace, "}", start, self.current_pos()) }
-    if ch == '[' { self.bracket_depth = self.bracket_depth + 1; return make_token(PLBracket, "[", start, self.current_pos()) }
-    if ch == ']' { self.bracket_depth = self.bracket_depth - 1; return make_token(PRBracket, "]", start, self.current_pos()) }
+    if ch == '[' {
+      self.bracket_depth = self.bracket_depth + 1
+      return make_token(PLBracket, "[", start, self.current_pos())
+    }
+    if ch == ']' {
+      self.bracket_depth = self.bracket_depth - 1
+      return make_token(PRBracket, "]", start, self.current_pos())
+    }
     if ch == ',' { return make_token(PComma, ",", start, self.current_pos()) }
     if ch == ':' { return make_token(PColon, ":", start, self.current_pos()) }
     if ch == '.' { return make_token(PDot, ".", start, self.current_pos()) }

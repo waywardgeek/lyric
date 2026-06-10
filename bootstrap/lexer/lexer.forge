@@ -16,9 +16,9 @@ forge lexer {
   """
 
   doc "Invariants — Keyword Lookup": """
-    The lexer uses if-else chains for keyword lookup (not Dict) because the
-    C backend needs simple control flow. Keywords are checked after scanning
-    an identifier token.
+    The lexer uses Dict<TokenKind> (HashedList) for keyword lookup — O(1)
+    via Sym hashing. Two dictionaries: keywords (hard keywords) and
+    annot_keywords (contextual annotation keywords like why, doc, source).
 
     LexerState (save_state/restore_state) enables parser backtracking for
     ambiguous constructs like struct literals vs blocks. LexerState is a
