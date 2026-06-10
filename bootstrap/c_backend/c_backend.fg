@@ -118,7 +118,7 @@ func new_cgen(prog: LProgram?) -> CGen? {
   while i < len(funcs) {
     let mut key = funcs[i].name
     if funcs[i].receiver != "" {
-      key = "{funcs[i].receiver}.{funcs[i].name}"
+      key = f"{funcs[i].receiver}.{funcs[i].name}"
     }
     dict_set<LFuncDecl>(g.func_by_name!, key, funcs[i])
     i = i + 1
@@ -188,7 +188,7 @@ func is_c_reserved(name: string) -> bool {
 
 func c_safe_name(name: string) -> string {
   if is_c_reserved(name) {
-    return "{name}_"
+    return f"{name}_"
   }
   return name
 }
@@ -254,7 +254,7 @@ func lc_first(s: string) -> string {
     if len(s) == 1 {
       return lower
     }
-    return "{lower}{s[1:len(s)]}"
+    return f"{lower}{s[1:len(s)]}"
   }
   return s
 }
@@ -365,7 +365,7 @@ func CGen.c_type(self, t: LType?) -> string {
           name = ren!.value
         }
       }
-      return "{name}*"
+      return f"{name}*"
     }
     TyOptional => {
       // Class handles are already pointers — NULL = none
@@ -379,7 +379,7 @@ func CGen.c_type(self, t: LType?) -> string {
     TyChannel => {
       if !isnull(t!.elem) {
         let suffix = self.chan_suffix(t!.elem)
-        return "ForgeChan_{suffix}*"
+        return f"ForgeChan_{suffix}*"
       }
       return "void* /* channel */"
     }
@@ -388,7 +388,7 @@ func CGen.c_type(self, t: LType?) -> string {
       let sb = new_string_builder()
       let params = t!.params
       if len(params) == 0 {
-        return "{ret} (*)(void)"
+        return f"{ret} (*)(void)"
       }
       let mut i = 0
       while i < len(params) {
@@ -398,7 +398,7 @@ func CGen.c_type(self, t: LType?) -> string {
         sb.write(self.c_type(params[i]))
         i = i + 1
       }
-      return "{ret} (*)({sb.to_string()})"
+      return f"{ret} (*)({sb.to_string()})"
     }
     TyErrorResult => {
       return self.result_type_name(t!.elem)
@@ -407,7 +407,7 @@ func CGen.c_type(self, t: LType?) -> string {
       return self.c_tuple_type(t!)
     }
     TyTypeVar => {
-      return "void* /* typevar {t!.name} */"
+      return f"void* /* typevar {t!.name} */"
     }
     _ => {
       return "/* unknown type */"
@@ -420,7 +420,7 @@ func CGen.c_field_decl(self, t: LType?, name: string) -> string {
     let ret = self.c_return_type(t!.ret)
     let params = t!.params
     if len(params) == 0 {
-      return "{ret} (*{name})(void)"
+      return f"{ret} (*{name})(void)"
     }
     let sb = new_string_builder()
     let mut i = 0
@@ -431,9 +431,9 @@ func CGen.c_field_decl(self, t: LType?, name: string) -> string {
       sb.write(self.c_type(params[i]))
       i = i + 1
     }
-    return "{ret} (*{name})({sb.to_string()})"
+    return f"{ret} (*{name})({sb.to_string()})"
   }
-  return "{self.c_type(t)} {name}"
+  return f"{self.c_type(t)} {name}"
 }
 
 func CGen.c_return_type(self, t: LType?) -> string {
@@ -459,14 +459,14 @@ func CGen.c_tuple_type(self, t: LType?) -> string {
   }
   // Fallback: anonymous struct
   let sb = new_string_builder()
-  sb.write("struct { ")
+  sb.write(f"struct { ")
   let mut i = 0
   while i < len(t!.fields) {
     if i > 0 {
       sb.write("; ")
     }
     sb.write(self.c_type(t!.fields[i].typ))
-    sb.write(" _{i}")
+    sb.write(f" _{i}")
     i = i + 1
   }
   sb.write("; }")
@@ -483,7 +483,7 @@ func CGen.slice_type_name(self, elem: LType?) -> string {
   if !isnull(entry) {
     return entry!.value
   }
-  let name = "ForgeSlice_{sanitize_c_type_name(key)}"
+  let name = f"ForgeSlice_{sanitize_c_type_name(key)}"
   dict_set<string>(self.slice_types!, key, name)
   return name
 }
@@ -497,7 +497,7 @@ func CGen.opt_type_name(self, elem: LType?) -> string {
   if !isnull(entry) {
     return entry!.value
   }
-  let name = "ForgeOpt_{sanitize_c_type_name(key)}"
+  let name = f"ForgeOpt_{sanitize_c_type_name(key)}"
   dict_set<string>(self.opt_types!, key, name)
   return name
 }
@@ -511,7 +511,7 @@ func CGen.result_type_name(self, elem: LType?) -> string {
   if !isnull(entry) {
     return entry!.value
   }
-  let name = "ForgeResult_{sanitize_c_type_name(key)}"
+  let name = f"ForgeResult_{sanitize_c_type_name(key)}"
   dict_set<string>(self.result_types!, key, name)
   return name
 }
@@ -546,13 +546,13 @@ func CGen.zero_value(self, t: LType?) -> string {
       if !isnull(t!.elem) && t!.elem!.kind is TyClassHandle {
         return "NULL"
       }
-      return "forge_none({self.opt_type_name(t!.elem)})"
+      return f"forge_none({self.opt_type_name(t!.elem)})"
     }
     TySlice => {
-      return "forge_slice_empty({self.slice_type_name(t!.elem)})"
+      return f"forge_slice_empty({self.slice_type_name(t!.elem)})"
     }
-    TyStruct | TyTaggedUnion => { return "{0}" }
-    _ => { return "{0}" }
+    TyStruct | TyTaggedUnion => { return f"{0}" }
+    _ => { return f"{0}" }
   }
 }
 
@@ -597,7 +597,7 @@ func CGen.contains_type_var(self, t: LType?) -> bool {
 
 func CGen.next_temp(self) -> i32 {
   let id = 9000 + len(dict_keys<bool>(self.temp_used!))
-  dict_set<bool>(self.temp_used!, "{id}", true)
+  dict_set<bool>(self.temp_used!, f"{id}", true)
   return id
 }
 
@@ -607,7 +607,7 @@ func CGen.next_temp(self) -> i32 {
 
 func CGen.func_name(self, f: LFuncDecl) -> string {
   if f.receiver != "" {
-    return "{f.receiver}_{f.name}"
+    return f"{f.receiver}_{f.name}"
   }
   if f.name == "Main" {
     return "main"
@@ -656,33 +656,33 @@ func CGen.emit_value(self, v: LValue?) -> string {
     ValVar => {
       let name = c_safe_name(v!.name)
       if self.in_generator {
-        return "_gen->{name}"
+        return f"_gen->{name}"
       }
       if !isnull(self.spawn_captures) {
         let entry = dict_get<bool>(self.spawn_captures!, v!.name)
         if !isnull(entry) {
-          return "(*_ctx->{name})"
+          return f"(*_ctx->{name})"
         }
       }
       return name
     }
     ValTemp => {
-      return "_t{v!.temp_id}"
+      return f"_t{v!.temp_id}"
     }
     ValGlobal => {
       return v!.name
     }
     ValLitInt => {
-      return "{v!.int_val}"
+      return f"{v!.int_val}"
     }
     ValLitUint => {
-      return "{v!.uint_val}U"
+      return f"{v!.uint_val}U"
     }
     ValLitFloat => {
-      return "{v!.float_val}"
+      return f"{v!.float_val}"
     }
     ValLitString => {
-      return "FORGE_STR(\"{escape_c(v!.str_val)}\")"
+      return f"FORGE_STR(\"{escape_c(v!.str_val)}\")"
     }
     ValLitBool => {
       if v!.bool_val {
@@ -701,17 +701,17 @@ func CGen.emit_value_as_cstr(self, v: LValue?) -> string {
     return "\"<null>\""
   }
   if v!.kind is ValLitString {
-    return "\"{escape_c(v!.str_val)}\""
+    return f"\"{escape_c(v!.str_val)}\""
   }
   // For error types, use directly
   if v!.kind is ValTemp {
-    let ty_entry = dict_get<LType?>(self.temp_types!, "{v!.temp_id}")
+    let ty_entry = dict_get<LType?>(self.temp_types!, f"{v!.temp_id}")
     if !isnull(ty_entry) && !isnull(ty_entry!.value) {
       if ty_entry!.value!.kind is TyError {
         return self.emit_value(v)
       }
       if ty_entry!.value!.kind is TyClassHandle {
-        return "(const char*){self.emit_value(v)}->msg.data"
+        return f"(const char*){self.emit_value(v)}->msg.data"
       }
     }
   }
@@ -722,11 +722,11 @@ func CGen.emit_value_as_cstr(self, v: LValue?) -> string {
         return self.emit_value(v)
       }
       if ty_entry!.value!.kind is TyClassHandle {
-        return "(const char*){self.emit_value(v)}->msg.data"
+        return f"(const char*){self.emit_value(v)}->msg.data"
       }
     }
   }
-  return "(const char*){self.emit_value(v)}.data"
+  return f"(const char*){self.emit_value(v)}.data"
 }
 
 func CGen.emit_args(self, args: [LValue?]) -> string {
@@ -754,7 +754,7 @@ func CGen.resolve_value_type(self, v: LValue?) -> LType? {
     return v!.typ
   }
   if v!.kind is ValTemp {
-    let entry = dict_get<LType?>(self.temp_types!, "{v!.temp_id}")
+    let entry = dict_get<LType?>(self.temp_types!, f"{v!.temp_id}")
     if !isnull(entry) {
       return entry!.value
     }
@@ -792,7 +792,7 @@ func CGen.infer_lval_type(self, v: LValue?) -> LType? {
       return LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
     }
     ValTemp => {
-      let entry = dict_get<LType?>(self.temp_types!, "{v!.temp_id}")
+      let entry = dict_get<LType?>(self.temp_types!, f"{v!.temp_id}")
       if !isnull(entry) {
         return entry!.value
       }
@@ -925,20 +925,20 @@ func CGen.union_tag_for_type(self, t: LType?) -> string {
 
 func CGen.c_wrap_union(self, expr: string, src_type: LType?) -> string {
   if isnull(src_type) {
-    return "forge_union_ptr((void*)({expr}))"
+    return f"forge_union_ptr((void*)({expr}))"
   }
   match src_type!.kind {
     TyI8 | TyI16 | TyI32 | TyU8 | TyU16 | TyU32 | TyPlatformInt => {
-      return "forge_union_i32((int32_t)({expr}))"
+      return f"forge_union_i32((int32_t)({expr}))"
     }
     TyI64 | TyU64 | TyPlatformUint => {
-      return "forge_union_i64((int64_t)({expr}))"
+      return f"forge_union_i64((int64_t)({expr}))"
     }
-    TyF32 => { return "forge_union_f32({expr})" }
-    TyF64 => { return "forge_union_f64({expr})" }
-    TyBool => { return "forge_union_bool({expr})" }
-    TyString => { return "forge_union_string({expr})" }
-    _ => { return "forge_union_ptr((void*)({expr}))" }
+    TyF32 => { return f"forge_union_f32({expr})" }
+    TyF64 => { return f"forge_union_f64({expr})" }
+    TyBool => { return f"forge_union_bool({expr})" }
+    TyString => { return f"forge_union_string({expr})" }
+    _ => { return f"forge_union_ptr((void*)({expr}))" }
   }
 }
 
@@ -950,7 +950,7 @@ func CGen.printf_spec_and_arg(self, v: LValue?) -> (string, string) {
   let mut t = if !isnull(v) { v!.typ } else { null }
   // Resolve through temp/var types
   if !isnull(v) && v!.kind is ValTemp {
-    let entry = dict_get<LType?>(self.temp_types!, "{v!.temp_id}")
+    let entry = dict_get<LType?>(self.temp_types!, f"{v!.temp_id}")
     if !isnull(entry) && !isnull(entry!.value) {
       t = entry!.value
     }
@@ -970,8 +970,8 @@ func CGen.printf_spec_and_arg(self, v: LValue?) -> (string, string) {
     TyU8 | TyU16 | TyU32 | TyPlatformUint => { return ("%u", val) }
     TyU64 => { return ("%llu", val) }
     TyF32 | TyF64 => { return ("%g", val) }
-    TyBool => { return ("%s", "forge_bool_str({val})") }
-    TyString => { return ("%.*s", "(int){val}.len, (const char*){val}.data") }
+    TyBool => { return ("%s", f"forge_bool_str({val})") }
+    TyString => { return ("%.*s", f"(int){val}.len, (const char*){val}.data") }
     TyError => { return ("%s", val) }
     TyAny => { return ("%p", val) }
     _ => { return ("%d", val) }
@@ -985,9 +985,9 @@ func CGen.printf_spec_and_arg(self, v: LValue?) -> (string, string) {
 func CGen.emit_fprint(self, stream: string, args: [LValue?], newline: bool) -> string {
   if len(args) == 0 {
     if newline {
-      return "fprintf({stream}, \"\\n\")"
+      return f"fprintf({stream}, \"\\n\")"
     }
-    return "fprintf({stream}, \"\")"
+    return f"fprintf({stream}, \"\")"
   }
   let fmt_sb = new_string_builder()
   let arg_sb = new_string_builder()
@@ -1010,12 +1010,12 @@ func CGen.emit_fprint(self, stream: string, args: [LValue?], newline: bool) -> s
   }
   let mut fmt_str = fmt_sb.to_string()
   if newline {
-    fmt_str = "{fmt_str}\\n"
+    fmt_str = f"{fmt_str}\\n"
   }
   if arg_count == 0 {
-    return "fprintf({stream}, \"{fmt_str}\")"
+    return f"fprintf({stream}, \"{fmt_str}\")"
   }
-  return "fprintf({stream}, \"{fmt_str}\", {arg_sb.to_string()})"
+  return f"fprintf({stream}, \"{fmt_str}\", {arg_sb.to_string()})"
 }
 
 func CGen.emit_println(self, args: [LValue?]) -> string {
@@ -1026,7 +1026,7 @@ func CGen.emit_printf(self, args: [LValue?]) -> string {
   if len(args) == 0 {
     return "printf(\"\")"
   }
-  let fmt_arg = "(const char*){self.emit_value(args[0])}.data"
+  let fmt_arg = f"(const char*){self.emit_value(args[0])}.data"
   let sb = new_string_builder()
   let mut i = 1
   while i < len(args) {
@@ -1037,16 +1037,16 @@ func CGen.emit_printf(self, args: [LValue?]) -> string {
     i = i + 1
   }
   if i == 1 {
-    return "printf({fmt_arg})"
+    return f"printf({fmt_arg})"
   }
-  return "printf({fmt_arg}, {sb.to_string()})"
+  return f"printf({fmt_arg}, {sb.to_string()})"
 }
 
 func CGen.emit_sprintf(self, args: [LValue?]) -> string {
   if len(args) == 0 {
     return "FORGE_STR_EMPTY"
   }
-  let fmt_str = "(const char*){self.emit_value(args[0])}.data"
+  let fmt_str = f"(const char*){self.emit_value(args[0])}.data"
   if len(args) == 1 {
     return self.emit_value(args[0])
   }
@@ -1059,7 +1059,7 @@ func CGen.emit_sprintf(self, args: [LValue?]) -> string {
     sb.write(self.emit_value(args[i]))
     i = i + 1
   }
-  return "forge_sprintf({fmt_str}, {sb.to_string()})"
+  return f"forge_sprintf({fmt_str}, {sb.to_string()})"
 }
 
 func CGen.emit_format(self, d: LFormatData?) -> string {
@@ -1089,9 +1089,9 @@ func CGen.emit_format(self, d: LFormatData?) -> string {
   }
   let fmt_str = fmt_sb.to_string()
   if arg_count == 0 {
-    return "FORGE_STR(\"{fmt_str}\")"
+    return f"FORGE_STR(\"{fmt_str}\")"
   }
-  return "forge_sprintf(\"{fmt_str}\", {arg_sb.to_string()})"
+  return f"forge_sprintf(\"{fmt_str}\", {arg_sb.to_string()})"
 }
 
 // ---------------------------------------------------------------------------
@@ -1107,12 +1107,12 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
 
   if name == "len" || name == "string_len" {
     if len(args) > 0 {
-      return "{self.emit_value(args[0])}.len"
+      return f"{self.emit_value(args[0])}.len"
     }
   }
   if name == "slice_len" {
     if len(args) > 0 {
-      return "{self.emit_value(args[0])}.len"
+      return f"{self.emit_value(args[0])}.len"
     }
     return "0"
   }
@@ -1121,12 +1121,12 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       let slice_arg = self.emit_value(args[0])
       let elem_arg = self.emit_value(args[1])
       let slice_type = self.slice_type_name_from_value(args[0])
-      return "(\\{ forge_push(&{slice_arg}, {elem_arg}, {slice_type}); {slice_arg}; \\})"
+      return f"({{ forge_push(&{slice_arg}, {elem_arg}, {slice_type}); {slice_arg}; }})"
     }
   }
   if name == "pop" || name == "slice_pop" {
     if len(args) > 0 {
-      return "forge_pop(&{self.emit_value(args[0])})"
+      return f"forge_pop(&{self.emit_value(args[0])})"
     }
   }
   if name == "isnull" {
@@ -1140,75 +1140,75 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
           && !isnull(arg_type!.elem) && arg_type!.elem!.kind is TyClassHandle
         )
         if is_class || is_any || is_opt_class {
-          return "({self.emit_value(args[0])} == NULL)"
+          return f"({self.emit_value(args[0])} == NULL)"
         }
       }
-      return "forge_isnull({self.emit_value(args[0])})"
+      return f"forge_isnull({self.emit_value(args[0])})"
     }
     return "false"
   }
   if name == "has_prefix" || name == "str_has_prefix" || name == "string_has_prefix" {
     if len(args) >= 2 {
-      return "forge_str_has_prefix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_str_has_prefix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "has_suffix" || name == "str_has_suffix" || name == "string_has_suffix" {
     if len(args) >= 2 {
-      return "forge_str_has_suffix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_str_has_suffix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "contains" || name == "str_contains" || name == "string_contains" || name == "slice_contains" {
     if len(args) >= 2 {
       if !isnull(args[0]) && !isnull(args[0]!.typ) && args[0]!.typ!.kind is TyString {
-        return "forge_str_contains({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+        return f"forge_str_contains({self.emit_value(args[0])}, {self.emit_value(args[1])})"
       }
-      return "forge_contains({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_contains({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "index_of" || name == "str_index_of" || name == "string_index_of" {
     if len(args) >= 2 {
-      return "forge_str_index_of({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_str_index_of({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "replace" || name == "str_replace" || name == "string_replace" {
     if len(args) >= 3 {
-      return "forge_str_replace({self.emit_value(args[0])}, {self.emit_value(args[1])}, {self.emit_value(args[2])})"
+      return f"forge_str_replace({self.emit_value(args[0])}, {self.emit_value(args[1])}, {self.emit_value(args[2])})"
     }
   }
   if name == "join" || name == "str_join" || name == "slice_join" {
     if len(args) >= 2 {
       let slice_val = self.emit_value(args[0])
       let sep = self.emit_value(args[1])
-      return "forge_str_join({sep}, {slice_val}.data, {slice_val}.len)"
+      return f"forge_str_join({sep}, {slice_val}.data, {slice_val}.len)"
     }
   }
   if name == "repeat" || name == "str_repeat" || name == "string_repeat" {
     if len(args) >= 2 {
-      return "forge_str_repeat({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_str_repeat({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "string_to_upper" {
     if len(args) > 0 {
-      return "forge_toupper({self.emit_value(args[0])})"
+      return f"forge_toupper({self.emit_value(args[0])})"
     }
   }
   if name == "string_to_lower" {
     if len(args) > 0 {
-      return "forge_tolower({self.emit_value(args[0])})"
+      return f"forge_tolower({self.emit_value(args[0])})"
     }
   }
   if name == "string_split" {
     let st = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
-    return "forge_slice_empty({st}) /* string_split not implemented */"
+    return f"forge_slice_empty({st}) /* string_split not implemented */"
   }
   if name == "string_trim" {
     if len(args) > 0 {
-      return "forge_str_trim({self.emit_value(args[0])})"
+      return f"forge_str_trim({self.emit_value(args[0])})"
     }
   }
   if name == "hash_string" {
     if len(args) > 0 {
-      return "forge_hash_string({self.emit_value(args[0])})"
+      return f"forge_hash_string({self.emit_value(args[0])})"
     }
     return "0"
   }
@@ -1220,12 +1220,12 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   }
   if name == "read_file" {
     if len(args) > 0 {
-      return "forge_read_file({self.emit_value(args[0])})"
+      return f"forge_read_file({self.emit_value(args[0])})"
     }
   }
   if name == "write_file" {
     if len(args) >= 2 {
-      return "forge_write_file({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"forge_write_file({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "os_args" {
@@ -1234,7 +1234,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   }
   if name == "os_exit" {
     if len(args) > 0 {
-      return "exit({self.emit_value(args[0])})"
+      return f"exit({self.emit_value(args[0])})"
     }
     return "exit(0)"
   }
@@ -1243,64 +1243,64 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   }
   if name == "list_dir" {
     if len(args) > 0 {
-      return "forge_list_dir({self.emit_value(args[0])})"
+      return f"forge_list_dir({self.emit_value(args[0])})"
     }
   }
   if name == "file_exists" {
     if len(args) > 0 {
-      return "forge_file_exists({self.emit_value(args[0])})"
+      return f"forge_file_exists({self.emit_value(args[0])})"
     }
   }
   if name == "mkdtemp" {
     if len(args) > 0 {
-      return "forge_mkdtemp({self.emit_value(args[0])})"
+      return f"forge_mkdtemp({self.emit_value(args[0])})"
     }
   }
   if name == "exec_command" {
     self.needs_exec_cmd = true
     if len(args) >= 2 {
-      return "_forge_exec_command({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+      return f"_forge_exec_command({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
   if name == "path_join" {
     self.needs_path_join = true
     if len(args) > 0 {
-      return "_forge_path_join({self.emit_value(args[0])})"
+      return f"_forge_path_join({self.emit_value(args[0])})"
     }
   }
   if name == "path_dir" {
     if len(args) > 0 {
-      return "forge_path_dir({self.emit_value(args[0])})"
+      return f"forge_path_dir({self.emit_value(args[0])})"
     }
   }
   if name == "path_base" {
     if len(args) > 0 {
-      return "forge_path_base({self.emit_value(args[0])})"
+      return f"forge_path_base({self.emit_value(args[0])})"
     }
   }
   if name == "path_ext" {
     if len(args) > 0 {
-      return "forge_path_ext({self.emit_value(args[0])})"
+      return f"forge_path_ext({self.emit_value(args[0])})"
     }
   }
   if name == "itoa" {
     if len(args) > 0 {
-      return "forge_itoa({self.emit_value(args[0])})"
+      return f"forge_itoa({self.emit_value(args[0])})"
     }
   }
   if name == "atoi" {
     if len(args) > 0 {
-      return "forge_atoi({self.emit_value(args[0])})"
+      return f"forge_atoi({self.emit_value(args[0])})"
     }
   }
   if name == "parse_float" {
     if len(args) > 0 {
-      return "forge_parse_float({self.emit_value(args[0])})"
+      return f"forge_parse_float({self.emit_value(args[0])})"
     }
   }
   if name == "char_to_string" {
     if len(args) > 0 {
-      return "forge_char_to_string({self.emit_value(args[0])})"
+      return f"forge_char_to_string({self.emit_value(args[0])})"
     }
   }
   if name == "println" || name == "Println" {
@@ -1311,7 +1311,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   }
   if name == "panic" {
     if len(args) >= 1 {
-      return "forge_panic({self.emit_value(args[0])})"
+      return f"forge_panic({self.emit_value(args[0])})"
     }
   }
   if name == "channel_receive" {
@@ -1321,7 +1321,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       if !isnull(chan_type) && chan_type!.kind is TyChannel && !isnull(chan_type!.elem) {
         suffix = self.chan_suffix(chan_type!.elem)
       }
-      return "forge_chan_recv_{suffix}({self.emit_value(args[0])})"
+      return f"forge_chan_recv_{suffix}({self.emit_value(args[0])})"
     }
   }
   if name == "channel_close" {
@@ -1331,7 +1331,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       if !isnull(chan_type) && chan_type!.kind is TyChannel && !isnull(chan_type!.elem) {
         suffix = self.chan_suffix(chan_type!.elem)
       }
-      return "forge_chan_close_{suffix}({self.emit_value(args[0])})"
+      return f"forge_chan_close_{suffix}({self.emit_value(args[0])})"
     }
   }
   // Map builtins — stubs
@@ -1340,7 +1340,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
 
   // Fallback
   let sb = new_string_builder()
-  sb.write("/* builtin {name}(")
+  sb.write(f"/* builtin {name}(")
   let mut i = 0
   while i < len(args) {
     if i > 0 {
@@ -1379,11 +1379,11 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExUnOp => {
       let d = e!.un_op!
-      return "({c_un_op(d.op)}{self.emit_value(d.operand)})"
+      return f"({c_un_op(d.op)}{self.emit_value(d.operand)})"
     }
     ExCast => {
       let d = e!.cast!
-      return "(({self.c_type(d.target)}){self.emit_value(d.operand)})"
+      return f"(({self.c_type(d.target)}){self.emit_value(d.operand)})"
     }
     ExBuiltin => {
       return self.emit_builtin(e!.builtin)
@@ -1393,19 +1393,19 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExClassGet => {
       let d = e!.class_get!
-      return "{self.emit_value(d.handle)}->{d.field}"
+      return f"{self.emit_value(d.handle)}->{d.field}"
     }
     ExIndexGet => {
       let d = e!.index_get!
-      return "{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}]"
+      return f"{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}]"
     }
     ExSlice => {
       let d = e!.slice_data!
       let coll = self.emit_value(d.collection)
       let low = if !isnull(d.low) { self.emit_value(d.low) } else { "0" }
-      let high = if !isnull(d.high) { self.emit_value(d.high) } else { "{coll}.len" }
+      let high = if !isnull(d.high) { self.emit_value(d.high) } else { f"{coll}.len" }
       let slice_type = self.c_type(e!.typ)
-      return "forge_subslice({coll}, {low}, {high}, {slice_type})"
+      return f"forge_subslice({coll}, {low}, {high}, {slice_type})"
     }
     ExWrapOptional => {
       let d = e!.wrap_opt!
@@ -1413,7 +1413,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
         return self.emit_value(d.value)
       }
       let opt_name = self.opt_type_name_from_expr(e)
-      return "forge_some({self.emit_value(d.value)}, {opt_name})"
+      return f"forge_some({self.emit_value(d.value)}, {opt_name})"
     }
     ExUnwrapOptional => {
       let d = e!.unwrap_opt!
@@ -1425,7 +1425,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
           return self.emit_value(d.value)
         }
       }
-      return "forge_unwrap({self.emit_value(d.value)})"
+      return f"forge_unwrap({self.emit_value(d.value)})"
     }
     ExIsNull => {
       let d = e!.is_null!
@@ -1438,10 +1438,10 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
           && !isnull(val_type!.elem) && val_type!.elem!.kind is TyClassHandle
         )
         if is_class || is_any || is_opt_class {
-          return "({self.emit_value(d.value)} == NULL)"
+          return f"({self.emit_value(d.value)} == NULL)"
         }
       }
-      return "forge_isnull({self.emit_value(d.value)})"
+      return f"forge_isnull({self.emit_value(d.value)})"
     }
     ExVariantConstruct => {
       return self.emit_variant_construct_expr(e!)
@@ -1457,15 +1457,15 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
           return val
         }
       }
-      return "{val}.tag"
+      return f"{val}.tag"
     }
     ExVariantData => {
       let d = e!.variant_data!
       let variant_lower = c_safe_name(str_to_lower(d.variant))
       if d.field != "" {
-        return "{self.emit_value(d.value)}.data.{variant_lower}.{d.field}"
+        return f"{self.emit_value(d.value)}.data.{variant_lower}.{d.field}"
       }
-      return "{self.emit_value(d.value)}.data.{variant_lower}"
+      return f"{self.emit_value(d.value)}.data.{variant_lower}"
     }
     ExFuncLit => {
       return self.emit_func_lit_expr(e!)
@@ -1475,23 +1475,23 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExExtractValue => {
       let d = e!.extract_value!
-      return "{self.emit_value(d.value)}.value"
+      return f"{self.emit_value(d.value)}.value"
     }
     ExExtractError => {
       let d = e!.extract_error!
-      return "{self.emit_value(d.value)}.error"
+      return f"{self.emit_value(d.value)}.error"
     }
     ExMakeResult => {
       let d = e!.make_result!
       let result_name = self.result_type_name_from_expr(e)
       if d.err!.kind is ValLitNull || (d.err!.kind is ValLitString && d.err!.str_val == "") {
-        return "forge_ok({self.emit_value(d.value)}, {result_name})"
+        return f"forge_ok({self.emit_value(d.value)}, {result_name})"
       }
-      return "forge_err({self.emit_value_as_cstr(d.err)}, {result_name})"
+      return f"forge_err({self.emit_value_as_cstr(d.err)}, {result_name})"
     }
     ExMakeSlice => {
       let slice_type = self.slice_type_name_from_type(e!.typ)
-      return "forge_slice_empty({slice_type})"
+      return f"forge_slice_empty({slice_type})"
     }
     ExMakeMap => {
       return "NULL /* make_map: not supported in C backend */"
@@ -1500,7 +1500,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
       let d = e!.make_channel!
       let suffix = self.chan_suffix(d.elem_type)
       let buf_size = if !isnull(d.buf_size) { self.emit_value(d.buf_size) } else { "0" }
-      return "forge_chan_make_{suffix}({buf_size})"
+      return f"forge_chan_make_{suffix}({buf_size})"
     }
     ExFuncRef => {
       let d = e!.func_ref!
@@ -1508,7 +1508,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExEnvGet => {
       let d = e!.env_get!
-      return "{self.emit_value(d.env)}.{d.field}"
+      return f"{self.emit_value(d.env)}.{d.field}"
     }
     _ => {
       return "/* unknown expr */"
@@ -1524,25 +1524,25 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
     return self.emit_println(d.args)
   }
   if name == "panic" && len(d.args) > 0 {
-    return "forge_panic({self.emit_value(d.args[0])})"
+    return f"forge_panic({self.emit_value(d.args[0])})"
   }
   // Check if calling a generator function
   if self.is_gen_func_by_name(name) {
     let args_str = self.emit_args(d.args)
-    return "{name}_init({args_str})"
+    return f"{name}_init({args_str})"
   }
   // Known C library mappings
   if name == "atoi" {
-    return "forge_atoi({self.emit_args(d.args)})"
+    return f"forge_atoi({self.emit_args(d.args)})"
   }
   if name == "parse_float" {
-    return "forge_parse_float({self.emit_args(d.args)})"
+    return f"forge_parse_float({self.emit_args(d.args)})"
   }
   if name == "itoa" {
-    return "forge_itoa({self.emit_args(d.args)})"
+    return f"forge_itoa({self.emit_args(d.args)})"
   }
   let args_str = self.emit_args_boxed(d.func_name, d.args)
-  return "{name}({args_str})"
+  return f"{name}({args_str})"
 }
 
 func CGen.emit_method_call_expr(self, e: LExpr?) -> string {
@@ -1556,9 +1556,9 @@ func CGen.emit_method_call_expr(self, e: LExpr?) -> string {
     let iface_entry = dict_get<LInterfaceDecl>(self.iface_by_name!, recv_type!.name)
     if !isnull(iface_entry) {
       if args_str != "" {
-        return "{recv}._vtable->{d.method}({recv}._data, {args_str})"
+        return f"{recv}._vtable->{d.method}({recv}._data, {args_str})"
       }
-      return "{recv}._vtable->{d.method}({recv}._data)"
+      return f"{recv}._vtable->{d.method}({recv}._data)"
     }
   }
 
@@ -1597,11 +1597,11 @@ func CGen.emit_method_call_expr(self, e: LExpr?) -> string {
       i = i + 1
     }
   }
-  let method_name = "{class_name}_{d.method}"
+  let method_name = f"{class_name}_{d.method}"
   if args_str != "" {
-    return "{method_name}({recv}, {args_str})"
+    return f"{method_name}({recv}, {args_str})"
   }
-  return "{method_name}({recv})"
+  return f"{method_name}({recv})"
 }
 
 func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string {
@@ -1619,7 +1619,7 @@ func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string {
     i = i + 1
   }
   let sb = new_string_builder()
-  sb.write("(\\{ {name}* _p = malloc(sizeof({name})); *_p = ({name})\\{")
+  sb.write(f"({{ {name}* _p = malloc(sizeof({name})); *_p = ({name}){{")
   let mut j = 0
   while j < len(d.fields) {
     if j > 0 {
@@ -1636,16 +1636,16 @@ func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string {
         }
       } else if !isnull(f.value) && f.value!.kind is ValLitNull {
         let opt_n = self.opt_type_name(field_type!.elem)
-        val = "forge_none({opt_n})"
+        val = f"forge_none({opt_n})"
       } else if isnull(f.value) || isnull(f.value!.typ) || !(f.value!.typ!.kind is TyOptional) {
         let opt_n = self.opt_type_name(field_type!.elem)
-        val = "forge_some({val}, {opt_n})"
+        val = f"forge_some({val}, {opt_n})"
       }
     }
-    sb.write(".{lc_first(f.name)} = {val}")
+    sb.write(f".{lc_first(f.name)} = {val}")
     j = j + 1
   }
-  sb.write("\\}; _p; \\})")
+  sb.write("}; _p; })")
   return sb.to_string()
 }
 
@@ -1656,10 +1656,10 @@ func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string {
     let slice_type = self.slice_type_name(e!.typ!.elem)
     let elem_type = self.c_type(e!.typ!.elem)
     if len(d.fields) == 0 {
-      return "forge_slice_empty({slice_type})"
+      return f"forge_slice_empty({slice_type})"
     }
     let sb = new_string_builder()
-    sb.write("forge_slice_lit({slice_type}, {elem_type}, ")
+    sb.write(f"forge_slice_lit({slice_type}, {elem_type}, ")
     let mut i = 0
     while i < len(d.fields) {
       if i > 0 {
@@ -1675,12 +1675,12 @@ func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string {
   let is_class = !isnull(e!.typ) && e!.typ!.kind is TyClassHandle
   if is_class {
     let name = e!.typ!.name
-    sb.write("(\\{ {name}* _p = malloc(sizeof({name})); *_p = ({name})\\{")
+    sb.write(f"({{ {name}* _p = malloc(sizeof({name})); *_p = ({name}){{")
   } else if !isnull(e!.typ) && e!.typ!.kind is TyMutex {
     return "(pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER"
   } else {
     let type_name = if !isnull(e!.typ) { self.c_type(e!.typ) } else { "/* struct */" }
-    sb.write("({type_name})\\{")
+    sb.write(f"({type_name}){{")
   }
   let mut i = 0
   while i < len(d.fields) {
@@ -1688,13 +1688,13 @@ func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string {
       sb.write(", ")
     }
     let fname = if is_class { lc_first(d.fields[i].name) } else { d.fields[i].name }
-    sb.write(".{fname} = {self.emit_value(d.fields[i].value)}")
+    sb.write(f".{fname} = {self.emit_value(d.fields[i].value)}")
     i = i + 1
   }
   if is_class {
-    sb.write("\\}; _p; \\})")
+    sb.write("}; _p; })")
   } else {
-    sb.write("\\}")
+    sb.write("}")
   }
   return sb.to_string()
 }
@@ -1706,13 +1706,13 @@ func CGen.emit_bin_op_expr(self, e: LExpr?) -> string {
   // String equality/concat
   if !isnull(d.left) && !isnull(d.left!.typ) && d.left!.typ!.kind is TyString {
     if d.op is BinEq {
-      return "forge_str_eq({left}, {right})"
+      return f"forge_str_eq({left}, {right})"
     }
     if d.op is BinNe {
-      return "(!forge_str_eq({left}, {right}))"
+      return f"(!forge_str_eq({left}, {right}))"
     }
     if d.op is BinAdd {
-      return "forge_str_concat({left}, {right})"
+      return f"forge_str_concat({left}, {right})"
     }
   }
   // Optional null comparison
@@ -1727,30 +1727,30 @@ func CGen.emit_bin_op_expr(self, e: LExpr?) -> string {
     }
     if !isnull(opt_type) && opt_type!.kind is TyOptional && !self.is_class_optional(opt_type) {
       if d.op is BinNe {
-        return "{opt_val}.has"
+        return f"{opt_val}.has"
       }
-      return "(!{opt_val}.has)"
+      return f"(!{opt_val}.has)"
     }
   }
-  return "({left} {c_bin_op(d.op)} {right})"
+  return f"({left} {c_bin_op(d.op)} {right})"
 }
 
 func CGen.emit_struct_field_expr(self, e: LExpr?) -> string {
   let d = e!.struct_field!
   let recv_type = self.resolve_value_type(d.receiver)
   if !isnull(recv_type) && recv_type!.kind is TyClassHandle {
-    return "{self.emit_value(d.receiver)}->{d.field}"
+    return f"{self.emit_value(d.receiver)}->{d.field}"
   }
   if !isnull(recv_type) && recv_type!.kind is TyErrorResult {
     let field = d.field
     if field == "_0" {
-      return "{self.emit_value(d.receiver)}.value"
+      return f"{self.emit_value(d.receiver)}.value"
     }
     if field == "_1" {
-      return "{self.emit_value(d.receiver)}.error"
+      return f"{self.emit_value(d.receiver)}.error"
     }
   }
-  return "{self.emit_value(d.receiver)}.{d.field}"
+  return f"{self.emit_value(d.receiver)}.{d.field}"
 }
 
 func CGen.emit_variant_construct_expr(self, e: LExpr?) -> string {
@@ -1762,14 +1762,14 @@ func CGen.emit_variant_construct_expr(self, e: LExpr?) -> string {
   // Simple enums
   let entry = dict_get<bool>(self.simple_enums!, enum_name)
   if !isnull(entry) {
-    return "{enum_name}_{d.variant}"
+    return f"{enum_name}_{d.variant}"
   }
   if len(d.fields) == 0 {
-    return "({enum_name})\\{.tag = {enum_name}_{d.variant}\\}"
+    return f"({enum_name}){{.tag = {enum_name}_{d.variant}}}"
   }
   let sb = new_string_builder()
   let variant_lower = c_safe_name(str_to_lower(d.variant))
-  sb.write("({enum_name})\\{.tag = {enum_name}_{d.variant}, .data.{variant_lower} = \\{")
+  sb.write(f"({enum_name}){{.tag = {enum_name}_{d.variant}, .data.{variant_lower} = {{")
   let mut i = 0
   while i < len(d.fields) {
     if i > 0 {
@@ -1778,7 +1778,7 @@ func CGen.emit_variant_construct_expr(self, e: LExpr?) -> string {
     sb.write(self.emit_value(d.fields[i]))
     i = i + 1
   }
-  sb.write("\\}\\}")
+  sb.write("}}")
   return sb.to_string()
 }
 
@@ -1800,7 +1800,7 @@ func CGen.emit_func_lit_expr(self, e: LExpr?) -> string {
     ret_type = self.c_type(d.return_type)
   }
   self.lambda_id = self.lambda_id + 1
-  let lambda_name = "_lambda_{self.lambda_id}"
+  let lambda_name = f"_lambda_{self.lambda_id}"
   let param_str = if sb.len() > 0 { sb.to_string() } else { "void" }
 
   // Emit body into temp buffer
@@ -1850,7 +1850,7 @@ func CGen.emit_args_boxed(self, func_name: string, args: [LValue?]) -> string {
         if !isnull(iface_e) {
           let concrete_class = self.resolve_concrete_class(args[i])
           if concrete_class != "" {
-            arg_str = "({pt!.name})\\{._data = {arg_str}, ._vtable = &{concrete_class}_as_{pt!.name}\\}"
+            arg_str = f"({pt!.name}){{._data = {arg_str}, ._vtable = &{concrete_class}_as_{pt!.name}}}"
           }
         }
       }
@@ -1889,7 +1889,7 @@ func CGen.emit_side_effect(self, e: LExpr?) -> string {
       let slice_arg = self.emit_value(d.args[0])
       let elem_arg = self.emit_value(d.args[1])
       let slice_type = self.slice_type_name_from_value(d.args[0])
-      self.line("forge_push(&{slice_arg}, {elem_arg}, {slice_type});")
+      self.line(f"forge_push(&{slice_arg}, {elem_arg}, {slice_type});")
       return ""
     }
   }
@@ -1921,21 +1921,21 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
       elem_type = LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
     }
     let result_type = self.result_type_name(elem_type)
-    let tmp_name = "_multi_{self.next_temp()}"
-    self.line("{result_type} {tmp_name} = {expr_str};")
+    let tmp_name = f"_multi_{self.next_temp()}"
+    self.line(f"{result_type} {tmp_name} = {expr_str};")
     if names[0] != "_" {
       let val_type = self.c_type(elem_type)
-      self.line("{val_type} {names[0]} = {tmp_name}.value;")
+      self.line(f"{val_type} {names[0]} = {tmp_name}.value;")
       dict_set<LType?>(self.var_types!, names[0], elem_type)
     }
     if names[1] != "_" {
-      self.line("const char* {names[1]} = {tmp_name}.error;")
+      self.line(f"const char* {names[1]} = {tmp_name}.error;")
       dict_set<LType?>(self.var_types!, names[1], LType { kind: TyError, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
     }
   } else if len(names) == 2 && !isnull(expr) && !isnull(expr!.typ) && expr!.typ!.kind is TyTuple {
-    let tmp_name = "_multi_{self.next_temp()}"
+    let tmp_name = f"_multi_{self.next_temp()}"
     let tuple_type = self.c_tuple_type(expr!.typ)
-    self.line("{tuple_type} {tmp_name} = {expr_str};")
+    self.line(f"{tuple_type} {tmp_name} = {expr_str};")
     let mut i = 0
     while i < len(names) {
       if names[i] != "_" {
@@ -1945,7 +1945,7 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
           ltyp = expr!.typ!.fields[i].typ
           field_type_str = self.c_type(ltyp)
         }
-        self.line("{field_type_str} {names[i]} = {tmp_name}._{i};")
+        self.line(f"{field_type_str} {names[i]} = {tmp_name}._{i};")
         if !isnull(ltyp) {
           dict_set<LType?>(self.var_types!, names[i], ltyp)
         }
@@ -1962,7 +1962,7 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
       sb.write(names[i])
       i = i + 1
     }
-    self.line("/* multi-assign: {sb.to_string()} = {expr_str} */")
+    self.line(f"/* multi-assign: {sb.to_string()} = {expr_str} */")
   }
 }
 
@@ -1986,19 +1986,19 @@ func CGen.emit_stmt(self, s: LStmt?) {
     StTempDef => {
       let d = s!.temp_def!
       let ty = self.infer_expr_type(d.expr)
-      dict_set<LType?>(self.temp_types!, "{d.id}", ty)
+      dict_set<LType?>(self.temp_types!, f"{d.id}", ty)
       if !isnull(ty) && ty!.kind is TyUnit {
-        self.line("{self.emit_expr_str(d.expr)};")
+        self.line(f"{self.emit_expr_str(d.expr)};")
         return
       }
-      let temp_name = "_t{d.id}"
-      self.line("{self.c_field_decl(ty, temp_name)} = {self.emit_expr_str(d.expr)};")
+      let temp_name = f"_t{d.id}"
+      self.line(f"{self.c_field_decl(ty, temp_name)} = {self.emit_expr_str(d.expr)};")
     }
     StVarDecl => {
       let d = s!.var_decl!
       if d.name == "_" {
         if !isnull(d.init) {
-          self.line("(void){self.emit_value(d.init)};")
+          self.line(f"(void){self.emit_value(d.init)};")
         }
         return
       }
@@ -2006,7 +2006,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
       if self.in_generator {
         dict_set<LType?>(self.var_types!, d.name, d.typ)
         if !isnull(d.init) {
-          self.line("_gen->{name} = {self.emit_value(d.init)};")
+          self.line(f"_gen->{name} = {self.emit_value(d.init)};")
         }
         return
       }
@@ -2041,65 +2041,65 @@ func CGen.emit_stmt(self, s: LStmt?) {
             || d.init!.kind is ValLitBool
           )
           if is_lit {
-            init_str = "forge_some({init_str}, {self.c_type(var_type)})"
+            init_str = f"forge_some({init_str}, {self.c_type(var_type)})"
           }
         }
-        self.line("{self.c_field_decl(var_type, name)} = {init_str};")
+        self.line(f"{self.c_field_decl(var_type, name)} = {init_str};")
       } else {
-        self.line("{self.c_field_decl(var_type, name)} = {self.zero_value(var_type)};")
+        self.line(f"{self.c_field_decl(var_type, name)} = {self.zero_value(var_type)};")
       }
     }
     StAssign => {
       let d = s!.assign!
       let mut target = c_safe_name(d.target)
       if self.in_generator {
-        target = "_gen->{target}"
+        target = f"_gen->{target}"
       } else if !isnull(self.spawn_captures) {
         let entry = dict_get<bool>(self.spawn_captures!, d.target)
         if !isnull(entry) {
-          target = "(*_ctx->{target})"
+          target = f"(*_ctx->{target})"
         }
       }
-      self.line("{target} = {self.emit_value(d.value)};")
+      self.line(f"{target} = {self.emit_value(d.value)};")
     }
     StStructSet => {
       let d = s!.struct_set!
-      self.line("{self.emit_value(d.receiver)}.{d.field} = {self.emit_value(d.value)};")
+      self.line(f"{self.emit_value(d.receiver)}.{d.field} = {self.emit_value(d.value)};")
     }
     StClassSet => {
       let d = s!.class_set!
-      self.line("{self.emit_value(d.handle)}->{d.field} = {self.emit_value(d.value)};")
+      self.line(f"{self.emit_value(d.handle)}->{d.field} = {self.emit_value(d.value)};")
     }
     StIndexSet => {
       let d = s!.index_set!
-      self.line("{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}] = {self.emit_value(d.value)};")
+      self.line(f"{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}] = {self.emit_value(d.value)};")
     }
     StReturn => {
       self.emit_return_stmt(s!)
     }
     StIf => {
       let d = s!.if_data!
-      self.line("if ({self.emit_value(d.cond)}) \\{")
+      self.line(f"if ({self.emit_value(d.cond)}) {{")
       self.indent = self.indent + 1
       self.emit_stmts(d.then_body)
       self.indent = self.indent - 1
       if len(d.else_body) > 0 {
-        self.line("\\} else \\{")
+        self.line(f"}} else {{")
         self.indent = self.indent + 1
         self.emit_stmts(d.else_body)
         self.indent = self.indent - 1
       }
-      self.line("\\}")
+      self.line("}")
     }
     StWhile => {
       let d = s!.while_data!
-      self.line("while (1) \\{")
+      self.line(f"while (1) {{")
       self.indent = self.indent + 1
       self.emit_stmts(d.cond_block)
-      self.line("if (!({self.emit_value(d.cond_var)})) break;")
+      self.line(f"if (!({self.emit_value(d.cond_var)})) break;")
       self.emit_stmts(d.body)
       self.indent = self.indent - 1
-      self.line("\\}")
+      self.line("}")
     }
     StFor => {
       self.emit_for_stmt(s!)
@@ -2112,17 +2112,17 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StBlock => {
       let d = s!.block!
-      self.line("\\{")
+      self.line(f"{{")
       self.indent = self.indent + 1
       self.emit_stmts(d.stmts)
       self.indent = self.indent - 1
-      self.line("\\}")
+      self.line("}")
     }
     StSideEffect => {
       let d = s!.side_effect!
       let expr = self.emit_side_effect(d.expr)
       if expr != "" {
-        self.line("{expr};")
+        self.line(f"{expr};")
       }
     }
     StMultiAssign => {
@@ -2136,7 +2136,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
       if !isnull(chan_type) && chan_type!.kind is TyChannel && !isnull(chan_type!.elem) {
         suffix = self.chan_suffix(chan_type!.elem)
       }
-      self.line("forge_chan_send_{suffix}({self.emit_value(d.channel)}, {self.emit_value(d.value)});")
+      self.line(f"forge_chan_send_{suffix}({self.emit_value(d.channel)}, {self.emit_value(d.value)});")
     }
     StSpawn => {
       self.line("/* spawn: not fully implemented in bootstrap C backend */")
@@ -2152,17 +2152,17 @@ func CGen.emit_stmt(self, s: LStmt?) {
     StLock => {
       let d = s!.lock_data!
       let mutex_val = self.emit_value(d.mutex)
-      self.line("pthread_mutex_lock(&{mutex_val});")
+      self.line(f"pthread_mutex_lock(&{mutex_val});")
       self.emit_stmts(d.body)
-      self.line("pthread_mutex_unlock(&{mutex_val});")
+      self.line(f"pthread_mutex_unlock(&{mutex_val});")
     }
     StExpr => {
       let d = s!.expr_stmt!
-      let ty_entry = dict_get<LType?>(self.temp_types!, "{d.temp_id}")
+      let ty_entry = dict_get<LType?>(self.temp_types!, f"{d.temp_id}")
       if !isnull(ty_entry) && !isnull(ty_entry!.value) && ty_entry!.value!.kind is TyUnit {
         return
       }
-      self.line("_t{d.temp_id};")
+      self.line(f"_t{d.temp_id};")
     }
     StBreak => {
       self.line("break;")
@@ -2174,10 +2174,10 @@ func CGen.emit_stmt(self, s: LStmt?) {
       let d = s!.yield_data!
       self.gen_yield_count = self.gen_yield_count + 1
       let state_num = self.gen_yield_count
-      self.line("_gen->_value = {self.emit_value(d.value)};")
-      self.line("_gen->_state = {state_num};")
+      self.line(f"_gen->_value = {self.emit_value(d.value)};")
+      self.line(f"_gen->_state = {state_num};")
       self.line("return true;")
-      self.line("_gen_s{state_num}:;")
+      self.line(f"_gen_s{state_num}:;")
     }
     _ => {}
   }
@@ -2200,10 +2200,10 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
       let result_name = self.result_type_name(self.current_func!.return_type!.elem)
       let val_type = self.resolve_value_type(d.values[0])
       if !isnull(val_type) && val_type!.kind is TyErrorResult {
-        self.line("return {val};")
+        self.line(f"return {val};")
         return
       }
-      self.line("return forge_ok({val}, {result_name});")
+      self.line(f"return forge_ok({val}, {result_name});")
       return
     }
     // Check optional return
@@ -2212,21 +2212,21 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
         if !isnull(d.values[0]) && d.values[0]!.kind is ValLitNull {
           self.line("return NULL;")
         } else {
-          self.line("return {val};")
+          self.line(f"return {val};")
         }
         return
       }
       let opt_name = self.opt_type_name(self.current_func!.return_type!.elem)
       if !isnull(d.values[0]) && d.values[0]!.kind is ValLitNull {
-        self.line("return forge_none({opt_name});")
+        self.line(f"return forge_none({opt_name});")
       } else if !isnull(d.values[0]) && !isnull(d.values[0]!.typ) && d.values[0]!.typ!.kind is TyOptional {
-        self.line("return {val};")
+        self.line(f"return {val};")
       } else {
-        self.line("return forge_some({val}, {opt_name});")
+        self.line(f"return forge_some({val}, {opt_name});")
       }
       return
     }
-    self.line("return {val};")
+    self.line(f"return {val};")
     return
   }
   // 2-value return for ErrorResult
@@ -2234,13 +2234,13 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
     let result_name = self.result_type_name(self.current_func!.return_type!.elem)
     let val_str = self.emit_value(d.values[0])
     if !isnull(d.values[1]) && (d.values[1]!.kind is ValLitNull || (d.values[1]!.kind is ValLitString && d.values[1]!.str_val == "")) {
-      self.line("return forge_ok({val_str}, {result_name});")
+      self.line(f"return forge_ok({val_str}, {result_name});")
     } else {
-      self.line("return forge_err({self.emit_value_as_cstr(d.values[1])}, {result_name});")
+      self.line(f"return forge_err({self.emit_value_as_cstr(d.values[1])}, {result_name});")
     }
     return
   }
-  self.line("return {self.emit_value(d.values[0])};")
+  self.line(f"return {self.emit_value(d.values[0])};")
 }
 
 func CGen.emit_for_stmt(self, s: LStmt?) {
@@ -2250,68 +2250,68 @@ func CGen.emit_for_stmt(self, s: LStmt?) {
   // Generator iteration
   if !isnull(d.collection) && !isnull(d.collection!.typ) && d.collection!.typ!.kind is TyGenerator {
     let gen_base_name = self.resolve_gen_base_name(d.collection)
-    let struct_name = "{gen_base_name}_gen_t"
+    let struct_name = f"{gen_base_name}_gen_t"
     self.lambda_id = self.lambda_id + 1
-    let iter_var = "_gen_iter_{self.lambda_id}"
-    self.line("{struct_name}* {iter_var} = {coll_str};")
-    self.line("while ({gen_base_name}_next({iter_var})) \\{")
+    let iter_var = f"_gen_iter_{self.lambda_id}"
+    self.line(f"{struct_name}* {iter_var} = {coll_str};")
+    self.line(f"while ({gen_base_name}_next({iter_var})) {{")
     self.indent = self.indent + 1
-    self.line("{self.c_type(d.var_type)} {d.var_name} = {iter_var}->_value;")
+    self.line(f"{self.c_type(d.var_type)} {d.var_name} = {iter_var}->_value;")
     self.emit_stmts(d.body)
     self.indent = self.indent - 1
-    self.line("\\}")
-    self.line("free({iter_var});")
+    self.line("}")
+    self.line(f"free({iter_var});")
     return
   }
 
   if d.index_var != "" {
-    self.line("for (int32_t {d.index_var} = 0; {d.index_var} < {coll_str}.len; {d.index_var}++) \\{")
+    self.line(f"for (int32_t {d.index_var} = 0; {d.index_var} < {coll_str}.len; {d.index_var}++) {{")
     self.indent = self.indent + 1
-    self.line("{self.c_type(d.var_type)} {d.var_name} = {coll_str}.data[{d.index_var}];")
+    self.line(f"{self.c_type(d.var_type)} {d.var_name} = {coll_str}.data[{d.index_var}];")
   } else {
-    self.line("for (int32_t _idx = 0; _idx < {coll_str}.len; _idx++) \\{")
+    self.line(f"for (int32_t _idx = 0; _idx < {coll_str}.len; _idx++) {{")
     self.indent = self.indent + 1
-    self.line("{self.c_type(d.var_type)} {d.var_name} = {coll_str}.data[_idx];")
+    self.line(f"{self.c_type(d.var_type)} {d.var_name} = {coll_str}.data[_idx];")
   }
   self.emit_stmts(d.body)
   self.indent = self.indent - 1
-  self.line("\\}")
+  self.line("}")
 }
 
 func CGen.emit_switch_stmt(self, s: LStmt?) {
   let d = s!.switch_data!
-  self.line("switch ({self.emit_value(d.tag)}) \\{")
+  self.line(f"switch ({self.emit_value(d.tag)}) {{")
   let mut has_default = false
   let mut i = 0
   while i < len(d.cases) {
     let c = d.cases[i]
     if c.tag == -1 {
-      self.line("default: \\{")
+      self.line(f"default: {{")
       has_default = true
     } else {
-      self.line("case {c.tag}: \\{")
+      self.line(f"case {c.tag}: {{")
     }
     self.indent = self.indent + 1
     if c.binding != "" && d.enum_name != "" {
       let variant_lower = c_safe_name(str_to_lower(c.binding))
-      self.line("{d.enum_name}_{c.binding}_Data {c.binding} = {self.emit_value(d.tag)}.data.{variant_lower};")
+      self.line(f"{d.enum_name}_{c.binding}_Data {c.binding} = {self.emit_value(d.tag)}.data.{variant_lower};")
     }
     self.emit_stmts(c.body)
     self.line("break;")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     i = i + 1
   }
   if !has_default {
     self.line("default: __builtin_unreachable();")
   }
-  self.line("\\}")
+  self.line("}")
 }
 
 func CGen.emit_type_switch_stmt(self, s: LStmt?) {
   let d = s!.type_switch!
   let val = self.emit_value(d.value)
-  self.line("switch ({val}.tag) \\{")
+  self.line(f"switch ({val}.tag) {{")
   let mut i = 0
   while i < len(d.cases) {
     let c = d.cases[i]
@@ -2319,26 +2319,26 @@ func CGen.emit_type_switch_stmt(self, s: LStmt?) {
       // Check for ad-hoc union
       let val_type = self.resolve_value_type(d.value)
       if !isnull(val_type) && val_type!.kind is TyUnion {
-        self.line("case {self.union_tag_for_type(c.typ)}: \\{")
+        self.line(f"case {self.union_tag_for_type(c.typ)}: {{")
       } else {
         let tag_const = self.resolve_tag_constant(d, c.typ)
         if tag_const != "" {
-          self.line("case {tag_const}: \\{")
+          self.line(f"case {tag_const}: {{")
         } else {
-          self.line("case /* {self.c_type(c.typ)} */0: \\{")
+          self.line(f"case /* {self.c_type(c.typ)} */0: {{")
         }
       }
     } else {
-      self.line("default: \\{")
+      self.line(f"default: {{")
     }
     self.indent = self.indent + 1
     self.emit_stmts(c.body)
     self.line("break;")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     i = i + 1
   }
-  self.line("\\}")
+  self.line("}")
 }
 
 func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> string {
@@ -2349,7 +2349,7 @@ func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> s
   let mut variant_name = ""
   if !isnull(case_type) && case_type!.name != "" {
     variant_name = case_type!.name
-    let prefix = "{enum_name}_"
+    let prefix = f"{enum_name}_"
     if str_starts_with(variant_name, prefix) {
       variant_name = variant_name[len(prefix):len(variant_name)]
       // Strip _Data suffix if present
@@ -2361,7 +2361,7 @@ func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> s
   if variant_name == "" {
     return ""
   }
-  return "{enum_name}_{variant_name}"
+  return f"{enum_name}_{variant_name}"
 }
 
 // ---------------------------------------------------------------------------
@@ -2381,6 +2381,7 @@ func CGen.find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> st
     if isnull(stmts[i]) {
       i = i + 1
       // skip null
+      continue
     }
     let s = stmts[i]!
     if s.kind is StTempDef {
@@ -2441,6 +2442,7 @@ func CGen.collect_gen_vars(self, stmts: [LStmt?]) -> [LVarDeclData] {
     if isnull(stmts[i]) {
       i = i + 1
       // skip
+      continue
     }
     let s = stmts[i]!
     if s.kind is StVarDecl {
@@ -2500,6 +2502,7 @@ func CGen.count_yields(self, stmts: [LStmt?]) -> i32 {
     if isnull(stmts[i]) {
       i = i + 1
       // skip
+      continue
     }
     let s = stmts[i]!
     if s.kind is StYield { count = count + 1 }
@@ -2523,16 +2526,16 @@ func CGen.count_yields(self, stmts: [LStmt?]) -> i32 {
 
 func CGen.emit_generator_struct_decl(self, f: LFuncDecl) {
   let base_name = self.func_name(f)
-  let struct_name = "{base_name}_gen_t"
+  let struct_name = f"{base_name}_gen_t"
   let elem_type = self.c_type(f.return_type!.elem)
 
-  self.line("typedef struct {struct_name} \\{")
+  self.line(f"typedef struct {struct_name} {{")
   self.indent = self.indent + 1
   self.line("int _state;")
-  self.line("{elem_type} _value;")
+  self.line(f"{elem_type} _value;")
   let mut i = 0
   while i < len(f.params) {
-    self.line("{self.c_type(f.params[i].typ)} {c_safe_name(f.params[i].name)};")
+    self.line(f"{self.c_type(f.params[i].typ)} {c_safe_name(f.params[i].name)};")
     i = i + 1
   }
   let vars = self.collect_gen_vars(f.body)
@@ -2542,37 +2545,37 @@ func CGen.emit_generator_struct_decl(self, f: LFuncDecl) {
     let entry = dict_get<bool>(seen, vars[i].name)
     if isnull(entry) {
       dict_set<bool>(seen, vars[i].name, true)
-      self.line("{self.c_type(vars[i].typ)} {c_safe_name(vars[i].name)};")
+      self.line(f"{self.c_type(vars[i].typ)} {c_safe_name(vars[i].name)};")
     }
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\} {struct_name};")
+  self.line(f"}} {struct_name};")
   self.line("")
 }
 
 func CGen.emit_generator_forward_decls(self, f: LFuncDecl) {
   let base_name = self.func_name(f)
-  let struct_name = "{base_name}_gen_t"
+  let struct_name = f"{base_name}_gen_t"
   let params = self.c_param_list(f)
-  self.line("{struct_name}* {base_name}_init({params});")
-  self.line("bool {base_name}_next({struct_name}* _gen);")
+  self.line(f"{struct_name}* {base_name}_init({params});")
+  self.line(f"bool {base_name}_next({struct_name}* _gen);")
 }
 
 func CGen.emit_generator_func_decl(self, f: LFuncDecl) {
   let base_name = self.func_name(f)
-  let struct_name = "{base_name}_gen_t"
+  let struct_name = f"{base_name}_gen_t"
   let params = self.c_param_list(f)
 
   // Init function
-  self.line("{struct_name}* {base_name}_init({params}) \\{")
+  self.line(f"{struct_name}* {base_name}_init({params}) {{")
   self.indent = self.indent + 1
-  self.line("{struct_name}* _gen = ({struct_name}*)malloc(sizeof({struct_name}));")
+  self.line(f"{struct_name}* _gen = ({struct_name}*)malloc(sizeof({struct_name}));")
   self.line("_gen->_state = 0;")
   let mut i = 0
   while i < len(f.params) {
     let name = c_safe_name(f.params[i].name)
-    self.line("_gen->{name} = {name};")
+    self.line(f"_gen->{name} = {name};")
     i = i + 1
   }
   let vars = self.collect_gen_vars(f.body)
@@ -2583,31 +2586,31 @@ func CGen.emit_generator_func_decl(self, f: LFuncDecl) {
     if isnull(entry) {
       dict_set<bool>(seen, vars[i].name, true)
       if !isnull(vars[i].init) && !(vars[i].init!.kind is ValTemp) {
-        self.line("_gen->{c_safe_name(vars[i].name)} = {self.emit_value(vars[i].init)};")
+        self.line(f"_gen->{c_safe_name(vars[i].name)} = {self.emit_value(vars[i].init)};")
       } else if isnull(vars[i].init) {
-        self.line("_gen->{c_safe_name(vars[i].name)} = 0;")
+        self.line(f"_gen->{c_safe_name(vars[i].name)} = 0;")
       }
     }
     i = i + 1
   }
   self.line("return _gen;")
   self.indent = self.indent - 1
-  self.line("\\}")
+  self.line("}")
   self.line("")
 
   // Next function
-  self.line("bool {base_name}_next({struct_name}* _gen) \\{")
+  self.line(f"bool {base_name}_next({struct_name}* _gen) {{")
   self.indent = self.indent + 1
   let n_yields = self.count_yields(f.body)
-  self.line("switch (_gen->_state) \\{")
+  self.line(f"switch (_gen->_state) {{")
   self.line("case 0: goto _gen_s0;")
   let mut y = 1
   while y <= n_yields {
-    self.line("case {y}: goto _gen_s{y};")
+    self.line(f"case {y}: goto _gen_s{y};")
     y = y + 1
   }
   self.line("default: return false;")
-  self.line("\\}")
+  self.line("}")
   self.in_generator = true
   self.gen_struct_name = struct_name
   self.gen_yield_count = 0
@@ -2616,7 +2619,7 @@ func CGen.emit_generator_func_decl(self, f: LFuncDecl) {
   self.line("return false;")
   self.in_generator = false
   self.indent = self.indent - 1
-  self.line("\\}")
+  self.line("}")
   self.line("")
 }
 
@@ -2733,18 +2736,18 @@ func CGen.to_string_expr(self, v: LValue?) -> string {
     return "FORGE_STR(\"<unknown>\")"
   }
   match t!.kind {
-    TyBool => { return "({val} ? FORGE_STR(\"true\") : FORGE_STR(\"false\"))" }
-    TyI8 | TyI16 | TyI32 | TyPlatformInt => { return "forge_sprintf(\"%d\", {val})" }
-    TyI64 => { return "forge_sprintf(\"%lld\", (long long){val})" }
-    TyU8 | TyU16 | TyU32 | TyPlatformUint => { return "forge_sprintf(\"%u\", (unsigned){val})" }
-    TyU64 => { return "forge_sprintf(\"%llu\", (unsigned long long){val})" }
-    TyF32 => { return "forge_sprintf(\"%g\", (double){val})" }
-    TyF64 => { return "forge_sprintf(\"%g\", {val})" }
-    TyString => { return "forge_sprintf(\"\\\"%.*s\\\"\", (int){val}.len, (const char*){val}.data)" }
-    TyTaggedUnion => { return "{t!.name}_to_string({val})" }
-    TyStruct => { return "{t!.name}_to_string({val})" }
-    TyClassHandle => { return "({val} == NULL ? FORGE_STR(\"null\") : {t!.name}_to_string({val}))" }
-    _ => { return "FORGE_STR(\"<{t!.name}>\")" }
+    TyBool => { return f"({val} ? FORGE_STR(\"true\") : FORGE_STR(\"false\"))" }
+    TyI8 | TyI16 | TyI32 | TyPlatformInt => { return f"forge_sprintf(\"%d\", {val})" }
+    TyI64 => { return f"forge_sprintf(\"%lld\", (long long){val})" }
+    TyU8 | TyU16 | TyU32 | TyPlatformUint => { return f"forge_sprintf(\"%u\", (unsigned){val})" }
+    TyU64 => { return f"forge_sprintf(\"%llu\", (unsigned long long){val})" }
+    TyF32 => { return f"forge_sprintf(\"%g\", (double){val})" }
+    TyF64 => { return f"forge_sprintf(\"%g\", {val})" }
+    TyString => { return f"forge_sprintf(\"\\\"%.*s\\\"\", (int){val}.len, (const char*){val}.data)" }
+    TyTaggedUnion => { return f"{t!.name}_to_string({val})" }
+    TyStruct => { return f"{t!.name}_to_string({val})" }
+    TyClassHandle => { return f"({val} == NULL ? FORGE_STR(\"null\") : {t!.name}_to_string({val}))" }
+    _ => { return f"FORGE_STR(\"<{t!.name}>\")" }
   }
 }
 
@@ -2753,17 +2756,17 @@ func CGen.eq_expr(self, a: LValue?, b: LValue?) -> string {
   let va = self.emit_value(a)
   let vb = self.emit_value(b)
   if !isnull(t) && t!.kind is TyString {
-    return "forge_str_eq({va}, {vb})"
+    return f"forge_str_eq({va}, {vb})"
   }
   if !isnull(t) && t!.kind is TyTaggedUnion {
     let sn = t!.name
     let entry = dict_get<bool>(self.simple_enums!, sn)
     if !isnull(entry) {
-      return "({va} == {vb})"
+      return f"({va} == {vb})"
     }
-    return "({va}.tag == {vb}.tag)"
+    return f"({va}.tag == {vb}.tag)"
   }
-  return "({va} == {vb})"
+  return f"({va} == {vb})"
 }
 
 func CGen.field_to_string_expr(self, t: LType?, val: string) -> string {
@@ -2771,18 +2774,18 @@ func CGen.field_to_string_expr(self, t: LType?, val: string) -> string {
     return "FORGE_STR(\"?\")"
   }
   match t!.kind {
-    TyBool => { return "({val} ? FORGE_STR(\"true\") : FORGE_STR(\"false\"))" }
-    TyI8 | TyI16 | TyI32 | TyPlatformInt => { return "forge_sprintf(\"%d\", {val})" }
-    TyI64 => { return "forge_sprintf(\"%lld\", (long long){val})" }
-    TyU8 | TyU16 | TyU32 | TyPlatformUint => { return "forge_sprintf(\"%u\", (unsigned){val})" }
-    TyU64 => { return "forge_sprintf(\"%llu\", (unsigned long long){val})" }
-    TyF32 => { return "forge_sprintf(\"%g\", (double){val})" }
-    TyF64 => { return "forge_sprintf(\"%g\", {val})" }
-    TyString => { return "forge_sprintf(\"\\\"%.*s\\\"\", (int){val}.len, (const char*){val}.data)" }
-    TyTaggedUnion => { return "{t!.name}_to_string({val})" }
-    TyStruct => { return "{t!.name}_to_string({val})" }
-    TyClassHandle => { return "({val} == NULL ? FORGE_STR(\"null\") : {t!.name}_to_string({val}))" }
-    _ => { return "FORGE_STR(\"<{t!.name}>\")" }
+    TyBool => { return f"({val} ? FORGE_STR(\"true\") : FORGE_STR(\"false\"))" }
+    TyI8 | TyI16 | TyI32 | TyPlatformInt => { return f"forge_sprintf(\"%d\", {val})" }
+    TyI64 => { return f"forge_sprintf(\"%lld\", (long long){val})" }
+    TyU8 | TyU16 | TyU32 | TyPlatformUint => { return f"forge_sprintf(\"%u\", (unsigned){val})" }
+    TyU64 => { return f"forge_sprintf(\"%llu\", (unsigned long long){val})" }
+    TyF32 => { return f"forge_sprintf(\"%g\", (double){val})" }
+    TyF64 => { return f"forge_sprintf(\"%g\", {val})" }
+    TyString => { return f"forge_sprintf(\"\\\"%.*s\\\"\", (int){val}.len, (const char*){val}.data)" }
+    TyTaggedUnion => { return f"{t!.name}_to_string({val})" }
+    TyStruct => { return f"{t!.name}_to_string({val})" }
+    TyClassHandle => { return f"({val} == NULL ? FORGE_STR(\"null\") : {t!.name}_to_string({val}))" }
+    _ => { return f"FORGE_STR(\"<{t!.name}>\")" }
   }
 }
 
@@ -2842,7 +2845,7 @@ func dedup_funcs(items: [LFuncDecl]) -> [LFuncDecl] {
   while i < len(items) {
     let mut key = items[i].name
     if items[i].receiver != "" {
-      key = "{items[i].receiver}.{items[i].name}"
+      key = f"{items[i].receiver}.{items[i].name}"
     }
     let entry = dict_get<bool>(seen, key)
     if isnull(entry) {
@@ -3061,102 +3064,102 @@ func CGen.walk_type_for_composite(self, t: LType?) {
 // ---------------------------------------------------------------------------
 
 func CGen.emit_struct_decl(self, s: LStructDecl) {
-  self.line("struct {s.name} \\{")
+  self.line(f"struct {s.name} {{")
   self.indent = self.indent + 1
   if len(s.fields) == 0 {
     self.line("int _empty; /* C requires at least one field */")
   }
   let mut i = 0
   while i < len(s.fields) {
-    self.line("{self.c_field_decl(s.fields[i].typ, s.fields[i].name)};")
+    self.line(f"{self.c_field_decl(s.fields[i].typ, s.fields[i].name)};")
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\};")
+  self.line("};")
   self.line("")
 }
 
 func CGen.emit_class_decl(self, c: LClassDecl) {
-  self.line("struct {c.name} \\{")
+  self.line(f"struct {c.name} {{")
   self.indent = self.indent + 1
   if len(c.fields) == 0 {
     self.line("int _empty;")
   }
   let mut i = 0
   while i < len(c.fields) {
-    self.line("{self.c_field_decl(c.fields[i].typ, c.fields[i].name)};")
+    self.line(f"{self.c_field_decl(c.fields[i].typ, c.fields[i].name)};")
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\};")
+  self.line("};")
   self.line("")
 }
 
 func CGen.emit_simple_enum_decl(self, e: LEnumDecl) {
   dict_set<bool>(self.simple_enums!, e.name, true)
-  self.line("typedef enum \\{")
+  self.line(f"typedef enum {{")
   self.indent = self.indent + 1
   let mut i = 0
   while i < len(e.variants) {
     let comma = if i < len(e.variants) - 1 { "," } else { "" }
-    self.line("{e.name}_{e.variants[i].name} = {e.variants[i].tag}{comma}")
+    self.line(f"{e.name}_{e.variants[i].name} = {e.variants[i].tag}{comma}")
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\} {e.name};")
+  self.line(f"}} {e.name};")
   self.line("")
 }
 
 func CGen.emit_enum_decl(self, e: LEnumDecl) {
   // Tag enum
-  self.line("enum {e.name}_Tag \\{")
+  self.line(f"enum {e.name}_Tag {{")
   self.indent = self.indent + 1
   let mut i = 0
   while i < len(e.variants) {
     let comma = if i < len(e.variants) - 1 { "," } else { "" }
-    self.line("{e.name}_{e.variants[i].name} = {e.variants[i].tag}{comma}")
+    self.line(f"{e.name}_{e.variants[i].name} = {e.variants[i].tag}{comma}")
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\};")
+  self.line("};")
   self.line("")
 
   // Variant data structs
   i = 0
   while i < len(e.variants) {
     if len(e.variants[i].fields) > 0 {
-      self.line("typedef struct \\{")
+      self.line(f"typedef struct {{")
       self.indent = self.indent + 1
       let mut j = 0
       while j < len(e.variants[i].fields) {
-        self.line("{self.c_field_decl(e.variants[i].fields[j].typ, e.variants[i].fields[j].name)};")
+        self.line(f"{self.c_field_decl(e.variants[i].fields[j].typ, e.variants[i].fields[j].name)};")
         j = j + 1
       }
       self.indent = self.indent - 1
-      self.line("\\} {e.name}_{e.variants[i].name}_Data;")
+      self.line(f"}} {e.name}_{e.variants[i].name}_Data;")
       self.line("")
     }
     i = i + 1
   }
 
   // Tagged union struct
-  self.line("struct {e.name} \\{")
+  self.line(f"struct {e.name} {{")
   self.indent = self.indent + 1
-  self.line("enum {e.name}_Tag tag;")
-  self.line("union \\{")
+  self.line(f"enum {e.name}_Tag tag;")
+  self.line(f"union {{")
   self.indent = self.indent + 1
   i = 0
   while i < len(e.variants) {
     if len(e.variants[i].fields) > 0 {
       let variant_lower = c_safe_name(str_to_lower(e.variants[i].name))
-      self.line("{e.name}_{e.variants[i].name}_Data {variant_lower};")
+      self.line(f"{e.name}_{e.variants[i].name}_Data {variant_lower};")
     }
     i = i + 1
   }
   self.indent = self.indent - 1
-  self.line("\\} data;")
+  self.line("} data;")
   self.indent = self.indent - 1
-  self.line("\\};")
+  self.line("};")
   self.line("")
 }
 
@@ -3173,7 +3176,7 @@ func CGen.emit_func_forward_decl(self, f: LFuncDecl) {
   }
   let ret_type = self.c_return_type(f.return_type)
   let params = self.c_param_list(f)
-  self.line("{ret_type} {name}({params});")
+  self.line(f"{ret_type} {name}({params});")
 }
 
 func CGen.emit_func_decl(self, f: LFuncDecl) {
@@ -3189,9 +3192,9 @@ func CGen.emit_func_decl(self, f: LFuncDecl) {
   let name = self.func_name(f)
 
   if name == "main" {
-    self.line("int main(int _argc, char** _argv) \\{")
+    self.line(f"int main(int _argc, char** _argv) {{")
   } else {
-    self.line("{ret_type} {name}({params}) \\{")
+    self.line(f"{ret_type} {name}({params}) {{")
   }
   self.indent = self.indent + 1
   // Register param types
@@ -3207,7 +3210,7 @@ func CGen.emit_func_decl(self, f: LFuncDecl) {
     self.line("return 0;")
   }
   self.indent = self.indent - 1
-  self.line("\\}")
+  self.line("}")
   self.line("")
 }
 
@@ -3232,7 +3235,7 @@ func CGen.emit_to_string_functions(self) {
   while i < len(enums) {
     let name = enums[i].name
     if isnull(dict_get<bool>(has_to_string, name)) {
-      self.line("static forge_string {name}_to_string({name} v);")
+      self.line(f"static forge_string {name}_to_string({name} v);")
     }
     i = i + 1
   }
@@ -3241,7 +3244,7 @@ func CGen.emit_to_string_functions(self) {
   while i < len(structs) {
     let name = structs[i].name
     if isnull(dict_get<bool>(has_to_string, name)) {
-      self.line("static forge_string {name}_to_string({name} v);")
+      self.line(f"static forge_string {name}_to_string({name} v);")
     }
     i = i + 1
   }
@@ -3250,7 +3253,7 @@ func CGen.emit_to_string_functions(self) {
   while i < len(classes) {
     let name = classes[i].name
     if isnull(dict_get<bool>(has_to_string, name)) {
-      self.line("static forge_string {name}_to_string({name}* v);")
+      self.line(f"static forge_string {name}_to_string({name}* v);")
     }
     i = i + 1
   }
@@ -3263,26 +3266,27 @@ func CGen.emit_to_string_functions(self) {
     if !isnull(dict_get<bool>(has_to_string, name)) {
       i = i + 1
       // skip
+      continue
     }
-    self.line("static forge_string {name}_to_string({name} v) \\{")
+    self.line(f"static forge_string {name}_to_string({name} v) {{")
     self.indent = self.indent + 1
     let is_simple = !isnull(dict_get<bool>(self.simple_enums!, name))
     if is_simple {
-      self.line("switch (v) \\{")
+      self.line(f"switch (v) {{")
     } else {
-      self.line("switch (v.tag) \\{")
+      self.line(f"switch (v.tag) {{")
     }
     self.indent = self.indent + 1
     let mut j = 0
     while j < len(enums[i].variants) {
-      self.line("case {name}_{enums[i].variants[j].name}: return FORGE_STR(\"{enums[i].variants[j].name}\");")
+      self.line(f"case {name}_{enums[i].variants[j].name}: return FORGE_STR(\"{enums[i].variants[j].name}\");")
       j = j + 1
     }
-    self.line("default: return FORGE_STR(\"<unknown {name}>\");")
+    self.line(f"default: return FORGE_STR(\"<unknown {name}>\");")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
     i = i + 1
   }
@@ -3294,12 +3298,13 @@ func CGen.emit_to_string_functions(self) {
     if !isnull(dict_get<bool>(has_to_string, name)) {
       i = i + 1
       // skip
+      continue
     }
-    self.line("static forge_string {name}_to_string({name} v) \\{")
+    self.line(f"static forge_string {name}_to_string({name} v) {{")
     self.indent = self.indent + 1
     self.emit_field_dump_to_string(name, structs[i].fields, "v.")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
     i = i + 1
   }
@@ -3311,12 +3316,13 @@ func CGen.emit_to_string_functions(self) {
     if !isnull(dict_get<bool>(has_to_string, name)) {
       i = i + 1
       // skip
+      continue
     }
-    self.line("static forge_string {name}_to_string({name}* v) \\{")
+    self.line(f"static forge_string {name}_to_string({name}* v) {{")
     self.indent = self.indent + 1
     self.emit_field_dump_to_string(name, classes[i].fields, "v->")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
     i = i + 1
   }
@@ -3324,22 +3330,22 @@ func CGen.emit_to_string_functions(self) {
 
 func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string) {
   if len(fields) == 0 {
-    self.line("return FORGE_STR(\"{type_name}\\{\\}\");")
+    self.line(f"return FORGE_STR(\"{type_name}{{}}\");")
     return
   }
-  self.line("forge_string _result = FORGE_STR(\"{type_name}\\{\");")
+  self.line(f"forge_string _result = FORGE_STR(\"{type_name}{{\");")
   let mut i = 0
   while i < len(fields) {
     if i > 0 {
       self.line("_result = forge_str_concat(_result, FORGE_STR(\", \"));")
     }
-    self.line("_result = forge_str_concat(_result, FORGE_STR(\"{fields[i].name}: \"));")
-    let field_val = "{prefix}{c_safe_name(fields[i].name)}"
+    self.line(f"_result = forge_str_concat(_result, FORGE_STR(\"{fields[i].name}: \"));")
+    let field_val = f"{prefix}{c_safe_name(fields[i].name)}"
     let field_str = self.field_to_string_expr(fields[i].typ, field_val)
-    self.line("_result = forge_str_concat(_result, {field_str});")
+    self.line(f"_result = forge_str_concat(_result, {field_str});")
     i = i + 1
   }
-  self.line("_result = forge_str_concat(_result, FORGE_STR(\"\\}\"));")
+  self.line("_result = forge_str_concat(_result, FORGE_STR(\"}\"));")
   self.line("return _result;")
 }
 
@@ -3351,66 +3357,66 @@ func CGen.emit_os_helpers(self) {
   let slice_type = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
 
   if self.needs_os_args {
-    self.line("static inline {slice_type} _forge_os_args(int argc, char** argv) \\{")
+    self.line(f"static inline {slice_type} _forge_os_args(int argc, char** argv) {{")
     self.indent = self.indent + 1
-    self.line("{slice_type} result = \\{0\\};")
+    self.line(f"{slice_type} result = {{0}};")
     self.line("result.data = (forge_string*)malloc(sizeof(forge_string) * argc);")
     self.line("result.len = (int32_t)argc;")
     self.line("result.cap = (int32_t)argc;")
     self.line("for (int i = 0; i < argc; i++) result.data[i] = forge_str_from_cstr(argv[i]);")
     self.line("return result;")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
   }
   if self.needs_exec_cmd {
-    self.line("static inline forge_str_bool_t _forge_exec_command(forge_string program, {slice_type} args) \\{")
+    self.line(f"static inline forge_str_bool_t _forge_exec_command(forge_string program, {slice_type} args) {{")
     self.indent = self.indent + 1
     self.line("size_t total = program.len + 1;")
     self.line("for (int i = 0; i < args.len; i++) total += args.data[i].len + 3;")
     self.line("char* cmd = (char*)malloc(total + 16);")
     self.line("memcpy(cmd, program.data, program.len); cmd[program.len] = '\\0';")
-    self.line("for (int i = 0; i < args.len; i++) \\{ strcat(cmd, \" \"); strncat(cmd, (const char*)args.data[i].data, args.data[i].len); \\}")
+    self.line(f"for (int i = 0; i < args.len; i++) {{ strcat(cmd, \" \"); strncat(cmd, (const char*)args.data[i].data, args.data[i].len); }}")
     self.line("strcat(cmd, \" 2>&1\");")
     self.line("FILE* fp = popen(cmd, \"r\");")
     self.line("free(cmd);")
-    self.line("if (!fp) \\{ forge_str_bool_t r = \\{FORGE_STR_EMPTY, false\\}; return r; \\}")
+    self.line(f"if (!fp) {{ forge_str_bool_t r = {{FORGE_STR_EMPTY, false}}; return r; }}")
     self.line("size_t cap = 4096, len = 0;")
     self.line("uint8_t* out = (uint8_t*)malloc(cap);")
     self.line("size_t n;")
-    self.line("while ((n = fread(out + len, 1, cap - len - 1, fp)) > 0) \\{")
+    self.line(f"while ((n = fread(out + len, 1, cap - len - 1, fp)) > 0) {{")
     self.indent = self.indent + 1
     self.line("len += n;")
-    self.line("if (len + 1 >= cap) \\{ cap *= 2; out = (uint8_t*)realloc(out, cap); \\}")
+    self.line(f"if (len + 1 >= cap) {{ cap *= 2; out = (uint8_t*)realloc(out, cap); }}")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("out[len] = '\\0';")
     self.line("int status = pclose(fp);")
-    self.line("forge_str_bool_t r = \\{\\{.data = out, .len = (int32_t)len, .cap = (int32_t)len\\}, status == 0\\};")
+    self.line(f"forge_str_bool_t r = {{{{.data = out, .len = (int32_t)len, .cap = (int32_t)len}}, status == 0}};")
     self.line("return r;")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
   }
   if self.needs_path_join {
-    self.line("static inline forge_string _forge_path_join({slice_type} parts) \\{")
+    self.line(f"static inline forge_string _forge_path_join({slice_type} parts) {{")
     self.indent = self.indent + 1
     self.line("if (parts.len == 0) return FORGE_STR_EMPTY;")
     self.line("int32_t total = 0;")
     self.line("for (int i = 0; i < parts.len; i++) total += parts.data[i].len + 1;")
     self.line("uint8_t* out = (uint8_t*)malloc(total + 1);")
     self.line("int32_t pos = 0;")
-    self.line("for (int i = 0; i < parts.len; i++) \\{")
+    self.line(f"for (int i = 0; i < parts.len; i++) {{")
     self.indent = self.indent + 1
-    self.line("if (i > 0) \\{ out[pos++] = '/'; \\}")
+    self.line(f"if (i > 0) {{ out[pos++] = '/'; }}")
     self.line("memcpy(out + pos, parts.data[i].data, parts.data[i].len);")
     self.line("pos += parts.data[i].len;")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("out[pos] = '\\0';")
-    self.line("return (forge_string)\\{.data = out, .len = pos, .cap = pos\\};")
+    self.line(f"return (forge_string){{.data = out, .len = pos, .cap = pos}};")
     self.indent = self.indent - 1
-    self.line("\\}")
+    self.line("}")
     self.line("")
   }
 }
@@ -3435,15 +3441,15 @@ pub func emit_c(prog: LProgram?) -> string {
   // Test assertion macros
   g.line("static jmp_buf _forge_test_jmp;")
   g.line("static int _forge_test_failed;")
-  g.line("#define forge_assert(cond, msg, file, line) do \\{ \\\\")
-  g.line("    if (!(cond)) \\{ \\\\")
+  g.line(f"#define forge_assert(cond, msg, file, line) do {{ \\\\")
+  g.line(f"    if (!(cond)) {{ \\\\")
   g.line("        fprintf(stderr, \"  assert failed at %s:%d\\n    %.*s\\n\", file, line, (int)(msg).len, (const char*)(msg).data); \\\\")
   g.line("        _forge_test_failed = 1; \\\\")
   g.line("        longjmp(_forge_test_jmp, 1); \\\\")
-  g.line("    \\} \\\\")
-  g.line("\\} while(0)")
-  g.line("#define forge_assert_eq(eq, actual_str, expected_str, msg, file, line) do \\{ \\\\")
-  g.line("    if (!(eq)) \\{ \\\\")
+  g.line("    } \\\\")
+  g.line("} while(0)")
+  g.line(f"#define forge_assert_eq(eq, actual_str, expected_str, msg, file, line) do {{ \\\\")
+  g.line(f"    if (!(eq)) {{ \\\\")
   g.line("        forge_string _a = (actual_str); \\\\")
   g.line("        forge_string _e = (expected_str); \\\\")
   g.line("        fprintf(stderr, \"  assert_eq failed at %s:%d\\n    %.*s\\n    expected: %.*s\\n    got:      %.*s\\n\", \\\\")
@@ -3451,8 +3457,8 @@ pub func emit_c(prog: LProgram?) -> string {
   g.line("            (int)_e.len, (const char*)_e.data, (int)_a.len, (const char*)_a.data); \\\\")
   g.line("        _forge_test_failed = 1; \\\\")
   g.line("        longjmp(_forge_test_jmp, 1); \\\\")
-  g.line("    \\} \\\\")
-  g.line("\\} while(0)")
+  g.line("    } \\\\")
+  g.line("} while(0)")
   g.line("")
 
   // Pre-scan composite types
@@ -3469,13 +3475,13 @@ pub func emit_c(prog: LProgram?) -> string {
   let structs = prog_ref.structs
   let mut i = 0
   while i < len(structs) {
-    g.line("typedef struct {structs[i].name} {structs[i].name};")
+    g.line(f"typedef struct {structs[i].name} {structs[i].name};")
     i = i + 1
   }
   let classes = prog_ref.classes
   i = 0
   while i < len(classes) {
-    g.line("typedef struct {classes[i].name} {classes[i].name};")
+    g.line(f"typedef struct {classes[i].name} {classes[i].name};")
     i = i + 1
   }
   let enums = prog_ref.enums
@@ -3484,7 +3490,7 @@ pub func emit_c(prog: LProgram?) -> string {
     if is_simple_enum(enums[i]) {
       g.emit_simple_enum_decl(enums[i])
     } else {
-      g.line("typedef struct {enums[i].name} {enums[i].name};")
+      g.line(f"typedef struct {enums[i].name} {enums[i].name};")
     }
     i = i + 1
   }
@@ -3500,7 +3506,7 @@ pub func emit_c(prog: LProgram?) -> string {
     if !isnull(entry) {
       let name = entry!.value
       if name != "ForgeSlice_uint8_t" && name != "ForgeSlice_forge_string" {
-        g.line("FORGE_SLICE_DEF({slice_keys[i]}, {name})")
+        g.line(f"FORGE_SLICE_DEF({slice_keys[i]}, {name})")
       }
     }
     i = i + 1
@@ -3559,7 +3565,7 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(opt_keys) {
     let entry = dict_get<string>(g.opt_types!, opt_keys[i])
     if !isnull(entry) {
-      g.line("FORGE_OPT_DEF({opt_keys[i]}, {entry!.value})")
+      g.line(f"FORGE_OPT_DEF({opt_keys[i]}, {entry!.value})")
     }
     i = i + 1
   }
@@ -3568,7 +3574,7 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(result_keys) {
     let entry = dict_get<string>(g.result_types!, result_keys[i])
     if !isnull(entry) {
-      g.line("FORGE_RESULT_DEF({result_keys[i]}, {entry!.value})")
+      g.line(f"FORGE_RESULT_DEF({result_keys[i]}, {entry!.value})")
     }
     i = i + 1
   }
@@ -3589,7 +3595,7 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(chan_keys) {
     let entry = dict_get<string>(g.chan_types!, chan_keys[i])
     if !isnull(entry) {
-      g.line("FORGE_CHAN_DEF({chan_keys[i]}, ForgeChan_{entry!.value})")
+      g.line(f"FORGE_CHAN_DEF({chan_keys[i]}, ForgeChan_{entry!.value})")
     }
     i = i + 1
   }
@@ -3610,10 +3616,10 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(ifaces) {
     if len(ifaces[i].type_params) > 0 {
       i = i + 1
-      // skip generic interfaces
+      continue
     }
     let if_name = ifaces[i].name
-    g.line("typedef struct {if_name}_vtable \\{")
+    g.line(f"typedef struct {if_name}_vtable {{")
     g.indent = g.indent + 1
     let mut j = 0
     while j < len(ifaces[i].methods) {
@@ -3627,17 +3633,17 @@ pub func emit_c(prog: LProgram?) -> string {
         sb.write(g.c_type(m.params[k].typ))
         k = k + 1
       }
-      g.line("{ret_type} (*{m.name})({sb.to_string()});")
+      g.line(f"{ret_type} (*{m.name})({sb.to_string()});")
       j = j + 1
     }
     g.indent = g.indent - 1
-    g.line("\\} {if_name}_vtable;")
-    g.line("typedef struct {if_name} \\{")
+    g.line(f"}} {if_name}_vtable;")
+    g.line(f"typedef struct {if_name} {{")
     g.indent = g.indent + 1
     g.line("void* _data;")
-    g.line("const {if_name}_vtable* _vtable;")
+    g.line(f"const {if_name}_vtable* _vtable;")
     g.indent = g.indent - 1
-    g.line("\\} {if_name};")
+    g.line(f"}} {if_name};")
     g.line("")
     i = i + 1
   }
@@ -3651,7 +3657,7 @@ pub func emit_c(prog: LProgram?) -> string {
       let iface_name = classes[i].implements[j]
       let iface_entry = dict_get<LInterfaceDecl>(g.iface_by_name!, iface_name)
       if !isnull(iface_entry) {
-        g.line("static const {iface_name}_vtable {class_name}_as_{iface_name};")
+        g.line(f"static const {iface_name}_vtable {class_name}_as_{iface_name};")
       }
       j = j + 1
     }
@@ -3662,7 +3668,7 @@ pub func emit_c(prog: LProgram?) -> string {
   let type_defs = prog_ref.type_defs
   i = 0
   while i < len(type_defs) {
-    g.line("typedef {g.c_type(type_defs[i].typ)} {type_defs[i].name};")
+    g.line(f"typedef {g.c_type(type_defs[i].typ)} {type_defs[i].name};")
     g.line("")
     i = i + 1
   }
@@ -3673,15 +3679,9 @@ pub func emit_c(prog: LProgram?) -> string {
   // Forward-declare all functions
   i = 0
   while i < len(funcs) {
-    if g.func_name(funcs[i]) == "main" {
-      i = i + 1
-      // skip
+    if g.func_name(funcs[i]) != "main" && len(funcs[i].type_params) == 0 {
+      g.emit_func_forward_decl(funcs[i])
     }
-    if len(funcs[i].type_params) > 0 {
-      i = i + 1
-      // skip generic
-    }
-    g.emit_func_forward_decl(funcs[i])
     i = i + 1
   }
   if len(funcs) > 0 {
@@ -3694,9 +3694,9 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(globals) {
     let c_t = g.c_type(globals[i].typ)
     if !isnull(globals[i].init) {
-      g.line("static {c_t} {c_safe_name(globals[i].name)} = {g.emit_value(globals[i].init)};")
+      g.line(f"static {c_t} {c_safe_name(globals[i].name)} = {g.emit_value(globals[i].init)};")
     } else {
-      g.line("static {c_t} {c_safe_name(globals[i].name)};")
+      g.line(f"static {c_t} {c_safe_name(globals[i].name)};")
     }
     i = i + 1
   }
@@ -3714,7 +3714,7 @@ pub func emit_c(prog: LProgram?) -> string {
       let iface_entry = dict_get<LInterfaceDecl>(g.iface_by_name!, iface_name)
       if !isnull(iface_entry) {
         let iface = iface_entry!.value
-        g.line("static const {iface_name}_vtable {class_name}_as_{iface_name} = \\{")
+        g.line(f"static const {iface_name}_vtable {class_name}_as_{iface_name} = {{")
         g.indent = g.indent + 1
         let mut k = 0
         while k < len(iface.methods) {
@@ -3728,12 +3728,12 @@ pub func emit_c(prog: LProgram?) -> string {
             sb.write(g.c_type(m.params[p].typ))
             p = p + 1
           }
-          let cast_type = "{ret_type}(*)({sb.to_string()})"
-          g.line(".{m.name} = ({cast_type}){class_name}_{m.name},")
+          let cast_type = f"{ret_type}(*)({sb.to_string()})"
+          g.line(f".{m.name} = ({cast_type}){class_name}_{m.name},")
           k = k + 1
         }
         g.indent = g.indent - 1
-        g.line("\\};")
+        g.line("};")
       }
       j = j + 1
     }
@@ -3748,11 +3748,9 @@ pub func emit_c(prog: LProgram?) -> string {
   g.buf = new_string_builder()
   i = 0
   while i < len(funcs) {
-    if len(funcs[i].type_params) > 0 {
-      i = i + 1
-      // skip unmonomorphized
+    if len(funcs[i].type_params) == 0 {
+      g.emit_func_decl(funcs[i])
     }
-    g.emit_func_decl(funcs[i])
     i = i + 1
   }
   let func_code = g.buf!.to_string()
@@ -3762,9 +3760,9 @@ pub func emit_c(prog: LProgram?) -> string {
   i = 0
   while i < len(g.lambdas) {
     let lam = g.lambdas[i]
-    g.line("static {lam.ret_type} {lam.name}({lam.params}) \\{")
+    g.line(f"static {lam.ret_type} {lam.name}({lam.params}) {{")
     g.write_raw(lam.body_str)
-    g.line("\\}")
+    g.line("}")
     g.line("")
     i = i + 1
   }
@@ -3774,8 +3772,8 @@ pub func emit_c(prog: LProgram?) -> string {
   while i < len(chan_keys) {
     let entry = dict_get<string>(g.chan_types!, chan_keys[i])
     if !isnull(entry) {
-      let chan_name = "ForgeChan_{entry!.value}"
-      g.line("FORGE_CHAN_IMPL({chan_keys[i]}, {chan_name}, {entry!.value})")
+      let chan_name = f"ForgeChan_{entry!.value}"
+      g.line(f"FORGE_CHAN_IMPL({chan_keys[i]}, {chan_name}, {entry!.value})")
       g.line("")
     }
     i = i + 1
@@ -3797,31 +3795,31 @@ pub func emit_c(prog: LProgram?) -> string {
 pub func emit_test_runner(test_funcs: [string]) -> string {
   let sb = new_string_builder()
   sb.write("\n// --- Test runner (generated by forge test) ---\n")
-  sb.write("int main(int _argc, char** _argv) \\{\n")
+  sb.write(f"int main(int _argc, char** _argv) {{\n")
   sb.write("    int _passed = 0, _failed_count = 0, _total = 0;\n")
-  sb.write("    struct \\{ const char* name; void (*fn)(void); \\} _tests[] = \\{\n")
+  sb.write(f"    struct {{ const char* name; void (*fn)(void); }} _tests[] = {{\n")
   let mut i = 0
   while i < len(test_funcs) {
-    sb.write("        \\{\"{test_funcs[i]}\", {test_funcs[i]}\\},\n")
+    sb.write(f"        {{\"{test_funcs[i]}\", {test_funcs[i]}}},\n")
     i = i + 1
   }
-  sb.write("    \\};\n")
-  sb.write("    _total = {len(test_funcs)};\n")
-  sb.write("    for (int _i = 0; _i < _total; _i++) \\{\n")
+  sb.write("    };\n")
+  sb.write(f"    _total = {len(test_funcs)};\n")
+  sb.write(f"    for (int _i = 0; _i < _total; _i++) {{\n")
   sb.write("        _forge_test_failed = 0;\n")
-  sb.write("        if (setjmp(_forge_test_jmp) == 0) \\{\n")
+  sb.write(f"        if (setjmp(_forge_test_jmp) == 0) {{\n")
   sb.write("            _tests[_i].fn();\n")
-  sb.write("        \\}\n")
-  sb.write("        if (_forge_test_failed) \\{\n")
+  sb.write("        }\n")
+  sb.write(f"        if (_forge_test_failed) {{\n")
   sb.write("            fprintf(stderr, \"FAIL  %s\\n\", _tests[_i].name);\n")
   sb.write("            _failed_count++;\n")
-  sb.write("        \\} else \\{\n")
+  sb.write(f"        }} else {{\n")
   sb.write("            fprintf(stderr, \"PASS  %s\\n\", _tests[_i].name);\n")
   sb.write("            _passed++;\n")
-  sb.write("        \\}\n")
-  sb.write("    \\}\n")
+  sb.write("        }\n")
+  sb.write("    }\n")
   sb.write("    fprintf(stderr, \"\\n%d tests, %d passed, %d failed\\n\", _total, _passed, _failed_count);\n")
   sb.write("    return _failed_count > 0 ? 1 : 0;\n")
-  sb.write("\\}\n")
+  sb.write("}\n")
   return sb.to_string()
 }

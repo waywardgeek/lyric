@@ -636,10 +636,10 @@ func (l *Lexer) scanFString(start ast.Pos) Token {
 		} else if r == '\\' && depth == 0 {
 			// Check for escaped braces first
 			if l.peek() == '{' {
-				buf.WriteByte('{')
+				buf.WriteByte(0x01) // sentinel for literal {
 				l.advance()
 			} else if l.peek() == '}' {
-				buf.WriteByte('}')
+				buf.WriteByte(0x02) // sentinel for literal }
 				l.advance()
 			} else {
 				l.scanEscape(&buf)
