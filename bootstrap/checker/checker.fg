@@ -52,6 +52,7 @@ forge checker {
   class Type {
     kind: TypeKind
     bits: i32  // for Int/Uint/Float: 8,16,32,64; -1 for platform-width int/uint
+    type_args: [Type]  // for generic class/struct instances (e.g., Stack<i32> → [i32])
   }
 
   // ---- TypeInfo: registry entry for named types ----
@@ -169,103 +170,103 @@ forge checker {
   // =====================================================================
 
   func make_int_type(bits: i32) -> Type {
-    return Type { kind: Int, bits: bits }
+    return Type { kind: Int, bits: bits, type_args: [] }
   }
 
   func make_uint_type(bits: i32) -> Type {
-    return Type { kind: Uint, bits: bits }
+    return Type { kind: Uint, bits: bits, type_args: [] }
   }
 
   func make_float_type(bits: i32) -> Type {
-    return Type { kind: Float, bits: bits }
+    return Type { kind: Float, bits: bits, type_args: [] }
   }
 
   func make_bool_type() -> Type {
-    return Type { kind: Bool, bits: 0 }
+    return Type { kind: Bool, bits: 0, type_args: [] }
   }
 
   func make_string_type() -> Type {
-    return Type { kind: String, bits: 0 }
+    return Type { kind: String, bits: 0, type_args: [] }
   }
 
   func make_void_type() -> Type {
-    return Type { kind: Void, bits: 0 }
+    return Type { kind: Void, bits: 0, type_args: [] }
   }
 
   func make_nil_type() -> Type {
-    return Type { kind: Nil, bits: 0 }
+    return Type { kind: Nil, bits: 0, type_args: [] }
   }
 
   func make_any_type() -> Type {
-    return Type { kind: Any, bits: 0 }
+    return Type { kind: Any, bits: 0, type_args: [] }
   }
 
   func make_error_type() -> Type {
-    return Type { kind: Error, bits: 0 }
+    return Type { kind: Error, bits: 0, type_args: [] }
   }
 
   func make_lock_type() -> Type {
-    return Type { kind: Lock, bits: 0 }
+    return Type { kind: Lock, bits: 0, type_args: [] }
   }
 
   func make_union_type(variants: [Type]) -> Type {
-    return Type { kind: Union(variants), bits: 0 }
+    return Type { kind: Union(variants), bits: 0, type_args: [] }
   }
 
   func make_optional_type(inner: Type) -> Type {
-    return Type { kind: Optional(inner), bits: 0 }
+    return Type { kind: Optional(inner), bits: 0, type_args: [] }
   }
 
   func make_sequence_type(elem: Type) -> Type {
-    return Type { kind: Sequence(elem), bits: 0 }
+    return Type { kind: Sequence(elem), bits: 0, type_args: [] }
   }
 
   func make_map_type(key: Type, value: Type) -> Type {
-    return Type { kind: Map(key, value), bits: 0 }
+    return Type { kind: Map(key, value), bits: 0, type_args: [] }
   }
 
   func make_tuple_type(fields: [TupleFieldType]) -> Type {
-    return Type { kind: Tuple(fields), bits: 0 }
+    return Type { kind: Tuple(fields), bits: 0, type_args: [] }
   }
 
   func make_func_type(params: [Type], ret: Type, tpnames: [string]) -> Type {
-    return Type { kind: Func(params, ret, tpnames), bits: 0 }
+    return Type { kind: Func(params, ret, tpnames), bits: 0, type_args: [] }
   }
 
   func make_channel_type(elem: Type) -> Type {
-    return Type { kind: Channel(elem), bits: 0 }
+    return Type { kind: Channel(elem), bits: 0, type_args: [] }
   }
 
   func make_generator_type(elem: Type) -> Type {
-    return Type { kind: Generator(elem), bits: 0 }
+    return Type { kind: Generator(elem), bits: 0, type_args: [] }
   }
 
   func make_error_result_type(ok: Type, err: Type) -> Type {
-    return Type { kind: ErrorResult(ok, err), bits: 0 }
+    return Type { kind: ErrorResult(ok, err), bits: 0, type_args: [] }
   }
 
   func make_typevar_type(name: string) -> Type {
-    return Type { kind: TypeVar(name), bits: 0 }
+    return Type { kind: TypeVar(name), bits: 0, type_args: [] }
   }
 
   func make_struct_type(name: string) -> Type {
-    return Type { kind: Struct(name), bits: 0 }
+    return Type { kind: Struct(name), bits: 0, type_args: [] }
   }
 
   func make_class_type(name: string) -> Type {
-    return Type { kind: Class(name), bits: 0 }
+    return Type { kind: Class(name), bits: 0, type_args: [] }
   }
 
   func make_enum_type(name: string) -> Type {
-    return Type { kind: Enum(name), bits: 0 }
+    return Type { kind: Enum(name), bits: 0, type_args: [] }
   }
 
   func make_interface_type(name: string) -> Type {
-    return Type { kind: Interface(name), bits: 0 }
+    return Type { kind: Interface(name), bits: 0, type_args: [] }
   }
 
   func make_module_type(name: string) -> Type {
-    return Type { kind: Module(name), bits: 0 }
+    return Type { kind: Module(name), bits: 0, type_args: [] }
   }
 
   // =====================================================================
@@ -951,7 +952,11 @@ forge checker {
         return TypeExpr { kind: Func(param_tes, type_to_type_expr(ret)), span: zero_span }
       }
       Struct(name) | Class(name) | Enum(name) | Interface(name) => {
-        return TypeExpr { kind: Named(sym(name), []), span: zero_span }
+        let mut ta_exprs: [TypeExpr] = []
+        for ta in t.type_args {
+          append(ta_exprs, type_to_type_expr(ta))
+        }
+        return TypeExpr { kind: Named(sym(name), ta_exprs), span: zero_span }
       }
       TypeVar(name) => {
         return TypeExpr { kind: Named(sym(name), []), span: zero_span }
@@ -987,6 +992,34 @@ forge checker {
   func annotate(expr: Expr, t: Type) -> Type {
     expr.resolved_type = type_to_type_expr(t)
     return t
+  }
+
+  // type_contains_var returns true if the type contains any TypeVar
+  func type_contains_var(t: Type) -> bool {
+    match t.kind {
+      TypeVar(_) => { return true }
+      Optional(inner) => { return type_contains_var(inner) }
+      Sequence(elem) => { return type_contains_var(elem) }
+      Map(k, v) => { return type_contains_var(k) || type_contains_var(v) }
+      Channel(elem) => { return type_contains_var(elem) }
+      Generator(elem) => { return type_contains_var(elem) }
+      ErrorResult(ok, err) => { return type_contains_var(ok) || type_contains_var(err) }
+      Func(params, ret, _) => {
+        if type_contains_var(ret) { return true }
+        for p in params {
+          if type_contains_var(p) { return true }
+        }
+        return false
+      }
+      Tuple(fields) => {
+        for f in fields {
+          if f.type_val != nil && type_contains_var(f.type_val!) { return true }
+        }
+        return false
+      }
+      _ => { return false }
+    }
+    return false
   }
 
   // =====================================================================
@@ -1075,11 +1108,15 @@ forge checker {
         let bindings = dict_new<Type>()
         let mut limit = len(info!.type_param_names)
         if len(args) < limit { limit = len(args) }
+        let mut resolved_args: [Type] = []
         for i in range(0, limit) {
-          dict_set<Type>(bindings, info!.type_param_names[i], self.resolve_type_expr(args[i]))
+          let resolved = self.resolve_type_expr(args[i])
+          dict_set<Type>(bindings, info!.type_param_names[i], resolved)
+          append(resolved_args, resolved)
         }
-        // Return the base type — substitution happens at use sites
-        return info!.type_val
+        // Return a NEW type with type_args populated (like Go compiler)
+        let result = Type { kind: info!.type_val.kind, bits: info!.type_val.bits, type_args: resolved_args }
+        return result
       }
       return info!.type_val
     }
@@ -2431,6 +2468,16 @@ forge checker {
           }
         }
       }
+      // Return type with type_args for generic classes/structs
+      if len(type_args) > 0 && len(info!.type_param_names) > 0 {
+        let mut resolved_args: [Type] = []
+        let mut limit = len(info!.type_param_names)
+        if len(type_args) < limit { limit = len(type_args) }
+        for i in range(0, limit) {
+          append(resolved_args, self.resolve_type_expr(type_args[i]))
+        }
+        return Type { kind: info!.type_val.kind, bits: info!.type_val.bits, type_args: resolved_args }
+      }
       return info!.type_val
     }
 
@@ -2758,6 +2805,27 @@ forge checker {
   }
 
   // =====================================================================
+  // Generic type argument substitution
+  // =====================================================================
+
+  // build_type_arg_subst creates a substitution map from a type's type_args
+  // and the class/struct's type_param_names. Returns nil if no substitution needed.
+  func Checker.build_type_arg_subst(self, recv_type: Type) -> Dict<Type>? {
+    if len(recv_type.type_args) == 0 { return nil }
+    let tname = type_name(recv_type)
+    if tname == "" { return nil }
+    let info = self.registry.lookup(tname)
+    if info == nil || len(info!.type_param_names) == 0 { return nil }
+    let subst = dict_new<Type>()
+    let mut limit = len(info!.type_param_names)
+    if len(recv_type.type_args) < limit { limit = len(recv_type.type_args) }
+    for i in range(0, limit) {
+      dict_set<Type>(subst, info!.type_param_names[i], recv_type.type_args[i])
+    }
+    return subst
+  }
+
+  // =====================================================================
   // Method call checking
   // =====================================================================
 
@@ -2808,6 +2876,11 @@ forge checker {
                   call_expr.inferred_type_args = inferred
                 }
                 return substitute_type(ret, bindings)
+              }
+              // Method has no own type params — substitute class type args
+              let class_subst = self.build_type_arg_subst(recv_type)
+              if class_subst != nil {
+                return substitute_type(ret, class_subst!)
               }
               return ret
             }
@@ -2941,10 +3014,18 @@ forge checker {
       if info != nil {
         // Check fields first
         let ft = dict_get<Type>(info!.fields, field_str)
-        if ft != nil { return ft!.value }
+        if ft != nil {
+          let subst = self.build_type_arg_subst(recv_type)
+          if subst != nil { return substitute_type(ft!.value, subst!) }
+          return ft!.value
+        }
         // Then check methods (for method-as-value)
         let mt = dict_get<Type>(info!.methods, field_str)
-        if mt != nil { return mt!.value }
+        if mt != nil {
+          let subst = self.build_type_arg_subst(recv_type)
+          if subst != nil { return substitute_type(mt!.value, subst!) }
+          return mt!.value
+        }
       }
     }
 
@@ -3189,6 +3270,128 @@ forge checker {
   // Invariant validators
   // =====================================================================
 
+  func is_primitive_name(n: string) -> bool {
+    if n == "i8" { return true }
+    if n == "i16" { return true }
+    if n == "i32" { return true }
+    if n == "i64" { return true }
+    if n == "int" { return true }
+    if n == "u8" { return true }
+    if n == "u16" { return true }
+    if n == "u32" { return true }
+    if n == "u64" { return true }
+    if n == "uint" { return true }
+    if n == "f32" { return true }
+    if n == "f64" { return true }
+    if n == "bool" { return true }
+    if n == "string" { return true }
+    if n == "any" { return true }
+    if n == "error" { return true }
+    return false
+  }
+
+  // type_expr_has_typevar checks if a TypeExpr contains unresolved type variables.
+  // A type variable shows up as Named("T", []) where T is not a primitive and not
+  // in the registry. Used by the invariant validator to catch TypeVar leaks.
+  func Checker.type_expr_has_typevar(self, te: TypeExpr) -> bool {
+    match te.kind {
+      Named(name, args) => {
+        let n = name.name
+        // Check if it's a known primitive
+        if is_primitive_name(n) { return false }
+        // Check if it's in the registry (struct/class/enum/interface)
+        let info = self.registry.lookup(n)
+        if info == nil {
+          // Check if it's a known module/import (not a type variable)
+          let scope_val = self.scope.lookup(n)
+          if scope_val != nil {
+            match scope_val!.kind {
+              Module(_) => { return false }
+              _ => {}
+            }
+          }
+          // Not a primitive, not registered, not a module — it's an unresolved type variable
+          return true
+        }
+        // Recurse into type args
+        for a in args {
+          if self.type_expr_has_typevar(a) { return true }
+        }
+        return false
+      }
+      Optional(inner) => { return self.type_expr_has_typevar(inner) }
+      Sequence(elem) => { return self.type_expr_has_typevar(elem) }
+      Map(key, value) => {
+        return self.type_expr_has_typevar(key) || self.type_expr_has_typevar(value)
+      }
+      Tuple(fields) => {
+        for f in fields {
+          if f.type_expr != nil && self.type_expr_has_typevar(f.type_expr!) { return true }
+        }
+        return false
+      }
+      Func(params, ret) => {
+        // Function types legitimately contain type variables (generic function references)
+        return false
+      }
+      Channel(elem) => { return self.type_expr_has_typevar(elem) }
+      Generator(elem) => { return self.type_expr_has_typevar(elem) }
+      Union(variants) => {
+        for v in variants {
+          if self.type_expr_has_typevar(v) { return true }
+        }
+        return false
+      }
+      Unit | Lock => { return false }
+    }
+    return false
+  }
+
+  // find_typevar_name returns the first unresolved type variable name in a TypeExpr
+  func Checker.find_typevar_name(self, te: TypeExpr) -> string {
+    match te.kind {
+      Named(name, args) => {
+        let n = name.name
+        if !is_primitive_name(n) {
+          let info = self.registry.lookup(n)
+          if info == nil { return n }
+        }
+        for a in args {
+          let found = self.find_typevar_name(a)
+          if found != "" { return found }
+        }
+      }
+      Optional(inner) => { return self.find_typevar_name(inner) }
+      Sequence(elem) => { return self.find_typevar_name(elem) }
+      Map(key, value) => {
+        let k = self.find_typevar_name(key)
+        if k != "" { return k }
+        return self.find_typevar_name(value)
+      }
+      Func(params, ret) => {
+        // Function types legitimately contain type variables
+      }
+      Tuple(fields) => {
+        for f in fields {
+          if f.type_expr != nil {
+            let found = self.find_typevar_name(f.type_expr!)
+            if found != "" { return found }
+          }
+        }
+      }
+      Channel(elem) => { return self.find_typevar_name(elem) }
+      Generator(elem) => { return self.find_typevar_name(elem) }
+      Union(variants) => {
+        for v in variants {
+          let found = self.find_typevar_name(v)
+          if found != "" { return found }
+        }
+      }
+      Unit | Lock => {}
+    }
+    return ""
+  }
+
   // validateAllExprsResolved walks every Expr in the file and panics if
   // any has a nil resolved_type. Only runs when checker has zero errors.
   func Checker.validate_all_exprs_resolved(self, file: File) {
@@ -3209,6 +3412,10 @@ forge checker {
 
       let classes = block.cd_children()
       for cls in classes {
+        // Skip generic classes — their methods use unresolved type variables
+        let cls_tps = cls.ctp_children()
+        if len(cls_tps) > 0 { continue }
+
         let cmethods = cls.cm_children()
         for m in cmethods {
           if m.body == nil { continue }
@@ -3337,6 +3544,12 @@ forge checker {
         }
       }
       _ => {}
+    }
+    // Detect TypeVar leaks — type variables should be fully resolved in non-generic functions
+    if self.type_expr_has_typevar(expr.resolved_type!) {
+      let leaked = self.find_typevar_name(expr.resolved_type!)
+      eprintln(f"checker: validateAllExprsResolved: TypeVar leak '{leaked}' in {ctx} at {expr.span.start.file}:{itoa(expr.span.start.line as i64)}:{itoa(expr.span.start.column as i64)}")
+      os_exit(1)
     }
 
     match expr.kind {
