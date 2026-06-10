@@ -104,6 +104,7 @@ func compile_pipeline(inputs: [string], output: string) -> bool {
       eprintln(checker.errors[j])
       j = j + 1
     }
+    return false
   }
 
   // Lower
@@ -239,7 +240,6 @@ func cmd_test(args: [string]) -> bool {
   // Desugar
   desugar_all(merged!)
 
-  // Check
   let checker = check_file(merged!)
   if len(checker.errors) > 0 {
     let mut j = 0
@@ -247,6 +247,7 @@ func cmd_test(args: [string]) -> bool {
       eprintln(checker.errors[j])
       j = j + 1
     }
+    return false
   }
 
   // Lower

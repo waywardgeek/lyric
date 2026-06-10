@@ -990,11 +990,11 @@ forge checker {
   // =====================================================================
 
   func Checker.resolve_named_type(self, name: string, args: [TypeExpr], span: Span) -> Type {
-    // Check scope first (type vars, aliases)
+    // Check scope first (type vars, aliases, modules)
     let sv = self.scope.lookup(name)
     if sv != nil {
       match sv!.kind {
-        TypeVar(_) => { return sv! }
+        TypeVar(_) | Module(_) => { return sv! }
         _ => {}
       }
     }
@@ -1016,7 +1016,8 @@ forge checker {
       return info!.type_val
     }
 
-    self.error_at(span, "unknown type: " + name)
+    eprintln(f"checker: unknown type: {name} at {span.start.file}:{itoa(span.start.line as i64)}:{itoa(span.start.column as i64)}")
+    os_exit(1)
     return make_error_type()
   }
 
@@ -1070,6 +1071,15 @@ forge checker {
   // =====================================================================
 
   func Checker.register_forge_block(self, block: ForgeBlock) {
+    // Register imports as module types
+    let imports = block.imp_children()
+    for imp in imports {
+      if imp.alias != nil {
+        let alias = sym_to_string(imp.alias!)
+        self.scope.define(alias, make_module_type(alias))
+      }
+    }
+
     // Register interfaces first (classes may implement them)
     let ifaces = block.id_children()
     for iface in ifaces {
@@ -2288,7 +2298,8 @@ forge checker {
       return info!.type_val
     }
 
-    self.error("unknown struct/class: " + name_str)
+    eprintln(f"checker: unknown struct/class: {name_str}")
+    os_exit(1)
     return make_error_type()
   }
 
@@ -2409,8 +2420,8 @@ forge checker {
           return info!.type_val
         }
 
-        self.error("unknown function: " + name_str)
-        annotate(func_expr, make_error_type())
+        eprintln(f"checker: unknown function: {name_str} at {func_expr.span.start.file}:{itoa(func_expr.span.start.line as i64)}:{itoa(func_expr.span.start.column as i64)}")
+        os_exit(1)
         return make_error_type()
       }
       FieldAccess(receiver, field) => {
@@ -2418,9 +2429,13 @@ forge checker {
         let recv_type = self.check_expr(receiver)
         let field_str = sym_to_string(field)
         match recv_type.kind {
-          Module(_) | Enum(_) => {
-            // Module function or enum variant constructor
-            // TODO: resolve actual return type from module/enum registry
+          Module(mod_name) => {
+            // Known module function return types
+            let result = self.resolve_module_func(mod_name, field_str)
+            annotate(func_expr, result)
+            return result
+          }
+          Enum(_) => {
             annotate(func_expr, recv_type)
             return recv_type
           }
@@ -2448,6 +2463,47 @@ forge checker {
     return make_void_type()
   }
 
+  func Checker.resolve_module_func(self, mod_name: string, func_name: string) -> Type {
+    // fmt
+    if mod_name == "fmt" {
+      if func_name == "Println" || func_name == "Printf" || func_name == "Print" { return make_void_type() }
+      if func_name == "Sprintf" { return make_string_type() }
+      if func_name == "Errorf" { return make_error_type() }
+    }
+    // errors
+    if mod_name == "errors" {
+      if func_name == "New" { return make_error_type() }
+    }
+    // strconv
+    if mod_name == "strconv" {
+      if func_name == "Itoa" { return make_string_type() }
+      if func_name == "Atoi" {
+        return make_tuple_type([
+          TupleFieldType { name: "", type_val: make_int_type(64) },
+          TupleFieldType { name: "", type_val: make_bool_type() },
+        ])
+      }
+    }
+    // strings
+    if mod_name == "strings" {
+      if func_name == "ToUpper" || func_name == "ToLower" || func_name == "TrimSpace" || func_name == "Join" { return make_string_type() }
+      if func_name == "Contains" || func_name == "HasPrefix" || func_name == "HasSuffix" { return make_bool_type() }
+      if func_name == "Split" { return make_sequence_type(make_string_type()) }
+    }
+    // math
+    if mod_name == "math" {
+      if func_name == "Sqrt" || func_name == "Abs" || func_name == "Floor" || func_name == "Ceil" { return make_float_type(64) }
+    }
+    // os
+    if mod_name == "os" {
+      if func_name == "Exit" { return make_void_type() }
+      if func_name == "Args" { return make_sequence_type(make_string_type()) }
+    }
+    eprintln(f"checker: unknown module function: {mod_name}.{func_name}")
+    os_exit(1)
+    return make_error_type()
+  }
+
   // check_builtin_call handles built-in functions. Returns nil if not a builtin.
   func Checker.check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type? {
     if name == "len" { return make_int_type(32) }
@@ -2459,8 +2515,12 @@ forge checker {
       return make_void_type()
     }
     if name == "panic" { return make_void_type() }
+    if name == "assert" { return make_void_type() }
+    if name == "assert_eq" { return make_void_type() }
+    if name == "exit" { return make_void_type() }
+    if name == "format" { return make_string_type() }
     if name == "itoa" { return make_string_type() }
-    if name == "atoi" {
+    if name == "atoi" || name == "parse_int" {
       return make_tuple_type([
         TupleFieldType { name: "", type_val: make_int_type(64) },
         TupleFieldType { name: "", type_val: make_bool_type() },
@@ -2485,7 +2545,9 @@ forge checker {
     if name == "sym" {
       let info = self.registry.lookup("Sym")
       if info != nil { return info!.type_val }
-      self.error("stdlib type Sym not found"); return make_error_type()
+      eprintln("checker: stdlib type Sym not found")
+      os_exit(1)
+      return make_error_type()
     }
     if name == "hash_string" { return make_uint_type(64) }
     if name == "os_args" { return make_sequence_type(make_string_type()) }
@@ -2502,7 +2564,9 @@ forge checker {
     if name == "new_string_builder" {
       let info = self.registry.lookup("StringBuilder")
       if info != nil { return info!.type_val }
-      self.error("stdlib type StringBuilder not found"); return make_error_type()
+      eprintln("checker: stdlib type StringBuilder not found")
+      os_exit(1)
+      return make_error_type()
     }
     if name == "new_error" { return make_error_type() }
 
@@ -2510,12 +2574,12 @@ forge checker {
     if name == "str_contains" || name == "str_starts_with" || name == "str_ends_with" {
       return make_bool_type()
     }
-    if name == "str_index" || name == "str_len" { return make_int_type(32) }
-    if name == "str_trim" || name == "str_replace" || name == "str_substr" || name == "str_char_at" {
+    if name == "str_index" || name == "str_len" || name == "str_index_of" { return make_int_type(32) }
+    if name == "str_trim" || name == "str_replace" || name == "str_substr" || name == "str_char_at" || name == "str_to_lower" || name == "str_to_upper" || name == "str_from_chars" {
       return make_string_type()
     }
     if name == "str_split" { return make_sequence_type(make_string_type()) }
-    if name == "char_is_digit" || name == "char_is_alpha" || name == "char_is_space" || name == "char_is_upper" || name == "char_is_lower" {
+    if name == "char_is_digit" || name == "char_is_alpha" || name == "char_is_space" || name == "char_is_upper" || name == "char_is_lower" || name == "char_is_alnum" {
       return make_bool_type()
     }
 
@@ -2523,13 +2587,17 @@ forge checker {
     if name == "dict_new" {
       let info = self.registry.lookup("Dict")
       if info != nil { return info!.type_val }
-      self.error("stdlib type Dict not found"); return make_error_type()
+      eprintln("checker: stdlib type Dict not found")
+      os_exit(1)
+      return make_error_type()
     }
     if name == "dict_set" { return make_void_type() }
     if name == "dict_get" {
       let info = self.registry.lookup("DictEntry")
       if info != nil { return make_optional_type(info!.type_val) }
-      self.error("stdlib type DictEntry not found"); return make_error_type()
+      eprintln("checker: stdlib type DictEntry not found")
+      os_exit(1)
+      return make_error_type()
     }
     if name == "dict_has" { return make_bool_type() }
     if name == "dict_remove" { return make_bool_type() }
@@ -2568,6 +2636,18 @@ forge checker {
     // Built-in methods by receiver type
     let builtin = self.check_builtin_method(recv_type, method_str, arg_types)
     if builtin != nil { return builtin! }
+
+    // Module function calls (e.g. fmt.Println)
+    match recv_type.kind {
+      Module(mod_name) => {
+        return self.resolve_module_func(mod_name, method_str)
+      }
+      Enum(ename) => {
+        // Enum variant constructor via method syntax
+        return recv_type
+      }
+      _ => {}
+    }
 
     // Look up method in registry
     let tname = type_name(recv_type)
@@ -2636,7 +2716,8 @@ forge checker {
     // Universal methods
     if method_str == "to_string" { return make_string_type() }
 
-    self.error("unknown method: " + method_str)
+    eprintln(f"checker: unknown method: {method_str} at {call_expr.span.start.file}:{itoa(call_expr.span.start.line as i64)}:{itoa(call_expr.span.start.column as i64)}")
+    os_exit(1)
     return make_error_type()
   }
 
@@ -2670,18 +2751,20 @@ forge checker {
     if method == "index_of" || method == "find" { return make_int_type(32) }
     if method == "first" || method == "last" { return make_optional_type(elem) }
     if method == "is_empty" { return make_bool_type() }
+    if method == "join" { return make_string_type() }
     return nil
   }
 
   func Checker.check_string_method(self, method: string) -> Type? {
     if method == "length" || method == "len" { return make_int_type(32) }
-    if method == "contains" || method == "starts_with" || method == "ends_with" { return make_bool_type() }
-    if method == "substring" || method == "trim" || method == "to_lower" || method == "to_upper" || method == "replace" {
+    if method == "contains" || method == "starts_with" || method == "ends_with" || method == "has_prefix" || method == "has_suffix" { return make_bool_type() }
+    if method == "substring" || method == "trim" || method == "to_lower" || method == "to_upper" || method == "replace" || method == "repeat" || method == "char_at" {
       return make_string_type()
     }
     if method == "split" { return make_sequence_type(make_string_type()) }
     if method == "index_of" { return make_int_type(32) }
     if method == "is_empty" { return make_bool_type() }
+    if method == "join" { return make_string_type() }
     return nil
   }
 
@@ -2697,9 +2780,10 @@ forge checker {
     if method == "set" || method == "put" || method == "delete" || method == "remove" {
       return make_void_type()
     }
-    if method == "has" || method == "contains" { return make_bool_type() }
+    if method == "has" || method == "contains" || method == "contains_key" { return make_bool_type() }
     if method == "keys" { return make_sequence_type(key) }
     if method == "values" { return make_sequence_type(value) }
+    if method == "len" || method == "length" { return make_int_type(32) }
     if method == "len" || method == "length" { return make_int_type(32) }
     return nil
   }
@@ -2762,7 +2846,8 @@ forge checker {
       _ => {}
     }
 
-    self.error("field not found on type")
+    eprintln(f"checker: field {field_str} not found on type {tname}")
+    os_exit(1)
     return make_error_type()
   }
 
