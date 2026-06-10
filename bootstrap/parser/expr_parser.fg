@@ -178,7 +178,7 @@ forge parser {
               if is_ident_kind(expr!.kind) && self.is_struct_lit_ahead() {
                 let ident_name = match expr!.kind { Ident(n) => { n } _ => { sym("") } }
                 let qual_name = sym(ident_name.get_name() + "." + name!.text)
-                expr = self.parse_struct_lit(qual_name, expr!.span.start)?
+                expr = self.parse_struct_lit(qual_name, [], expr!.span.start)?
               } else {
                 expr = Expr {
                   kind: FieldAccess(expr!, sym(name!.text)),
@@ -208,8 +208,7 @@ forge parser {
           } else if type_args != null && self.peek().kind == PLBrace && is_ident_kind(expr!.kind) && self.is_struct_lit_ahead() {
             // Generic struct literal: TypeName<T> { ... }
             let ident_name = match expr!.kind { Ident(n) => { n } _ => { sym("") } }
-            expr = self.parse_struct_lit(ident_name, expr!.span.start)?
-            // TODO: store type_args on struct lit
+            expr = self.parse_struct_lit(ident_name, type_args!, expr!.span.start)?
           } else {
             self.lex!.restore_state(saved)
             return (expr, null)
@@ -383,7 +382,7 @@ forge parser {
         let name = tok.text
         // Check for struct literal: TypeName { field: value }
         if self.peek().kind == PLBrace && self.is_struct_lit_ahead() {
-          return self.parse_struct_lit(sym(name), tok.span.start)
+          return self.parse_struct_lit(sym(name), [], tok.span.start)
         }
         // Check for map literal: map[K]V { ... }
         if name == "map" && self.peek().kind == PLBracket {
@@ -1229,7 +1228,7 @@ forge parser {
     return result
   }
 
-  func Parser.parse_struct_lit(self, name: Sym, start: Pos) -> (Expr?, error) {
+  func Parser.parse_struct_lit(self, name: Sym, type_args: [TypeExpr], start: Pos) -> (Expr?, error) {
     self.next()  // consume {
     let mut fields: [StructLitField] = []
     self.skip_newlines()
@@ -1245,7 +1244,7 @@ forge parser {
     }
     let end = self.expect(PRBrace)?
     return (Expr {
-      StructLit(name, [], fields),
+      StructLit(name, type_args, fields),
       span: Span { start: start, end: end!.span.end }
     }, null)
   }

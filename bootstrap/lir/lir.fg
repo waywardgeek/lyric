@@ -58,6 +58,7 @@ forge lir {
     params: [LType?]
     ret: LType?
     variants: [LVariant]
+    type_args: [LType?]
     bits: i32
     is_exported: bool
   }
@@ -258,7 +259,7 @@ forge lir {
     fields: [LFieldInit]
   }
 
-  struct LClassAllocData {
+  class LClassAllocData {
     class_name: string
     fields: [LFieldInit]
     type_args: [LType?]

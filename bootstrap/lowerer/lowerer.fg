@@ -270,10 +270,10 @@ forge lowerer {
 
     // Check registered types
     if dict_has<StructDecl>(self.structs!, n) {
-      return LType { kind: TyStruct, name: n, params: largs, bits: 0, is_exported: false }
+      return LType { kind: TyStruct, name: n, type_args: largs, bits: 0, is_exported: false }
     }
     if dict_has<ClassDecl>(self.classes!, n) {
-      return LType { kind: TyClassHandle, name: n, params: largs, bits: 0, is_exported: false }
+      return LType { kind: TyClassHandle, name: n, type_args: largs, bits: 0, is_exported: false }
     }
     if dict_has<EnumDecl>(self.enums!, n) {
       return LType { kind: TyTaggedUnion, name: n, bits: 0, is_exported: false }
@@ -831,12 +831,12 @@ forge lowerer {
       return LType { kind: TyFuncPtr, name: "", params: ps, ret: self.subst_impl_type(t!.ret, argmap), bits: 0, is_exported: false }
     }
     // Struct/class with type args
-    if len(t!.params) > 0 {
-      let mut ps: [LType?] = []
-      for p in t!.params {
-        append(ps, self.subst_impl_type(p, argmap))
+    if len(t!.type_args) > 0 {
+      let mut ta: [LType?] = []
+      for p in t!.type_args {
+        append(ta, self.subst_impl_type(p, argmap))
       }
-      return LType { kind: t!.kind, name: t!.name, params: ps, bits: t!.bits, is_exported: t!.is_exported }
+      return LType { kind: t!.kind, name: t!.name, type_args: ta, bits: t!.bits, is_exported: t!.is_exported }
     }
     return t
   }
@@ -1949,7 +1949,7 @@ forge lowerer {
       }
       let alloc = LExpr {
         kind: ExClassAlloc,
-        typ: LType { kind: TyClassHandle, name: func_name, bits: 0, is_exported: false },
+        typ: LType { kind: TyClassHandle, name: func_name, type_args: lta, bits: 0, is_exported: false },
         class_alloc: LClassAllocData { class_name: func_name, fields: finits, type_args: lta }
       }
       return self.emit_temp(alloc)
@@ -2467,7 +2467,7 @@ forge lowerer {
 
       let alloc = LExpr {
         kind: ExClassAlloc,
-        typ: LType { kind: TyClassHandle, name: tname, bits: 0, is_exported: false },
+        typ: LType { kind: TyClassHandle, name: tname, type_args: lta, bits: 0, is_exported: false },
         class_alloc: LClassAllocData { class_name: tname, fields: finits, type_args: lta }
       }
       return self.emit_temp(alloc)

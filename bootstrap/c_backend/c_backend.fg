@@ -625,7 +625,7 @@ func CGen.c_param_list(self, f: LFuncDecl) -> string {
   // For methods, ensure self is the first parameter
   let has_self = len(f.params) > 0 && f.params[0].name == "self"
   if f.receiver != "" && !has_self {
-    let self_type = LType { kind: TyClassHandle, name: f.receiver, elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+    let self_type = LType { kind: TyClassHandle, name: f.receiver, elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     sb.write(self.c_field_decl(self_type, "self"))
     count = count + 1
   }
@@ -833,19 +833,19 @@ func CGen.infer_lval_type(self, v: LValue?) -> LType? {
   }
   match v!.kind {
     ValLitInt => {
-      return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 32, is_exported: false }
+      return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 32, is_exported: false }
     }
     ValLitUint => {
-      return LType { kind: TyU32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 32, is_exported: false }
+      return LType { kind: TyU32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 32, is_exported: false }
     }
     ValLitFloat => {
-      return LType { kind: TyF64, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 64, is_exported: false }
+      return LType { kind: TyF64, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 64, is_exported: false }
     }
     ValLitString => {
-      return LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     ValLitBool => {
-      return LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     ValTemp => {
       let entry = dict_get<LType?>(self.temp_types!, f"{v!.temp_id}")
@@ -1255,7 +1255,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
     }
   }
   if name == "string_split" {
-    let st = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
+    let st = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false })
     return f"forge_slice_empty({st}) /* string_split not implemented */"
   }
   if name == "string_trim" {
@@ -2063,7 +2063,7 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
       elem_type = expr!.typ!.elem
     }
     if isnull(elem_type) {
-      elem_type = LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      elem_type = LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     let result_type = self.result_type_name(elem_type)
     let tmp_name = f"_multi_{self.next_temp()}"
@@ -2075,7 +2075,7 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
     }
     if names[1] != "_" {
       self.line(f"const char* {names[1]} = {tmp_name}.error;")
-      dict_set<LType?>(self.var_types!, names[1], LType { kind: TyError, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
+      dict_set<LType?>(self.var_types!, names[1], LType { kind: TyError, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false })
     }
   } else if len(names) == 2 && !isnull(expr) && !isnull(expr!.typ) && expr!.typ!.kind is TyTuple {
     let tmp_name = f"_multi_{self.next_temp()}"
@@ -2774,7 +2774,7 @@ func CGen.emit_generator_func_decl(self, f: LFuncDecl) {
 
 func CGen.infer_expr_type(self, e: LExpr?) -> LType? {
   if isnull(e) {
-    return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+    return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
   }
   let t = e!.typ
   if !isnull(t) && !(t!.kind is TyAny) && !self.contains_type_var(t) {
@@ -2852,23 +2852,23 @@ func CGen.infer_expr_type(self, e: LExpr?) -> LType? {
   if e!.kind is ExBuiltin {
     let d = e!.builtin!
     if d.name == "len" || d.name == "string_len" || d.name == "slice_len" || d.name == "map_len" {
-      return LType { kind: TyPlatformInt, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyPlatformInt, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     if d.name == "isnull" || d.name == "contains" || d.name == "has_prefix" || d.name == "has_suffix" || d.name == "file_exists" {
-      return LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     if d.name == "itoa" || d.name == "char_to_string" || d.name == "mkdtemp" || d.name == "os_getwd" || d.name == "string_trim" {
-      return LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
     if d.name == "hash_string" {
-      return LType { kind: TyU64, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 64, is_exported: false }
+      return LType { kind: TyU64, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 64, is_exported: false }
     }
     if d.name == "assert" || d.name == "assert_eq" || d.name == "println" || d.name == "print" || d.name == "eprintln" || d.name == "eprint" || d.name == "panic" || d.name == "Println" || d.name == "Print" || d.name == "fmt.Println" || d.name == "fmt.Print" || d.name == "fmt.Printf" {
-      return LType { kind: TyUnit, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+      return LType { kind: TyUnit, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
     }
   }
   if isnull(t) {
-    return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false }
+    return LType { kind: TyI32, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
   }
   return t
 }
@@ -3201,6 +3201,11 @@ func CGen.walk_type_for_composite(self, t: LType?) {
     i = i + 1
   }
   i = 0
+  while i < len(t!.type_args) {
+    self.walk_type_for_composite(t!.type_args[i])
+    i = i + 1
+  }
+  i = 0
   while i < len(t!.fields) {
     self.walk_type_for_composite(t!.fields[i].typ)
     i = i + 1
@@ -3502,7 +3507,7 @@ func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], p
 // ---------------------------------------------------------------------------
 
 func CGen.emit_os_helpers(self) {
-  let slice_type = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], bits: 0, is_exported: false })
+  let slice_type = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false })
 
   if self.needs_os_args {
     self.line(f"static inline {slice_type} _forge_os_args(int argc, char** argv) {{")

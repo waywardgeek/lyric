@@ -192,17 +192,24 @@ func MonoPass.collect_from_type(self, t: LType?) {
   }
   match t!.kind {
     TyClassHandle => {
-      if len(t!.fields) == 0 {
-        // Check TypeArgs via params (LType uses params for type args in bootstrap)
-        // Actually in bootstrap LType, type args are... let me check
+      if len(t!.type_args) > 0 && !has_type_vars(t!.type_args) {
+        self.record_class_instance(t!.name, t!.type_args)
       }
-      // In Go LType, TypeArgs is a separate field. In bootstrap LType,
-      // we don't have TypeArgs. We need to check the LType structure.
-      // Looking at lir.fg: LType has no type_args field — it uses params.
-      // Wait, looking more carefully, LType doesn't have a TypeArgs field at all.
-      // The Go code uses t.TypeArgs. We need to figure out what maps to this.
-      // From the C backend pattern, type_args on types must exist somewhere...
-      // For now, skip collection from types — the main collection from exprs handles it.
+      let mut i = 0
+      while i < len(t!.type_args) {
+        self.collect_from_type(t!.type_args[i])
+        i = i + 1
+      }
+    }
+    TyStruct => {
+      if len(t!.type_args) > 0 && !has_type_vars(t!.type_args) {
+        self.record_struct_instance(t!.name, t!.type_args)
+      }
+      let mut i = 0
+      while i < len(t!.type_args) {
+        self.collect_from_type(t!.type_args[i])
+        i = i + 1
+      }
     }
     TyOptional => {
       self.collect_from_type(t!.elem)
@@ -772,6 +779,7 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
                       params: [],
                       ret: nil,
                       variants: [],
+                      type_args: [],
                       bits: 0,
                       is_exported: false,
                     }
@@ -806,6 +814,7 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
               params: [],
               ret: nil,
               variants: [],
+              type_args: [],
               bits: 0,
               is_exported: false,
             }
@@ -1061,6 +1070,12 @@ func subst_type(t: LType?, subst: Dict<LType?>?) -> LType? {
     append(new_variants, LVariant { name: t!.variants[i].name, tag: t!.variants[i].tag, fields: vfields })
     i = i + 1
   }
+  let mut new_type_args: [LType?] = []
+  i = 0
+  while i < len(t!.type_args) {
+    append(new_type_args, subst_type(t!.type_args[i], subst))
+    i = i + 1
+  }
   return LType {
     kind: t!.kind,
     name: t!.name,
@@ -1070,6 +1085,7 @@ func subst_type(t: LType?, subst: Dict<LType?>?) -> LType? {
     params: new_params,
     ret: subst_type(t!.ret, subst),
     variants: new_variants,
+    type_args: new_type_args,
     bits: t!.bits,
     is_exported: t!.is_exported,
   }
@@ -1085,9 +1101,9 @@ func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType? {
     t!.kind is TyStruct
   )
   if is_class_or_struct {
-    if len(t!.params) > 0 {
-      if !has_type_vars(t!.params) {
-        let mangled = mangle_name(t!.name, t!.params)
+    if len(t!.type_args) > 0 {
+      if !has_type_vars(t!.type_args) {
+        let mangled = mangle_name(t!.name, t!.type_args)
         return LType {
           kind: t!.kind,
           name: mangled,
@@ -1097,6 +1113,7 @@ func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType? {
           params: [],
           ret: t!.ret,
           variants: t!.variants,
+          type_args: [],
           bits: t!.bits,
           is_exported: t!.is_exported,
         }
@@ -1108,12 +1125,15 @@ func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType? {
   let new_key = self.subst_type_remove_vars(t!.key)
   let new_ret = self.subst_type_remove_vars(t!.ret)
   let mut new_params: [LType?] = []
-  let mut changed = false
   let mut i = 0
   while i < len(t!.params) {
-    let np = self.subst_type_remove_vars(t!.params[i])
-    append(new_params, np)
-    // Simple change check — can't compare pointers in Forge
+    append(new_params, self.subst_type_remove_vars(t!.params[i]))
+    i = i + 1
+  }
+  let mut new_type_args: [LType?] = []
+  i = 0
+  while i < len(t!.type_args) {
+    append(new_type_args, self.subst_type_remove_vars(t!.type_args[i]))
     i = i + 1
   }
   // Always rebuild to be safe (unlike Go which checks pointer equality)
@@ -1126,6 +1146,7 @@ func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType? {
     params: new_params,
     ret: new_ret,
     variants: t!.variants,
+    type_args: new_type_args,
     bits: t!.bits,
     is_exported: t!.is_exported,
   }
@@ -2281,8 +2302,8 @@ func type_to_mangle(t: LType?) -> string {
     TyStruct => {
       let mut name = "S{t!.name}"
       let mut i = 0
-      while i < len(t!.params) {
-        name = f"{name}_{type_to_mangle(t!.params[i])}"
+      while i < len(t!.type_args) {
+        name = f"{name}_{type_to_mangle(t!.type_args[i])}"
         i = i + 1
       }
       return name
@@ -2290,8 +2311,8 @@ func type_to_mangle(t: LType?) -> string {
     TyClassHandle => {
       let mut name = "C{t!.name}"
       let mut i = 0
-      while i < len(t!.params) {
-        name = f"{name}_{type_to_mangle(t!.params[i])}"
+      while i < len(t!.type_args) {
+        name = f"{name}_{type_to_mangle(t!.type_args[i])}"
         i = i + 1
       }
       return name
@@ -2367,6 +2388,13 @@ func type_has_var(t: LType?) -> bool {
   let mut i = 0
   while i < len(t!.params) {
     if type_has_var(t!.params[i]) {
+      return true
+    }
+    i = i + 1
+  }
+  i = 0
+  while i < len(t!.type_args) {
+    if type_has_var(t!.type_args[i]) {
       return true
     }
     i = i + 1
