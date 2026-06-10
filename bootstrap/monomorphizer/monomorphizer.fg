@@ -2937,19 +2937,19 @@ func rewrite_impl_renames(prog: LProgram?) {
   let rename_keys = dict_keys<string>(prog!.impl_method_renames!)
   if len(rename_keys) == 0 { return }
 
-  // Build flat (className + "\x00" + methodName) -> concreteName lookup
+  // Build flat (className + "@" + methodName) -> concreteName lookup
   let renames = dict_new<string>()
   let mut i = 0
   while i < len(rename_keys) {
     let key = rename_keys[i]
     let new_name_entry = dict_get<string>(prog!.impl_method_renames!, key)
     if !isnull(new_name_entry) {
-      // Key format: "Interface\x00TypeArg0\x00...\x00ClassName\x00MethodName"
-      let parts = str_split(key, "\x00")
+      // Key format: "Interface@TypeArg0@...@ClassName@MethodName"
+      let parts = str_split(key, "@")
       if len(parts) >= 3 {
         let class_name = parts[len(parts) - 2]
         let method_name = parts[len(parts) - 1]
-        let flat_key = f"{class_name}\x00{method_name}"
+        let flat_key = f"{class_name}@{method_name}"
         dict_set<string>(renames, flat_key, new_name_entry!.value)
       }
     }
@@ -2969,12 +2969,12 @@ func rewrite_impl_renames(prog: LProgram?) {
       let mut j = 0
       while j < len(flat_keys) {
         let fk = flat_keys[j]
-        let fk_parts = str_split(fk, "\x00")
+        let fk_parts = str_split(fk, "@")
         if len(fk_parts) == 2 {
           let base_class = fk_parts[0]
           let method = fk_parts[1]
           if mono_starts_with(f.receiver, f"{base_class}_") {
-            let mono_key = f"{f.receiver}\x00{method}"
+            let mono_key = f"{f.receiver}@{method}"
             let existing = dict_get<string>(renames, mono_key)
             if isnull(existing) {
               let val = dict_get<string>(renames, fk)
@@ -2997,12 +2997,12 @@ func rewrite_impl_renames(prog: LProgram?) {
     let mut j = 0
     while j < len(flat_keys) {
       let fk = flat_keys[j]
-      let fk_parts = str_split(fk, "\x00")
+      let fk_parts = str_split(fk, "@")
       if len(fk_parts) == 2 {
         let base_class = fk_parts[0]
         let method = fk_parts[1]
         if mono_starts_with(c.name, f"{base_class}_") {
-          let mono_key = f"{c.name}\x00{method}"
+          let mono_key = f"{c.name}@{method}"
           let existing = dict_get<string>(renames, mono_key)
           if isnull(existing) {
             let val = dict_get<string>(renames, fk)
@@ -3081,7 +3081,7 @@ func rewrite_impl_expr(e: LExpr?, renames: Dict<string>?) {
       if !isnull(mc.receiver) {
         if !isnull(mc.receiver!.typ) {
           if mc.receiver!.typ!.kind is TyClassHandle {
-            let key = f"{mc.receiver!.typ!.name}\x00{mc.method}"
+            let key = f"{mc.receiver!.typ!.name}@{mc.method}"
             let entry = dict_get<string>(renames!, key)
             if !isnull(entry) {
               mc.method = entry!.value

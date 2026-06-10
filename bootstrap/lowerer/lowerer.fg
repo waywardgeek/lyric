@@ -28,6 +28,7 @@ forge lowerer {
     enum_variant_fields: Dict<[TupleField]>?
     current_func_return: LType?
     import_aliases: Dict<string>?
+    lowered_ifaces: Dict<LInterfaceDecl>?
   }
 
   func new_lowerer() -> Lowerer {
@@ -48,7 +49,8 @@ forge lowerer {
       enum_variant_tags: Dict<i32> {},
       enum_variant_fields: Dict<[TupleField]> {},
       current_func_return: LType { kind: TyUnit, name: "", bits: 0, is_exported: false },
-      import_aliases: Dict<string> {}
+      import_aliases: Dict<string> {},
+      lowered_ifaces: Dict<LInterfaceDecl> {}
     }
   }
 
@@ -465,7 +467,9 @@ forge lowerer {
 
       // Interfaces
       for id in block.id_children() {
-        append(ifaces, self.lower_interface_decl(id))
+        let li = self.lower_interface_decl(id)
+        dict_set<LInterfaceDecl>(self.lowered_ifaces!, li.name, li)
+        append(ifaces, li)
       }
 
       // Functions
@@ -623,7 +627,7 @@ forge lowerer {
         if !isnull(m.name) {
           let mut params: [LParam] = []
           for p in m.param_children() {
-            if !isnull(p.name) {
+            if !isnull(p.name) && !p.is_self {
               append(params, LParam { name: p.name!.name, typ: self.lower_type(p.type_expr), mutable: p.is_mut })
             }
           }
@@ -653,26 +657,40 @@ forge lowerer {
 
   func Lowerer.lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl] {
     let mut result: [LFuncDecl] = []
-    if isnull(ib) || isnull(ib!.interface_name) || isnull(ib!.for_type) {
+    if isnull(ib) || isnull(ib!.interface_name) {
       return result
     }
 
     let iface_name = ib!.interface_name!.name
-    let for_type = ib!.for_type!.name
 
-    // Build type arg map from impl block args
-    let mut type_arg_map: Dict<LType> = dict_new<LType>()
-    let iface_entry = dict_get<InterfaceDecl>(self.interfaces!, iface_name)
-    if !isnull(iface_entry) {
-      let iface_decl = iface_entry!.value
-      let ib_args = ib!.ib_arg_children()
-      let iface_tps = iface_decl.itp_children()
-      let mut i = 0
-      for tp in iface_tps {
-        if !isnull(tp.name) && i < len(ib_args) {
-          dict_set<LType>(type_arg_map, tp.name!.name, self.lower_type(ib_args[i])!)
+    // Look up lowered interface (matches Go's l.ifaceDecls)
+    let iface_entry = dict_get<LInterfaceDecl>(self.lowered_ifaces!, iface_name)
+    if isnull(iface_entry) { return result }
+    let iface = iface_entry!.value
+
+
+    // Build type param -> concrete type mappings (matches Go's typeArgMap + typeArgLTypeMap)
+    let mut type_arg_map: Dict<string> = dict_new<string>()
+    let mut type_arg_ltype_map: Dict<LType> = dict_new<LType>()
+    let ib_args = ib!.ib_arg_children()
+    let mut i = 0
+    for tp in iface.type_params {
+      if i < len(ib_args) {
+        let lt = self.lower_type(ib_args[i])
+        if !isnull(lt) {
+          dict_set<LType>(type_arg_ltype_map, tp.name, lt!)
+          dict_set<string>(type_arg_map, tp.name, lt!.name)
         }
-        i = i + 1
+      }
+      i = i + 1
+    }
+
+    // Build rename key prefix: iface_name + @ + type_arg_names...
+    let mut rename_prefix = iface_name
+    for tp in iface.type_params {
+      let ta_entry = dict_get<string>(type_arg_map, tp.name)
+      if !isnull(ta_entry) {
+        rename_prefix = rename_prefix + "@" + ta_entry!.value
       }
     }
 
@@ -680,35 +698,55 @@ forge lowerer {
     for mapping in ib!.ibm_children() {
       if isnull(mapping.type_param) || isnull(mapping.method_name) { continue }
 
-      let iface_method_name = mapping.type_param!.name
-      let impl_method_name = mapping.method_name!.name
+      let type_param = mapping.type_param!.name
+      let method_name = mapping.method_name!.name
+
+      // Find the interface method matching TypeParam + MethodName
+      let mut iface_method_idx: i32 = -1
+      let mut mi = 0
+      for m in iface.methods {
+        if m.receiver_type == type_param && m.name == method_name {
+          iface_method_idx = mi
+        }
+        mi = mi + 1
+      }
+      if iface_method_idx < 0 { continue }
+      let iface_method = iface.methods[iface_method_idx]
+
+      // Get concrete class name from type arg map
+      let class_entry = dict_get<string>(type_arg_map, type_param)
+      if isnull(class_entry) { continue }
+      let class_name = class_entry!.value
+
+      // Get full LType for self (preserves TypeArgs for generic classes)
+      let self_ltype_entry = dict_get<LType>(type_arg_ltype_map, type_param)
+      let self_type = if !isnull(self_ltype_entry) {
+        self_ltype_entry!.value
+      } else {
+        LType { kind: TyClassHandle, name: class_name, bits: 0, is_exported: false }
+      }
 
       match mapping.kind {
         Alias => {
-          // Create forwarding wrapper
-          let sig_key = iface_name + "." + iface_method_name
-          let sig_entry = dict_get<FuncDecl>(self.func_sigs!, sig_key)
-          if isnull(sig_entry) { continue }
-          let iface_sig = sig_entry!.value
-
-          let wrapper_name = for_type + "_" + iface_method_name
-          let target_name = for_type + "." + impl_method_name
-
-          // Register rename
-          dict_set<string>(self.impl_method_renames!, for_type + "." + iface_method_name, wrapper_name)
-
-          // Build params (substitute type vars)
+          // Substitute type vars with concrete types
           let mut params: [LParam] = []
-          append(params, LParam { name: "self", typ: LType { kind: TyClassHandle, name: for_type, bits: 0, is_exported: false }, mutable: false })
-          for p in iface_sig.param_children() {
-            if !isnull(p.name) && !p.is_self {
-              let pt = self.lower_type(p.type_expr)
-              let subst = self.subst_impl_type(pt, type_arg_map)
-              append(params, LParam { name: p.name!.name, typ: subst, mutable: p.is_mut })
-            }
+          append(params, LParam { name: "self", typ: self_type, mutable: false })
+          for p in iface_method.params {
+            let subst = self.subst_impl_type(p.typ, type_arg_ltype_map)
+            append(params, LParam { name: p.name, typ: subst, mutable: p.mutable })
           }
+          let rt = self.subst_impl_type(iface_method.return_type, type_arg_ltype_map)
 
-          let rt = self.subst_impl_type(self.lower_type(iface_sig.return_type), type_arg_map)
+          // Wrapper name and target
+          let wrapper_name = class_name + "_" + method_name
+          let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
+          let target_name = class_name + "." + target_member
+
+          // Register rename with @-delimited key
+          let rename_key = rename_prefix + "@" + class_name + "@" + method_name
+          dict_set<string>(self.impl_method_renames!, rename_key, wrapper_name)
+          // Also register short key for backward compat
+          dict_set<string>(self.impl_method_renames!, class_name + "." + method_name, wrapper_name)
 
           // Build forwarding call body
           let mut call_args: [LValue?] = []
@@ -724,7 +762,7 @@ forge lowerer {
             call: LCallData { func_name: target_name, args: call_args, mut_args: [], type_args: [], is_exported: false }
           }
 
-          if rt!.kind is TyUnit {
+          if !isnull(rt) && rt!.kind is TyUnit {
             let tid = self.next_temp()
             self.emit(LStmt { kind: StTempDef, temp_def: LTempDef { id: tid, expr: call_expr } })
             self.emit(LStmt { kind: StExpr, expr_stmt: LExprStmtData { temp_id: tid } })
@@ -741,16 +779,17 @@ forge lowerer {
             params: params,
             return_type: rt,
             body: body,
-            is_exported: false,
-            receiver: for_type
+            is_exported: true,
+            receiver: class_name
           })
         }
         Inline => {
-          // Inline function
           if !isnull(mapping.inline_func) {
-            let wrapper_name = for_type + "_" + iface_method_name
-            dict_set<string>(self.impl_method_renames!, for_type + "." + iface_method_name, wrapper_name)
-            let lf = self.lower_func_with_receiver(mapping.inline_func, for_type)
+            let wrapper_name = class_name + "_" + method_name
+            let rename_key = rename_prefix + "@" + class_name + "@" + method_name
+            dict_set<string>(self.impl_method_renames!, rename_key, wrapper_name)
+            dict_set<string>(self.impl_method_renames!, class_name + "." + method_name, wrapper_name)
+            let lf = self.lower_func_with_receiver(mapping.inline_func, class_name)
             if !isnull(lf) {
               let mut f = lf!
               f.name = wrapper_name
@@ -759,47 +798,71 @@ forge lowerer {
           }
         }
         FieldBind => {
-          // Field binding: method just returns/sets a field
-          let wrapper_name = for_type + "_" + iface_method_name
-          dict_set<string>(self.impl_method_renames!, for_type + "." + iface_method_name, wrapper_name)
+          // Field binding: P.children <-> Folder.items
+          // Uses target_member for the concrete field name (label-prefixed)
+          let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
 
-          let field_name = impl_method_name
-          let mut field_type: LType? = nil
-          if dict_has<Dict<LType>>(self.class_fields!, for_type) {
-            let fm_entry = dict_get<Dict<LType>>(self.class_fields!, for_type)
-            if !isnull(fm_entry) {
-              let ft_entry = dict_get<LType>(fm_entry!.value, field_name)
-              if !isnull(ft_entry) { field_type = ft_entry!.value }
+          // Determine getter vs setter from interface method signature
+          let is_setter = len(iface_method.params) > 0
+          let concrete_name = if is_setter { "set_" + target_member } else { target_member }
+
+          // Register rename with @-delimited key
+          let rename_key = rename_prefix + "@" + class_name + "@" + method_name
+          dict_set<string>(self.impl_method_renames!, rename_key, concrete_name)
+          dict_set<string>(self.impl_method_renames!, class_name + "." + method_name, concrete_name)
+
+          let self_param = LParam { name: "self", typ: self_type, mutable: false }
+
+          if is_setter {
+            // Setter: set the field
+            let val_type = self.subst_impl_type(iface_method.params[0].typ, type_arg_ltype_map)
+
+            self.temp_id = 0
+            let saved = self.save_stmts()
+            self.emit(LStmt { kind: StClassSet, class_set: LClassSetData {
+              handle: make_var_val("self", self_type),
+              class_name: class_name,
+              field: target_member,
+              value: make_var_val("val", val_type)
+            } })
+
+            let body = self.stmts
+            self.restore_stmts(saved)
+
+            append(result, LFuncDecl {
+              name: concrete_name,
+              params: [self_param, LParam { name: "val", typ: val_type, mutable: false }],
+              return_type: nil,
+              body: body,
+              is_exported: true,
+              receiver: class_name
+            })
+          } else {
+            // Getter: return the field
+            let ret_type = self.subst_impl_type(iface_method.return_type, type_arg_ltype_map)
+
+            self.temp_id = 0
+            let saved = self.save_stmts()
+            let get_expr = LExpr {
+              kind: ExClassGet,
+              typ: ret_type,
+              class_get: LClassGetData { handle: make_var_val("self", self_type), class_name: class_name, field: target_member }
             }
+            let tv = self.emit_temp(get_expr)
+            self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [tv] } })
+
+            let body = self.stmts
+            self.restore_stmts(saved)
+
+            append(result, LFuncDecl {
+              name: concrete_name,
+              params: [self_param],
+              return_type: ret_type,
+              body: body,
+              is_exported: true,
+              receiver: class_name
+            })
           }
-          if isnull(field_type) {
-            field_type = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
-          }
-
-          let self_param = LParam { name: "self", typ: LType { kind: TyClassHandle, name: for_type, bits: 0, is_exported: false }, mutable: false }
-
-          self.temp_id = 0
-          let saved = self.save_stmts()
-
-          let get_expr = LExpr {
-            kind: ExClassGet,
-            typ: field_type,
-            class_get: LClassGetData { handle: make_var_val("self", self_param.typ), class_name: for_type, field: field_name }
-          }
-          let tv = self.emit_temp(get_expr)
-          self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [tv] } })
-
-          let body = self.stmts
-          self.restore_stmts(saved)
-
-          append(result, LFuncDecl {
-            name: wrapper_name,
-            params: [self_param],
-            return_type: field_type,
-            body: body,
-            is_exported: false,
-            receiver: for_type
-          })
         }
       }
     }
