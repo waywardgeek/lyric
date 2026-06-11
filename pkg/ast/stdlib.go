@@ -25,6 +25,15 @@ func MergeStdlib(file *File, stdFile *File) {
 	// Collect all function call names in user code
 	usedFuncNames := collectUsedFuncNames(file)
 
+	// Collect user-defined function names so stdlib doesn't shadow them.
+	// Users can call shadowed stdlib functions via std.funcName().
+	userDefinedFuncs := make(map[string]bool)
+	for _, block := range file.Blocks {
+		for _, fn := range block.Functions {
+			userDefinedFuncs[fn.Name] = true
+		}
+	}
+
 	// Build a lookup of all stdlib interfaces by name
 	stdIfaceMap := make(map[string]InterfaceDecl)
 	for _, block := range stdFile.Blocks {
@@ -86,6 +95,10 @@ func MergeStdlib(file *File, stdFile *File) {
 	// or that are directly called by user code
 	var stdFuncs []FuncDecl
 	for name, fn := range stdFuncMap {
+		// Skip stdlib functions that would shadow user-defined functions
+		if userDefinedFuncs[name] {
+			continue
+		}
 		if usedFuncNames[name] || funcReferencesTypes(fn, usedTypes, stdClassMap) {
 			stdFuncs = append(stdFuncs, fn)
 			// If a function returns a stdlib class, also merge that class

@@ -1383,7 +1383,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       return f"forge_itoa({self.emit_value(args[0])})"
     }
   }
-  if name == "atoi" || name == "parse_int" {
+  if name == "atoi" {
     if len(args) > 0 {
       return f"forge_atoi({self.emit_value(args[0])})"
     }
@@ -1683,7 +1683,7 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
     return f"{name}_init({args_str})"
   }
   // Known C library mappings
-  if name == "atoi" || name == "parse_int" {
+  if name == "atoi" {
     return f"forge_atoi({self.emit_args(d.args)})"
   }
   if name == "parse_float" {

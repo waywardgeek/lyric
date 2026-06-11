@@ -959,12 +959,27 @@ func merge_stdlib(file: File?, std_file: File?) {
         }
     }
 
+    // Collect user-defined function names so stdlib doesn't shadow them.
+    // Users can call shadowed stdlib functions via std.funcName().
+    let user_defined_funcs = dict_new<bool>()
+    for bi in range(0, len(blocks)) {
+        let user_fns = blocks[bi].fd_children()
+        for i in range(0, len(user_fns)) {
+            if user_fns[i].name != nil {
+                dict_set<bool>(user_defined_funcs, user_fns[i].name!.name, true)
+            }
+        }
+    }
+
     // Collect functions that return/use referenced stdlib classes or are called
     let mut std_funcs: [FuncDecl] = []
     let merged_funcs = dict_new<bool>()
     let func_keys = dict_keys<FuncDecl>(std_func_map)
     for i in range(0, len(func_keys)) {
         let fname = func_keys[i]
+        // Skip stdlib functions that would shadow user-defined functions
+        let user_has_func = dict_get<bool>(user_defined_funcs, fname)
+        if user_has_func != nil { continue }
         let fentry = dict_get<FuncDecl>(std_func_map, fname)
         if fentry == nil { continue }
         let fn_ = fentry!.value

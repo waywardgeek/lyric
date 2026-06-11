@@ -2861,7 +2861,7 @@ forge checker {
     if name == "exit" { return make_void_type() }
     if name == "format" { return make_string_type() }
     if name == "itoa" { return make_string_type() }
-    if name == "atoi" || name == "parse_int" {
+    if name == "atoi" {
       return make_tuple_type([
         TupleFieldType { name: "", type_val: make_int_type(64) },
         TupleFieldType { name: "", type_val: make_bool_type() },

@@ -2415,7 +2415,6 @@ forge lowerer {
     if name == "print" { return true }
     if name == "panic" { return true }
     if name == "to_string" { return true }
-    if name == "parse_int" { return true }
     if name == "parse_float" { return true }
     if name == "isnull" { return true }
     if name == "new_dict" { return true }
