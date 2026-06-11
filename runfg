@@ -22,9 +22,7 @@ if ! ./bforge co -o ${NAME}.c $1; then
 	exit 1
 fi
 
-set -x
-
-if ! gcc -I./bootstrap -o ${NAME} ${NAME}.c; then
+if ! gcc -I ./runtime ${NAME}.c -o ${NAME}; then
 	"gcc failed"
 	exit 1
 fi

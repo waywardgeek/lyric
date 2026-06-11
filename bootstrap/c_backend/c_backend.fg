@@ -775,6 +775,19 @@ func CGen.emit_value_as_cstr(self, v: LValue?) -> string {
       }
     }
   }
+  // Also check varTypes — multi-return destructuring creates VarDecls with _tN names
+  if v!.kind is ValTemp {
+    let var_name = f"_t{v!.temp_id}"
+    let vt_entry = dict_get<LType?>(self.var_types!, var_name)
+    if !isnull(vt_entry) && !isnull(vt_entry!.value) {
+      if vt_entry!.value!.kind is TyError {
+        return self.emit_value(v)
+      }
+      if vt_entry!.value!.kind is TyClassHandle {
+        return f"(const char*){self.emit_value(v)}->msg.data"
+      }
+    }
+  }
   if v!.kind is ValVar {
     let ty_entry = dict_get<LType?>(self.var_types!, v!.name)
     if !isnull(ty_entry) && !isnull(ty_entry!.value) {
@@ -1442,9 +1455,9 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   if name == "map_len" { return "0 /* map_len: maps not supported */" }
   if name == "map_contains_key" || name == "contains_key" { return "false /* contains_key: not supported */" }
 
-  // Fallback
+  // Fallback: emit as regular function call
   let sb = new_string_builder()
-  sb.write(f"/* builtin {name}(")
+  sb.write(f"{name}(")
   let mut i = 0
   while i < len(args) {
     if i > 0 {
@@ -1453,7 +1466,7 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
     sb.write(self.emit_value(args[i]))
     i = i + 1
   }
-  sb.write(") */")
+  sb.write(")")
   return sb.to_string()
 }
 
@@ -1678,6 +1691,9 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
   }
   if name == "itoa" {
     return f"forge_itoa({self.emit_args(d.args)})"
+  }
+  if name == "char_to_string" {
+    return f"forge_char_to_string({self.emit_args(d.args)})"
   }
   let args_str = self.emit_args_boxed_mut(d.func_name, d.args, d.mut_args)
   return f"{name}({args_str})"

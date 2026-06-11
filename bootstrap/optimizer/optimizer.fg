@@ -1137,6 +1137,14 @@ func collect_used_temps_in_expr(e: LExpr, used: Dict<bool>) {
         if !isnull(d!.high) { collect_used_temps_in_value(d!.high!, used) }
       }
     }
+    ExMakeSlice => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
     ExMakeChannel => {
       let d = e.make_channel
       if !isnull(d) {
@@ -1483,6 +1491,14 @@ func collect_used_var_names_in_expr(e: LExpr, used: Dict<bool>) {
         if !isnull(d!.collection) { collect_used_var_names_in_value(d!.collection!, used) }
         if !isnull(d!.low) { collect_used_var_names_in_value(d!.low!, used) }
         if !isnull(d!.high) { collect_used_var_names_in_value(d!.high!, used) }
+      }
+    }
+    ExMakeSlice => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
       }
     }
     ExMakeChannel => {
