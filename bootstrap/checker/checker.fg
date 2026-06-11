@@ -2934,11 +2934,8 @@ forge checker {
       return make_void_type()
     }
     if name == "hash_find_slot" { return make_int_type(32) }
-    if name == "hash_lookup" {
-      if len(arg_types) >= 1 { return make_optional_type(arg_types[0]) }
-      self.error("hash_lookup requires at least one argument")
-      return make_error_type()
-    }
+    // hash_lookup is handled via scope lookup with generic substitution
+    // (NOT as a builtin — its return type depends on type params, not arg types)
 
     // Not a builtin
     return nil

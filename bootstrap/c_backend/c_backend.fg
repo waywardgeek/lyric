@@ -1700,11 +1700,20 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
   if name == "parse_float" {
     return f"forge_parse_float({self.emit_args(d.args)})"
   }
-  if name == "itoa" {
+  if name == "itoa" || name == "strconv.Itoa" {
     return f"forge_itoa({self.emit_args(d.args)})"
   }
   if name == "char_to_string" {
     return f"forge_char_to_string({self.emit_args(d.args)})"
+  }
+  if name == "hash_string" {
+    if len(d.args) > 0 {
+      return f"forge_hash_string({self.emit_value(d.args[0])})"
+    }
+    return "0"
+  }
+  if name == "new_string_builder" {
+    return "forge_new_string_builder()"
   }
   let args_str = self.emit_args_boxed_mut(d.func_name, d.args, d.mut_args)
   return f"{name}({args_str})"
