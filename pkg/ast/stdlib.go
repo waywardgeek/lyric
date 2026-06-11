@@ -91,6 +91,17 @@ func MergeStdlib(file *File, stdFile *File) {
 		}
 	}
 
+	// Also merge classes called as constructors (e.g. Dict<Sym, i32>())
+	// — class names appear in usedFuncNames since constructors look like function calls
+	for name := range usedFuncNames {
+		if cls, ok := stdClassMap[name]; ok {
+			if !usedTypes[name] {
+				usedTypes[name] = true
+				stdClasses = append(stdClasses, cls)
+			}
+		}
+	}
+
 	// Collect functions that return or use referenced stdlib classes,
 	// or that are directly called by user code
 	var stdFuncs []FuncDecl
@@ -222,7 +233,63 @@ func MergeStdlib(file *File, stdFile *File) {
 		}
 	}
 
-	if len(stdIfaces) == 0 && len(stdClasses) == 0 && len(stdFuncs) == 0 && len(stdRelations) == 0 {
+	// Also merge external methods (func T.method) whose receiver type is a merged class.
+	// E.g. func Sym.equals(self, other: Sym) -> bool must be merged when Sym is merged.
+	for _, block := range stdFile.Blocks {
+		for _, fn := range block.Functions {
+			if fn.ReceiverType != "" && mergedClasses[fn.ReceiverType] && !mergedFuncs[fn.Name] {
+				mergedFuncs[fn.Name] = true
+				stdFuncs = append(stdFuncs, fn)
+			}
+		}
+	}
+
+	// Merge interfaces referenced by where clauses on merged classes and functions.
+	// E.g. class Dict<K, V> where K: Hashable requires the Hashable interface.
+	for _, cls := range stdClasses {
+		for _, wc := range cls.Where {
+			if wc.Constraint != "" && !usedIfaces[wc.Constraint] {
+				usedIfaces[wc.Constraint] = true
+				if iface, ok := stdIfaceMap[wc.Constraint]; ok {
+					stdIfaces = append(stdIfaces, iface)
+				}
+			}
+		}
+	}
+	for _, fn := range stdFuncs {
+		for _, wc := range fn.Where {
+			if wc.Constraint != "" && !usedIfaces[wc.Constraint] {
+				usedIfaces[wc.Constraint] = true
+				if iface, ok := stdIfaceMap[wc.Constraint]; ok {
+					stdIfaces = append(stdIfaces, iface)
+				}
+			}
+		}
+	}
+
+	// Collect stdlib constants referenced by merged functions.
+	// E.g. _sym_table is used by sym() and _get_sym_table().
+	stdConstMap := make(map[string]ConstDecl)
+	for _, block := range stdFile.Blocks {
+		for _, con := range block.Constants {
+			stdConstMap[con.Name] = con
+		}
+	}
+	// Collect all variable names referenced by merged functions
+	mergedVarRefs := make(map[string]bool)
+	for _, fn := range stdFuncs {
+		if fn.Body != nil {
+			collectVarRefsInStmts(fn.Body.Stmts, mergedVarRefs)
+		}
+	}
+	var stdConstants []ConstDecl
+	for name, con := range stdConstMap {
+		if mergedVarRefs[name] {
+			stdConstants = append(stdConstants, con)
+		}
+	}
+
+	if len(stdIfaces) == 0 && len(stdClasses) == 0 && len(stdFuncs) == 0 && len(stdRelations) == 0 && len(stdConstants) == 0 {
 		return
 	}
 
@@ -240,6 +307,9 @@ func MergeStdlib(file *File, stdFile *File) {
 		}
 		if len(stdRelations) > 0 {
 			file.Blocks[0].Relations = append(stdRelations, file.Blocks[0].Relations...)
+		}
+		if len(stdConstants) > 0 {
+			file.Blocks[0].Constants = append(stdConstants, file.Blocks[0].Constants...)
 		}
 	}
 }
@@ -588,6 +658,128 @@ func collectFuncCallNamesExpr(expr *Expr, names map[string]bool) {
 		// no sub-expressions to collect
 	default:
 		panic(fmt.Sprintf("collectFuncCallNamesExpr: unhandled ExprKind %d", expr.Kind))
+	}
+}
+
+// collectVarRefsInStmts collects all identifier names referenced in statements.
+// Used by MergeStdlib to find constants that merged functions depend on.
+func collectVarRefsInStmts(stmts []Stmt, names map[string]bool) {
+	for _, stmt := range stmts {
+		collectVarRefsInStmt(&stmt, names)
+	}
+}
+
+func collectVarRefsInStmt(stmt *Stmt, names map[string]bool) {
+	// Delegate to the func-call walker for recursion, but also collect idents
+	switch stmt.Kind {
+	case StmtExpr:
+		if d, ok := stmt.Data.(*ExprStmt); ok {
+			collectVarRefsInExpr(&d.Expr, names)
+		}
+	case StmtVarDecl:
+		if d, ok := stmt.Data.(*VarDeclStmt); ok {
+			if d.Value != nil {
+				collectVarRefsInExpr(d.Value, names)
+			}
+		}
+	case StmtReturn:
+		if d, ok := stmt.Data.(*ReturnStmt); ok {
+			if d.Value != nil {
+				collectVarRefsInExpr(d.Value, names)
+			}
+		}
+	case StmtAssign:
+		if d, ok := stmt.Data.(*AssignStmt); ok {
+			collectVarRefsInExpr(&d.Target, names)
+			collectVarRefsInExpr(&d.Value, names)
+		}
+	case StmtIf:
+		if d, ok := stmt.Data.(*IfStmt); ok {
+			if d.LetValue != nil {
+				collectVarRefsInExpr(d.LetValue, names)
+			} else {
+				collectVarRefsInExpr(&d.Condition, names)
+			}
+			collectVarRefsInStmts(d.Then.Stmts, names)
+			if d.Else != nil {
+				collectVarRefsInStmts(d.Else.Stmts, names)
+			}
+		}
+	case StmtFor:
+		if d, ok := stmt.Data.(*ForStmt); ok {
+			collectVarRefsInExpr(&d.Collection, names)
+			collectVarRefsInStmts(d.Body.Stmts, names)
+		}
+	case StmtWhile:
+		if d, ok := stmt.Data.(*WhileStmt); ok {
+			collectVarRefsInExpr(&d.Condition, names)
+			collectVarRefsInStmts(d.Body.Stmts, names)
+		}
+	case StmtMatch:
+		if d, ok := stmt.Data.(*MatchStmt); ok {
+			collectVarRefsInExpr(&d.Value, names)
+			for _, arm := range d.Arms {
+				collectVarRefsInStmts(arm.Body.Stmts, names)
+			}
+		}
+	case StmtBlock:
+		if d, ok := stmt.Data.(*Block); ok {
+			collectVarRefsInStmts(d.Stmts, names)
+		}
+	default:
+		// Other statement kinds — skip for constant collection
+	}
+}
+
+func collectVarRefsInExpr(expr *Expr, names map[string]bool) {
+	if expr == nil {
+		return
+	}
+	switch expr.Kind {
+	case ExprIdent:
+		if d, ok := expr.Data.(*IdentExpr); ok {
+			names[d.Name] = true
+		}
+	case ExprCall:
+		if d, ok := expr.Data.(*CallExpr); ok {
+			collectVarRefsInExpr(&d.Func, names)
+			for i := range d.Args {
+				collectVarRefsInExpr(&d.Args[i], names)
+			}
+		}
+	case ExprBinary:
+		if d, ok := expr.Data.(*BinaryExpr); ok {
+			collectVarRefsInExpr(&d.Left, names)
+			collectVarRefsInExpr(&d.Right, names)
+		}
+	case ExprUnary:
+		if d, ok := expr.Data.(*UnaryExpr); ok {
+			collectVarRefsInExpr(&d.Operand, names)
+		}
+	case ExprFieldAccess:
+		if d, ok := expr.Data.(*FieldAccessExpr); ok {
+			collectVarRefsInExpr(&d.Receiver, names)
+		}
+	case ExprMethodCall:
+		if d, ok := expr.Data.(*MethodCallExpr); ok {
+			collectVarRefsInExpr(&d.Receiver, names)
+			for i := range d.Args {
+				collectVarRefsInExpr(&d.Args[i], names)
+			}
+		}
+	case ExprIndex:
+		if d, ok := expr.Data.(*IndexExpr); ok {
+			collectVarRefsInExpr(&d.Receiver, names)
+			collectVarRefsInExpr(&d.Index, names)
+		}
+	case ExprStructLit:
+		if d, ok := expr.Data.(*StructLitExpr); ok {
+			for i := range d.Fields {
+				collectVarRefsInExpr(&d.Fields[i].Value, names)
+			}
+		}
+	default:
+		// For remaining expr kinds, we don't need deep collection for constant refs
 	}
 }
 

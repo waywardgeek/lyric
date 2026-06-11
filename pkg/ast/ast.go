@@ -176,6 +176,7 @@ type ClassDecl struct {
 	Name       string
 	IsPublic   bool // true if declared with `pub`
 	TypeParams []TypeParam
+	Where      []WhereClause
 	Implements []string
 	Fields     []Field
 	Methods    []FuncDecl
@@ -357,12 +358,13 @@ type ForgeBlock struct {
 	Span        Span
 }
 
-// ConstDecl represents a top-level constant: let NAME: Type = value
+// ConstDecl represents a top-level constant: let [mut] NAME: Type = value
 type ConstDecl struct {
 	Name     string
 	Type     *TypeExpr // nil if inferred
 	Value    Expr
 	IsPublic bool
+	IsMut    bool
 	Span     Span
 }
 

@@ -1107,6 +1107,25 @@ func (p *Parser) parseClass() (*ast.ClassDecl, error) {
 		cls.TypeParams = params
 	}
 
+	// Optional where clause
+	p.skipNewlines()
+	for p.peek().Kind == TWhere {
+		p.next()
+		for {
+			wc, err := p.parseWhereClause()
+			if err != nil {
+				return nil, err
+			}
+			cls.Where = append(cls.Where, *wc)
+			if p.peek().Kind == TComma {
+				p.next()
+			} else {
+				break
+			}
+		}
+		p.skipNewlines()
+	}
+
 	// Optional implements
 	if p.peek().Kind == TImplements || p.peekAnnotation() == TImplements {
 		p.next()
@@ -1955,17 +1974,24 @@ func (p *Parser) parseFake() (string, error) {
 	return tok.Text, nil
 }
 
-// parseConstDecl parses a top-level constant: let NAME: Type = value
+// parseConstDecl parses a top-level constant: let [mut] NAME: Type = value
 func (p *Parser) parseConstDecl() (*ast.ConstDecl, error) {
 	start := p.peek().Span.Start
 	p.next() // consume 'let'
+
+	// Optional 'mut' modifier
+	isMut := false
+	if p.peek().Kind == TMut {
+		isMut = true
+		p.next()
+	}
 
 	name, err := p.expectIdentLike()
 	if err != nil {
 		return nil, err
 	}
 
-	decl := &ast.ConstDecl{Name: name.Text}
+	decl := &ast.ConstDecl{Name: name.Text, IsMut: isMut}
 
 	// Optional type annotation
 	if p.peek().Kind == TColon {

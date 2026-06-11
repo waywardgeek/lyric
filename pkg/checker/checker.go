@@ -2562,8 +2562,16 @@ func (c *Checker) satisfiesConstraint(t *Type, constraint string) bool {
 		// Equatable: comparable in Go (==)
 		return t.IsNumeric() || t.Kind == TyString || t.Kind == TyBool
 	case "Hashable":
-		// Same as Equatable for now
-		return t.IsNumeric() || t.Kind == TyString || t.Kind == TyBool
+		// Check if type has get_hash method (either built-in or user-defined)
+		if t.IsNumeric() || t.Kind == TyString || t.Kind == TyBool {
+			return true
+		}
+		// Check registry for type with get_hash method
+		if info := c.registry.Lookup(t.Name); info != nil {
+			_, hasGetHash := info.Methods["get_hash"]
+			return hasGetHash
+		}
+		return false
 	case "":
 		return true // unconstrained
 	default:
@@ -3210,7 +3218,11 @@ func (c *Checker) registerForgeBlock(block *ast.ForgeBlock) {
 		} else {
 			typ = c.checkExpr(&con.Value)
 		}
-		c.scope.Define(con.Name, typ)
+		if con.IsMut {
+			c.scope.DefineMut(con.Name, typ)
+		} else {
+			c.scope.Define(con.Name, typ)
+		}
 	}
 
 	// Register functions in scope
@@ -3244,6 +3256,28 @@ func (c *Checker) checkForgeBlockBodies(block *ast.ForgeBlock) {
 	for i := range block.Classes {
 		cls := &block.Classes[i]
 		classType := c.registry.Lookup(cls.Name)
+		// Process class-level where clauses for typeVarMethods
+		// (e.g., class DictEntry<K, V> where K: Hashable grants K.get_hash())
+		prevTypeVarMethods := c.typeVarMethods
+		c.typeVarMethods = nil
+		for _, wc := range cls.Where {
+			if wc.Variable != "" {
+				iface := c.ifaceDecls[wc.Constraint]
+				if iface == nil {
+					continue
+				}
+				if c.typeVarMethods == nil {
+					c.typeVarMethods = make(map[string]map[string]*Type)
+				}
+				if c.typeVarMethods[wc.Variable] == nil {
+					c.typeVarMethods[wc.Variable] = make(map[string]*Type)
+				}
+				for _, m := range iface.Methods {
+					methType := c.funcDeclToType(&m)
+					c.typeVarMethods[wc.Variable][m.Name] = methType
+				}
+			}
+		}
 		for j := range cls.Methods {
 			if cls.Methods[j].Body != nil {
 				// Define 'self' in the method's scope
@@ -3259,6 +3293,7 @@ func (c *Checker) checkForgeBlockBodies(block *ast.ForgeBlock) {
 				c.scope = c.scope.parent
 			}
 		}
+		c.typeVarMethods = prevTypeVarMethods
 	}
 }
 
@@ -3336,6 +3371,14 @@ func (c *Checker) registerClass(cls *ast.ClassDecl) {
 	for _, tp := range cls.TypeParams {
 		typeParamNames = append(typeParamNames, tp.Name)
 		typeParamConstraints = append(typeParamConstraints, tp.Constraint)
+	}
+	// Merge where clause constraints into type param constraints
+	for _, wc := range cls.Where {
+		for i, name := range typeParamNames {
+			if name == wc.Variable && typeParamConstraints[i] == "" {
+				typeParamConstraints[i] = wc.Constraint
+			}
+		}
 	}
 
 	if hasExplicitCtor {
@@ -3732,23 +3775,55 @@ func (c *Checker) checkFuncBody(fn *ast.FuncDecl) {
 		c.scope.Define(tp.Name, &Type{Kind: TyVar, Name: tp.Name})
 	}
 
-	// Populate typeVarMethods from relational where clauses
+	// Populate typeVarMethods from where clauses, preserving any inherited ones
+	// (e.g., class-level where clauses set by the caller)
 	prevTypeVarMethods := c.typeVarMethods
-	c.typeVarMethods = nil
-	for _, wc := range fn.Where {
-		if wc.Variable == "" && len(wc.TypeArgs) > 0 {
-			// Bare relational constraint: where Graph<G, N, E>
-			ifaceInfo := c.registry.Lookup(wc.Constraint)
-			if ifaceInfo == nil || ifaceInfo.Type.Kind != TyInterface {
-				continue
+	if len(fn.Where) > 0 {
+		inherited := c.typeVarMethods
+		c.typeVarMethods = nil
+		for _, wc := range fn.Where {
+			if wc.Variable == "" && len(wc.TypeArgs) > 0 {
+				ifaceInfo := c.registry.Lookup(wc.Constraint)
+				if ifaceInfo == nil || ifaceInfo.Type.Kind != TyInterface {
+					continue
+				}
+				c.grantRelationalMethods(wc.Constraint, wc.TypeArgs)
+			} else if wc.Variable != "" {
+				iface := c.ifaceDecls[wc.Constraint]
+				if iface == nil {
+					continue
+				}
+				if c.typeVarMethods == nil {
+					c.typeVarMethods = make(map[string]map[string]*Type)
+				}
+				if c.typeVarMethods[wc.Variable] == nil {
+					c.typeVarMethods[wc.Variable] = make(map[string]*Type)
+				}
+				for _, m := range iface.Methods {
+					methType := c.funcDeclToType(&m)
+					c.typeVarMethods[wc.Variable][m.Name] = methType
+				}
 			}
-			// Look up the interface declaration to find typed methods
-			// Build a type param name → concrete type arg mapping
-			// For now, we just need to know which methods go to which type vars
-			c.grantRelationalMethods(wc.Constraint, wc.TypeArgs)
+		}
+		// Merge inherited type var methods (from class-level where clauses)
+		if inherited != nil {
+			if c.typeVarMethods == nil {
+				c.typeVarMethods = make(map[string]map[string]*Type)
+			}
+			for tv, methods := range inherited {
+				if c.typeVarMethods[tv] == nil {
+					c.typeVarMethods[tv] = make(map[string]*Type)
+				}
+				for name, typ := range methods {
+					if _, exists := c.typeVarMethods[tv][name]; !exists {
+						c.typeVarMethods[tv][name] = typ
+					}
+				}
+			}
 		}
 	}
 	defer func() { c.typeVarMethods = prevTypeVarMethods }()
+
 
 	// Set expected return type
 	prevReturn := c.currentReturn

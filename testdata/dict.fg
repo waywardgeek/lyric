@@ -1,0 +1,50 @@
+forge dict_test {
+  func main() {
+    // Create a Dict<Sym, i32> using constructor syntax
+    let d = Dict<Sym, i32>()
+
+    // Insert values using method syntax
+    d.set(sym("x"), 10)
+    d.set(sym("y"), 20)
+    d.set(sym("z"), 30)
+
+    // Lookup
+    let ex = d.get(sym("x"))
+    if !isnull(ex) {
+      println(itoa(ex!.value))
+    }
+
+    // Has
+    if d.has(sym("y")) {
+      println("has y")
+    }
+    if !d.has(sym("w")) {
+      println("no w")
+    }
+
+    // Keys
+    let keys = d.keys()
+    println(itoa(len(keys)))
+
+    // Remove
+    d.remove(sym("y"))
+    if !d.has(sym("y")) {
+      println("y removed")
+    }
+
+    // String convenience methods
+    let d2 = Dict<Sym, i32>()
+    d2.set_str("hello", 99)
+    if d2.has_str("hello") {
+      println("has hello")
+    }
+
+    // Sym interning - reference equality
+    let a = sym("hello")
+    let b = sym("hello")
+    if a == b {
+      println("sym interning works")
+    }
+    println(a.get_name())
+  }
+}

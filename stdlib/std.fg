@@ -435,76 +435,83 @@ forge std {
     hash_insert<SymTable, Sym>(table, s)
     return s
   }
+  // --- Hashable interface: required for Dict keys ---
 
-  // --- Dict: generic string-keyed hash table ---
+  pub interface Hashable {
+    func get_hash(self) -> u64
+  }
 
-  // DictEntry<V>: key-value pair with Sym key for O(1) hash lookup.
-  pub class DictEntry<V> {
-    key: Sym?
+  // Sym implements Hashable
+  pub func Sym.equals(self, other: Sym) -> bool {
+    return self == other
+  }
+
+  // --- Dict: generic hash table with clean method API ---
+
+  // DictEntry<K, V>: key-value pair stored in a Dict.
+  pub class DictEntry<K, V> where K: Hashable {
+    key: K
     value: V
 
     pub func hash_key(self) -> u64 {
-      return self.key!.get_hash()
+      return self.key.get_hash()
     }
   }
 
-  // Dict<V>: a simple hash table mapping string keys to values of type V.
-  // Built on HashedList. Keys are interned as Sym for fast hashing.
+  // Dict<K, V>: a hash table mapping keys of type K to values of type V.
+  // K must satisfy Hashable (get_hash() -> u64, equals(other) -> bool).
   //
   // Usage:
-  //   let d = dict_new<i32>()
-  //   dict_set<i32>(d, "x", 42)
-  //   let entry = dict_get<i32>(d, "x")
-  //   if !isnull(entry) { print(entry!.value) }
-  pub class Dict<V> { }
-  relation HashedList Dict<V>:d owns [DictEntry<V>:d]
+  //   let d = dict_new<Sym, i32>()
+  //   d.set(sym("x"), 42)
+  //   let entry = d.get(sym("x"))
+  //   if !isnull(entry) { println(itoa(entry!.value)) }
+  pub class Dict<K, V> where K: Hashable { }
+  relation HashedList Dict<K, V>:d owns [DictEntry<K, V>:d]
 
-  // Create a new empty Dict.
-  pub func dict_new<V>() -> Dict<V> {
-    return Dict<V> { }
+  // Core methods
+  pub func Dict.set<K, V>(self, key: K, value: V) where K: Hashable {
+    let entry = DictEntry<K, V> { key: key, value: value }
+    hash_insert<Dict<K, V>, DictEntry<K, V>>(self, entry)
   }
 
-  // Set a key-value pair. Replaces existing entry if key exists.
-  pub func dict_set<V>(d: Dict<V>, key: string, value: V) {
-    let entry = DictEntry<V> { key: sym(key), value: value }
-    hash_insert<Dict<V>, DictEntry<V>>(d, entry)
+  pub func Dict.get<K, V>(self, key: K) -> DictEntry<K, V>? where K: Hashable {
+    let h = key.get_hash()
+    return hash_lookup<Dict<K, V>, DictEntry<K, V>>(self, h)
   }
 
-  // Get entry by key. Returns null if not found.
-  // Access value via entry!.value after null check.
-  pub func dict_get<V>(d: Dict<V>, key: string) -> DictEntry<V>? {
-    let h = hash_string(key)
-    let entry = hash_lookup<Dict<V>, DictEntry<V>>(d, h)
-    if isnull(entry) {
-      return null
+  pub func Dict.has<K, V>(self, key: K) -> bool where K: Hashable {
+    return !isnull(self.get(key))
+  }
+
+  pub func Dict.remove<K, V>(self, key: K) -> bool where K: Hashable {
+    let h = key.get_hash()
+    return hash_remove<Dict<K, V>, DictEntry<K, V>>(self, h)
+  }
+
+  pub func Dict.keys<K, V>(self) -> [K] where K: Hashable {
+    let mut result: [K] = []
+    for entry in self.d_children() {
+      append(result, entry.key)
     }
-    // Verify key matches (hash collision guard)
-    if entry!.key!.get_name() == key {
-      return entry
-    }
-    return null
+    return result
   }
 
-  // Check if key exists.
-  pub func dict_has<V>(d: Dict<V>, key: string) -> bool {
-    return !isnull(dict_get<V>(d, key))
+  // String convenience methods (auto-intern via sym())
+  pub func Dict.set_str<V>(self, key: string, value: V) {
+    self.set(sym(key), value)
   }
 
-  // Remove entry by key. Returns true if found and removed.
-  pub func dict_remove<V>(d: Dict<V>, key: string) -> bool {
-    let h = hash_string(key)
-    return hash_remove<Dict<V>, DictEntry<V>>(d, h)
+  pub func Dict.get_str<V>(self, key: string) -> DictEntry<Sym, V>? {
+    return self.get(sym(key))
   }
 
-  // Return all keys in the dictionary as a list of strings.
-  pub func dict_keys<V>(d: Dict<V>) -> [string] {
-    let mut keys: [string] = []
-    for entry in d.d_children() {
-      if !isnull(entry.key) {
-        append(keys, entry.key!.get_name())
-      }
-    }
-    return keys
+  pub func Dict.has_str<V>(self, key: string) -> bool {
+    return self.has(sym(key))
+  }
+
+  pub func Dict.remove_str<V>(self, key: string) -> bool {
+    return self.remove(sym(key))
   }
 
   // --- Parsing ---
