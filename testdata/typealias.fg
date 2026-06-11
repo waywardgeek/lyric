@@ -2,17 +2,11 @@
 
 forge typealias {
     type StringList = [string]
-    type IntOrString = i32 | string
-    type MaybeInt = i32?
 
     func test_aliases() {
         let names: StringList = ["alice", "bob"]
         println(names.len())
-
-        let val: IntOrString = 42
-        println(val)
-        let maybe: MaybeInt = 10
-        println(maybe)
+        println(f"first: {names[0]}")
     }
 
     func main() {

@@ -1609,9 +1609,81 @@ forge lowerer {
     // Determine if this is an enum match
     if !isnull(val_type) && val_type!.kind is TyTaggedUnion {
       self.lower_enum_match(v, val_type!.name, arms)
+    } else if self.is_union_match(val_type, arms) {
+      self.emit_union_type_switch(v, val_type, arms, "", nil)
     } else {
       // Non-enum match: lower as if-else chain
       self.lower_match_as_if_else(v, val_type, arms, "", nil)
+    }
+  }
+
+  // is_union_match checks if this is a union type match (match on union/any with type patterns).
+  func Lowerer.is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool {
+    if isnull(val_type) {
+      return false
+    }
+    if val_type!.kind is TyUnion || val_type!.kind is TyAny {
+      // Check if any arm has an ident pattern that looks like a type name
+      for arm in arms {
+        if !isnull(arm.pattern) && arm.pattern!.kind is Ident {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  // emit_union_type_switch emits a LStmtTypeSwitch for union type matching.
+  func Lowerer.emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?) {
+    let mut cases: [LTypeSwitchCase] = []
+    for arm in arms {
+      if isnull(arm.pattern) { continue }
+      let saved = self.save_stmts()
+      match arm.pattern!.kind {
+        Wildcard => {
+          if result_name != "" {
+            self.lower_arm_body(arm.body, result_name, result_type)
+          } else {
+            self.lower_block(arm.body)
+          }
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LTypeSwitchCase { typ: nil, binding: "", body: body })
+        }
+        Ident(name) => {
+          let case_type = self.forge_name_to_ltype(name.name)
+          if result_name != "" {
+            self.lower_arm_body(arm.body, result_name, result_type)
+          } else {
+            self.lower_block(arm.body)
+          }
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LTypeSwitchCase { typ: case_type, binding: "", body: body })
+        }
+        _ => {
+          self.restore_stmts(saved)
+        }
+      }
+    }
+    self.emit(LStmt {
+      kind: StTypeSwitch,
+      type_switch: LTypeSwitchData { value: val, cases: cases }
+    })
+  }
+
+  // forge_name_to_ltype converts a Forge type name to an LType (for union patterns).
+  func Lowerer.forge_name_to_ltype(self, name: string) -> LType? {
+    match name {
+      "string" => { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+      "bool" => { return LType { kind: TyBool, name: "", bits: 0, is_exported: false } }
+      "i8" => { return LType { kind: TyI8, name: "", bits: 8, is_exported: false } }
+      "i16" => { return LType { kind: TyI16, name: "", bits: 16, is_exported: false } }
+      "i32" => { return LType { kind: TyI32, name: "", bits: 32, is_exported: false } }
+      "i64" => { return LType { kind: TyI64, name: "", bits: 64, is_exported: false } }
+      "f32" => { return LType { kind: TyF32, name: "", bits: 0, is_exported: false } }
+      "f64" => { return LType { kind: TyF64, name: "", bits: 0, is_exported: false } }
+      _ => { return LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
     }
   }
 
@@ -2988,8 +3060,9 @@ forge lowerer {
         })
       }
 
+    } else if self.is_union_match(val_type, arms) {
+      self.emit_union_type_switch(v, val_type, arms, result_name, rt)
     } else {
-      // Non-enum: if-else chain with result assignment
       self.lower_match_as_if_else(v, val_type, arms, result_name, rt)
     }
 
