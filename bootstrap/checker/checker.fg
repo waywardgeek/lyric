@@ -3045,9 +3045,10 @@ forge checker {
     if name == "array_append" || name == "array_remove" || name == "dll_append" || name == "dll_remove" {
       return make_void_type()
     }
-    if name == "hash_init" || name == "hash_insert" || name == "hash_remove" || name == "hash_rehash" {
+    if name == "hash_init" || name == "hash_insert" || name == "hash_rehash" {
       return make_void_type()
     }
+    // hash_remove returns bool — let it fall through to scope lookup
     if name == "hash_find_slot" { return make_int_type(32) }
     // hash_lookup is handled via scope lookup with generic substitution
     // (NOT as a builtin — its return type depends on type params, not arg types)

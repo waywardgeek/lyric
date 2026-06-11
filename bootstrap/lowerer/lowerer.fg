@@ -932,7 +932,17 @@ forge lowerer {
 
     // Add self param for methods
     if receiver != "" {
-      let self_type = LType { kind: TyClassHandle, name: receiver, bits: 0, is_exported: false }
+      // Build type_args from class type params (matching Go lowerer behavior)
+      let mut self_type_args: [LType?] = []
+      let cls_entry = self.classes!.get(sym(receiver))
+      if !isnull(cls_entry) {
+        for tp in cls_entry!.value.ctp_children() {
+          if !isnull(tp.name) {
+            append(self_type_args, LType { kind: TyTypeVar, name: tp.name!.name, bits: 0, is_exported: false })
+          }
+        }
+      }
+      let self_type = LType { kind: TyClassHandle, name: receiver, type_args: self_type_args, bits: 0, is_exported: false }
       append(params, LParam { name: "self", typ: self_type, mutable: false })
       self.define_var("self", self_type)
     }
