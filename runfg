@@ -22,7 +22,7 @@ if ! ./bforge co -o ${NAME}.c $1; then
 	exit 1
 fi
 
-if ! gcc -I ./runtime ${NAME}.c -o ${NAME}; then
+if ! gcc -Wno-switch-enum -I ./runtime ${NAME}.c -o ${NAME}; then
 	"gcc failed"
 	exit 1
 fi

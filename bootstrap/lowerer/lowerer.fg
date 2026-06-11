@@ -1707,14 +1707,53 @@ forge lowerer {
 
     match arm.pattern!.kind {
       Wildcard => {
-        // Default case: just emit body
-        self.lower_arm_body(arm.body, result_name, result_type)
+        if !isnull(arm.guard) {
+          // Guarded wildcard: _ if cond => { ... }
+          let guard_val = self.lower_expr(arm.guard)
+          let saved_then = self.save_stmts()
+          self.lower_arm_body(arm.body, result_name, result_type)
+          let then_body = self.stmts
+          self.restore_stmts(saved_then)
+
+          let saved_else = self.save_stmts()
+          self.lower_match_as_if_else(val, val_type, rest, result_name, result_type)
+          let else_body = self.stmts
+          self.restore_stmts(saved_else)
+
+          self.emit(LStmt {
+            kind: StIf,
+            if_data: LIfData { cond: guard_val, then_body: then_body, else_body: else_body }
+          })
+        } else {
+          // Default case: just emit body
+          self.lower_arm_body(arm.body, result_name, result_type)
+        }
       }
       Ident(name) => {
         // Binding: bind and emit body
         self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val_type, init: val, mutable: false } })
         self.define_var(name.name, val_type)
-        self.lower_arm_body(arm.body, result_name, result_type)
+
+        if !isnull(arm.guard) {
+          // Guarded binding: x if x < 0 => { ... }
+          let guard_val = self.lower_expr(arm.guard)
+          let saved_then = self.save_stmts()
+          self.lower_arm_body(arm.body, result_name, result_type)
+          let then_body = self.stmts
+          self.restore_stmts(saved_then)
+
+          let saved_else = self.save_stmts()
+          self.lower_match_as_if_else(val, val_type, rest, result_name, result_type)
+          let else_body = self.stmts
+          self.restore_stmts(saved_else)
+
+          self.emit(LStmt {
+            kind: StIf,
+            if_data: LIfData { cond: guard_val, then_body: then_body, else_body: else_body }
+          })
+        } else {
+          self.lower_arm_body(arm.body, result_name, result_type)
+        }
       }
       Literal(expr) => {
         let pat_val = self.lower_expr(expr)
