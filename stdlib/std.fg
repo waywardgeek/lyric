@@ -397,17 +397,43 @@ forge std {
 
   // Sym: an interned symbol with pre-computed hash.
   // Hash is computed once at creation; all subsequent lookups use the u64.
+  // Reference equality — sym("foo") == sym("foo") is always true.
   pub class Sym {
     name: string
     hash: u64
 
     pub func get_name(self) -> string { return self.name }
     pub func get_hash(self) -> u64 { return self.hash }
+    pub func hash_key(self) -> u64 { return self.hash }
   }
 
-  // sym: create a Sym from a string, computing its FNV-1a hash once.
-  func sym(name: string) -> Sym {
-    return Sym { name: name, hash: hash_string(name) }
+  // SymTable: global intern table for Sym instances.
+  // Uses HashedList for O(1) lookup by hash.
+  pub class SymTable { }
+  relation HashedList SymTable:st owns [Sym:st]
+
+  // Global symbol table instance.
+  let mut _sym_table: SymTable? = null
+
+  func _get_sym_table() -> SymTable {
+    if isnull(_sym_table) {
+      _sym_table = SymTable { }
+    }
+    return _sym_table!
+  }
+
+  // sym: intern a string as a Sym. Returns the same instance for the same string.
+  // Hash computed once; subsequent calls with same string return cached Sym.
+  pub func sym(name: string) -> Sym {
+    let h = hash_string(name)
+    let table = _get_sym_table()
+    let existing = hash_lookup<SymTable, Sym>(table, h)
+    if !isnull(existing) {
+      return existing!
+    }
+    let s = Sym { name: name, hash: h }
+    hash_insert<SymTable, Sym>(table, s)
+    return s
   }
 
   // --- Dict: generic string-keyed hash table ---
