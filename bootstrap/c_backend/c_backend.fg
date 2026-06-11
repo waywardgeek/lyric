@@ -2005,7 +2005,12 @@ func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string {
       sb.write(", ")
     }
     let fname = if is_class { lc_first(d.fields[i].name) } else { d.fields[i].name }
-    sb.write(f".{fname} = {self.emit_value(d.fields[i].value)}")
+    if fname == "" {
+      // Positional field — no designator
+      sb.write(self.emit_value(d.fields[i].value))
+    } else {
+      sb.write(f".{fname} = {self.emit_value(d.fields[i].value)}")
+    }
     i = i + 1
   }
   if is_class {

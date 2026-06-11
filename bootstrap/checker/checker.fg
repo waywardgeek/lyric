@@ -2708,6 +2708,19 @@ forge checker {
     let info = self.registry.lookup(name_str)
 
     if info != nil {
+      // Resolve positional fields to named fields using field_order
+      let mut pos_idx = 0
+      for f in fields {
+        if f.name == null || sym_to_string(f.name!) == "" {
+          if pos_idx < len(info!.field_order) {
+            f.name = sym(info!.field_order[pos_idx])
+            pos_idx = pos_idx + 1
+          }
+        } else {
+          // Named field encountered; stop positional tracking
+          pos_idx = len(info!.field_order)
+        }
+      }
       // Check field values, propagating expected types for empty literals
       for f in fields {
         if f.value != nil {
@@ -3031,6 +3044,17 @@ forge checker {
     if name == "file_exists" { return make_bool_type() }
     if name == "mkdtemp" { return make_string_type() }
     if name == "os_getwd" { return make_string_type() }
+    if name == "path_base" { return make_string_type() }
+    if name == "path_dir" { return make_string_type() }
+    if name == "path_join" { return make_string_type() }
+    if name == "path_ext" { return make_string_type() }
+    if name == "exec_command" {
+      let fields: [TupleFieldType] = [
+        TupleFieldType { name: "", type_val: make_string_type() },
+        TupleFieldType { name: "", type_val: make_bool_type() }
+      ]
+      return Type { kind: Tuple(fields), bits: 0, type_args: [] }
+    }
 
     // String builtins
     if name == "str_contains" || name == "str_starts_with" || name == "str_ends_with" {
@@ -3828,28 +3852,8 @@ forge checker {
     }
     // Note: we do NOT reject 'any' here — it's a legitimate type.
     // The Go checker only rejects nil resolved_type, not any.
-    // Detect Sequence(Unit) — empty [] that wasn't propagated to correct element type
-    match expr.resolved_type!.kind {
-      Sequence(elem) => {
-        match elem.kind {
-          Unit => {
-            eprintln(f"checker: validateAllExprsResolved: Sequence(Unit) [empty slice with no inferred type] in {ctx} at {expr.span.start.file}:{itoa(expr.span.start.line as i64)}:{itoa(expr.span.start.column as i64)}")
-            os_exit(1)
-          }
-          _ => {}
-        }
-      }
-      Map(key_type, _) => {
-        match key_type.kind {
-          Unit => {
-            eprintln(f"checker: validateAllExprsResolved: Map(Unit,...) [empty map with no inferred type] in {ctx} at {expr.span.start.file}:{itoa(expr.span.start.line as i64)}:{itoa(expr.span.start.column as i64)}")
-            os_exit(1)
-          }
-          _ => {}
-        }
-      }
-      _ => {}
-    }
+    // Note: Go checker does NOT reject Sequence(Unit) or Map(Unit,...) — they produce
+    // valid void* slices/maps in C. Removed strict checks to match Go behavior.
     // Detect TypeVar leaks — type variables should be fully resolved in non-generic functions
     if self.type_expr_has_typevar(expr.resolved_type!) {
       let leaked = self.find_typevar_name(expr.resolved_type!)

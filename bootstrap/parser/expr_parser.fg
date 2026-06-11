@@ -175,7 +175,7 @@ forge parser {
             }
             PLBrace => {
               // Qualified struct literal: pkg.Type{} — only if expr is ident
-              if is_ident_kind(expr!.kind) && self.is_struct_lit_ahead() {
+              if is_ident_kind(expr!.kind) && (self.is_struct_lit_ahead() || self.expr_depth > 0) {
                 let ident_name = match expr!.kind { Ident(n) => { n } _ => { sym("") } }
                 let qual_name = sym(ident_name.get_name() + "." + name!.text)
                 expr = self.parse_struct_lit(qual_name, [], expr!.span.start)?
@@ -205,7 +205,7 @@ forge parser {
               kind: Call(expr!, type_args!, args!.elems, args!.mut_args),
               span: Span { start: expr!.span.start, end: args!.end_pos }
             }
-          } else if type_args != null && self.peek().kind == PLBrace && is_ident_kind(expr!.kind) && self.is_struct_lit_ahead() {
+          } else if type_args != null && self.peek().kind == PLBrace && is_ident_kind(expr!.kind) && (self.is_struct_lit_ahead() || self.expr_depth > 0) {
             // Generic struct literal: TypeName<T> { ... }
             let ident_name = match expr!.kind { Ident(n) => { n } _ => { sym("") } }
             expr = self.parse_struct_lit(ident_name, type_args!, expr!.span.start)?
@@ -309,6 +309,7 @@ forge parser {
   }
 
   func Parser.parse_arg_list(self) -> (ArgListResult?, error) {
+    self.expr_depth = self.expr_depth + 1
     let mut args: [Expr] = []
     let mut mut_flags: [bool] = []
     let mut has_mut: bool = false
@@ -333,6 +334,7 @@ forge parser {
     if has_mut {
       result_mut_args = mut_flags
     }
+    self.expr_depth = self.expr_depth - 1
     return (ArgListResult { args, result_mut_args, end!.span.end }, null)
   }
 
@@ -392,7 +394,7 @@ forge parser {
         self.next()
         let name = tok.text
         // Check for struct literal: TypeName { field: value }
-        if self.peek().kind == PLBrace && self.is_struct_lit_ahead() {
+        if self.peek().kind == PLBrace && (self.is_struct_lit_ahead() || self.expr_depth > 0) {
           return self.parse_struct_lit(sym(name), [], tok.span.start)
         }
         // Check for map literal: map[K]V { ... }
@@ -412,8 +414,10 @@ forge parser {
         }
         // Parenthesized expr or tuple literal
         self.next()
+        self.expr_depth = self.expr_depth + 1
         if self.peek().kind == PRParen {
           let end = self.next()
+          self.expr_depth = self.expr_depth - 1
           return (Expr { TupleLit([]), span: Span { start: tok.span.start, end: end.span.end } }, null)
         }
         let first = self.parse_expr()?
@@ -427,15 +431,18 @@ forge parser {
             elems = append(elems, elem!)
           }
           let end = self.expect(PRParen)?
+          self.expr_depth = self.expr_depth - 1
           return (Expr { TupleLit(elems), span: Span { start: tok.span.start, end: end!.span.end } }, null)
         }
         // Parenthesized expression
         self.expect(PRParen)?
+        self.expr_depth = self.expr_depth - 1
         return (first, null)
       }
       PLBracket => {
         // List literal: [1, 2, 3]
         self.next()
+        self.expr_depth = self.expr_depth + 1
         let mut elems: [Expr] = []
         while self.peek().kind != PRBracket && self.peek().kind != SEOF {
           self.skip_newlines()
@@ -447,6 +454,7 @@ forge parser {
           self.skip_newlines()
         }
         let end = self.expect(PRBracket)?
+        self.expr_depth = self.expr_depth - 1
         return (Expr { ListLit(elems), span: Span { start: tok.span.start, end: end!.span.end } }, null)
       }
       KMatch => {
@@ -1244,10 +1252,28 @@ forge parser {
     let mut fields: [StructLitField] = []
     self.skip_newlines()
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      let field_name = self.expect_ident()?
-      self.expect(PColon)?
+      // Try named field: ident ':'
+      if self.peek().kind == LIdent {
+        let saved = self.lex!.save_state()
+        let pushed_saved = self.pushed
+        let field_name = self.next()
+        if self.peek().kind == PColon {
+          self.next()  // consume :
+          let val = self.parse_expr()?
+          fields = append(fields, StructLitField { sym(field_name.text), value: val })
+          if self.peek().kind == PComma {
+            self.next()
+          }
+          self.skip_newlines()
+          continue
+        }
+        // Not a named field — restore and parse as positional
+        self.lex!.restore_state(saved)
+        self.pushed = pushed_saved
+      }
+      // Positional field
       let val = self.parse_expr()?
-      fields = append(fields, StructLitField { sym(field_name!.text), value: val })
+      fields = append(fields, StructLitField { name: sym(""), value: val })
       if self.peek().kind == PComma {
         self.next()
       }

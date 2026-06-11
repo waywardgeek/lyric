@@ -14,6 +14,7 @@ forge parser {
     lex: Lexer?
     no_struct_lit: bool
     pushed: Token?
+    expr_depth: i32
   }
 
   func new_parser(src_text: string, filename: string) -> Parser {

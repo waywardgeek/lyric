@@ -2051,7 +2051,12 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 			if isClass {
 				fname = lcFirst(fname)
 			}
-			fieldInits = append(fieldInits, fmt.Sprintf(".%s = %s", fname, g.emitValue(&f.Value)))
+			if fname == "" {
+				// Positional field — no designator
+				fieldInits = append(fieldInits, g.emitValue(&f.Value))
+			} else {
+				fieldInits = append(fieldInits, fmt.Sprintf(".%s = %s", fname, g.emitValue(&f.Value)))
+			}
 		}
 		// Class handles are heap-allocated — use malloc pattern
 		if isClass {
