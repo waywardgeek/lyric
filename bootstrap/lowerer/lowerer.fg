@@ -1192,18 +1192,42 @@ forge lowerer {
         self.emit(LStmt { kind: StAssign, assign: LAssignData { target: name.name, value: rhs } })
       }
       FieldAccess(receiver, field_name) => {
-        let recv = self.lower_expr(receiver)
-        let recv_type = self.expr_type(receiver)
-        if recv_type!.kind is TyClassHandle {
-          self.emit(LStmt {
-            kind: StClassSet,
-            class_set: LClassSetData { handle: recv, class_name: recv_type!.name, field: field_name.name, value: rhs }
-          })
-        } else {
-          self.emit(LStmt {
-            kind: StStructSet,
-            struct_set: LStructSetData { receiver: recv, field: field_name.name, value: rhs }
-          })
+        // Check for slice[i].field = val pattern — must emit lvalue chain, not copy-then-modify
+        match receiver!.kind {
+          Index(idx_recv, idx_index) => {
+            let recv_type = self.expr_type(receiver)
+            if !isnull(recv_type) && recv_type!.kind is TyClassHandle {
+              // Class element — pointer dereference, normal ClassSet works
+              let recv = self.lower_expr(receiver)
+              self.emit(LStmt {
+                kind: StClassSet,
+                class_set: LClassSetData { handle: recv, class_name: recv_type!.name, field: field_name.name, value: rhs }
+              })
+            } else {
+              // Struct element — slice[i].field = val needs LStmtIndexSet with field
+              let coll = self.lower_expr(idx_recv)
+              let idx = self.lower_expr(idx_index)
+              self.emit(LStmt {
+                kind: StIndexSet,
+                index_set: LIndexSetData { collection: coll, index: idx, value: rhs, field: field_name.name }
+              })
+            }
+          }
+          _ => {
+            let recv = self.lower_expr(receiver)
+            let recv_type = self.expr_type(receiver)
+            if recv_type!.kind is TyClassHandle {
+              self.emit(LStmt {
+                kind: StClassSet,
+                class_set: LClassSetData { handle: recv, class_name: recv_type!.name, field: field_name.name, value: rhs }
+              })
+            } else {
+              self.emit(LStmt {
+                kind: StStructSet,
+                struct_set: LStructSetData { receiver: recv, field: field_name.name, value: rhs }
+              })
+            }
+          }
         }
       }
       Index(receiver, index) => {
@@ -1211,7 +1235,7 @@ forge lowerer {
         let idx = self.lower_expr(index)
         self.emit(LStmt {
           kind: StIndexSet,
-          index_set: LIndexSetData { collection: recv, index: idx, value: rhs }
+          index_set: LIndexSetData { collection: recv, index: idx, value: rhs, field: "" }
         })
       }
       _ => {
@@ -2947,7 +2971,7 @@ forge lowerer {
       let vv = self.lower_expr(values[i])
       self.emit(LStmt {
         kind: StIndexSet,
-        index_set: LIndexSetData { collection: map_val, index: kv, value: vv }
+        index_set: LIndexSetData { collection: map_val, index: kv, value: vv, field: "" }
       })
       i = i + 1
     }

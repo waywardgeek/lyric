@@ -1952,6 +1952,10 @@ func (c *Checker) checkUnwrap(expr *ast.Expr) *Type {
 	if operandType.Kind == TyOptional {
 		return operandType.Elem
 	}
+	// Class handles are nullable pointers — unwrap is valid (runtime nil check)
+	if operandType.Kind == TyClass {
+		return operandType
+	}
 	if operandType.Kind != TyError {
 		c.error(expr.Span, "cannot unwrap non-optional type %s", operandType)
 	}

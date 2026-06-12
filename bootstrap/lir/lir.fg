@@ -435,6 +435,7 @@ forge lir {
     collection: LValue?
     index: LValue?
     value: LValue?
+    field: string  // optional: for slice[i].field = value (struct element field write)
   }
 
   struct LIfData {

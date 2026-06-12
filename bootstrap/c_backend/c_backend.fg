@@ -2466,7 +2466,12 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StIndexSet => {
       let d = s!.index_set!
-      self.line(f"{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}] = {self.emit_value(d.value)};")
+      if d.field != "" {
+        // slice[i].field = val → direct lvalue chain
+        self.line(f"{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}].{d.field} = {self.emit_value(d.value)};")
+      } else {
+        self.line(f"{self.emit_value(d.collection)}.data[{self.emit_value(d.index)}] = {self.emit_value(d.value)};")
+      }
     }
     StReturn => {
       self.emit_return_stmt(s!)

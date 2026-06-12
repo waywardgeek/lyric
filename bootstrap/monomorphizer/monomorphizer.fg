@@ -1789,7 +1789,7 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         }
         return LStmt {
           kind: StIndexSet,
-          index_set: LIndexSetData { collection: c, index: idx, value: v },
+          index_set: LIndexSetData { collection: c, index: idx, value: v, field: s.index_set!.field },
           temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
           class_set: nil, if_data: nil, while_data: nil, for_data: nil,
           switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
