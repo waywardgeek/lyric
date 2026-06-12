@@ -17,7 +17,7 @@ if ! gcc -o bforge bforge.c -I runtime; then
 	exit 1
 fi
 
-if ! ./borge co -o cforge.c `find bootstrap -name '*.fg'`; then
+if ! ./bforge co -o cforge.c `find bootstrap -name '*.fg'`; then
 	echo "Could not build bootstrap2 compiler"
 	exit 1
 fi

@@ -2827,7 +2827,6 @@ forge lowerer {
     if name == "new_dict" { return true }
     if name == "new_string_builder" { return true }
     if name == "str_contains" { return true }
-    if name == "str_split" { return true }
     if name == "str_trim" { return true }
     if name == "str_replace" { return true }
     if name == "str_index_of" { return true }
