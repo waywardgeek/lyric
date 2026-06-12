@@ -43,7 +43,4 @@ forge short_circuit {
     assert_eq(result, "false", "5!=0 and 10/5=2 not > 2")
   }
 
-  func main() {
-    println("short circuit tests")
-  }
 }

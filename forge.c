@@ -410,7 +410,8 @@ typedef enum {
     LValueKind_ValLitString = 6,
     LValueKind_ValLitBool = 7,
     LValueKind_ValLitNull = 8,
-    LValueKind_ValIndexRef = 9
+    LValueKind_ValIndexRef = 9,
+    LValueKind_ValClassFieldRef = 10
 } LValueKind;
 
 typedef enum {
@@ -3266,6 +3267,7 @@ static forge_string LValueKind_to_string(LValueKind v) {
         case LValueKind_ValLitBool: return FORGE_STR("ValLitBool");
         case LValueKind_ValLitNull: return FORGE_STR("ValLitNull");
         case LValueKind_ValIndexRef: return FORGE_STR("ValIndexRef");
+        case LValueKind_ValClassFieldRef: return FORGE_STR("ValClassFieldRef");
         default: return FORGE_STR("<unknown LValueKind>");
     }
 }
@@ -45892,208 +45894,293 @@ LValue* Lowerer_lower_method_call(Lowerer* self, Expr* orig, Expr* receiver, Sym
             _sc85 = _t87;
         }
         if (_sc85) {
-            ForgeSlice_LValueptr _t88 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
-            ForgeSlice_LValueptr bargs = _t88;
+            bool _t88 = forge_str_eq(method_name, FORGE_STR("push"));
+            bool _sc89 = false;
+            _sc89 = _t88;
+            bool _t90 = (!_sc89);
+            if (_t90) {
+                bool _t91 = forge_str_eq(method_name, FORGE_STR("append"));
+                _sc89 = _t91;
+            }
+            bool _sc92 = false;
+            _sc92 = _sc89;
+            bool _t93 = (!_sc92);
+            if (_t93) {
+                bool _t94 = forge_str_eq(method_name, FORGE_STR("pop"));
+                _sc92 = _t94;
+            }
+            bool _sc95 = false;
+            _sc95 = _sc92;
+            bool _t96 = (!_sc95);
+            if (_t96) {
+                bool _t97 = forge_str_eq(method_name, FORGE_STR("clear"));
+                _sc95 = _t97;
+            }
+            bool _sc98 = false;
+            _sc98 = _sc95;
+            bool _t99 = (!_sc98);
+            if (_t99) {
+                bool _t100 = forge_str_eq(method_name, FORGE_STR("reverse"));
+                _sc98 = _t100;
+            }
+            bool is_mutating = _sc98;
+            LValue* slice_val = recv;
+            bool _sc101 = false;
+            _sc101 = is_mutating;
+            if (_sc101) {
+                bool _t102 = (receiver == NULL);
+                bool _t103 = (!_t102);
+                _sc101 = _t103;
+            }
+            bool _sc104 = false;
+            _sc104 = _sc101;
+            if (_sc104) {
+                Expr* _t105 = receiver;
+                ExprKind _t106 = _t105->kind;
+                int32_t _t107 = _t106.tag;
+                bool _t108 = (_t107 == 9);
+                _sc104 = _t108;
+            }
+            if (_sc104) {
+                Expr* _t109 = receiver;
+                ExprKind _t110 = _t109->kind;
+                int32_t _t111 = _t110.tag;
+                switch (_t111) {
+                case 9: {
+                    Expr* _t112 = _t110.data.fieldaccess.receiver;
+                    Expr* field_recv = _t112;
+                    Sym* _t113 = _t110.data.fieldaccess.field_name;
+                    Sym* field_name = _t113;
+                    LType* _t114 = Lowerer_expr_type(self, field_recv);
+                    LType* field_recv_type = _t114;
+                    bool _t115 = (field_recv_type == NULL);
+                    bool _t116 = (!_t115);
+                    bool _sc117 = false;
+                    _sc117 = _t116;
+                    if (_sc117) {
+                        LType* _t118 = field_recv_type;
+                        LTypeKind _t119 = _t118->kind;
+                        int32_t _t120 = _t119;
+                        bool _t121 = (_t120 == 17);
+                        _sc117 = _t121;
+                    }
+                    if (_sc117) {
+                        LValue* _t122 = Lowerer_lower_expr(self, field_recv);
+                        LValue* field_recv_val = _t122;
+                        LValueKind _t123 = LValueKind_ValClassFieldRef;
+                        forge_string _t124 = field_name->name;
+                        LValue* _t125 = ({ LValue* _p = malloc(sizeof(LValue)); *_p = (LValue){.kind = _t123, .name = _t124, .typ = recv_type, .collection = field_recv_val}; _p; });
+                        slice_val = _t125;
+                    }
+                    break;
+                }
+                default: {
+                    break;
+                }
+                }
+            }
+            ForgeSlice_LValueptr _t126 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, slice_val);
+            ForgeSlice_LValueptr bargs = _t126;
             for (int32_t _idx = 0; _idx < args.len; _idx++) {
                 Expr* a = args.data[_idx];
-                LValue* _t89 = Lowerer_lower_expr(self, a);
-                ForgeSlice_LValueptr _t90 = ({ forge_push(&bargs, _t89, ForgeSlice_LValueptr); bargs; });
-                _t90;
+                LValue* _t127 = Lowerer_lower_expr(self, a);
+                ForgeSlice_LValueptr _t128 = ({ forge_push(&bargs, _t127, ForgeSlice_LValueptr); bargs; });
+                _t128;
             }
-            LType* _t91 = Lowerer_expr_type(self, orig);
-            LType* rt = _t91;
-            LExprKind _t92 = LExprKind_ExBuiltin;
-            forge_string _t93 = forge_str_concat(FORGE_STR("slice_"), method_name);
-            LBuiltinData _t94 = (LBuiltinData){.name = _t93, .args = bargs};
-            LExpr* _t95 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t92, .typ = rt, .builtin = forge_some(_t94, ForgeOpt_LBuiltinData)}; _p; });
-            LExpr* builtin = _t95;
-            LValue* _t96 = Lowerer_emit_temp(self, builtin);
-            return _t96;
+            LType* _t129 = Lowerer_expr_type(self, orig);
+            LType* rt = _t129;
+            LExprKind _t130 = LExprKind_ExBuiltin;
+            forge_string _t131 = forge_str_concat(FORGE_STR("slice_"), method_name);
+            LBuiltinData _t132 = (LBuiltinData){.name = _t131, .args = bargs};
+            LExpr* _t133 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t130, .typ = rt, .builtin = forge_some(_t132, ForgeOpt_LBuiltinData)}; _p; });
+            LExpr* builtin = _t133;
+            LValue* _t134 = Lowerer_emit_temp(self, builtin);
+            return _t134;
         }
     }
-    bool _t97 = (recv_type == NULL);
-    bool _t98 = (!_t97);
-    bool _sc99 = false;
-    _sc99 = _t98;
-    if (_sc99) {
-        LType* _t100 = recv_type;
-        LTypeKind _t101 = _t100->kind;
-        int32_t _t102 = _t101;
-        bool _t103 = (_t102 == 20);
-        _sc99 = _t103;
+    bool _t135 = (recv_type == NULL);
+    bool _t136 = (!_t135);
+    bool _sc137 = false;
+    _sc137 = _t136;
+    if (_sc137) {
+        LType* _t138 = recv_type;
+        LTypeKind _t139 = _t138->kind;
+        int32_t _t140 = _t139;
+        bool _t141 = (_t140 == 20);
+        _sc137 = _t141;
     }
-    if (_sc99) {
-        bool _t104 = is_map_method(method_name);
-        if (_t104) {
-            ForgeSlice_LValueptr _t105 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
-            ForgeSlice_LValueptr bargs = _t105;
+    if (_sc137) {
+        bool _t142 = is_map_method(method_name);
+        if (_t142) {
+            ForgeSlice_LValueptr _t143 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
+            ForgeSlice_LValueptr bargs = _t143;
             for (int32_t _idx = 0; _idx < args.len; _idx++) {
                 Expr* a = args.data[_idx];
-                LValue* _t106 = Lowerer_lower_expr(self, a);
-                ForgeSlice_LValueptr _t107 = ({ forge_push(&bargs, _t106, ForgeSlice_LValueptr); bargs; });
-                _t107;
+                LValue* _t144 = Lowerer_lower_expr(self, a);
+                ForgeSlice_LValueptr _t145 = ({ forge_push(&bargs, _t144, ForgeSlice_LValueptr); bargs; });
+                _t145;
             }
-            LType* _t108 = Lowerer_expr_type(self, orig);
-            LType* rt = _t108;
-            LExprKind _t109 = LExprKind_ExBuiltin;
-            forge_string _t110 = forge_str_concat(FORGE_STR("map_"), method_name);
-            LBuiltinData _t111 = (LBuiltinData){.name = _t110, .args = bargs};
-            LExpr* _t112 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t109, .typ = rt, .builtin = forge_some(_t111, ForgeOpt_LBuiltinData)}; _p; });
-            LExpr* builtin = _t112;
-            LValue* _t113 = Lowerer_emit_temp(self, builtin);
-            return _t113;
+            LType* _t146 = Lowerer_expr_type(self, orig);
+            LType* rt = _t146;
+            LExprKind _t147 = LExprKind_ExBuiltin;
+            forge_string _t148 = forge_str_concat(FORGE_STR("map_"), method_name);
+            LBuiltinData _t149 = (LBuiltinData){.name = _t148, .args = bargs};
+            LExpr* _t150 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t147, .typ = rt, .builtin = forge_some(_t149, ForgeOpt_LBuiltinData)}; _p; });
+            LExpr* builtin = _t150;
+            LValue* _t151 = Lowerer_emit_temp(self, builtin);
+            return _t151;
         }
     }
-    bool _t114 = (recv_type == NULL);
-    bool _t115 = (!_t114);
-    bool _sc116 = false;
-    _sc116 = _t115;
-    if (_sc116) {
-        LType* _t117 = recv_type;
-        LTypeKind _t118 = _t117->kind;
-        int32_t _t119 = _t118;
-        bool _t120 = (_t119 == 21);
-        _sc116 = _t120;
-    }
-    if (_sc116) {
-        bool _t121 = forge_str_eq(method_name, FORGE_STR("send"));
-        if (_t121) {
-            Expr* _t122 = args.data[0];
-            LValue* _t123 = Lowerer_lower_expr(self, _t122);
-            LValue* val = _t123;
-            LStmtKind _t124 = LStmtKind_StSend;
-            LSendData _t125 = (LSendData){.channel = recv, .value = val};
-            LStmt* _t126 = ({ LStmt* _p = malloc(sizeof(LStmt)); *_p = (LStmt){.kind = _t124, .send_data = forge_some(_t125, ForgeOpt_LSendData)}; _p; });
-            Lowerer_emit(self, _t126);
-            LValueKind _t128 = LValueKind_ValLitNull;
-            LTypeKind _t129 = LTypeKind_TyUnit;
-            LType* _t130 = ({ LType* _p = malloc(sizeof(LType)); *_p = (LType){.kind = _t129, .name = FORGE_STR(""), .bits = 0, .is_exported = false}; _p; });
-            LValue* _t131 = ({ LValue* _p = malloc(sizeof(LValue)); *_p = (LValue){.kind = _t128, .name = FORGE_STR(""), .int_val = 0, .uint_val = 0, .float_val = 0, .str_val = FORGE_STR(""), .temp_id = 0, .bool_val = false, .typ = _t130}; _p; });
-            return _t131;
-        }
-        bool _t132 = forge_str_eq(method_name, FORGE_STR("receive"));
-        if (_t132) {
-            LType* _t133 = Lowerer_expr_type(self, orig);
-            LType* rt = _t133;
-            LExprKind _t134 = LExprKind_ExBuiltin;
-            ForgeSlice_LValueptr _t135 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
-            LBuiltinData _t136 = (LBuiltinData){.name = FORGE_STR("channel_receive"), .args = _t135};
-            LExpr* _t137 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t134, .typ = rt, .builtin = forge_some(_t136, ForgeOpt_LBuiltinData)}; _p; });
-            LExpr* builtin = _t137;
-            LValue* _t138 = Lowerer_emit_temp(self, builtin);
-            return _t138;
-        }
-        bool _t139 = forge_str_eq(method_name, FORGE_STR("close"));
-        if (_t139) {
-            LType* _t140 = Lowerer_expr_type(self, orig);
-            LType* rt = _t140;
-            LExprKind _t141 = LExprKind_ExBuiltin;
-            ForgeSlice_LValueptr _t142 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
-            LBuiltinData _t143 = (LBuiltinData){.name = FORGE_STR("channel_close"), .args = _t142};
-            LExpr* _t144 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t141, .typ = rt, .builtin = forge_some(_t143, ForgeOpt_LBuiltinData)}; _p; });
-            LExpr* builtin = _t144;
-            LValue* _t145 = Lowerer_emit_temp(self, builtin);
-            return _t145;
-        }
-    }
-    ForgeSlice_LValueptr _t146 = forge_slice_empty(ForgeSlice_LValueptr);
-    ForgeSlice_LValueptr call_args = _t146;
-    for (int32_t _idx = 0; _idx < args.len; _idx++) {
-        Expr* a = args.data[_idx];
-        LValue* _t147 = Lowerer_lower_expr(self, a);
-        ForgeSlice_LValueptr _t148 = ({ forge_push(&call_args, _t147, ForgeSlice_LValueptr); call_args; });
-        _t148;
-    }
-    ForgeSlice_LTypeptr _t149 = forge_slice_empty(ForgeSlice_LTypeptr);
-    ForgeSlice_LTypeptr lta = _t149;
-    for (int32_t _idx = 0; _idx < type_args.len; _idx++) {
-        TypeExpr* ta = type_args.data[_idx];
-        LType* _t150 = Lowerer_lower_type(self, ta);
-        ForgeSlice_LTypeptr _t151 = ({ forge_push(&lta, _t150, ForgeSlice_LTypeptr); lta; });
-        _t151;
-    }
-    int32_t _t152 = lta.len;
-    bool _t153 = (_t152 == 0);
+    bool _t152 = (recv_type == NULL);
+    bool _t153 = (!_t152);
     bool _sc154 = false;
     _sc154 = _t153;
     if (_sc154) {
-        bool _t155 = (orig == NULL);
-        bool _t156 = (!_t155);
-        _sc154 = _t156;
+        LType* _t155 = recv_type;
+        LTypeKind _t156 = _t155->kind;
+        int32_t _t157 = _t156;
+        bool _t158 = (_t157 == 21);
+        _sc154 = _t158;
     }
-    bool _sc157 = false;
-    _sc157 = _sc154;
-    if (_sc157) {
-        Expr* _t158 = orig;
-        ForgeSlice_TypeExprptr _t159 = _t158->inferred_type_args;
-        int32_t _t160 = _t159.len;
-        bool _t161 = (_t160 > 0);
-        _sc157 = _t161;
-    }
-    if (_sc157) {
-        Expr* _t162 = orig;
-        ForgeSlice_TypeExprptr _t163 = _t162->inferred_type_args;
-        for (int32_t _idx = 0; _idx < _t163.len; _idx++) {
-            TypeExpr* ta = _t163.data[_idx];
-            LType* _t164 = Lowerer_lower_type(self, ta);
-            ForgeSlice_LTypeptr _t165 = ({ forge_push(&lta, _t164, ForgeSlice_LTypeptr); lta; });
-            _t165;
+    if (_sc154) {
+        bool _t159 = forge_str_eq(method_name, FORGE_STR("send"));
+        if (_t159) {
+            Expr* _t160 = args.data[0];
+            LValue* _t161 = Lowerer_lower_expr(self, _t160);
+            LValue* val = _t161;
+            LStmtKind _t162 = LStmtKind_StSend;
+            LSendData _t163 = (LSendData){.channel = recv, .value = val};
+            LStmt* _t164 = ({ LStmt* _p = malloc(sizeof(LStmt)); *_p = (LStmt){.kind = _t162, .send_data = forge_some(_t163, ForgeOpt_LSendData)}; _p; });
+            Lowerer_emit(self, _t164);
+            LValueKind _t166 = LValueKind_ValLitNull;
+            LTypeKind _t167 = LTypeKind_TyUnit;
+            LType* _t168 = ({ LType* _p = malloc(sizeof(LType)); *_p = (LType){.kind = _t167, .name = FORGE_STR(""), .bits = 0, .is_exported = false}; _p; });
+            LValue* _t169 = ({ LValue* _p = malloc(sizeof(LValue)); *_p = (LValue){.kind = _t166, .name = FORGE_STR(""), .int_val = 0, .uint_val = 0, .float_val = 0, .str_val = FORGE_STR(""), .temp_id = 0, .bool_val = false, .typ = _t168}; _p; });
+            return _t169;
+        }
+        bool _t170 = forge_str_eq(method_name, FORGE_STR("receive"));
+        if (_t170) {
+            LType* _t171 = Lowerer_expr_type(self, orig);
+            LType* rt = _t171;
+            LExprKind _t172 = LExprKind_ExBuiltin;
+            ForgeSlice_LValueptr _t173 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
+            LBuiltinData _t174 = (LBuiltinData){.name = FORGE_STR("channel_receive"), .args = _t173};
+            LExpr* _t175 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t172, .typ = rt, .builtin = forge_some(_t174, ForgeOpt_LBuiltinData)}; _p; });
+            LExpr* builtin = _t175;
+            LValue* _t176 = Lowerer_emit_temp(self, builtin);
+            return _t176;
+        }
+        bool _t177 = forge_str_eq(method_name, FORGE_STR("close"));
+        if (_t177) {
+            LType* _t178 = Lowerer_expr_type(self, orig);
+            LType* rt = _t178;
+            LExprKind _t179 = LExprKind_ExBuiltin;
+            ForgeSlice_LValueptr _t180 = forge_slice_lit(ForgeSlice_LValueptr, LValue*, recv);
+            LBuiltinData _t181 = (LBuiltinData){.name = FORGE_STR("channel_close"), .args = _t180};
+            LExpr* _t182 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t179, .typ = rt, .builtin = forge_some(_t181, ForgeOpt_LBuiltinData)}; _p; });
+            LExpr* builtin = _t182;
+            LValue* _t183 = Lowerer_emit_temp(self, builtin);
+            return _t183;
         }
     }
-    ForgeSlice_LTypeptr _t166 = forge_slice_empty(ForgeSlice_LTypeptr);
-    ForgeSlice_LTypeptr ptypes = _t166;
-    forge_string __ifexpr_167 = FORGE_STR_EMPTY;
-    bool _t168 = (recv_type == NULL);
-    bool _t169 = (!_t168);
-    if (_t169) {
-        LType* _t170 = recv_type;
-        forge_string _t171 = _t170->name;
-        forge_string _t172 = forge_str_concat(_t171, FORGE_STR("."));
-        forge_string _t173 = forge_str_concat(_t172, method_name);
-        __ifexpr_167 = _t173;
+    ForgeSlice_LValueptr _t184 = forge_slice_empty(ForgeSlice_LValueptr);
+    ForgeSlice_LValueptr call_args = _t184;
+    for (int32_t _idx = 0; _idx < args.len; _idx++) {
+        Expr* a = args.data[_idx];
+        LValue* _t185 = Lowerer_lower_expr(self, a);
+        ForgeSlice_LValueptr _t186 = ({ forge_push(&call_args, _t185, ForgeSlice_LValueptr); call_args; });
+        _t186;
+    }
+    ForgeSlice_LTypeptr _t187 = forge_slice_empty(ForgeSlice_LTypeptr);
+    ForgeSlice_LTypeptr lta = _t187;
+    for (int32_t _idx = 0; _idx < type_args.len; _idx++) {
+        TypeExpr* ta = type_args.data[_idx];
+        LType* _t188 = Lowerer_lower_type(self, ta);
+        ForgeSlice_LTypeptr _t189 = ({ forge_push(&lta, _t188, ForgeSlice_LTypeptr); lta; });
+        _t189;
+    }
+    int32_t _t190 = lta.len;
+    bool _t191 = (_t190 == 0);
+    bool _sc192 = false;
+    _sc192 = _t191;
+    if (_sc192) {
+        bool _t193 = (orig == NULL);
+        bool _t194 = (!_t193);
+        _sc192 = _t194;
+    }
+    bool _sc195 = false;
+    _sc195 = _sc192;
+    if (_sc195) {
+        Expr* _t196 = orig;
+        ForgeSlice_TypeExprptr _t197 = _t196->inferred_type_args;
+        int32_t _t198 = _t197.len;
+        bool _t199 = (_t198 > 0);
+        _sc195 = _t199;
+    }
+    if (_sc195) {
+        Expr* _t200 = orig;
+        ForgeSlice_TypeExprptr _t201 = _t200->inferred_type_args;
+        for (int32_t _idx = 0; _idx < _t201.len; _idx++) {
+            TypeExpr* ta = _t201.data[_idx];
+            LType* _t202 = Lowerer_lower_type(self, ta);
+            ForgeSlice_LTypeptr _t203 = ({ forge_push(&lta, _t202, ForgeSlice_LTypeptr); lta; });
+            _t203;
+        }
+    }
+    ForgeSlice_LTypeptr _t204 = forge_slice_empty(ForgeSlice_LTypeptr);
+    ForgeSlice_LTypeptr ptypes = _t204;
+    forge_string __ifexpr_205 = FORGE_STR_EMPTY;
+    bool _t206 = (recv_type == NULL);
+    bool _t207 = (!_t206);
+    if (_t207) {
+        LType* _t208 = recv_type;
+        forge_string _t209 = _t208->name;
+        forge_string _t210 = forge_str_concat(_t209, FORGE_STR("."));
+        forge_string _t211 = forge_str_concat(_t210, method_name);
+        __ifexpr_205 = _t211;
     } else {
-        __ifexpr_167 = method_name;
+        __ifexpr_205 = method_name;
     }
-    forge_string sig_key = __ifexpr_167;
-    Dict_CSym_CFuncDecl* _t174 = self->func_sigs;
-    Dict_CSym_CFuncDecl* _t175 = _t174;
-    Sym* _t176 = sym(sig_key);
-    DictEntry_CSym_CFuncDecl* _t177 = Dict_CSym_CFuncDecl_get(_t175, _t176);
-    DictEntry_CSym_CFuncDecl* sig = _t177;
-    bool _t178 = (sig == NULL);
-    bool _t179 = (!_t178);
-    if (_t179) {
-        DictEntry_CSym_CFuncDecl* _t180 = sig;
-        FuncDecl* _t181 = _t180->value;
-        ForgeSlice_Paramptr _t182 = FuncDecl_param_children(_t181);
-        for (int32_t _idx = 0; _idx < _t182.len; _idx++) {
-            Param* p = _t182.data[_idx];
-            Sym* _t183 = p->name;
-            bool _t184 = (_t183 == NULL);
-            bool _t185 = (!_t184);
-            bool _sc186 = false;
-            _sc186 = _t185;
-            if (_sc186) {
-                bool _t187 = p->is_self;
-                bool _t188 = (!_t187);
-                _sc186 = _t188;
+    forge_string sig_key = __ifexpr_205;
+    Dict_CSym_CFuncDecl* _t212 = self->func_sigs;
+    Dict_CSym_CFuncDecl* _t213 = _t212;
+    Sym* _t214 = sym(sig_key);
+    DictEntry_CSym_CFuncDecl* _t215 = Dict_CSym_CFuncDecl_get(_t213, _t214);
+    DictEntry_CSym_CFuncDecl* sig = _t215;
+    bool _t216 = (sig == NULL);
+    bool _t217 = (!_t216);
+    if (_t217) {
+        DictEntry_CSym_CFuncDecl* _t218 = sig;
+        FuncDecl* _t219 = _t218->value;
+        ForgeSlice_Paramptr _t220 = FuncDecl_param_children(_t219);
+        for (int32_t _idx = 0; _idx < _t220.len; _idx++) {
+            Param* p = _t220.data[_idx];
+            Sym* _t221 = p->name;
+            bool _t222 = (_t221 == NULL);
+            bool _t223 = (!_t222);
+            bool _sc224 = false;
+            _sc224 = _t223;
+            if (_sc224) {
+                bool _t225 = p->is_self;
+                bool _t226 = (!_t225);
+                _sc224 = _t226;
             }
-            if (_sc186) {
-                TypeExpr* _t189 = p->type_expr;
-                LType* _t190 = Lowerer_lower_type(self, _t189);
-                ForgeSlice_LTypeptr _t191 = ({ forge_push(&ptypes, _t190, ForgeSlice_LTypeptr); ptypes; });
-                _t191;
+            if (_sc224) {
+                TypeExpr* _t227 = p->type_expr;
+                LType* _t228 = Lowerer_lower_type(self, _t227);
+                ForgeSlice_LTypeptr _t229 = ({ forge_push(&ptypes, _t228, ForgeSlice_LTypeptr); ptypes; });
+                _t229;
             }
         }
     }
-    LType* _t192 = Lowerer_expr_type(self, orig);
-    LType* rt = _t192;
-    LExprKind _t193 = LExprKind_ExMethodCall;
-    LMethodCallData* _t194 = ({ LMethodCallData* _p = malloc(sizeof(LMethodCallData)); *_p = (LMethodCallData){.receiver = recv, .method = method_name, .args = call_args, .mut_args = mc_mut_args, .type_args = lta, .is_exported = false, .param_types = ptypes}; _p; });
-    LExpr* _t195 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t193, .typ = rt, .method_call = _t194}; _p; });
-    LExpr* mc = _t195;
-    LValue* _t196 = Lowerer_emit_temp(self, mc);
-    return _t196;
+    LType* _t230 = Lowerer_expr_type(self, orig);
+    LType* rt = _t230;
+    LExprKind _t231 = LExprKind_ExMethodCall;
+    LMethodCallData* _t232 = ({ LMethodCallData* _p = malloc(sizeof(LMethodCallData)); *_p = (LMethodCallData){.receiver = recv, .method = method_name, .args = call_args, .mut_args = mc_mut_args, .type_args = lta, .is_exported = false, .param_types = ptypes}; _p; });
+    LExpr* _t233 = ({ LExpr* _p = malloc(sizeof(LExpr)); *_p = (LExpr){.kind = _t231, .typ = rt, .method_call = _t232}; _p; });
+    LExpr* mc = _t233;
+    LValue* _t234 = Lowerer_emit_temp(self, mc);
+    return _t234;
 }
 
 LValue* Lowerer_lower_field_access(Lowerer* self, Expr* orig, Expr* receiver, Sym* field_name) {
@@ -50866,22 +50953,31 @@ void collect_used_temps_in_value(LValue* v, Dict_CSym_bool* used) {
     LValueKind _t7 = v->kind;
     LValueKind _t8 = LValueKind_ValIndexRef;
     bool _t9 = (_t7 == _t8);
-    if (_t9) {
-        LValue* _t10 = v->collection;
-        bool _t11 = (_t10 == NULL);
-        bool _t12 = (!_t11);
-        if (_t12) {
-            LValue* _t13 = v->collection;
-            LValue* _t14 = _t13;
-            collect_used_temps_in_value(_t14, used);
+    bool _sc10 = false;
+    _sc10 = _t9;
+    bool _t11 = (!_sc10);
+    if (_t11) {
+        LValueKind _t12 = v->kind;
+        LValueKind _t13 = LValueKind_ValClassFieldRef;
+        bool _t14 = (_t12 == _t13);
+        _sc10 = _t14;
+    }
+    if (_sc10) {
+        LValue* _t15 = v->collection;
+        bool _t16 = (_t15 == NULL);
+        bool _t17 = (!_t16);
+        if (_t17) {
+            LValue* _t18 = v->collection;
+            LValue* _t19 = _t18;
+            collect_used_temps_in_value(_t19, used);
         }
-        LValue* _t16 = v->index;
-        bool _t17 = (_t16 == NULL);
-        bool _t18 = (!_t17);
-        if (_t18) {
-            LValue* _t19 = v->index;
-            LValue* _t20 = _t19;
-            collect_used_temps_in_value(_t20, used);
+        LValue* _t21 = v->index;
+        bool _t22 = (_t21 == NULL);
+        bool _t23 = (!_t22);
+        if (_t23) {
+            LValue* _t24 = v->index;
+            LValue* _t25 = _t24;
+            collect_used_temps_in_value(_t25, used);
         }
     }
 }
@@ -51974,22 +52070,31 @@ void collect_used_var_names_in_value(LValue* v, Dict_CSym_bool* used) {
     LValueKind _t6 = v->kind;
     LValueKind _t7 = LValueKind_ValIndexRef;
     bool _t8 = (_t6 == _t7);
-    if (_t8) {
-        LValue* _t9 = v->collection;
-        bool _t10 = (_t9 == NULL);
-        bool _t11 = (!_t10);
-        if (_t11) {
-            LValue* _t12 = v->collection;
-            LValue* _t13 = _t12;
-            collect_used_var_names_in_value(_t13, used);
+    bool _sc9 = false;
+    _sc9 = _t8;
+    bool _t10 = (!_sc9);
+    if (_t10) {
+        LValueKind _t11 = v->kind;
+        LValueKind _t12 = LValueKind_ValClassFieldRef;
+        bool _t13 = (_t11 == _t12);
+        _sc9 = _t13;
+    }
+    if (_sc9) {
+        LValue* _t14 = v->collection;
+        bool _t15 = (_t14 == NULL);
+        bool _t16 = (!_t15);
+        if (_t16) {
+            LValue* _t17 = v->collection;
+            LValue* _t18 = _t17;
+            collect_used_var_names_in_value(_t18, used);
         }
-        LValue* _t15 = v->index;
-        bool _t16 = (_t15 == NULL);
-        bool _t17 = (!_t16);
-        if (_t17) {
-            LValue* _t18 = v->index;
-            LValue* _t19 = _t18;
-            collect_used_var_names_in_value(_t19, used);
+        LValue* _t20 = v->index;
+        bool _t21 = (_t20 == NULL);
+        bool _t22 = (!_t21);
+        if (_t22) {
+            LValue* _t23 = v->index;
+            LValue* _t24 = _t23;
+            collect_used_var_names_in_value(_t24, used);
         }
     }
 }
@@ -62427,6 +62532,17 @@ forge_string CGen_emit_value(CGen* self, LValue* v) {
         return _t62;
         break;
     }
+    case 10: {
+        LValue* _t63 = v;
+        LValue* _t64 = _t63->collection;
+        forge_string _t65 = CGen_emit_value(self, _t64);
+        forge_string handle = _t65;
+        LValue* _t66 = v;
+        forge_string _t67 = _t66->name;
+        forge_string _t68 = forge_sprintf("%.*s->%.*s", (int)handle.len, (const char*)handle.data, (int)_t67.len, (const char*)_t67.data);
+        return _t68;
+        break;
+    }
     default: __builtin_unreachable();
     }
 }
@@ -64240,643 +64356,643 @@ forge_string CGen_emit_builtin(CGen* self, ForgeOpt_LBuiltinData d) {
         _sc244 = _t246;
     }
     if (_sc244) {
-        LTypeKind _t247 = LTypeKind_TyString;
-        ForgeSlice_LField _t248 = forge_slice_empty(ForgeSlice_LField);
-        ForgeSlice_LTypeptr _t249 = forge_slice_empty(ForgeSlice_LTypeptr);
-        ForgeSlice_LVariant _t250 = forge_slice_empty(ForgeSlice_LVariant);
-        ForgeSlice_LTypeptr _t251 = forge_slice_empty(ForgeSlice_LTypeptr);
-        LType* _t252 = ({ LType* _p = malloc(sizeof(LType)); *_p = (LType){.kind = _t247, .name = FORGE_STR(""), .elem = NULL, .key = NULL, .fields = _t248, .params = _t249, .ret = NULL, .variants = _t250, .type_args = _t251, .bits = 0, .is_exported = false}; _p; });
-        forge_string _t253 = CGen_slice_type_name(self, _t252);
-        forge_string st = _t253;
-        forge_string _t254 = forge_sprintf("forge_slice_empty(%.*s) /* string_split not implemented */", (int)st.len, (const char*)st.data);
-        return _t254;
-    }
-    bool _t255 = forge_str_eq(name, FORGE_STR("string_trim"));
-    bool _sc256 = false;
-    _sc256 = _t255;
-    bool _t257 = (!_sc256);
-    if (_t257) {
-        bool _t258 = forge_str_eq(name, FORGE_STR("str_trim"));
-        _sc256 = _t258;
-    }
-    if (_sc256) {
-        int32_t _t259 = args.len;
-        bool _t260 = (_t259 > 0);
-        if (_t260) {
-            LValue* _t261 = args.data[0];
-            forge_string _t262 = CGen_emit_value(self, _t261);
-            forge_string _t263 = forge_sprintf("forge_str_trim(%.*s)", (int)_t262.len, (const char*)_t262.data);
-            return _t263;
+        int32_t _t247 = args.len;
+        bool _t248 = (_t247 >= 2);
+        if (_t248) {
+            LValue* _t249 = args.data[0];
+            forge_string _t250 = CGen_emit_value(self, _t249);
+            LValue* _t251 = args.data[1];
+            forge_string _t252 = CGen_emit_value(self, _t251);
+            forge_string _t253 = forge_sprintf("forge_str_split(%.*s, %.*s)", (int)_t250.len, (const char*)_t250.data, (int)_t252.len, (const char*)_t252.data);
+            return _t253;
         }
     }
-    bool _t264 = forge_str_eq(name, FORGE_STR("hash_string"));
-    if (_t264) {
-        int32_t _t265 = args.len;
-        bool _t266 = (_t265 > 0);
-        if (_t266) {
-            LValue* _t267 = args.data[0];
-            forge_string _t268 = CGen_emit_value(self, _t267);
-            forge_string _t269 = forge_sprintf("forge_hash_string(%.*s)", (int)_t268.len, (const char*)_t268.data);
-            return _t269;
+    bool _t254 = forge_str_eq(name, FORGE_STR("string_trim"));
+    bool _sc255 = false;
+    _sc255 = _t254;
+    bool _t256 = (!_sc255);
+    if (_t256) {
+        bool _t257 = forge_str_eq(name, FORGE_STR("str_trim"));
+        _sc255 = _t257;
+    }
+    if (_sc255) {
+        int32_t _t258 = args.len;
+        bool _t259 = (_t258 > 0);
+        if (_t259) {
+            LValue* _t260 = args.data[0];
+            forge_string _t261 = CGen_emit_value(self, _t260);
+            forge_string _t262 = forge_sprintf("forge_str_trim(%.*s)", (int)_t261.len, (const char*)_t261.data);
+            return _t262;
+        }
+    }
+    bool _t263 = forge_str_eq(name, FORGE_STR("hash_string"));
+    if (_t263) {
+        int32_t _t264 = args.len;
+        bool _t265 = (_t264 > 0);
+        if (_t265) {
+            LValue* _t266 = args.data[0];
+            forge_string _t267 = CGen_emit_value(self, _t266);
+            forge_string _t268 = forge_sprintf("forge_hash_string(%.*s)", (int)_t267.len, (const char*)_t267.data);
+            return _t268;
         }
         return FORGE_STR("0");
     }
-    bool _t270 = forge_str_eq(name, FORGE_STR("eprint"));
-    if (_t270) {
-        forge_string _t271 = CGen_emit_fprint(self, FORGE_STR("stderr"), args, false);
-        return _t271;
+    bool _t269 = forge_str_eq(name, FORGE_STR("eprint"));
+    if (_t269) {
+        forge_string _t270 = CGen_emit_fprint(self, FORGE_STR("stderr"), args, false);
+        return _t270;
     }
-    bool _t272 = forge_str_eq(name, FORGE_STR("eprintln"));
-    if (_t272) {
-        forge_string _t273 = CGen_emit_fprint(self, FORGE_STR("stderr"), args, true);
-        return _t273;
+    bool _t271 = forge_str_eq(name, FORGE_STR("eprintln"));
+    if (_t271) {
+        forge_string _t272 = CGen_emit_fprint(self, FORGE_STR("stderr"), args, true);
+        return _t272;
     }
-    bool _t274 = forge_str_eq(name, FORGE_STR("read_file"));
-    if (_t274) {
-        int32_t _t275 = args.len;
-        bool _t276 = (_t275 > 0);
-        if (_t276) {
-            LValue* _t277 = args.data[0];
-            forge_string _t278 = CGen_emit_value(self, _t277);
-            forge_string _t279 = forge_sprintf("forge_read_file(%.*s)", (int)_t278.len, (const char*)_t278.data);
-            return _t279;
+    bool _t273 = forge_str_eq(name, FORGE_STR("read_file"));
+    if (_t273) {
+        int32_t _t274 = args.len;
+        bool _t275 = (_t274 > 0);
+        if (_t275) {
+            LValue* _t276 = args.data[0];
+            forge_string _t277 = CGen_emit_value(self, _t276);
+            forge_string _t278 = forge_sprintf("forge_read_file(%.*s)", (int)_t277.len, (const char*)_t277.data);
+            return _t278;
         }
     }
-    bool _t280 = forge_str_eq(name, FORGE_STR("write_file"));
-    if (_t280) {
-        int32_t _t281 = args.len;
-        bool _t282 = (_t281 >= 2);
-        if (_t282) {
-            LValue* _t283 = args.data[0];
-            forge_string _t284 = CGen_emit_value(self, _t283);
-            LValue* _t285 = args.data[1];
-            forge_string _t286 = CGen_emit_value(self, _t285);
-            forge_string _t287 = forge_sprintf("forge_write_file(%.*s, %.*s)", (int)_t284.len, (const char*)_t284.data, (int)_t286.len, (const char*)_t286.data);
-            return _t287;
+    bool _t279 = forge_str_eq(name, FORGE_STR("write_file"));
+    if (_t279) {
+        int32_t _t280 = args.len;
+        bool _t281 = (_t280 >= 2);
+        if (_t281) {
+            LValue* _t282 = args.data[0];
+            forge_string _t283 = CGen_emit_value(self, _t282);
+            LValue* _t284 = args.data[1];
+            forge_string _t285 = CGen_emit_value(self, _t284);
+            forge_string _t286 = forge_sprintf("forge_write_file(%.*s, %.*s)", (int)_t283.len, (const char*)_t283.data, (int)_t285.len, (const char*)_t285.data);
+            return _t286;
         }
     }
-    bool _t288 = forge_str_eq(name, FORGE_STR("os_args"));
-    if (_t288) {
+    bool _t287 = forge_str_eq(name, FORGE_STR("os_args"));
+    if (_t287) {
         self->needs_os_args = true;
         return FORGE_STR("_forge_os_args(_argc, _argv)");
     }
-    bool _t289 = forge_str_eq(name, FORGE_STR("os_exit"));
-    if (_t289) {
-        int32_t _t290 = args.len;
-        bool _t291 = (_t290 > 0);
-        if (_t291) {
-            LValue* _t292 = args.data[0];
-            forge_string _t293 = CGen_emit_value(self, _t292);
-            forge_string _t294 = forge_sprintf("exit(%.*s)", (int)_t293.len, (const char*)_t293.data);
-            return _t294;
+    bool _t288 = forge_str_eq(name, FORGE_STR("os_exit"));
+    if (_t288) {
+        int32_t _t289 = args.len;
+        bool _t290 = (_t289 > 0);
+        if (_t290) {
+            LValue* _t291 = args.data[0];
+            forge_string _t292 = CGen_emit_value(self, _t291);
+            forge_string _t293 = forge_sprintf("exit(%.*s)", (int)_t292.len, (const char*)_t292.data);
+            return _t293;
         }
         return FORGE_STR("exit(0)");
     }
-    bool _t295 = forge_str_eq(name, FORGE_STR("os_getwd"));
-    if (_t295) {
+    bool _t294 = forge_str_eq(name, FORGE_STR("os_getwd"));
+    if (_t294) {
         return FORGE_STR("forge_getwd()");
     }
-    bool _t296 = forge_str_eq(name, FORGE_STR("list_dir"));
-    if (_t296) {
-        int32_t _t297 = args.len;
-        bool _t298 = (_t297 > 0);
-        if (_t298) {
-            LValue* _t299 = args.data[0];
-            forge_string _t300 = CGen_emit_value(self, _t299);
-            forge_string _t301 = forge_sprintf("forge_list_dir(%.*s)", (int)_t300.len, (const char*)_t300.data);
-            return _t301;
+    bool _t295 = forge_str_eq(name, FORGE_STR("list_dir"));
+    if (_t295) {
+        int32_t _t296 = args.len;
+        bool _t297 = (_t296 > 0);
+        if (_t297) {
+            LValue* _t298 = args.data[0];
+            forge_string _t299 = CGen_emit_value(self, _t298);
+            forge_string _t300 = forge_sprintf("forge_list_dir(%.*s)", (int)_t299.len, (const char*)_t299.data);
+            return _t300;
         }
     }
-    bool _t302 = forge_str_eq(name, FORGE_STR("file_exists"));
-    if (_t302) {
-        int32_t _t303 = args.len;
-        bool _t304 = (_t303 > 0);
-        if (_t304) {
-            LValue* _t305 = args.data[0];
-            forge_string _t306 = CGen_emit_value(self, _t305);
-            forge_string _t307 = forge_sprintf("forge_file_exists(%.*s)", (int)_t306.len, (const char*)_t306.data);
-            return _t307;
+    bool _t301 = forge_str_eq(name, FORGE_STR("file_exists"));
+    if (_t301) {
+        int32_t _t302 = args.len;
+        bool _t303 = (_t302 > 0);
+        if (_t303) {
+            LValue* _t304 = args.data[0];
+            forge_string _t305 = CGen_emit_value(self, _t304);
+            forge_string _t306 = forge_sprintf("forge_file_exists(%.*s)", (int)_t305.len, (const char*)_t305.data);
+            return _t306;
         }
     }
-    bool _t308 = forge_str_eq(name, FORGE_STR("mkdtemp"));
-    if (_t308) {
-        int32_t _t309 = args.len;
-        bool _t310 = (_t309 > 0);
-        if (_t310) {
-            LValue* _t311 = args.data[0];
-            forge_string _t312 = CGen_emit_value(self, _t311);
-            forge_string _t313 = forge_sprintf("forge_mkdtemp(%.*s)", (int)_t312.len, (const char*)_t312.data);
-            return _t313;
+    bool _t307 = forge_str_eq(name, FORGE_STR("mkdtemp"));
+    if (_t307) {
+        int32_t _t308 = args.len;
+        bool _t309 = (_t308 > 0);
+        if (_t309) {
+            LValue* _t310 = args.data[0];
+            forge_string _t311 = CGen_emit_value(self, _t310);
+            forge_string _t312 = forge_sprintf("forge_mkdtemp(%.*s)", (int)_t311.len, (const char*)_t311.data);
+            return _t312;
         }
     }
-    bool _t314 = forge_str_eq(name, FORGE_STR("exec_command"));
-    if (_t314) {
+    bool _t313 = forge_str_eq(name, FORGE_STR("exec_command"));
+    if (_t313) {
         self->needs_exec_cmd = true;
-        int32_t _t315 = args.len;
-        bool _t316 = (_t315 >= 2);
-        if (_t316) {
-            LValue* _t317 = args.data[0];
-            forge_string _t318 = CGen_emit_value(self, _t317);
-            LValue* _t319 = args.data[1];
-            forge_string _t320 = CGen_emit_value(self, _t319);
-            forge_string _t321 = forge_sprintf("_forge_exec_command(%.*s, %.*s)", (int)_t318.len, (const char*)_t318.data, (int)_t320.len, (const char*)_t320.data);
-            return _t321;
+        int32_t _t314 = args.len;
+        bool _t315 = (_t314 >= 2);
+        if (_t315) {
+            LValue* _t316 = args.data[0];
+            forge_string _t317 = CGen_emit_value(self, _t316);
+            LValue* _t318 = args.data[1];
+            forge_string _t319 = CGen_emit_value(self, _t318);
+            forge_string _t320 = forge_sprintf("_forge_exec_command(%.*s, %.*s)", (int)_t317.len, (const char*)_t317.data, (int)_t319.len, (const char*)_t319.data);
+            return _t320;
         }
     }
-    bool _t322 = forge_str_eq(name, FORGE_STR("path_join"));
-    if (_t322) {
+    bool _t321 = forge_str_eq(name, FORGE_STR("path_join"));
+    if (_t321) {
         self->needs_path_join = true;
-        int32_t _t323 = args.len;
-        bool _t324 = (_t323 > 0);
-        if (_t324) {
-            LValue* _t325 = args.data[0];
-            forge_string _t326 = CGen_emit_value(self, _t325);
-            forge_string _t327 = forge_sprintf("_forge_path_join(%.*s)", (int)_t326.len, (const char*)_t326.data);
-            return _t327;
+        int32_t _t322 = args.len;
+        bool _t323 = (_t322 > 0);
+        if (_t323) {
+            LValue* _t324 = args.data[0];
+            forge_string _t325 = CGen_emit_value(self, _t324);
+            forge_string _t326 = forge_sprintf("_forge_path_join(%.*s)", (int)_t325.len, (const char*)_t325.data);
+            return _t326;
         }
     }
-    bool _t328 = forge_str_eq(name, FORGE_STR("path_dir"));
-    if (_t328) {
-        int32_t _t329 = args.len;
-        bool _t330 = (_t329 > 0);
-        if (_t330) {
-            LValue* _t331 = args.data[0];
-            forge_string _t332 = CGen_emit_value(self, _t331);
-            forge_string _t333 = forge_sprintf("forge_path_dir(%.*s)", (int)_t332.len, (const char*)_t332.data);
-            return _t333;
+    bool _t327 = forge_str_eq(name, FORGE_STR("path_dir"));
+    if (_t327) {
+        int32_t _t328 = args.len;
+        bool _t329 = (_t328 > 0);
+        if (_t329) {
+            LValue* _t330 = args.data[0];
+            forge_string _t331 = CGen_emit_value(self, _t330);
+            forge_string _t332 = forge_sprintf("forge_path_dir(%.*s)", (int)_t331.len, (const char*)_t331.data);
+            return _t332;
         }
     }
-    bool _t334 = forge_str_eq(name, FORGE_STR("path_base"));
-    if (_t334) {
-        int32_t _t335 = args.len;
-        bool _t336 = (_t335 > 0);
-        if (_t336) {
-            LValue* _t337 = args.data[0];
-            forge_string _t338 = CGen_emit_value(self, _t337);
-            forge_string _t339 = forge_sprintf("forge_path_base(%.*s)", (int)_t338.len, (const char*)_t338.data);
-            return _t339;
+    bool _t333 = forge_str_eq(name, FORGE_STR("path_base"));
+    if (_t333) {
+        int32_t _t334 = args.len;
+        bool _t335 = (_t334 > 0);
+        if (_t335) {
+            LValue* _t336 = args.data[0];
+            forge_string _t337 = CGen_emit_value(self, _t336);
+            forge_string _t338 = forge_sprintf("forge_path_base(%.*s)", (int)_t337.len, (const char*)_t337.data);
+            return _t338;
         }
     }
-    bool _t340 = forge_str_eq(name, FORGE_STR("path_ext"));
-    if (_t340) {
-        int32_t _t341 = args.len;
-        bool _t342 = (_t341 > 0);
-        if (_t342) {
-            LValue* _t343 = args.data[0];
-            forge_string _t344 = CGen_emit_value(self, _t343);
-            forge_string _t345 = forge_sprintf("forge_path_ext(%.*s)", (int)_t344.len, (const char*)_t344.data);
-            return _t345;
+    bool _t339 = forge_str_eq(name, FORGE_STR("path_ext"));
+    if (_t339) {
+        int32_t _t340 = args.len;
+        bool _t341 = (_t340 > 0);
+        if (_t341) {
+            LValue* _t342 = args.data[0];
+            forge_string _t343 = CGen_emit_value(self, _t342);
+            forge_string _t344 = forge_sprintf("forge_path_ext(%.*s)", (int)_t343.len, (const char*)_t343.data);
+            return _t344;
         }
     }
-    bool _t346 = forge_str_eq(name, FORGE_STR("itoa"));
-    if (_t346) {
-        int32_t _t347 = args.len;
-        bool _t348 = (_t347 > 0);
-        if (_t348) {
-            LValue* _t349 = args.data[0];
-            forge_string _t350 = CGen_emit_value(self, _t349);
-            forge_string _t351 = forge_sprintf("forge_itoa(%.*s)", (int)_t350.len, (const char*)_t350.data);
-            return _t351;
+    bool _t345 = forge_str_eq(name, FORGE_STR("itoa"));
+    if (_t345) {
+        int32_t _t346 = args.len;
+        bool _t347 = (_t346 > 0);
+        if (_t347) {
+            LValue* _t348 = args.data[0];
+            forge_string _t349 = CGen_emit_value(self, _t348);
+            forge_string _t350 = forge_sprintf("forge_itoa(%.*s)", (int)_t349.len, (const char*)_t349.data);
+            return _t350;
         }
     }
-    bool _t352 = forge_str_eq(name, FORGE_STR("atoi"));
-    if (_t352) {
-        int32_t _t353 = args.len;
-        bool _t354 = (_t353 > 0);
-        if (_t354) {
-            LValue* _t355 = args.data[0];
-            forge_string _t356 = CGen_emit_value(self, _t355);
-            forge_string _t357 = forge_sprintf("forge_atoi(%.*s)", (int)_t356.len, (const char*)_t356.data);
-            return _t357;
+    bool _t351 = forge_str_eq(name, FORGE_STR("atoi"));
+    if (_t351) {
+        int32_t _t352 = args.len;
+        bool _t353 = (_t352 > 0);
+        if (_t353) {
+            LValue* _t354 = args.data[0];
+            forge_string _t355 = CGen_emit_value(self, _t354);
+            forge_string _t356 = forge_sprintf("forge_atoi(%.*s)", (int)_t355.len, (const char*)_t355.data);
+            return _t356;
         }
     }
-    bool _t358 = forge_str_eq(name, FORGE_STR("parse_float"));
-    if (_t358) {
-        int32_t _t359 = args.len;
-        bool _t360 = (_t359 > 0);
-        if (_t360) {
-            LValue* _t361 = args.data[0];
-            forge_string _t362 = CGen_emit_value(self, _t361);
-            forge_string _t363 = forge_sprintf("forge_parse_float(%.*s)", (int)_t362.len, (const char*)_t362.data);
-            return _t363;
+    bool _t357 = forge_str_eq(name, FORGE_STR("parse_float"));
+    if (_t357) {
+        int32_t _t358 = args.len;
+        bool _t359 = (_t358 > 0);
+        if (_t359) {
+            LValue* _t360 = args.data[0];
+            forge_string _t361 = CGen_emit_value(self, _t360);
+            forge_string _t362 = forge_sprintf("forge_parse_float(%.*s)", (int)_t361.len, (const char*)_t361.data);
+            return _t362;
         }
     }
-    bool _t364 = forge_str_eq(name, FORGE_STR("char_to_string"));
-    if (_t364) {
-        int32_t _t365 = args.len;
-        bool _t366 = (_t365 > 0);
-        if (_t366) {
-            LValue* _t367 = args.data[0];
-            forge_string _t368 = CGen_emit_value(self, _t367);
-            forge_string _t369 = forge_sprintf("forge_char_to_string(%.*s)", (int)_t368.len, (const char*)_t368.data);
-            return _t369;
+    bool _t363 = forge_str_eq(name, FORGE_STR("char_to_string"));
+    if (_t363) {
+        int32_t _t364 = args.len;
+        bool _t365 = (_t364 > 0);
+        if (_t365) {
+            LValue* _t366 = args.data[0];
+            forge_string _t367 = CGen_emit_value(self, _t366);
+            forge_string _t368 = forge_sprintf("forge_char_to_string(%.*s)", (int)_t367.len, (const char*)_t367.data);
+            return _t368;
         }
     }
-    bool _t370 = forge_str_eq(name, FORGE_STR("println"));
-    bool _sc371 = false;
-    _sc371 = _t370;
-    bool _t372 = (!_sc371);
-    if (_t372) {
-        bool _t373 = forge_str_eq(name, FORGE_STR("Println"));
-        _sc371 = _t373;
+    bool _t369 = forge_str_eq(name, FORGE_STR("println"));
+    bool _sc370 = false;
+    _sc370 = _t369;
+    bool _t371 = (!_sc370);
+    if (_t371) {
+        bool _t372 = forge_str_eq(name, FORGE_STR("Println"));
+        _sc370 = _t372;
     }
-    bool _sc374 = false;
-    _sc374 = _sc371;
-    bool _t375 = (!_sc374);
-    if (_t375) {
-        bool _t376 = forge_str_eq(name, FORGE_STR("fmt.Println"));
-        _sc374 = _t376;
+    bool _sc373 = false;
+    _sc373 = _sc370;
+    bool _t374 = (!_sc373);
+    if (_t374) {
+        bool _t375 = forge_str_eq(name, FORGE_STR("fmt.Println"));
+        _sc373 = _t375;
     }
-    if (_sc374) {
-        forge_string _t377 = CGen_emit_println(self, args);
-        return _t377;
+    if (_sc373) {
+        forge_string _t376 = CGen_emit_println(self, args);
+        return _t376;
     }
-    bool _t378 = forge_str_eq(name, FORGE_STR("print"));
-    bool _sc379 = false;
-    _sc379 = _t378;
-    bool _t380 = (!_sc379);
-    if (_t380) {
-        bool _t381 = forge_str_eq(name, FORGE_STR("Print"));
-        _sc379 = _t381;
+    bool _t377 = forge_str_eq(name, FORGE_STR("print"));
+    bool _sc378 = false;
+    _sc378 = _t377;
+    bool _t379 = (!_sc378);
+    if (_t379) {
+        bool _t380 = forge_str_eq(name, FORGE_STR("Print"));
+        _sc378 = _t380;
     }
-    bool _sc382 = false;
-    _sc382 = _sc379;
-    bool _t383 = (!_sc382);
-    if (_t383) {
-        bool _t384 = forge_str_eq(name, FORGE_STR("fmt.Print"));
-        _sc382 = _t384;
+    bool _sc381 = false;
+    _sc381 = _sc378;
+    bool _t382 = (!_sc381);
+    if (_t382) {
+        bool _t383 = forge_str_eq(name, FORGE_STR("fmt.Print"));
+        _sc381 = _t383;
     }
-    if (_sc382) {
-        forge_string _t385 = CGen_emit_fprint(self, FORGE_STR("stdout"), args, false);
-        return _t385;
+    if (_sc381) {
+        forge_string _t384 = CGen_emit_fprint(self, FORGE_STR("stdout"), args, false);
+        return _t384;
     }
-    bool _t386 = forge_str_eq(name, FORGE_STR("assert"));
-    if (_t386) {
-        int32_t _t387 = args.len;
-        bool _t388 = (_t387 >= 1);
-        if (_t388) {
-            LValue* _t389 = args.data[0];
-            forge_string _t390 = CGen_emit_value(self, _t389);
-            forge_string cond = _t390;
+    bool _t385 = forge_str_eq(name, FORGE_STR("assert"));
+    if (_t385) {
+        int32_t _t386 = args.len;
+        bool _t387 = (_t386 >= 1);
+        if (_t387) {
+            LValue* _t388 = args.data[0];
+            forge_string _t389 = CGen_emit_value(self, _t388);
+            forge_string cond = _t389;
             forge_string msg = FORGE_STR("FORGE_STR(\"assertion failed\")");
-            int32_t _t391 = args.len;
-            bool _t392 = (_t391 >= 2);
-            if (_t392) {
-                LValue* _t393 = args.data[1];
-                forge_string _t394 = CGen_emit_value(self, _t393);
-                msg = _t394;
+            int32_t _t390 = args.len;
+            bool _t391 = (_t390 >= 2);
+            if (_t391) {
+                LValue* _t392 = args.data[1];
+                forge_string _t393 = CGen_emit_value(self, _t392);
+                msg = _t393;
             }
-            LBuiltinData _t395 = forge_unwrap(d);
-            forge_string _t396 = _t395.file;
-            LBuiltinData _t397 = forge_unwrap(d);
-            int32_t _t398 = _t397.line;
-            forge_string _t399 = forge_itoa(_t398);
-            forge_string _t400 = forge_sprintf("forge_assert(%.*s, %.*s, \"%.*s\", %.*s)", (int)cond.len, (const char*)cond.data, (int)msg.len, (const char*)msg.data, (int)_t396.len, (const char*)_t396.data, (int)_t399.len, (const char*)_t399.data);
-            return _t400;
+            LBuiltinData _t394 = forge_unwrap(d);
+            forge_string _t395 = _t394.file;
+            LBuiltinData _t396 = forge_unwrap(d);
+            int32_t _t397 = _t396.line;
+            forge_string _t398 = forge_itoa(_t397);
+            forge_string _t399 = forge_sprintf("forge_assert(%.*s, %.*s, \"%.*s\", %.*s)", (int)cond.len, (const char*)cond.data, (int)msg.len, (const char*)msg.data, (int)_t395.len, (const char*)_t395.data, (int)_t398.len, (const char*)_t398.data);
+            return _t399;
         }
     }
-    bool _t401 = forge_str_eq(name, FORGE_STR("assert_eq"));
-    if (_t401) {
-        int32_t _t402 = args.len;
-        bool _t403 = (_t402 >= 2);
-        if (_t403) {
-            LValue* _t404 = args.data[0];
-            forge_string _t405 = CGen_to_string_expr(self, _t404);
-            forge_string to_str_a = _t405;
-            LValue* _t406 = args.data[1];
-            forge_string _t407 = CGen_to_string_expr(self, _t406);
-            forge_string to_str_e = _t407;
-            LValue* _t408 = args.data[0];
-            LValue* _t409 = args.data[1];
-            forge_string _t410 = CGen_eq_expr(self, _t408, _t409);
-            forge_string eq = _t410;
+    bool _t400 = forge_str_eq(name, FORGE_STR("assert_eq"));
+    if (_t400) {
+        int32_t _t401 = args.len;
+        bool _t402 = (_t401 >= 2);
+        if (_t402) {
+            LValue* _t403 = args.data[0];
+            forge_string _t404 = CGen_to_string_expr(self, _t403);
+            forge_string to_str_a = _t404;
+            LValue* _t405 = args.data[1];
+            forge_string _t406 = CGen_to_string_expr(self, _t405);
+            forge_string to_str_e = _t406;
+            LValue* _t407 = args.data[0];
+            LValue* _t408 = args.data[1];
+            forge_string _t409 = CGen_eq_expr(self, _t407, _t408);
+            forge_string eq = _t409;
             forge_string msg = FORGE_STR("FORGE_STR(\"assert_eq failed\")");
-            int32_t _t411 = args.len;
-            bool _t412 = (_t411 >= 3);
-            if (_t412) {
-                LValue* _t413 = args.data[2];
-                forge_string _t414 = CGen_emit_value(self, _t413);
-                msg = _t414;
+            int32_t _t410 = args.len;
+            bool _t411 = (_t410 >= 3);
+            if (_t411) {
+                LValue* _t412 = args.data[2];
+                forge_string _t413 = CGen_emit_value(self, _t412);
+                msg = _t413;
             }
-            LBuiltinData _t415 = forge_unwrap(d);
-            forge_string _t416 = _t415.file;
-            LBuiltinData _t417 = forge_unwrap(d);
-            int32_t _t418 = _t417.line;
-            forge_string _t419 = forge_itoa(_t418);
-            forge_string _t420 = forge_sprintf("forge_assert_eq(%.*s, %.*s, %.*s, %.*s, \"%.*s\", %.*s)", (int)eq.len, (const char*)eq.data, (int)to_str_a.len, (const char*)to_str_a.data, (int)to_str_e.len, (const char*)to_str_e.data, (int)msg.len, (const char*)msg.data, (int)_t416.len, (const char*)_t416.data, (int)_t419.len, (const char*)_t419.data);
-            return _t420;
+            LBuiltinData _t414 = forge_unwrap(d);
+            forge_string _t415 = _t414.file;
+            LBuiltinData _t416 = forge_unwrap(d);
+            int32_t _t417 = _t416.line;
+            forge_string _t418 = forge_itoa(_t417);
+            forge_string _t419 = forge_sprintf("forge_assert_eq(%.*s, %.*s, %.*s, %.*s, \"%.*s\", %.*s)", (int)eq.len, (const char*)eq.data, (int)to_str_a.len, (const char*)to_str_a.data, (int)to_str_e.len, (const char*)to_str_e.data, (int)msg.len, (const char*)msg.data, (int)_t415.len, (const char*)_t415.data, (int)_t418.len, (const char*)_t418.data);
+            return _t419;
         }
     }
-    bool _t421 = forge_str_eq(name, FORGE_STR("panic"));
-    if (_t421) {
-        int32_t _t422 = args.len;
-        bool _t423 = (_t422 >= 1);
-        if (_t423) {
-            LValue* _t424 = args.data[0];
-            forge_string _t425 = CGen_emit_value(self, _t424);
-            forge_string _t426 = forge_sprintf("forge_panic(%.*s)", (int)_t425.len, (const char*)_t425.data);
-            return _t426;
+    bool _t420 = forge_str_eq(name, FORGE_STR("panic"));
+    if (_t420) {
+        int32_t _t421 = args.len;
+        bool _t422 = (_t421 >= 1);
+        if (_t422) {
+            LValue* _t423 = args.data[0];
+            forge_string _t424 = CGen_emit_value(self, _t423);
+            forge_string _t425 = forge_sprintf("forge_panic(%.*s)", (int)_t424.len, (const char*)_t424.data);
+            return _t425;
         }
     }
-    bool _t427 = forge_str_eq(name, FORGE_STR("channel_receive"));
-    if (_t427) {
-        int32_t _t428 = args.len;
-        bool _t429 = (_t428 > 0);
-        if (_t429) {
-            LValue* _t430 = args.data[0];
-            LType* _t431 = CGen_resolve_value_type(self, _t430);
-            LType* chan_type = _t431;
+    bool _t426 = forge_str_eq(name, FORGE_STR("channel_receive"));
+    if (_t426) {
+        int32_t _t427 = args.len;
+        bool _t428 = (_t427 > 0);
+        if (_t428) {
+            LValue* _t429 = args.data[0];
+            LType* _t430 = CGen_resolve_value_type(self, _t429);
+            LType* chan_type = _t430;
             forge_string suffix = FORGE_STR("void");
-            bool _t432 = (chan_type == NULL);
-            bool _t433 = (!_t432);
-            bool _sc434 = false;
-            _sc434 = _t433;
-            if (_sc434) {
-                LType* _t435 = chan_type;
-                LTypeKind _t436 = _t435->kind;
-                int32_t _t437 = _t436;
-                bool _t438 = (_t437 == 21);
-                _sc434 = _t438;
+            bool _t431 = (chan_type == NULL);
+            bool _t432 = (!_t431);
+            bool _sc433 = false;
+            _sc433 = _t432;
+            if (_sc433) {
+                LType* _t434 = chan_type;
+                LTypeKind _t435 = _t434->kind;
+                int32_t _t436 = _t435;
+                bool _t437 = (_t436 == 21);
+                _sc433 = _t437;
             }
-            bool _sc439 = false;
-            _sc439 = _sc434;
-            if (_sc439) {
-                LType* _t440 = chan_type;
-                LType* _t441 = _t440->elem;
-                bool _t442 = (_t441 == NULL);
-                bool _t443 = (!_t442);
-                _sc439 = _t443;
+            bool _sc438 = false;
+            _sc438 = _sc433;
+            if (_sc438) {
+                LType* _t439 = chan_type;
+                LType* _t440 = _t439->elem;
+                bool _t441 = (_t440 == NULL);
+                bool _t442 = (!_t441);
+                _sc438 = _t442;
             }
-            if (_sc439) {
-                LType* _t444 = chan_type;
-                LType* _t445 = _t444->elem;
-                forge_string _t446 = CGen_chan_suffix(self, _t445);
-                suffix = _t446;
+            if (_sc438) {
+                LType* _t443 = chan_type;
+                LType* _t444 = _t443->elem;
+                forge_string _t445 = CGen_chan_suffix(self, _t444);
+                suffix = _t445;
             }
-            LValue* _t447 = args.data[0];
-            forge_string _t448 = CGen_emit_value(self, _t447);
-            forge_string _t449 = forge_sprintf("forge_chan_recv_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t448.len, (const char*)_t448.data);
-            return _t449;
+            LValue* _t446 = args.data[0];
+            forge_string _t447 = CGen_emit_value(self, _t446);
+            forge_string _t448 = forge_sprintf("forge_chan_recv_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t447.len, (const char*)_t447.data);
+            return _t448;
         }
     }
-    bool _t450 = forge_str_eq(name, FORGE_STR("channel_close"));
-    if (_t450) {
-        int32_t _t451 = args.len;
-        bool _t452 = (_t451 > 0);
-        if (_t452) {
-            LValue* _t453 = args.data[0];
-            LType* _t454 = CGen_resolve_value_type(self, _t453);
-            LType* chan_type = _t454;
+    bool _t449 = forge_str_eq(name, FORGE_STR("channel_close"));
+    if (_t449) {
+        int32_t _t450 = args.len;
+        bool _t451 = (_t450 > 0);
+        if (_t451) {
+            LValue* _t452 = args.data[0];
+            LType* _t453 = CGen_resolve_value_type(self, _t452);
+            LType* chan_type = _t453;
             forge_string suffix = FORGE_STR("void");
-            bool _t455 = (chan_type == NULL);
-            bool _t456 = (!_t455);
-            bool _sc457 = false;
-            _sc457 = _t456;
-            if (_sc457) {
-                LType* _t458 = chan_type;
-                LTypeKind _t459 = _t458->kind;
-                int32_t _t460 = _t459;
-                bool _t461 = (_t460 == 21);
-                _sc457 = _t461;
+            bool _t454 = (chan_type == NULL);
+            bool _t455 = (!_t454);
+            bool _sc456 = false;
+            _sc456 = _t455;
+            if (_sc456) {
+                LType* _t457 = chan_type;
+                LTypeKind _t458 = _t457->kind;
+                int32_t _t459 = _t458;
+                bool _t460 = (_t459 == 21);
+                _sc456 = _t460;
             }
-            bool _sc462 = false;
-            _sc462 = _sc457;
-            if (_sc462) {
-                LType* _t463 = chan_type;
-                LType* _t464 = _t463->elem;
-                bool _t465 = (_t464 == NULL);
-                bool _t466 = (!_t465);
-                _sc462 = _t466;
+            bool _sc461 = false;
+            _sc461 = _sc456;
+            if (_sc461) {
+                LType* _t462 = chan_type;
+                LType* _t463 = _t462->elem;
+                bool _t464 = (_t463 == NULL);
+                bool _t465 = (!_t464);
+                _sc461 = _t465;
             }
-            if (_sc462) {
-                LType* _t467 = chan_type;
-                LType* _t468 = _t467->elem;
-                forge_string _t469 = CGen_chan_suffix(self, _t468);
-                suffix = _t469;
+            if (_sc461) {
+                LType* _t466 = chan_type;
+                LType* _t467 = _t466->elem;
+                forge_string _t468 = CGen_chan_suffix(self, _t467);
+                suffix = _t468;
             }
-            LValue* _t470 = args.data[0];
-            forge_string _t471 = CGen_emit_value(self, _t470);
-            forge_string _t472 = forge_sprintf("forge_chan_close_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t471.len, (const char*)_t471.data);
-            return _t472;
+            LValue* _t469 = args.data[0];
+            forge_string _t470 = CGen_emit_value(self, _t469);
+            forge_string _t471 = forge_sprintf("forge_chan_close_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t470.len, (const char*)_t470.data);
+            return _t471;
         }
     }
-    bool _t473 = forge_str_eq(name, FORGE_STR("map_len"));
-    if (_t473) {
+    bool _t472 = forge_str_eq(name, FORGE_STR("map_len"));
+    if (_t472) {
         return FORGE_STR("0 /* map_len: maps not supported */");
     }
-    bool _t474 = forge_str_eq(name, FORGE_STR("map_contains_key"));
-    bool _sc475 = false;
-    _sc475 = _t474;
-    bool _t476 = (!_sc475);
-    if (_t476) {
-        bool _t477 = forge_str_eq(name, FORGE_STR("contains_key"));
-        _sc475 = _t477;
+    bool _t473 = forge_str_eq(name, FORGE_STR("map_contains_key"));
+    bool _sc474 = false;
+    _sc474 = _t473;
+    bool _t475 = (!_sc474);
+    if (_t475) {
+        bool _t476 = forge_str_eq(name, FORGE_STR("contains_key"));
+        _sc474 = _t476;
     }
-    if (_sc475) {
+    if (_sc474) {
         return FORGE_STR("false /* contains_key: not supported */");
     }
-    bool _t478 = forge_str_eq(name, FORGE_STR("read_file"));
-    if (_t478) {
-        int32_t _t479 = args.len;
-        bool _t480 = (_t479 > 0);
-        if (_t480) {
-            LValue* _t481 = args.data[0];
-            forge_string _t482 = CGen_emit_value(self, _t481);
-            forge_string _t483 = forge_sprintf("forge_read_file(%.*s)", (int)_t482.len, (const char*)_t482.data);
-            return _t483;
+    bool _t477 = forge_str_eq(name, FORGE_STR("read_file"));
+    if (_t477) {
+        int32_t _t478 = args.len;
+        bool _t479 = (_t478 > 0);
+        if (_t479) {
+            LValue* _t480 = args.data[0];
+            forge_string _t481 = CGen_emit_value(self, _t480);
+            forge_string _t482 = forge_sprintf("forge_read_file(%.*s)", (int)_t481.len, (const char*)_t481.data);
+            return _t482;
         }
     }
-    bool _t484 = forge_str_eq(name, FORGE_STR("write_file"));
-    if (_t484) {
-        int32_t _t485 = args.len;
-        bool _t486 = (_t485 >= 2);
-        if (_t486) {
-            LValue* _t487 = args.data[0];
-            forge_string _t488 = CGen_emit_value(self, _t487);
-            LValue* _t489 = args.data[1];
-            forge_string _t490 = CGen_emit_value(self, _t489);
-            forge_string _t491 = forge_sprintf("forge_write_file(%.*s, %.*s)", (int)_t488.len, (const char*)_t488.data, (int)_t490.len, (const char*)_t490.data);
-            return _t491;
+    bool _t483 = forge_str_eq(name, FORGE_STR("write_file"));
+    if (_t483) {
+        int32_t _t484 = args.len;
+        bool _t485 = (_t484 >= 2);
+        if (_t485) {
+            LValue* _t486 = args.data[0];
+            forge_string _t487 = CGen_emit_value(self, _t486);
+            LValue* _t488 = args.data[1];
+            forge_string _t489 = CGen_emit_value(self, _t488);
+            forge_string _t490 = forge_sprintf("forge_write_file(%.*s, %.*s)", (int)_t487.len, (const char*)_t487.data, (int)_t489.len, (const char*)_t489.data);
+            return _t490;
         }
     }
-    bool _t492 = forge_str_eq(name, FORGE_STR("os_args"));
-    if (_t492) {
+    bool _t491 = forge_str_eq(name, FORGE_STR("os_args"));
+    if (_t491) {
         self->needs_os_args = true;
         return FORGE_STR("_forge_os_args(_argc, _argv)");
     }
-    bool _t493 = forge_str_eq(name, FORGE_STR("os_exit"));
-    if (_t493) {
-        int32_t _t494 = args.len;
-        bool _t495 = (_t494 > 0);
-        if (_t495) {
-            LValue* _t496 = args.data[0];
-            forge_string _t497 = CGen_emit_value(self, _t496);
-            forge_string _t498 = forge_sprintf("exit(%.*s)", (int)_t497.len, (const char*)_t497.data);
-            return _t498;
+    bool _t492 = forge_str_eq(name, FORGE_STR("os_exit"));
+    if (_t492) {
+        int32_t _t493 = args.len;
+        bool _t494 = (_t493 > 0);
+        if (_t494) {
+            LValue* _t495 = args.data[0];
+            forge_string _t496 = CGen_emit_value(self, _t495);
+            forge_string _t497 = forge_sprintf("exit(%.*s)", (int)_t496.len, (const char*)_t496.data);
+            return _t497;
         }
         return FORGE_STR("exit(0)");
     }
-    bool _t499 = forge_str_eq(name, FORGE_STR("os_getwd"));
-    if (_t499) {
+    bool _t498 = forge_str_eq(name, FORGE_STR("os_getwd"));
+    if (_t498) {
         return FORGE_STR("forge_getwd()");
     }
-    bool _t500 = forge_str_eq(name, FORGE_STR("list_dir"));
-    if (_t500) {
-        int32_t _t501 = args.len;
-        bool _t502 = (_t501 > 0);
-        if (_t502) {
-            LValue* _t503 = args.data[0];
-            forge_string _t504 = CGen_emit_value(self, _t503);
-            forge_string _t505 = forge_sprintf("forge_list_dir(%.*s)", (int)_t504.len, (const char*)_t504.data);
-            return _t505;
+    bool _t499 = forge_str_eq(name, FORGE_STR("list_dir"));
+    if (_t499) {
+        int32_t _t500 = args.len;
+        bool _t501 = (_t500 > 0);
+        if (_t501) {
+            LValue* _t502 = args.data[0];
+            forge_string _t503 = CGen_emit_value(self, _t502);
+            forge_string _t504 = forge_sprintf("forge_list_dir(%.*s)", (int)_t503.len, (const char*)_t503.data);
+            return _t504;
         }
     }
-    bool _t506 = forge_str_eq(name, FORGE_STR("file_exists"));
-    if (_t506) {
-        int32_t _t507 = args.len;
-        bool _t508 = (_t507 > 0);
-        if (_t508) {
-            LValue* _t509 = args.data[0];
-            forge_string _t510 = CGen_emit_value(self, _t509);
-            forge_string _t511 = forge_sprintf("forge_file_exists(%.*s)", (int)_t510.len, (const char*)_t510.data);
-            return _t511;
+    bool _t505 = forge_str_eq(name, FORGE_STR("file_exists"));
+    if (_t505) {
+        int32_t _t506 = args.len;
+        bool _t507 = (_t506 > 0);
+        if (_t507) {
+            LValue* _t508 = args.data[0];
+            forge_string _t509 = CGen_emit_value(self, _t508);
+            forge_string _t510 = forge_sprintf("forge_file_exists(%.*s)", (int)_t509.len, (const char*)_t509.data);
+            return _t510;
         }
     }
-    bool _t512 = forge_str_eq(name, FORGE_STR("mkdtemp"));
-    if (_t512) {
-        int32_t _t513 = args.len;
-        bool _t514 = (_t513 > 0);
-        if (_t514) {
-            LValue* _t515 = args.data[0];
-            forge_string _t516 = CGen_emit_value(self, _t515);
-            forge_string _t517 = forge_sprintf("forge_mkdtemp(%.*s)", (int)_t516.len, (const char*)_t516.data);
-            return _t517;
+    bool _t511 = forge_str_eq(name, FORGE_STR("mkdtemp"));
+    if (_t511) {
+        int32_t _t512 = args.len;
+        bool _t513 = (_t512 > 0);
+        if (_t513) {
+            LValue* _t514 = args.data[0];
+            forge_string _t515 = CGen_emit_value(self, _t514);
+            forge_string _t516 = forge_sprintf("forge_mkdtemp(%.*s)", (int)_t515.len, (const char*)_t515.data);
+            return _t516;
         }
     }
-    bool _t518 = forge_str_eq(name, FORGE_STR("itoa"));
-    if (_t518) {
-        int32_t _t519 = args.len;
-        bool _t520 = (_t519 > 0);
-        if (_t520) {
-            LValue* _t521 = args.data[0];
-            forge_string _t522 = CGen_emit_value(self, _t521);
-            forge_string _t523 = forge_sprintf("forge_itoa(%.*s)", (int)_t522.len, (const char*)_t522.data);
-            return _t523;
+    bool _t517 = forge_str_eq(name, FORGE_STR("itoa"));
+    if (_t517) {
+        int32_t _t518 = args.len;
+        bool _t519 = (_t518 > 0);
+        if (_t519) {
+            LValue* _t520 = args.data[0];
+            forge_string _t521 = CGen_emit_value(self, _t520);
+            forge_string _t522 = forge_sprintf("forge_itoa(%.*s)", (int)_t521.len, (const char*)_t521.data);
+            return _t522;
         }
     }
-    bool _t524 = forge_str_eq(name, FORGE_STR("atoi"));
-    if (_t524) {
-        int32_t _t525 = args.len;
-        bool _t526 = (_t525 > 0);
-        if (_t526) {
-            LValue* _t527 = args.data[0];
-            forge_string _t528 = CGen_emit_value(self, _t527);
-            forge_string _t529 = forge_sprintf("forge_atoi(%.*s)", (int)_t528.len, (const char*)_t528.data);
-            return _t529;
+    bool _t523 = forge_str_eq(name, FORGE_STR("atoi"));
+    if (_t523) {
+        int32_t _t524 = args.len;
+        bool _t525 = (_t524 > 0);
+        if (_t525) {
+            LValue* _t526 = args.data[0];
+            forge_string _t527 = CGen_emit_value(self, _t526);
+            forge_string _t528 = forge_sprintf("forge_atoi(%.*s)", (int)_t527.len, (const char*)_t527.data);
+            return _t528;
         }
     }
-    bool _t530 = forge_str_eq(name, FORGE_STR("char_to_string"));
-    if (_t530) {
-        int32_t _t531 = args.len;
-        bool _t532 = (_t531 > 0);
-        if (_t532) {
-            LValue* _t533 = args.data[0];
-            forge_string _t534 = CGen_emit_value(self, _t533);
-            forge_string _t535 = forge_sprintf("forge_char_to_string(%.*s)", (int)_t534.len, (const char*)_t534.data);
-            return _t535;
+    bool _t529 = forge_str_eq(name, FORGE_STR("char_to_string"));
+    if (_t529) {
+        int32_t _t530 = args.len;
+        bool _t531 = (_t530 > 0);
+        if (_t531) {
+            LValue* _t532 = args.data[0];
+            forge_string _t533 = CGen_emit_value(self, _t532);
+            forge_string _t534 = forge_sprintf("forge_char_to_string(%.*s)", (int)_t533.len, (const char*)_t533.data);
+            return _t534;
         }
     }
-    bool _t536 = forge_str_eq(name, FORGE_STR("hash_string"));
-    if (_t536) {
-        int32_t _t537 = args.len;
-        bool _t538 = (_t537 > 0);
-        if (_t538) {
-            LValue* _t539 = args.data[0];
-            forge_string _t540 = CGen_emit_value(self, _t539);
-            forge_string _t541 = forge_sprintf("forge_hash_string(%.*s)", (int)_t540.len, (const char*)_t540.data);
-            return _t541;
+    bool _t535 = forge_str_eq(name, FORGE_STR("hash_string"));
+    if (_t535) {
+        int32_t _t536 = args.len;
+        bool _t537 = (_t536 > 0);
+        if (_t537) {
+            LValue* _t538 = args.data[0];
+            forge_string _t539 = CGen_emit_value(self, _t538);
+            forge_string _t540 = forge_sprintf("forge_hash_string(%.*s)", (int)_t539.len, (const char*)_t539.data);
+            return _t540;
         }
     }
-    bool _t542 = forge_str_eq(name, FORGE_STR("exec_command"));
-    if (_t542) {
+    bool _t541 = forge_str_eq(name, FORGE_STR("exec_command"));
+    if (_t541) {
         self->needs_exec_cmd = true;
-        int32_t _t543 = args.len;
-        bool _t544 = (_t543 >= 2);
-        if (_t544) {
-            LValue* _t545 = args.data[0];
-            forge_string _t546 = CGen_emit_value(self, _t545);
-            LValue* _t547 = args.data[1];
-            forge_string _t548 = CGen_emit_value(self, _t547);
-            forge_string _t549 = forge_sprintf("_forge_exec_command(%.*s, %.*s)", (int)_t546.len, (const char*)_t546.data, (int)_t548.len, (const char*)_t548.data);
-            return _t549;
+        int32_t _t542 = args.len;
+        bool _t543 = (_t542 >= 2);
+        if (_t543) {
+            LValue* _t544 = args.data[0];
+            forge_string _t545 = CGen_emit_value(self, _t544);
+            LValue* _t546 = args.data[1];
+            forge_string _t547 = CGen_emit_value(self, _t546);
+            forge_string _t548 = forge_sprintf("_forge_exec_command(%.*s, %.*s)", (int)_t545.len, (const char*)_t545.data, (int)_t547.len, (const char*)_t547.data);
+            return _t548;
         }
     }
-    bool _t550 = forge_str_eq(name, FORGE_STR("path_join"));
-    if (_t550) {
+    bool _t549 = forge_str_eq(name, FORGE_STR("path_join"));
+    if (_t549) {
         self->needs_path_join = true;
-        int32_t _t551 = args.len;
-        bool _t552 = (_t551 > 0);
-        if (_t552) {
-            LValue* _t553 = args.data[0];
-            forge_string _t554 = CGen_emit_value(self, _t553);
-            forge_string _t555 = forge_sprintf("_forge_path_join(%.*s)", (int)_t554.len, (const char*)_t554.data);
-            return _t555;
+        int32_t _t550 = args.len;
+        bool _t551 = (_t550 > 0);
+        if (_t551) {
+            LValue* _t552 = args.data[0];
+            forge_string _t553 = CGen_emit_value(self, _t552);
+            forge_string _t554 = forge_sprintf("_forge_path_join(%.*s)", (int)_t553.len, (const char*)_t553.data);
+            return _t554;
         }
     }
-    bool _t556 = forge_str_eq(name, FORGE_STR("path_dir"));
-    if (_t556) {
-        int32_t _t557 = args.len;
-        bool _t558 = (_t557 > 0);
-        if (_t558) {
-            LValue* _t559 = args.data[0];
-            forge_string _t560 = CGen_emit_value(self, _t559);
-            forge_string _t561 = forge_sprintf("forge_path_dir(%.*s)", (int)_t560.len, (const char*)_t560.data);
-            return _t561;
+    bool _t555 = forge_str_eq(name, FORGE_STR("path_dir"));
+    if (_t555) {
+        int32_t _t556 = args.len;
+        bool _t557 = (_t556 > 0);
+        if (_t557) {
+            LValue* _t558 = args.data[0];
+            forge_string _t559 = CGen_emit_value(self, _t558);
+            forge_string _t560 = forge_sprintf("forge_path_dir(%.*s)", (int)_t559.len, (const char*)_t559.data);
+            return _t560;
         }
     }
-    bool _t562 = forge_str_eq(name, FORGE_STR("path_base"));
-    if (_t562) {
-        int32_t _t563 = args.len;
-        bool _t564 = (_t563 > 0);
-        if (_t564) {
-            LValue* _t565 = args.data[0];
-            forge_string _t566 = CGen_emit_value(self, _t565);
-            forge_string _t567 = forge_sprintf("forge_path_base(%.*s)", (int)_t566.len, (const char*)_t566.data);
-            return _t567;
+    bool _t561 = forge_str_eq(name, FORGE_STR("path_base"));
+    if (_t561) {
+        int32_t _t562 = args.len;
+        bool _t563 = (_t562 > 0);
+        if (_t563) {
+            LValue* _t564 = args.data[0];
+            forge_string _t565 = CGen_emit_value(self, _t564);
+            forge_string _t566 = forge_sprintf("forge_path_base(%.*s)", (int)_t565.len, (const char*)_t565.data);
+            return _t566;
         }
     }
-    bool _t568 = forge_str_eq(name, FORGE_STR("path_ext"));
-    if (_t568) {
-        int32_t _t569 = args.len;
-        bool _t570 = (_t569 > 0);
-        if (_t570) {
-            LValue* _t571 = args.data[0];
-            forge_string _t572 = CGen_emit_value(self, _t571);
-            forge_string _t573 = forge_sprintf("forge_path_ext(%.*s)", (int)_t572.len, (const char*)_t572.data);
-            return _t573;
+    bool _t567 = forge_str_eq(name, FORGE_STR("path_ext"));
+    if (_t567) {
+        int32_t _t568 = args.len;
+        bool _t569 = (_t568 > 0);
+        if (_t569) {
+            LValue* _t570 = args.data[0];
+            forge_string _t571 = CGen_emit_value(self, _t570);
+            forge_string _t572 = forge_sprintf("forge_path_ext(%.*s)", (int)_t571.len, (const char*)_t571.data);
+            return _t572;
         }
     }
-    bool _t574 = forge_str_eq(name, FORGE_STR("new_string_builder"));
-    if (_t574) {
+    bool _t573 = forge_str_eq(name, FORGE_STR("new_string_builder"));
+    if (_t573) {
         return FORGE_STR("new_string_builder()");
     }
-    bool _t575 = forge_str_eq(name, FORGE_STR("new_dict"));
-    if (_t575) {
+    bool _t574 = forge_str_eq(name, FORGE_STR("new_dict"));
+    if (_t574) {
         return FORGE_STR("/* new_dict */");
     }
-    bool _t576 = forge_str_eq(name, FORGE_STR("to_string"));
-    if (_t576) {
-        int32_t _t577 = args.len;
-        bool _t578 = (_t577 > 0);
-        if (_t578) {
-            LValue* _t579 = args.data[0];
-            forge_string _t580 = CGen_emit_value(self, _t579);
-            forge_string _t581 = forge_sprintf("forge_to_string(%.*s)", (int)_t580.len, (const char*)_t580.data);
-            return _t581;
+    bool _t575 = forge_str_eq(name, FORGE_STR("to_string"));
+    if (_t575) {
+        int32_t _t576 = args.len;
+        bool _t577 = (_t576 > 0);
+        if (_t577) {
+            LValue* _t578 = args.data[0];
+            forge_string _t579 = CGen_emit_value(self, _t578);
+            forge_string _t580 = forge_sprintf("forge_to_string(%.*s)", (int)_t579.len, (const char*)_t579.data);
+            return _t580;
         }
     }
-    forge_string _t582 = forge_sprintf("c_backend: unhandled builtin: %.*s", (int)name.len, (const char*)name.data);
-    fprintf(stderr, "%.*s\n", (int)_t582.len, (const char*)_t582.data);
+    forge_string _t581 = forge_sprintf("c_backend: unhandled builtin: %.*s", (int)name.len, (const char*)name.data);
+    fprintf(stderr, "%.*s\n", (int)_t581.len, (const char*)_t581.data);
     return FORGE_STR("");
 }
 

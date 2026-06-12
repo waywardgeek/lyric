@@ -1167,7 +1167,7 @@ func collect_used_temps_in_value(v: LValue, used: Dict<Sym, bool>) {
   if v.kind == ValTemp {
     used.set(sym(f"{v.temp_id}"), true)
   }
-  if v.kind == ValIndexRef {
+  if v.kind == ValIndexRef || v.kind == ValClassFieldRef {
     if !isnull(v.collection) {
       collect_used_temps_in_value(v.collection!, used)
     }
@@ -1523,7 +1523,7 @@ func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>) {
   if v.kind == ValVar {
     used.set(sym(v.name), true)
   }
-  if v.kind == ValIndexRef {
+  if v.kind == ValIndexRef || v.kind == ValClassFieldRef {
     if !isnull(v.collection) {
       collect_used_var_names_in_value(v.collection!, used)
     }
@@ -1532,3 +1532,4 @@ func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>) {
     }
   }
 }
+

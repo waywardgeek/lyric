@@ -78,6 +78,7 @@ forge lir {
     ValLitBool
     ValLitNull
     ValIndexRef
+    ValClassFieldRef
   }
 
   class LValue {

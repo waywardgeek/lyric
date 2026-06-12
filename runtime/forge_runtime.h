@@ -298,6 +298,36 @@ static inline forge_string forge_str_join(forge_string sep, forge_string* parts,
     return (forge_string){.data = buf, .len = total, .cap = total};
 }
 
+/* Split string by separator, returns a slice of strings */
+static inline ForgeSlice_forge_string forge_str_split(forge_string s, forge_string sep) {
+    ForgeSlice_forge_string result = {.data = NULL, .len = 0, .cap = 0};
+    if (sep.len == 0) {
+        /* Split into individual bytes */
+        for (int32_t i = 0; i < s.len; i++) {
+            forge_string ch = forge_str_from_bytes(s.data + i, 1);
+            forge_push(&result, ch, forge_string);
+        }
+        return result;
+    }
+    const uint8_t* p = s.data;
+    int32_t remaining = s.len;
+    while (remaining >= 0) {
+        const uint8_t* found = (remaining >= sep.len) ?
+            forge_memmem(p, remaining, sep.data, sep.len) : NULL;
+        if (!found) {
+            forge_string part = forge_str_from_bytes(p, remaining);
+            forge_push(&result, part, forge_string);
+            break;
+        }
+        int32_t prefix_len = (int32_t)(found - p);
+        forge_string part = forge_str_from_bytes(p, prefix_len);
+        forge_push(&result, part, forge_string);
+        p = found + sep.len;
+        remaining -= prefix_len + sep.len;
+    }
+    return result;
+}
+
 /* forge_sprintf — heap-allocated formatted string.
  * NOTE: This uses C's printf family, which doesn't handle embedded \0.
  * Use only for format strings without embedded nulls. */

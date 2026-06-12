@@ -745,6 +745,10 @@ func CGen.emit_value(self, v: LValue?) -> string {
       let idx = self.emit_value(v!.index)
       return f"{coll}.data[{idx}]"
     }
+    ValClassFieldRef => {
+      let handle = self.emit_value(v!.collection)
+      return f"{handle}->{v!.name}"
+    }
   }
 }
 
@@ -1347,8 +1351,9 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
     }
   }
   if name == "string_split" || name == "str_split" {
-    let st = self.slice_type_name(LType { kind: TyString, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false })
-    return f"forge_slice_empty({st}) /* string_split not implemented */"
+    if len(args) >= 2 {
+      return f"forge_str_split({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+    }
   }
   if name == "string_trim" || name == "str_trim" {
     if len(args) > 0 {

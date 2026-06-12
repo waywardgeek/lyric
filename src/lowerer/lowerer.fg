@@ -2599,7 +2599,28 @@ forge lowerer {
     // Slice/list methods
     if !isnull(recv_type) && recv_type!.kind is TySlice {
       if method_name == "len" || method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "contains" || method_name == "reverse" || method_name == "join" {
-        let mut bargs: [LValue?] = [recv]
+        // For mutating methods on class field receivers, use a reference
+        // to avoid the copy-then-discard problem with value-type slice headers.
+        let is_mutating = method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "reverse"
+        let mut slice_val = recv
+        if is_mutating && !isnull(receiver) && receiver!.kind is FieldAccess {
+          match receiver!.kind {
+            FieldAccess(field_recv, field_name) => {
+              let field_recv_type = self.expr_type(field_recv)
+              if !isnull(field_recv_type) && field_recv_type!.kind is TyClassHandle {
+                let field_recv_val = self.lower_expr(field_recv)
+                slice_val = LValue {
+                  kind: ValClassFieldRef,
+                  name: field_name.name,
+                  typ: recv_type,
+                  collection: field_recv_val
+                }
+              }
+            }
+            _ => {}
+          }
+        }
+        let mut bargs: [LValue?] = [slice_val]
         for a in args {
           append(bargs, self.lower_expr(a))
         }

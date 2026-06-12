@@ -5,8 +5,8 @@ contains 'World': true
 has_prefix 'Hello': true
 has_suffix '!': true
 index_of 'World': 7
-split: 0 parts
-join: 
+split: 4 parts
+join: a | b | c | d
 trim: 'hello'
 replace: Hello, Forge!
 repeat: *****

@@ -1,1 +1,8 @@
-short circuit tests
+PASS  test_and_empty_slice
+PASS  test_and_match
+PASS  test_and_no_match
+PASS  test_or_zero
+PASS  test_or_large
+PASS  test_or_false
+
+6 tests, 6 passed, 0 failed

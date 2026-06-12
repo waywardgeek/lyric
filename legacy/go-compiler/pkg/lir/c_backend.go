@@ -2577,8 +2577,9 @@ func (g *cGen) emitBuiltin(d *LBuiltinData) string {
 			return fmt.Sprintf("forge_tolower(%s)", g.emitValue(&d.Args[0]))
 		}
 	case "string_split":
-		sliceType := g.sliceTypeName(&LType{Kind: LTyString})
-		return fmt.Sprintf("forge_slice_empty(%s) /* string_split not implemented */", sliceType)
+		if len(d.Args) >= 2 {
+			return fmt.Sprintf("forge_str_split(%s, %s)", g.emitValue(&d.Args[0]), g.emitValue(&d.Args[1]))
+		}
 	case "string_trim":
 		if len(d.Args) > 0 {
 			return fmt.Sprintf("forge_str_trim(%s)", g.emitValue(&d.Args[0]))
