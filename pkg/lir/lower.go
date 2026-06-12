@@ -1348,6 +1348,31 @@ func (l *Lowerer) lowerAssignStmt(stmt *ast.Stmt) {
 	if as.Target.Kind == ast.ExprFieldAccess {
 		fa := dataAs[ast.FieldAccessExpr](as.Target.Data)
 
+		// Check for slice element struct field write: slice[i].field = value
+		// Must emit slice.data[i].field = value (lvalue chain), NOT copy-then-modify.
+		// Only for struct elements — class elements are pointers and need -> (handled below).
+		if fa.Receiver.Kind == ast.ExprIndex {
+			idx := dataAs[ast.IndexExpr](fa.Receiver.Data)
+			coll := l.lowerExpr(&idx.Receiver)
+			index := l.lowerExpr(&idx.Index)
+			// Check element type: only use lvalue chain for structs, not class handles
+			isStructElem := true
+			if coll.Type != nil && coll.Type.Kind == LTySlice && coll.Type.Elem != nil {
+				if coll.Type.Elem.Kind == LTyClassHandle {
+					isStructElem = false
+				}
+			}
+			if isStructElem {
+				l.emit(LStmt{Kind: LStmtIndexSet, Data: &LIndexSet{
+					Collection: coll,
+					Index:      index,
+					Value:      val,
+					Field:      fa.Field,
+				}})
+				return
+			}
+		}
+
 		// Check for optional struct write-through pattern:
 		// class_obj.optional_struct_field!.field = value
 		// Should emit: obj->field.val.subfield = value (direct lvalue chain)

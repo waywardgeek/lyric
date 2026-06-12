@@ -445,11 +445,12 @@ type LClassSet struct {
 	Value  LValue
 }
 
-// LIndexSet: collection[index] = value
+// LIndexSet: collection[index] = value, or collection[index].field = value when Field is set
 type LIndexSet struct {
 	Collection LValue
 	Index      LValue
 	Value      LValue
+	Field      string // optional: for slice[i].field = value (struct element field write)
 }
 
 // LIf: if cond { then } [else { else }]

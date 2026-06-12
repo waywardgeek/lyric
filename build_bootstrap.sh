@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 OUTPUT="${1:-./bootstrap1}"
 TMPDIR_BUILD=$(mktemp -d)
-trap "rm -rf $TMPDIR_BUILD" EXIT
+# trap "rm -rf $TMPDIR_BUILD" EXIT
 
 BOOTSTRAP_FILES=(
   bootstrap/ast/ast.fg

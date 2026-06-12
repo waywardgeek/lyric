@@ -549,6 +549,7 @@ func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, 
     receiver: recv,
     receiver_type_params: [],
     relational_constraints: [],
+    class_rename_map: rename_map,
   }
 }
 
@@ -585,6 +586,9 @@ func MonoPass.specialize_struct(self, orig: LStructDecl, subst: Dict<Sym, LType?
 
 func MonoPass.build_class_rename_map(self, subst: Dict<Sym, LType?>?) -> Dict<Sym, string>? {
   let renames = Dict<Sym, string>()
+  if isnull(subst) {
+    return renames
+  }
   // Check all generic classes
   let class_names = self.class_by_name!.keys()
   let mut i = 0
@@ -2650,10 +2654,456 @@ func resolve_class_names(prog: LProgram?) {
   let mut i = 0
   while i < len(prog!.functions) {
     let f = prog!.functions[i]
-    // Skip if no class rename map
-    // In bootstrap, we'd need ClassRenameMap on LFuncDecl — currently not present.
-    // This is handled by the Go compiler; for bootstrap we skip this phase
-    // since the bootstrap compiler doesn't use class_rename_map on funcs yet.
+    if isnull(f.class_rename_map) {
+      i = i + 1
+      continue
+    }
+    let renames = f.class_rename_map!
+    // Rewrite params
+    let mut j = 0
+    while j < len(f.params) {
+      resolve_class_type(f.params[j].typ, renames)
+      j = j + 1
+    }
+    // Rewrite return type
+    resolve_class_type(f.return_type, renames)
+    // Rewrite body
+    resolve_class_stmts(f.body, renames)
+    i = i + 1
+  }
+}
+
+func resolve_class_stmts(stmts: [LStmt?], renames: Dict<Sym, string>) {
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) {
+      resolve_class_stmt(stmts[i]!, renames)
+    }
+    i = i + 1
+  }
+}
+
+func resolve_class_stmt(s: LStmt, renames: Dict<Sym, string>) {
+  match s.kind {
+    StTempDef => {
+      if !isnull(s.temp_def) {
+        let td = s.temp_def!
+        if !isnull(td.expr) {
+          resolve_class_expr(td.expr!, renames)
+        }
+      }
+    }
+    StVarDecl => {
+      if !isnull(s.var_decl) {
+        let mut vd = s.var_decl!
+        resolve_class_type(vd.typ, renames)
+        if !isnull(vd.init) {
+          resolve_class_value(vd.init!, renames)
+        }
+        s.var_decl = vd
+      }
+    }
+    StAssign => {
+      if !isnull(s.assign) {
+        let ad = s.assign!
+        if !isnull(ad.value) {
+          resolve_class_value(ad.value!, renames)
+        }
+      }
+    }
+    StReturn => {
+      if !isnull(s.ret) {
+        let rd = s.ret!
+        let mut j = 0
+        while j < len(rd.values) {
+          if !isnull(rd.values[j]) {
+            resolve_class_value(rd.values[j]!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    StIf => {
+      if !isnull(s.if_data) {
+        let id = s.if_data!
+        if !isnull(id.cond) {
+          resolve_class_value(id.cond!, renames)
+        }
+        resolve_class_stmts(id.then_body, renames)
+        resolve_class_stmts(id.else_body, renames)
+      }
+    }
+    StWhile => {
+      if !isnull(s.while_data) {
+        let wd = s.while_data!
+        resolve_class_stmts(wd.cond_block, renames)
+        if !isnull(wd.cond_var) {
+          resolve_class_value(wd.cond_var!, renames)
+        }
+        resolve_class_stmts(wd.body, renames)
+      }
+    }
+    StFor => {
+      if !isnull(s.for_data) {
+        let mut fd = s.for_data!
+        resolve_class_type(fd.var_type, renames)
+        if !isnull(fd.collection) {
+          resolve_class_value(fd.collection!, renames)
+        }
+        resolve_class_stmts(fd.body, renames)
+        s.for_data = fd
+      }
+    }
+    StSwitch => {
+      if !isnull(s.switch_data) {
+        let sd = s.switch_data!
+        if !isnull(sd.tag) {
+          resolve_class_value(sd.tag!, renames)
+        }
+        let mut j = 0
+        while j < len(sd.cases) {
+          resolve_class_stmts(sd.cases[j].body, renames)
+          j = j + 1
+        }
+      }
+    }
+    StTypeSwitch => {
+      if !isnull(s.type_switch) {
+        let ts = s.type_switch!
+        if !isnull(ts.value) {
+          resolve_class_value(ts.value!, renames)
+        }
+        let mut j = 0
+        while j < len(ts.cases) {
+          resolve_class_stmts(ts.cases[j].body, renames)
+          j = j + 1
+        }
+      }
+    }
+    StClassSet => {
+      if !isnull(s.class_set) {
+        let mut cs = s.class_set!
+        let entry = renames.get(sym(cs.class_name))
+        if !isnull(entry) {
+          cs.class_name = entry!.value
+        }
+        if !isnull(cs.handle) {
+          resolve_class_value(cs.handle!, renames)
+        }
+        if !isnull(cs.value) {
+          resolve_class_value(cs.value!, renames)
+        }
+        s.class_set = cs
+      }
+    }
+    StSideEffect => {
+      if !isnull(s.side_effect) {
+        let se = s.side_effect!
+        if !isnull(se.expr) {
+          resolve_class_expr(se.expr!, renames)
+        }
+      }
+    }
+    StBlock => {
+      if !isnull(s.block) {
+        resolve_class_stmts(s.block!.stmts, renames)
+      }
+    }
+    StMultiAssign => {
+      if !isnull(s.multi_assign) {
+        let ma = s.multi_assign!
+        let mut j = 0
+        while j < len(ma.types) {
+          resolve_class_type(ma.types[j], renames)
+          j = j + 1
+        }
+        if !isnull(ma.expr) {
+          resolve_class_expr(ma.expr!, renames)
+        }
+      }
+    }
+    StDefer => {
+      if !isnull(s.defer_data) {
+        resolve_class_stmts(s.defer_data!.body, renames)
+      }
+    }
+    StSpawn => {
+      if !isnull(s.spawn_data) {
+        resolve_class_stmts(s.spawn_data!.body, renames)
+      }
+    }
+    StLock => {
+      if !isnull(s.lock_data) {
+        let ld = s.lock_data!
+        if !isnull(ld.mutex) {
+          resolve_class_value(ld.mutex!, renames)
+        }
+        resolve_class_stmts(ld.body, renames)
+      }
+    }
+    _ => {}
+  }
+}
+
+func resolve_class_expr(e: LExpr, renames: Dict<Sym, string>) {
+  resolve_class_type(e.typ, renames)
+  match e.kind {
+    ExCall => {
+      if !isnull(e.call) {
+        let cd = e.call!
+        let mut j = 0
+        while j < len(cd.args) {
+          if !isnull(cd.args[j]) {
+            resolve_class_value(cd.args[j]!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExMethodCall => {
+      if !isnull(e.method_call) {
+        let md = e.method_call!
+        if !isnull(md.receiver) {
+          resolve_class_value(md.receiver!, renames)
+        }
+        let mut j = 0
+        while j < len(md.args) {
+          if !isnull(md.args[j]) {
+            resolve_class_value(md.args[j]!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExClassGet => {
+      if !isnull(e.class_get) {
+        let mut cg = e.class_get!
+        let entry = renames.get(sym(cg.class_name))
+        if !isnull(entry) {
+          cg.class_name = entry!.value
+        }
+        if !isnull(cg.handle) {
+          resolve_class_value(cg.handle!, renames)
+        }
+        e.class_get = cg
+      }
+    }
+    ExClassAlloc => {
+      if !isnull(e.class_alloc) {
+        let ca = e.class_alloc!
+        let entry = renames.get(sym(ca.class_name))
+        if !isnull(entry) {
+          ca.class_name = entry!.value
+        }
+        let mut j = 0
+        while j < len(ca.fields) {
+          if !isnull(ca.fields[j].value) {
+            resolve_class_value(ca.fields[j].value!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExBinOp => {
+      if !isnull(e.bin_op) {
+        let bo = e.bin_op!
+        if !isnull(bo.left) {
+          resolve_class_value(bo.left!, renames)
+        }
+        if !isnull(bo.right) {
+          resolve_class_value(bo.right!, renames)
+        }
+      }
+    }
+    ExCast => {
+      if !isnull(e.cast) {
+        let mut cd = e.cast!
+        if !isnull(cd.operand) {
+          resolve_class_value(cd.operand!, renames)
+        }
+        resolve_class_type(cd.target, renames)
+        e.cast = cd
+      }
+    }
+    ExStructField => {
+      if !isnull(e.struct_field) {
+        let sf = e.struct_field!
+        if !isnull(sf.receiver) {
+          resolve_class_value(sf.receiver!, renames)
+        }
+      }
+    }
+    ExFormat => {
+      if !isnull(e.format) {
+        let fd = e.format!
+        let mut j = 0
+        while j < len(fd.parts) {
+          if !fd.parts[j].is_literal {
+            if !isnull(fd.parts[j].value) {
+              resolve_class_value(fd.parts[j].value!, renames)
+            }
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExFuncLit => {
+      if !isnull(e.func_lit) {
+        let fl = e.func_lit!
+        let mut j = 0
+        while j < len(fl.params) {
+          resolve_class_type(fl.params[j].typ, renames)
+          j = j + 1
+        }
+        resolve_class_type(fl.return_type, renames)
+        resolve_class_stmts(fl.body, renames)
+      }
+    }
+    ExWrapOptional => {
+      if !isnull(e.wrap_opt) {
+        let wo = e.wrap_opt!
+        if !isnull(wo.value) {
+          resolve_class_value(wo.value!, renames)
+        }
+      }
+    }
+    ExUnwrapOptional => {
+      if !isnull(e.unwrap_opt) {
+        let uo = e.unwrap_opt!
+        if !isnull(uo.value) {
+          resolve_class_value(uo.value!, renames)
+        }
+      }
+    }
+    ExIsNull => {
+      if !isnull(e.is_null) {
+        let in_data = e.is_null!
+        if !isnull(in_data.value) {
+          resolve_class_value(in_data.value!, renames)
+        }
+      }
+    }
+    ExMakeResult => {
+      if !isnull(e.make_result) {
+        let mr = e.make_result!
+        if !isnull(mr.value) {
+          resolve_class_value(mr.value!, renames)
+        }
+        if !isnull(mr.err) {
+          resolve_class_value(mr.err!, renames)
+        }
+      }
+    }
+    ExIndexGet => {
+      if !isnull(e.index_get) {
+        let ig = e.index_get!
+        if !isnull(ig.collection) {
+          resolve_class_value(ig.collection!, renames)
+        }
+        if !isnull(ig.index) {
+          resolve_class_value(ig.index!, renames)
+        }
+      }
+    }
+    ExMakeSlice => {}
+    ExStructLit => {
+      if !isnull(e.struct_lit) {
+        let sl = e.struct_lit!
+        let mut j = 0
+        while j < len(sl.fields) {
+          if !isnull(sl.fields[j].value) {
+            resolve_class_value(sl.fields[j].value!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExVariantConstruct => {
+      if !isnull(e.variant_construct) {
+        let vc = e.variant_construct!
+        let mut j = 0
+        while j < len(vc.fields) {
+          if !isnull(vc.fields[j]) {
+            resolve_class_value(vc.fields[j]!, renames)
+          }
+          j = j + 1
+        }
+      }
+    }
+    ExVariantData => {
+      if !isnull(e.variant_data) {
+        let vd = e.variant_data!
+        if !isnull(vd.value) {
+          resolve_class_value(vd.value!, renames)
+        }
+      }
+    }
+    ExVariantTag => {
+      if !isnull(e.variant_tag) {
+        let vt = e.variant_tag!
+        if !isnull(vt.value) {
+          resolve_class_value(vt.value!, renames)
+        }
+      }
+    }
+    ExExtractValue => {
+      if !isnull(e.extract_value) {
+        let ev = e.extract_value!
+        if !isnull(ev.value) {
+          resolve_class_value(ev.value!, renames)
+        }
+      }
+    }
+    ExExtractError => {
+      if !isnull(e.extract_error) {
+        let ee = e.extract_error!
+        if !isnull(ee.value) {
+          resolve_class_value(ee.value!, renames)
+        }
+      }
+    }
+    ExUnOp => {
+      if !isnull(e.un_op) {
+        let uo = e.un_op!
+        if !isnull(uo.operand) {
+          resolve_class_value(uo.operand!, renames)
+        }
+      }
+    }
+    _ => {}
+  }
+}
+
+func resolve_class_value(v: LValue, renames: Dict<Sym, string>) {
+  resolve_class_type(v.typ, renames)
+}
+
+func resolve_class_type(t: LType?, renames: Dict<Sym, string>) {
+  if isnull(t) {
+    return
+  }
+  if t!.kind == TyClassHandle {
+    let entry = renames.get(sym(t!.name))
+    if !isnull(entry) {
+      t!.name = entry!.value
+    }
+  }
+  resolve_class_type(t!.elem, renames)
+  resolve_class_type(t!.key, renames)
+  resolve_class_type(t!.ret, renames)
+  let mut i = 0
+  while i < len(t!.type_args) {
+    resolve_class_type(t!.type_args[i], renames)
+    i = i + 1
+  }
+  i = 0
+  while i < len(t!.fields) {
+    resolve_class_type(t!.fields[i].typ, renames)
+    i = i + 1
+  }
+  i = 0
+  while i < len(t!.params) {
+    resolve_class_type(t!.params[i], renames)
     i = i + 1
   }
 }
@@ -2933,34 +3383,45 @@ func monomorphize(prog: LProgram?) {
   }
 
   // Phase 5: Rewrite signatures and field types
+  // LFuncDecl/LClassDecl/LStructDecl are structs in slices.
+  // Must copy-out, modify, write-back to persist changes.
   i = 0
   while i < len(prog!.functions) {
+    let mut f = prog!.functions[i]
     let mut j = 0
-    while j < len(prog!.functions[i].params) {
-      prog!.functions[i].params[j].typ = m.subst_type_remove_vars(prog!.functions[i].params[j].typ)
+    while j < len(f.params) {
+      f.params[j].typ = m.subst_type_remove_vars(f.params[j].typ)
       j = j + 1
     }
-    prog!.functions[i].return_type = m.subst_type_remove_vars(prog!.functions[i].return_type)
+    f.return_type = m.subst_type_remove_vars(f.return_type)
+    prog!.functions[i] = f
     i = i + 1
   }
   i = 0
   while i < len(prog!.classes) {
+    let mut c = prog!.classes[i]
     let mut j = 0
-    while j < len(prog!.classes[i].fields) {
-      prog!.classes[i].fields[j].typ = m.subst_type_remove_vars(prog!.classes[i].fields[j].typ)
+    while j < len(c.fields) {
+      c.fields[j].typ = m.subst_type_remove_vars(c.fields[j].typ)
       j = j + 1
     }
+    prog!.classes[i] = c
     i = i + 1
   }
   i = 0
   while i < len(prog!.structs) {
+    let mut s = prog!.structs[i]
     let mut j = 0
-    while j < len(prog!.structs[i].fields) {
-      prog!.structs[i].fields[j].typ = m.subst_type_remove_vars(prog!.structs[i].fields[j].typ)
+    while j < len(s.fields) {
+      s.fields[j].typ = m.subst_type_remove_vars(s.fields[j].typ)
       j = j + 1
     }
+    prog!.structs[i] = s
     i = i + 1
   }
+
+  // Phase 6: Resolve bare generic class names using per-function ClassRenameMap
+  resolve_class_names(prog)
 
   // Export rename map
   prog!.class_renames = m.class_renames

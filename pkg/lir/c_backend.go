@@ -1280,6 +1280,8 @@ func (g *cGen) emitStmt(s *LStmt) {
 		d := s.Data.(*LIndexSet)
 		if d.Collection.Type != nil && d.Collection.Type.Kind == LTyMap {
 			g.linef("/* map set not implemented */")
+		} else if d.Field != "" {
+			g.linef("%s.data[%s].%s = %s;", g.emitValue(&d.Collection), g.emitValue(&d.Index), d.Field, g.emitValue(&d.Value))
 		} else {
 			g.linef("%s.data[%s] = %s;", g.emitValue(&d.Collection), g.emitValue(&d.Index), g.emitValue(&d.Value))
 		}

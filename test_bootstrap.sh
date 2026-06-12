@@ -8,7 +8,7 @@ FORGE="./forge"
 BOOTSTRAP="/tmp/bootstrap"
 RUNTIME_DIR="runtime"
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+# trap "rm -rf $TMPDIR" EXIT
 
 VERBOSE=false
 PATTERN=""
