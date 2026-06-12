@@ -1,0 +1,4 @@
+PASS  test_is_basic
+PASS  test_is_in_conditions
+
+2 tests, 2 passed, 0 failed

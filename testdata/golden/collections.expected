@@ -1,0 +1,8 @@
+size: 3
+peek: 30
+popped: 30
+size after pop: 2
+doubled len: 5, first: 2
+strings len: 5, first: 1
+tripled len: 5, first: 3
+collections done

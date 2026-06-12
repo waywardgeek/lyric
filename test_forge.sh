@@ -4,6 +4,7 @@
 #
 # Builds forge from forge.c, then compiles+runs each test file.
 # Test files with test_ functions use `forge test`, others use `forge compile`.
+# If a golden file exists in testdata/golden/, output is compared.
 
 set -euo pipefail
 
@@ -11,6 +12,7 @@ cd "$(dirname "$0")"
 
 RUNTIME_DIR="runtime"
 TMPDIR=$(mktemp -d -t forge_test_XXXXXX)
+GOLDEN_DIR="testdata/golden"
 trap "rm -rf $TMPDIR" EXIT
 
 VERBOSE=false
@@ -29,7 +31,6 @@ make -s forge
 FORGE="./forge"
 echo ""
 
-# Skip files that use features not yet implemented (channels, spawn, select, lock)
 SKIP_FILES="guarded_by.fg"
 
 PASS=0
@@ -39,6 +40,7 @@ FAILURES=""
 
 for fg in testdata/*.fg; do
   name=$(basename "$fg")
+  base="${name%.fg}"
 
   # Filter by pattern if given
   if [ -n "$PATTERN" ] && [[ "$name" != *"$PATTERN"* ]]; then
@@ -74,8 +76,8 @@ for fg in testdata/*.fg; do
     test_min.fg) DEPS="src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
   esac
 
-  out_c="$TMPDIR/${name%.fg}.c"
-  out_bin="$TMPDIR/${name%.fg}"
+  out_c="$TMPDIR/${base}.c"
+  out_bin="$TMPDIR/${base}"
 
   # Step 1: Compile .fg → .c
   if ! $FORGE $CMD "$fg" $DEPS -o "$out_c" 2>"$TMPDIR/err"; then
@@ -87,15 +89,8 @@ for fg in testdata/*.fg; do
     continue
   fi
 
-  # For `forge test`, the test already ran — check exit code (already checked above)
-  if [ "$CMD" = "test" ]; then
-    PASS=$((PASS + 1))
-    echo "PASS  $name"
-    continue
-  fi
-
   # Step 2: GCC compile
-  if ! gcc -std=gnu11 -O2 -o "$out_bin" "$out_c" -I "$RUNTIME_DIR" 2>"$TMPDIR/err"; then
+  if ! gcc -std=gnu11 -O2 -w -o "$out_bin" "$out_c" -I "$RUNTIME_DIR" -lm -lpthread 2>"$TMPDIR/err"; then
     FAIL=$((FAIL + 1))
     err=$(head -5 "$TMPDIR/err")
     FAILURES="$FAILURES\nFAIL  $name  (gcc: $err)"
@@ -104,14 +99,26 @@ for fg in testdata/*.fg; do
     continue
   fi
 
-  # Step 3: Run
-  if ! "$out_bin" >"$TMPDIR/stdout" 2>"$TMPDIR/stderr"; then
+  # Step 3: Run and capture output
+  if ! "$out_bin" >"$TMPDIR/${base}.out" 2>"$TMPDIR/stderr"; then
     FAIL=$((FAIL + 1))
     err=$(tail -5 "$TMPDIR/stderr")
     FAILURES="$FAILURES\nFAIL  $name  (runtime: $err)"
     echo "FAIL  $name  (runtime)"
     if $VERBOSE; then tail -10 "$TMPDIR/stderr"; fi
     continue
+  fi
+
+  # Step 4: Compare against golden output (if exists)
+  golden="$GOLDEN_DIR/${base}.expected"
+  if [ -f "$golden" ]; then
+    if ! diff -q "$golden" "$TMPDIR/${base}.out" >/dev/null 2>&1; then
+      FAIL=$((FAIL + 1))
+      FAILURES="$FAILURES\nFAIL  $name  (output mismatch)"
+      echo "FAIL  $name  (output mismatch)"
+      if $VERBOSE; then diff -u "$golden" "$TMPDIR/${base}.out" | head -30; fi
+      continue
+    fi
   fi
 
   PASS=$((PASS + 1))

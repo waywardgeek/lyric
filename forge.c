@@ -74015,15 +74015,15 @@ forge_string emit_test_runner(ForgeSlice_forge_string test_funcs) {
     StringBuilder_write(sb, FORGE_STR("        }\n"));
     forge_string _t25 = FORGE_STR("        if (_forge_test_failed) {\n");
     StringBuilder_write(sb, _t25);
-    StringBuilder_write(sb, FORGE_STR("            fprintf(stderr, \"FAIL  %s\\n\", _tests[_i].name);\n"));
+    StringBuilder_write(sb, FORGE_STR("            printf(\"FAIL  %s\\n\", _tests[_i].name);\n"));
     StringBuilder_write(sb, FORGE_STR("            _failed_count++;\n"));
     forge_string _t29 = FORGE_STR("        } else {\n");
     StringBuilder_write(sb, _t29);
-    StringBuilder_write(sb, FORGE_STR("            fprintf(stderr, \"PASS  %s\\n\", _tests[_i].name);\n"));
+    StringBuilder_write(sb, FORGE_STR("            printf(\"PASS  %s\\n\", _tests[_i].name);\n"));
     StringBuilder_write(sb, FORGE_STR("            _passed++;\n"));
     StringBuilder_write(sb, FORGE_STR("        }\n"));
     StringBuilder_write(sb, FORGE_STR("    }\n"));
-    StringBuilder_write(sb, FORGE_STR("    fprintf(stderr, \"\\n%d tests, %d passed, %d failed\\n\", _total, _passed, _failed_count);\n"));
+    StringBuilder_write(sb, FORGE_STR("    printf(\"\\n%d tests, %d passed, %d failed\\n\", _total, _passed, _failed_count);\n"));
     StringBuilder_write(sb, FORGE_STR("    return _failed_count > 0 ? 1 : 0;\n"));
     StringBuilder_write(sb, FORGE_STR("}\n"));
     forge_string _t38 = StringBuilder_to_string(sb);

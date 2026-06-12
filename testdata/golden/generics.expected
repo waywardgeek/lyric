@@ -1,0 +1,4 @@
+identity<i32>(42) = 42
+identity<string>("hello") = hello
+max<i32>(10, 20) = 20
+identity<i64>(100) = 100

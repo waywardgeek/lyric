@@ -1,0 +1,6 @@
+=== Forge HTTP Example ===
+Status: 200, Body: Hello from /hello!
+Status: 200, Body: Hello World
+Process: Hello from /hello!
+Expected error: handler failed
+POST request

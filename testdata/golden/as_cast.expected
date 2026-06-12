@@ -1,0 +1,5 @@
+PASS  test_basic_cast
+PASS  test_downcast
+PASS  test_cast_in_expression
+
+3 tests, 3 passed, 0 failed

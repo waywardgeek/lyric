@@ -1,0 +1,6 @@
+PASS  test_list_dir
+PASS  test_file_exists
+PASS  test_mkdtemp
+PASS  test_os_getwd
+
+4 tests, 4 passed, 0 failed

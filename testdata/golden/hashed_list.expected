@@ -1,0 +1,10 @@
+found 200: 20
+999 not found
+count: 3
+removed 100: true
+count after remove: 2
+200 still there: 20
+100 gone
+200 replaced: 99
+count after replace: 2
+done

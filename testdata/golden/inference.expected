@@ -1,0 +1,6 @@
+identity(42) = 42
+identity(hello) = hello
+first([10,20,30]) = 10
+doubled: 20, 40, 60
+max(10, 20) = 20
+identity<i64>(100) = 100

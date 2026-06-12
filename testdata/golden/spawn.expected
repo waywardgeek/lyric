@@ -1,0 +1,6 @@
+hello from goroutine: 42
+item: 1
+item: 2
+item: 3
+third goroutine
+all done

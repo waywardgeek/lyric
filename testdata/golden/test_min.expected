@@ -1,0 +1,7 @@
+return 42: OKPASS  test_return_value
+expr 42: OKPASS  test_expr_stmt
+break: OKPASS  test_break
+nested {}: OKPASS  test_nested_block
+while: OKPASS  test_while
+
+5 tests, 5 passed, 0 failed

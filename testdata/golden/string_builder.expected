@@ -1,0 +1,8 @@
+PASS  test_basic_write
+PASS  test_write_byte
+PASS  test_mixed_write
+PASS  test_empty_write
+PASS  test_len
+PASS  test_large_append
+
+6 tests, 6 passed, 0 failed

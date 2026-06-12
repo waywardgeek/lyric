@@ -1,0 +1,20 @@
+len: 13
+HELLO, WORLD!
+hello, world!
+contains 'World': true
+has_prefix 'Hello': true
+has_suffix '!': true
+index_of 'World': 7
+split: 0 parts
+join: 
+trim: 'hello'
+replace: Hello, Forge!
+repeat: *****
+list len: 3
+contains 20: true
+last: 30
+after pop: 2
+has alice: true
+keys count: 3
+removed bob: true
+has bob after remove: false

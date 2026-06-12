@@ -1,0 +1,6 @@
+PASS  test_mut_slice_append
+PASS  test_mut_string_slice
+PASS  test_mut_primitive
+PASS  test_mut_swap
+
+4 tests, 4 passed, 0 failed

@@ -1,0 +1,7 @@
+PASS  test_basic_if_expr
+PASS  test_false_branch
+PASS  test_if_expr_with_variable
+PASS  test_if_expr_in_arithmetic
+PASS  test_if_expr_string
+
+5 tests, 5 passed, 0 failed

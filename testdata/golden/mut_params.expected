@@ -1,0 +1,5 @@
+PASS  test_mut_param
+PASS  test_mut_set
+PASS  test_mut_chain
+
+3 tests, 3 passed, 0 failed

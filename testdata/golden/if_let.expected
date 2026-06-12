@@ -1,0 +1,9 @@
+PASS  test_if_let_match
+PASS  test_if_let_no_match
+PASS  test_if_let_else_match
+PASS  test_if_let_else_no_match
+PASS  test_let_else_match
+PASS  test_let_else_no_match
+PASS  test_let_else_rect
+
+7 tests, 7 passed, 0 failed

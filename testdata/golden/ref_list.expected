@@ -1,0 +1,11 @@
+Alice
+Bob
+Carol
+after remove:
+Alice
+Carol
+g1 parent null: true
+g3 parent null: true
+g1 name: Alice
+g2 name: Bob
+g3 name: Carol

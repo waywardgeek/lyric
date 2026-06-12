@@ -1,0 +1,37 @@
+PASS  test_keywords_statement
+PASS  test_keywords_type
+PASS  test_keywords_other
+PASS  test_keywords_concurrency
+PASS  test_identifier_simple
+PASS  test_identifier_starts_with_keyword
+PASS  test_int_literal
+PASS  test_float_literal
+PASS  test_string_basic
+PASS  test_string_escapes
+PASS  test_string_empty
+PASS  test_char_literal
+PASS  test_char_escape
+PASS  test_fstring
+PASS  test_punctuation
+PASS  test_operators_arithmetic
+PASS  test_operators_comparison
+PASS  test_operators_logical
+PASS  test_operators_bitwise
+PASS  test_operators_compound_assign
+PASS  test_line_comment_skipped
+PASS  test_position_first_token
+PASS  test_position_second_line
+PASS  test_peek_does_not_consume
+PASS  test_empty_input
+PASS  test_eof_repeated
+PASS  test_newline_token
+PASS  test_annotation_keywords
+PASS  test_let_declaration
+PASS  test_function_header
+PASS  test_save_restore
+PASS  test_bracket_depth_parens
+PASS  test_bracket_depth_brackets
+PASS  test_bracket_depth_braces_do_not_suppress
+PASS  test_contextual_keywords_as_ident
+
+35 tests, 35 passed, 0 failed
