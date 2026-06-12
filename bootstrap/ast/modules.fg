@@ -80,9 +80,7 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
     let pkg_blocks = merged_pkg!.fb_children()
     for j in range(0, len(pkg_blocks)) {
       let block = pkg_blocks[j]
-      let result = prefix_block_declarations(block, prefix, cur_orig, cur_prefixed)
-      cur_orig = result._0
-      cur_prefixed = result._1
+      prefix_block_declarations(block, prefix, mut cur_orig, mut cur_prefixed)
     }
 
     alias_names = append(alias_names, alias)
@@ -145,16 +143,14 @@ func prefix_sym(s: Sym?, prefix: string) -> Sym? {
 // ---------------------------------------------------------------------------
 
 func prefix_block_declarations(block: ForgeBlock, prefix: string,
-    orig: [string], prefixed: [string]) -> ([string], [string]) {
-  let mut o = orig
-  let mut p = prefixed
+    mut orig: [string], mut prefixed: [string]) {
   // Functions
   let funcs = block.fd_children()
   for i in range(0, len(funcs)) {
     let f = funcs[i]
     let name = f.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     f.name = sym(prefix + name)
   }
   // Structs
@@ -162,8 +158,8 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(structs)) {
     let s = structs[i]
     let name = s.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     s.name = sym(prefix + name)
   }
   // Classes
@@ -171,8 +167,8 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(classes)) {
     let c = classes[i]
     let name = c.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     c.name = sym(prefix + name)
   }
   // Enums
@@ -180,8 +176,8 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(enums)) {
     let e = enums[i]
     let name = e.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     e.name = sym(prefix + name)
   }
   // Interfaces
@@ -189,8 +185,8 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(ifaces)) {
     let iface = ifaces[i]
     let name = iface.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     iface.name = sym(prefix + name)
   }
   // Constants
@@ -198,8 +194,8 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(consts)) {
     let con = consts[i]
     let name = con.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     con.name = sym(prefix + name)
   }
   // Type aliases
@@ -207,11 +203,10 @@ func prefix_block_declarations(block: ForgeBlock, prefix: string,
   for i in range(0, len(aliases)) {
     let ta = aliases[i]
     let name = ta.name!.get_name()
-    o = append(o, name)
-    p = append(p, prefix + name)
+    orig = append(orig, name)
+    prefixed = append(prefixed, prefix + name)
     ta.name = sym(prefix + name)
   }
-  return (o, p)
 }
 
 // ---------------------------------------------------------------------------

@@ -2432,6 +2432,11 @@ func CGen.emit_stmt(self, s: LStmt?) {
         if !isnull(entry) {
           target = f"(*_ctx->{target})"
         }
+      } else if !isnull(self.mut_params) {
+        let mp = self.mut_params!.get(sym(d.target))
+        if !isnull(mp) {
+          target = f"(*{target})"
+        }
       }
       self.line(f"{target} = {self.emit_value(d.value)};")
     }

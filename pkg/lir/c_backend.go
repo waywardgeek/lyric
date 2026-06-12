@@ -1261,16 +1261,14 @@ func (g *cGen) emitStmt(s *LStmt) {
 			target = "_gen->" + target
 		} else if g.spawnCaptures != nil && g.spawnCaptures[d.Target] {
 			target = fmt.Sprintf("(*_ctx->%s)", target)
+		} else if g.mutParams[d.Target] {
+			target = fmt.Sprintf("(*%s)", target)
 		}
 		g.linef("%s = %s;", target, g.emitValue(&d.Value))
 
 	case LStmtStructSet:
 		d := s.Data.(*LStructSet)
-		op := "."
-		if d.Receiver.Kind == LValVar && g.mutParams[d.Receiver.Name] {
-			op = "->"
-		}
-		g.linef("%s%s%s = %s;", g.emitValue(&d.Receiver), op, d.Field, g.emitValue(&d.Value))
+		g.linef("%s.%s = %s;", g.emitValue(&d.Receiver), d.Field, g.emitValue(&d.Value))
 
 	case LStmtClassSet:
 		d := s.Data.(*LClassSet)
@@ -2160,10 +2158,6 @@ func (g *cGen) emitExprStr(e *LExpr) string {
 		if recvType != nil && recvType.Kind == LTyClassHandle {
 			return fmt.Sprintf("%s->%s", g.emitValue(&d.Receiver), d.Field)
 		}
-		// mut params are pointers — use -> for field access
-		if d.Receiver.Kind == LValVar && g.mutParams[d.Receiver.Name] {
-			return fmt.Sprintf("%s->%s", d.Receiver.Name, d.Field)
-		}
 		// Map tuple field access ._0/._1 to .val/.err for ErrorResult types
 		if recvType != nil && recvType.Kind == LTyErrorResult {
 			field := d.Field
@@ -2401,6 +2395,10 @@ func (g *cGen) emitValue(v *LValue) string {
 		}
 		if g.spawnCaptures != nil && g.spawnCaptures[v.Name] {
 			return fmt.Sprintf("(*_ctx->%s)", name)
+		}
+		// mut params are passed as pointers — dereference when reading value
+		if g.mutParams[v.Name] {
+			return fmt.Sprintf("(*%s)", name)
 		}
 		return name
 	case LValTemp:
