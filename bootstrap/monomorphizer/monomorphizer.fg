@@ -539,7 +539,7 @@ func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, 
   // Build class rename map
   let rename_map = self.build_class_rename_map(subst)
 
-  return LFuncDecl {
+  let mut spec = LFuncDecl {
     name: new_name,
     type_params: [],
     params: params,
@@ -548,8 +548,187 @@ func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, 
     is_exported: orig.is_exported,
     receiver: recv,
     receiver_type_params: [],
-    relational_constraints: [],
+    relational_constraints: orig.relational_constraints,
     class_rename_map: rename_map,
+  }
+
+  // Rewrite method calls based on ImplMethodRenames (per-specialization, not post-pass).
+  // Matches Go compiler's rewriteImplMethodCalls in specializeFunc.
+  if len(orig.relational_constraints) > 0 && !isnull(self.prog!.impl_method_renames) {
+    self.rewrite_impl_method_calls(spec, orig.relational_constraints, subst)
+  }
+
+  return spec
+}
+
+// ---------------------------------------------------------------------------
+// Per-specialization impl method call rewriting.
+// Matches Go compiler's rewriteImplMethodCalls — uses the full @-delimited
+// key (including concrete type args) to find the correct rename, avoiding
+// the last-writer-wins bug in the flat post-pass.
+// ---------------------------------------------------------------------------
+
+struct ImplRenameEntry {
+  class_name: string
+  old_method: string
+  new_method: string
+}
+
+func MonoPass.rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?) {
+  let mut renames: [ImplRenameEntry] = []
+
+  let mut ci = 0
+  while ci < len(constraints) {
+    let rc = constraints[ci]
+    // Build key prefix: "InterfaceName@ConcreteArg0@ConcreteArg1@..."
+    let mut prefix = rc.interface_name
+    let mut ti = 0
+    while ti < len(rc.type_args) {
+      let ta = rc.type_args[ti]
+      if !isnull(subst) {
+        let ct = subst!.get(sym(ta))
+        if !isnull(ct) && !isnull(ct!.value) {
+          if ct!.value!.kind is TyClassHandle {
+            prefix = prefix + "@" + ct!.value!.name
+          } else {
+            prefix = prefix + "@" + ta
+          }
+        } else {
+          prefix = prefix + "@" + ta
+        }
+      } else {
+        prefix = prefix + "@" + ta
+      }
+      ti = ti + 1
+    }
+
+    // Check all rename entries matching this prefix
+    let prefix_at = prefix + "@"
+    let keys = self.prog!.impl_method_renames!.keys()
+    let mut ki = 0
+    while ki < len(keys) {
+      let key_name = keys[ki].get_name()
+      if mono_starts_with(key_name, prefix_at) {
+        let suffix = key_name[len(prefix_at):]
+        // Parse className@methodName from suffix
+        let at_pos = str_index_of(suffix, "@")
+        if at_pos >= 0 {
+          let class_name = suffix[0:at_pos]
+          let method_name = suffix[at_pos + 1:]
+          let new_name_entry = self.prog!.impl_method_renames!.get(keys[ki])
+          if !isnull(new_name_entry) {
+            append(renames, ImplRenameEntry {
+              class_name: class_name,
+              old_method: method_name,
+              new_method: new_name_entry!.value,
+            })
+          }
+        }
+      }
+      ki = ki + 1
+    }
+    ci = ci + 1
+  }
+
+  if len(renames) == 0 { return }
+
+  rewrite_method_calls_in_stmts(fn.body, renames)
+}
+
+func rewrite_method_calls_in_stmts(stmts: [LStmt?], renames: [ImplRenameEntry]) {
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) {
+      rewrite_method_calls_in_stmt(stmts[i]!, renames)
+    }
+    i = i + 1
+  }
+}
+
+func rewrite_method_calls_in_stmt(s: LStmt, renames: [ImplRenameEntry]) {
+  match s.kind {
+    StTempDef => {
+      if !isnull(s.temp_def) {
+        rewrite_method_calls_in_expr(s.temp_def!.expr, renames)
+      }
+    }
+    StExpr => {
+      if !isnull(s.side_effect) {
+        rewrite_method_calls_in_expr(s.side_effect!.expr, renames)
+      }
+    }
+    StSideEffect => {
+      if !isnull(s.side_effect) {
+        rewrite_method_calls_in_expr(s.side_effect!.expr, renames)
+      }
+    }
+    StIf => {
+      if !isnull(s.if_data) {
+        rewrite_method_calls_in_stmts(s.if_data!.then_body, renames)
+        rewrite_method_calls_in_stmts(s.if_data!.else_body, renames)
+      }
+    }
+    StWhile => {
+      if !isnull(s.while_data) {
+        rewrite_method_calls_in_stmts(s.while_data!.cond_block, renames)
+        rewrite_method_calls_in_stmts(s.while_data!.body, renames)
+      }
+    }
+    StBlock => {
+      if !isnull(s.block) {
+        rewrite_method_calls_in_stmts(s.block!.stmts, renames)
+      }
+    }
+    StFor => {
+      if !isnull(s.for_data) {
+        rewrite_method_calls_in_stmts(s.for_data!.body, renames)
+      }
+    }
+    _ => {}
+  }
+}
+
+func rewrite_method_calls_in_expr(e: LExpr?, renames: [ImplRenameEntry]) {
+  if isnull(e) { return }
+  if e!.kind is ExMethodCall {
+    if !isnull(e!.method_call) {
+      let mc = e!.method_call!
+      if !isnull(mc.receiver) && !isnull(mc.receiver!.typ) {
+        if mc.receiver!.typ!.kind is TyClassHandle {
+          let recv_class = mc.receiver!.typ!.name
+          let mut ri = 0
+          while ri < len(renames) {
+            if renames[ri].class_name == recv_class && renames[ri].old_method == mc.method {
+              mc.method = renames[ri].new_method
+              return
+            }
+            ri = ri + 1
+          }
+        }
+      }
+    }
+  }
+  // Also handle ExCall (plain function calls) — setters may be lowered as ExCall
+  // Match by func_name against old_method, and check first arg type for class match.
+  if e!.kind is ExCall {
+    if !isnull(e!.call) {
+      let cd = e!.call!
+      let mut ri = 0
+      while ri < len(renames) {
+        if renames[ri].old_method == cd.func_name {
+          // Verify first arg is the right class
+          if len(cd.args) > 0 && !isnull(cd.args[0]) && !isnull(cd.args[0]!.typ) {
+            if cd.args[0]!.typ!.kind is TyClassHandle {
+              if cd.args[0]!.typ!.name == renames[ri].class_name {
+                cd.func_name = renames[ri].new_method
+                return
+              }
+            }
+          }
+        }
+        ri = ri + 1
+      }
+    }
   }
 }
 
