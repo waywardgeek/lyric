@@ -1747,6 +1747,13 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
       let d = e!.make_result!
       let result_name = self.result_type_name_from_expr(e)
       if d.err!.kind is ValLitNull || (d.err!.kind is ValLitString && d.err!.str_val == "") {
+        // Check if ErrorResult wraps Optional — wrap value in forge_some
+        let ret_elem = if !isnull(e!.typ) { e!.typ!.elem } else { null }
+        let val_type = if !isnull(d.value) { d.value!.typ } else { null }
+        if !isnull(ret_elem) && ret_elem!.kind is TyOptional && !self.is_class_optional(ret_elem) && (isnull(val_type) || !(val_type!.kind is TyOptional)) && !(d.value!.kind is ValLitNull) {
+          let opt_name = self.opt_type_name(ret_elem!.elem)
+          return f"forge_ok(forge_some({self.emit_value(d.value)}, {opt_name}), {result_name})"
+        }
         return f"forge_ok({self.emit_value(d.value)}, {result_name})"
       }
       return f"forge_err({self.emit_value_as_cstr(d.err)}, {result_name})"
@@ -2568,7 +2575,14 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
         self.line(f"return {val};")
         return
       }
-      self.line(f"return forge_ok({val}, {result_name});")
+      // If ErrorResult wraps an Optional, wrap value in forge_some first
+      let ret_elem = self.current_func!.return_type!.elem
+      if !isnull(ret_elem) && ret_elem!.kind is TyOptional && !self.is_class_optional(ret_elem) && (isnull(val_type) || !(val_type!.kind is TyOptional)) && !(d.values[0]!.kind is ValLitNull) {
+        let opt_name = self.opt_type_name(ret_elem!.elem)
+        self.line(f"return forge_ok(forge_some({val}, {opt_name}), {result_name});")
+      } else {
+        self.line(f"return forge_ok({val}, {result_name});")
+      }
       return
     }
     // Check optional return
@@ -2599,7 +2613,15 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
     let result_name = self.result_type_name(self.current_func!.return_type!.elem)
     let val_str = self.emit_value(d.values[0])
     if !isnull(d.values[1]) && (d.values[1]!.kind is ValLitNull || (d.values[1]!.kind is ValLitString && d.values[1]!.str_val == "")) {
-      self.line(f"return forge_ok({val_str}, {result_name});")
+      // Wrap value in forge_some if ErrorResult's Elem is Optional and value isn't already optional
+      let ret_elem = self.current_func!.return_type!.elem
+      let val_type = self.resolve_value_type(d.values[0])
+      if !isnull(ret_elem) && ret_elem!.kind is TyOptional && !self.is_class_optional(ret_elem) && (isnull(val_type) || !(val_type!.kind is TyOptional)) && !(d.values[0]!.kind is ValLitNull) {
+        let opt_name = self.opt_type_name(ret_elem!.elem)
+        self.line(f"return forge_ok(forge_some({val_str}, {opt_name}), {result_name});")
+      } else {
+        self.line(f"return forge_ok({val_str}, {result_name});")
+      }
     } else {
       self.line(f"return forge_err({self.emit_value_as_cstr(d.values[1])}, {result_name});")
     }

@@ -659,16 +659,24 @@ forge desugar {
       Named(name, args) => {
         if len(iface_tps) >= 1 && !isnull(iface_tps[0].name) && name.name == iface_tps[0].name!.name {
           if !isnull(rel.parent.type_name) {
+            let mut new_args: [TypeExpr] = []
+            for arg in rel.parent.type_args {
+              append(new_args, TypeExpr { kind: Named(arg, []), span: te!.span })
+            }
             return TypeExpr {
-              kind: Named(rel.parent.type_name!, []),
+              kind: Named(rel.parent.type_name!, new_args),
               span: te!.span,
             }
           }
         }
         if len(iface_tps) >= 2 && !isnull(iface_tps[1].name) && name.name == iface_tps[1].name!.name {
           if !isnull(rel.child.type_name) {
+            let mut new_args: [TypeExpr] = []
+            for arg in rel.child.type_args {
+              append(new_args, TypeExpr { kind: Named(arg, []), span: te!.span })
+            }
             return TypeExpr {
-              kind: Named(rel.child.type_name!, []),
+              kind: Named(rel.child.type_name!, new_args),
               span: te!.span,
             }
           }

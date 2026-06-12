@@ -143,7 +143,7 @@ forge parser {
 
   func Parser.do_parse_file(self) -> (File?, error) {
     let start = self.peek().span.start
-    let file = File { filename: self.lex!.src, span: Span { start: start, end: start } }
+    let file = File { filename: self.lex!.filename!.get_name(), span: Span { start: start, end: start } }
     self.skip_newlines()
 
     while self.peek().kind != SEOF {

@@ -408,7 +408,7 @@ forge ast {
   relation ArrayList File:fb owns [ForgeBlock:fb]
   relation ArrayList File:fc owns [Comment:fc]
 
-}
+
 
 // --- merge_files / merge_stdlib / find_stdlib_dir ---
 
@@ -436,7 +436,8 @@ func merge_files(files: [File?]) -> File? {
         if f != nil {
             let blocks = f!.fb_children()
             for j in range(0, len(blocks)) {
-                array_append<File, ForgeBlock>(merged, blocks[j])
+                let b = blocks[j]
+                array_append<File, ForgeBlock>(merged, b)
             }
             let comments = f!.fc_children()
             for j in range(0, len(comments)) {
@@ -1472,3 +1473,5 @@ func merge_stdlib(file: File?, std_file: File?) {
 }
 
 
+
+}

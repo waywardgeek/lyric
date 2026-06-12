@@ -7,8 +7,11 @@ set -e
 cd "$(dirname "$0")"
 
 OUTPUT="${1:-./bootstrap1}"
-TMPDIR_BUILD=$(mktemp -d)
-# trap "rm -rf $TMPDIR_BUILD" EXIT
+# Clean up old build artifacts
+rm -rf /tmp/forge_build_*
+
+TMPDIR_BUILD=$(mktemp -d -t forge_build_XXXXXX)
+
 
 BOOTSTRAP_FILES=(
   bootstrap/ast/ast.fg

@@ -7,8 +7,11 @@ set -euo pipefail
 FORGE="./forge"
 BOOTSTRAP="/tmp/bootstrap"
 RUNTIME_DIR="runtime"
-TMPDIR=$(mktemp -d)
-# trap "rm -rf $TMPDIR" EXIT
+# Clean up old test artifacts
+rm -rf /tmp/forge_test_*
+
+TMPDIR=$(mktemp -d -t forge_test_XXXXXX)
+
 
 VERBOSE=false
 PATTERN=""
@@ -76,7 +79,16 @@ for fg in testdata/*.fg; do
   bs_c="$TMPDIR/bs_${name%.fg}.c"
   bs_out="$TMPDIR/bs_${name%.fg}"
 
-  if ! $BOOTSTRAP $CMD "$fg" -o "$bs_c" 2>"$TMPDIR/err" ; then
+  # Determine dependencies for unit tests
+  DEPS=""
+  case "$name" in
+    test_lexer.fg) DEPS="bootstrap/lexer/lexer.fg bootstrap/ast/ast.fg bootstrap/parser/parser.fg bootstrap/parser/expr_parser.fg" ;;
+    test_parser.fg) DEPS="bootstrap/parser/parser.fg bootstrap/parser/expr_parser.fg bootstrap/lexer/lexer.fg bootstrap/ast/ast.fg" ;;
+    test_desugar.fg) DEPS="bootstrap/desugar/desugar.fg bootstrap/parser/parser.fg bootstrap/parser/expr_parser.fg bootstrap/lexer/lexer.fg bootstrap/ast/ast.fg" ;;
+    test_min.fg) DEPS="bootstrap/parser/parser.fg bootstrap/parser/expr_parser.fg bootstrap/lexer/lexer.fg bootstrap/ast/ast.fg" ;;
+  esac
+
+  if ! $BOOTSTRAP $CMD "$fg" $DEPS -o "$bs_c" 2>"$TMPDIR/err" ; then
     FAIL=$((FAIL + 1))
     err=$(cat "$TMPDIR/err")
     FAILURES="$FAILURES\nFAIL  $name  (bootstrap compile: $err)"

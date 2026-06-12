@@ -122,10 +122,10 @@ forge checker {
     // Phase 0 stubs have empty methods/fields, so Phase 1 overwrites are OK.
     let existing = self.lookup(name)
     if existing != nil {
-      let em = existing!.methods.keys()
-      let ef = existing!.fields.keys()
-      if len(em) > 0 || len(ef) > 0 {
-        eprintln(f"FATAL: registry overwrite of fully-registered type '{name}' (had {itoa(len(em) as i64)} methods, {itoa(len(ef) as i64)} fields)")
+      let eem = existing!.methods.keys()
+      let eef = existing!.fields.keys()
+      if len(eem) > 0 || len(eef) > 0 {
+        eprintln(f"FATAL: registry overwrite of fully-registered type '{name}' (had {itoa(len(eem) as i64)} methods, {itoa(len(eef) as i64)} fields)")
         os_exit(1)
       }
     }
@@ -1390,26 +1390,41 @@ forge checker {
     // Save for checkImplements
     self.iface_decls.set(sym(iname), iface)
 
-    let info = TypeInfo {
-      type_val: make_interface_type(iname),
-      fields: Dict<Sym, Type>(),
-      field_order: [],
-      methods: Dict<Sym, Type>(),
-      variants: Dict<Sym, VariantInfo>(),
-      type_param_names: [],
-      type_param_constraints: [],
-      implements_list: [],
+    // Use existing TypeInfo if present (e.g. from Phase 0)
+    let mut info_opt = self.registry.lookup(iname)
+    if info_opt == nil {
+      let info = TypeInfo {
+        type_val: make_interface_type(iname),
+        fields: Dict<Sym, Type>(),
+        field_order: [],
+        methods: Dict<Sym, Type>(),
+        variants: Dict<Sym, VariantInfo>(),
+        type_param_names: [],
+        type_param_constraints: [],
+        implements_list: [],
+      }
+      self.registry.register(iname, info)
+      info_opt = self.registry.lookup(iname)
     }
+    let info = info_opt!
 
     // Register type params
     let itparams = iface.itp_children()
     for tp in itparams {
       if tp.name != nil {
-        append(info.type_param_names, sym_to_string(tp.name!))
-        if tp.constraint != nil {
-          append(info.type_param_constraints, sym_to_string(tp.constraint!))
-        } else {
-          append(info.type_param_constraints, "")
+        let tpname = sym_to_string(tp.name!)
+        // Avoid duplicates if already registered
+        let mut found = false
+        for existing_tp in info.type_param_names {
+          if existing_tp == tpname { found = true }
+        }
+        if !found {
+          append(info.type_param_names, tpname)
+          if tp.constraint != nil {
+            append(info.type_param_constraints, sym_to_string(tp.constraint!))
+          } else {
+            append(info.type_param_constraints, "")
+          }
         }
       }
     }
@@ -1429,33 +1444,47 @@ forge checker {
       let ft = self.func_decl_to_type(m)
       if m.name != nil {
         let mn = sym_to_string(m.name!)
-        let rn = if m.receiver_type != nil { sym_to_string(m.receiver_type!) } else { "" }
         info.methods.set(sym(mn), ft)
       }
     }
 
     self.pop_scope()
-    self.registry.register(iname, info)
+    // self.registry.register(iname, info) // Already in registry
   }
 
   func Checker.register_struct(self, s: StructDecl) {
     if s.name == nil { return }
     let sname = sym_to_string(s.name!)
-    let info = TypeInfo {
-      type_val: make_struct_type(sname),
-      fields: Dict<Sym, Type>(),
-      field_order: [],
-      methods: Dict<Sym, Type>(),
-      variants: Dict<Sym, VariantInfo>(),
-      type_param_names: [],
-      type_param_constraints: [],
-      implements_list: [],
+
+    // Use existing TypeInfo if present (e.g. from Phase 0)
+    let mut info_opt = self.registry.lookup(sname)
+    if info_opt == nil {
+      let info = TypeInfo {
+        type_val: make_struct_type(sname),
+        fields: Dict<Sym, Type>(),
+        field_order: [],
+        methods: Dict<Sym, Type>(),
+        variants: Dict<Sym, VariantInfo>(),
+        type_param_names: [],
+        type_param_constraints: [],
+        implements_list: [],
+      }
+      self.registry.register(sname, info)
+      info_opt = self.registry.lookup(sname)
     }
+    let info = info_opt!
 
     let stparams = s.stp_children()
     for tp in stparams {
       if tp.name != nil {
-        append(info.type_param_names, sym_to_string(tp.name!))
+        let tpname = sym_to_string(tp.name!)
+        let mut found = false
+        for existing_tp in info.type_param_names {
+          if existing_tp == tpname { found = true }
+        }
+        if !found {
+          append(info.type_param_names, tpname)
+        }
       }
     }
 
@@ -1486,22 +1515,30 @@ forge checker {
     }
 
     self.pop_scope()
-    self.registry.register(sname, info)
+    // self.registry.register(sname, info) // Already in registry
   }
 
   func Checker.register_class(self, cls: ClassDecl) {
     if cls.name == nil { return }
     let cname = sym_to_string(cls.name!)
-    let info = TypeInfo {
-      type_val: make_class_type(cname),
-      fields: Dict<Sym, Type>(),
-      field_order: [],
-      methods: Dict<Sym, Type>(),
-      variants: Dict<Sym, VariantInfo>(),
-      type_param_names: [],
-      type_param_constraints: [],
-      implements_list: [],
+
+    // Use existing TypeInfo if present (e.g. from Phase 0 or earlier impl blocks)
+    let mut info_opt = self.registry.lookup(cname)
+    if info_opt == nil {
+      let info = TypeInfo {
+        type_val: make_class_type(cname),
+        fields: Dict<Sym, Type>(),
+        field_order: [],
+        methods: Dict<Sym, Type>(),
+        variants: Dict<Sym, VariantInfo>(),
+        type_param_names: [],
+        type_param_constraints: [],
+        implements_list: [],
+      }
+      self.registry.register(cname, info)
+      info_opt = self.registry.lookup(cname)
     }
+    let info = info_opt!
 
     let ctparams = cls.ctp_children()
     let mut type_var_args: [Type] = []
@@ -1554,7 +1591,7 @@ forge checker {
     }
 
     self.pop_scope()
-    self.registry.register(cname, info)
+    // self.registry.register(cname, info) // Already in registry
 
     // Register class name as constructor in scope
     let mut ctor_params: [Type] = []
@@ -1602,21 +1639,36 @@ forge checker {
     if e.name == nil { return }
     let ename = sym_to_string(e.name!)
     let enum_type = make_enum_type(ename)
-    let info = TypeInfo {
-      type_val: enum_type,
-      fields: Dict<Sym, Type>(),
-      field_order: [],
-      methods: Dict<Sym, Type>(),
-      variants: Dict<Sym, VariantInfo>(),
-      type_param_names: [],
-      type_param_constraints: [],
-      implements_list: [],
+
+    // Use existing TypeInfo if present (e.g. from Phase 0)
+    let mut info_opt = self.registry.lookup(ename)
+    if info_opt == nil {
+      let info = TypeInfo {
+        type_val: enum_type,
+        fields: Dict<Sym, Type>(),
+        field_order: [],
+        methods: Dict<Sym, Type>(),
+        variants: Dict<Sym, VariantInfo>(),
+        type_param_names: [],
+        type_param_constraints: [],
+        implements_list: [],
+      }
+      self.registry.register(ename, info)
+      info_opt = self.registry.lookup(ename)
     }
+    let info = info_opt!
 
     let etparams = e.etp_children()
     for tp in etparams {
       if tp.name != nil {
-        append(info.type_param_names, sym_to_string(tp.name!))
+        let tpname = sym_to_string(tp.name!)
+        let mut found = false
+        for existing_tp in info.type_param_names {
+          if existing_tp == tpname { found = true }
+        }
+        if !found {
+          append(info.type_param_names, tpname)
+        }
       }
     }
 
@@ -1649,7 +1701,7 @@ forge checker {
       }
     }
 
-    self.registry.register(ename, info)
+    // self.registry.register(ename, info) // Already in registry
   }
 
   func Checker.check_implements(self, cls: ClassDecl) {
