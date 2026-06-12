@@ -2574,7 +2574,7 @@ forge checker {
         return self.check_method_call(expr, receiver, method, type_args, args)
       }
       FieldAccess(receiver, field_name) => {
-        return self.check_field_access(receiver, field_name)
+        return self.check_field_access(expr, receiver, field_name)
       }
       Index(receiver, index) => {
         return self.check_index(receiver, index)
@@ -3087,7 +3087,7 @@ forge checker {
           }
           _ => {
             // Regular field that's callable
-            let ft = self.check_field_access(receiver, field)
+            let ft = self.check_field_access(func_expr, receiver, field)
             annotate(func_expr, ft)
             match ft.kind {
               Func(_, ret, _) => { return ret }
@@ -3289,12 +3289,67 @@ forge checker {
   // =====================================================================
 
   func Checker.check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type {
+    // Qualified enum variant constructor: EnumName.Variant(args)
+    // Must check BEFORE check_expr on receiver — enum names are in registry, not scope,
+    // so check_expr would emit "undefined variable" and return TypeError.
+    match receiver.kind {
+      ExprKind.Ident(ident_name) => {
+        let enum_name = sym_to_string(ident_name)
+        let enum_info = self.registry.lookup(enum_name)
+        if enum_info != nil && enum_info!.type_val.kind is Enum {
+          let method_str = sym_to_string(method)
+          let vi = enum_info!.variants.get(sym(method_str))
+          if vi == nil {
+            eprintln(f"checker: enum {enum_name} has no variant '{method_str}'")
+            return make_error_type()
+          }
+          let variant = vi!.value
+          // Check args against variant fields
+          if len(variant.fields) == 0 {
+            // Unit variant called as constructor — just return enum type
+          } else {
+            if len(args) != len(variant.fields) {
+              eprintln(f"checker: {enum_name}.{method_str} expects {len(variant.fields)} arguments, got {len(args)}")
+            }
+            for i in range(0, len(args)) {
+              self.check_expr(args[i])
+            }
+          }
+          // Rewrite AST: MethodCall → Call on bare variant constructor
+          let func_expr = Expr {
+            kind: ExprKind.Ident(method),
+            span: receiver.span,
+            resolved_type: nil
+          }
+          // Set resolved_type on func expr
+          if len(variant.fields) > 0 {
+            let mut param_types: [Type] = []
+            for f in variant.fields {
+              append(param_types, f.type_val)
+            }
+            let empty_names: [string] = []
+            func_expr.resolved_type = type_to_type_expr(Type {
+              kind: TypeKind.Func(param_types, enum_info!.type_val, empty_names),
+              bits: 0,
+              type_args: []
+            })
+          } else {
+            func_expr.resolved_type = type_to_type_expr(enum_info!.type_val)
+          }
+          let mut_args: [bool] = []
+          call_expr.kind = ExprKind.Call(func_expr, type_args, args, mut_args)
+          return enum_info!.type_val
+        }
+      }
+      _ => {}
+    }
     let recv_type = self.check_expr(receiver)
     let mut arg_types: [Type] = []
     for a in args {
       append(arg_types, self.check_expr(a))
     }
     let method_str = sym_to_string(method)
+
 
     // Built-in methods by receiver type
     let builtin = self.check_builtin_method(recv_type, method_str, arg_types)
@@ -3494,11 +3549,45 @@ forge checker {
   // Field access checking
   // =====================================================================
 
-  func Checker.check_field_access(self, receiver: Expr, field_name: Sym) -> Type {
+  func Checker.check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type {
+    // Qualified enum variant: EnumName.Variant (for unit variants or constructor refs)
+    match receiver.kind {
+      ExprKind.Ident(ident_name) => {
+        let enum_name = sym_to_string(ident_name)
+        let enum_info = self.registry.lookup(enum_name)
+        if enum_info != nil && enum_info!.type_val.kind is Enum {
+          let field_str = sym_to_string(field_name)
+          let vi = enum_info!.variants.get(sym(field_str))
+          if vi == nil {
+            eprintln(f"checker: enum {enum_name} has no variant '{field_str}'")
+            return make_error_type()
+          }
+          let variant = vi!.value
+          if len(variant.fields) > 0 {
+            // Non-unit variant without args — return constructor function type
+            let mut param_types: [Type] = []
+            for f in variant.fields {
+              append(param_types, f.type_val)
+            }
+            let empty_names: [string] = []
+            return Type {
+              kind: TypeKind.Func(param_types, enum_info!.type_val, empty_names),
+              bits: 0,
+              type_args: []
+            }
+          }
+          // Unit variant — rewrite AST to plain Ident
+          parent_expr.kind = ExprKind.Ident(field_name)
+          return enum_info!.type_val
+        }
+      }
+      _ => {}
+    }
     let recv_type = self.check_expr(receiver)
     let field_str = sym_to_string(field_name)
     return self.resolve_field_type(recv_type, field_str)
   }
+
 
   func Checker.resolve_field_type(self, recv_type: Type, field_str: string) -> Type {
     let tname = type_name(recv_type)

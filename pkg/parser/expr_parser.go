@@ -1293,6 +1293,44 @@ func (p *Parser) parsePattern() (*ast.Pattern, error) {
 		if tok.Text == "_" {
 			return &ast.Pattern{Kind: ast.PatWildcard, Span: tok.Span}, nil
 		}
+		// Qualified variant pattern: EnumName.Variant or EnumName.Variant(bindings)
+		if p.peek().Kind == TDot {
+			p.next() // consume '.'
+			variantTok := p.peek()
+			if variantTok.Kind != TIdent {
+				return nil, p.newError(variantTok.Span, "expected variant name after '.'")
+			}
+			p.next() // consume variant name
+			// EnumName.Variant(bindings)
+			if p.peek().Kind == TLParen {
+				p.next()
+				var bindings []ast.Pattern
+				for p.peek().Kind != TRParen && p.peek().Kind != TEOF {
+					b, err := p.parsePattern()
+					if err != nil {
+						return nil, err
+					}
+					bindings = append(bindings, *b)
+					if p.peek().Kind == TComma {
+						p.next()
+					}
+				}
+				if _, err := p.expect(TRParen); err != nil {
+					return nil, err
+				}
+				return &ast.Pattern{
+					Kind: ast.PatVariant,
+					Data: &ast.VariantPattern{Name: variantTok.Text, Bindings: bindings},
+					Span: ast.Span{Start: tok.Span.Start, End: p.peek().Span.End},
+				}, nil
+			}
+			// EnumName.Variant (unit variant, no parens)
+			return &ast.Pattern{
+				Kind: ast.PatIdent,
+				Data: &ast.IdentPattern{Name: variantTok.Text},
+				Span: ast.Span{Start: tok.Span.Start, End: variantTok.Span.End},
+			}, nil
+		}
 		// Check for variant pattern: Name(bindings)
 		if p.peek().Kind == TLParen {
 			p.next()

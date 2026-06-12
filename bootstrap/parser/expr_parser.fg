@@ -993,6 +993,33 @@ forge parser {
         if tok.text == "_" {
           return (Pattern { Wildcard, tok.span }, null)
         }
+        // Qualified variant pattern: EnumName.Variant or EnumName.Variant(bindings)
+        if self.peek().kind == PDot {
+          self.next()  // consume '.'
+          let variant_tok = self.peek()
+          if variant_tok.kind != LIdent {
+            return (null, self.make_error(variant_tok.span, f"expected variant name after '.'"))          }
+          self.next()  // consume variant name
+          // EnumName.Variant(bindings)
+          if self.peek().kind == PLParen {
+            self.next()
+            let mut bindings: [Pattern] = []
+            while self.peek().kind != PRParen && self.peek().kind != SEOF {
+              let b = self.parse_pattern()?
+              bindings = append(bindings, b!)
+              if self.peek().kind == PComma {
+                self.next()
+              }
+            }
+            self.expect(PRParen)?
+            return (Pattern {
+              Variant(sym(variant_tok.text), bindings),
+              span: Span { start: tok.span.start, end: self.peek().span.end }
+            }, null)
+          }
+          // EnumName.Variant (unit variant, no parens)
+          return (Pattern { PatternKind.Ident(sym(variant_tok.text)), span: Span { start: tok.span.start, end: variant_tok.span.end } }, null)
+        }
         // Variant pattern: Name(bindings)
         if self.peek().kind == PLParen {
           self.next()
