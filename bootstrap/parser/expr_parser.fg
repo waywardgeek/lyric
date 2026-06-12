@@ -1295,7 +1295,15 @@ forge parser {
     let mut i: i32 = 0
 
     while i < len(raw) {
-      if raw[i] == '{' {
+      if raw[i] == 1 as u8 {
+        // Sentinel for escaped {{ → literal {
+        buf.write_byte('{')
+        i = i + 1
+      } else if raw[i] == 2 as u8 {
+        // Sentinel for escaped }} → literal }
+        buf.write_byte('}')
+        i = i + 1
+      } else if raw[i] == '{' {
         parts = append(parts, Expr {
           StringLit(buf.to_string()),
           span: tok.span

@@ -2143,7 +2143,9 @@ forge lowerer {
       StringInterp(parts) => { return self.lower_string_interp(e, parts) }
       BoolLit(value) => { return make_bool_val(value) }
       Nil => { return make_null_val(self.expr_type(e)) }
-      Call(func_expr, type_args, args, call_mut_args) => { return self.lower_call(e, func_expr, type_args, args, call_mut_args) }
+      Call(func_expr, type_args, args, call_mut_args) => {
+        return self.lower_call(e, func_expr, type_args, args, call_mut_args)
+      }
       MethodCall(receiver, method, type_args, args, mc_mut_args) => { return self.lower_method_call(e, receiver, method, type_args, args, mc_mut_args) }
       FieldAccess(receiver, field_name) => { return self.lower_field_access(e, receiver, field_name) }
       Index(receiver, index) => { return self.lower_index(e, receiver, index) }
@@ -2344,6 +2346,56 @@ forge lowerer {
 
     // Check builtin functions
     if is_builtin_func(func_name) {
+      // Special case: append with field access needs write-back
+      if func_name == "append" && len(args) >= 2 {
+        let first_arg = args[0]
+        match first_arg.kind {
+          FieldAccess(fa_recv, fa_field) => {
+            let recv_val = self.lower_expr(fa_recv)
+            let result_type = self.expr_type(first_arg)
+            let mut slice_val: LValue? = nil
+            let mut is_class_field = false
+            if !isnull(recv_val) && !isnull(recv_val!.typ) && recv_val!.typ!.kind is TyClassHandle {
+              is_class_field = true
+              let cget = LExpr {
+                kind: ExClassGet,
+                typ: result_type,
+                class_get: LClassGetData { handle: recv_val, class_name: recv_val!.typ!.name, field: fa_field.name }
+              }
+              slice_val = self.emit_temp(cget)
+            } else {
+              let sf = LExpr {
+                kind: ExStructField,
+                typ: result_type,
+                struct_field: LStructFieldData { receiver: recv_val, field: fa_field.name }
+              }
+              slice_val = self.emit_temp(sf)
+            }
+            // Lower remaining args
+            let mut bargs2: [LValue?] = [slice_val]
+            let mut bi = 1
+            while bi < len(args) {
+              append(bargs2, self.lower_expr(args[bi]))
+              bi = bi + 1
+            }
+            let builtin2 = LExpr {
+              kind: ExBuiltin,
+              typ: self.expr_type(orig),
+              builtin: LBuiltinData { name: "append", args: bargs2, file: "", line: 0 }
+            }
+            let result = self.emit_temp(builtin2)
+            // Write back
+            if is_class_field {
+              self.emit(LStmt { kind: StClassSet, class_set: LClassSetData { handle: recv_val, class_name: recv_val!.typ!.name, field: fa_field.name, value: slice_val } })
+            } else {
+              self.emit(LStmt { kind: StStructSet, struct_set: LStructSetData { receiver: recv_val, field: fa_field.name, value: slice_val } })
+            }
+            return result
+          }
+          _ => {}
+        }
+      }
+
       let mut bargs: [LValue?] = []
       for a in args {
         append(bargs, self.lower_expr(a))
@@ -2652,6 +2704,43 @@ forge lowerer {
   // ---------- Binary ----------
 
   func Lowerer.lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue? {
+    // Short-circuit && and || — right side must not be evaluated if left determines result.
+    // Lower: a && b → { let _sc = a; if _sc { _sc = b }; _sc }
+    // Lower: a || b → { let _sc = a; if !_sc { _sc = b }; _sc }
+    let is_and = match op { And => { true } _ => { false } }
+    let is_or = match op { Or => { true } _ => { false } }
+    if is_and || is_or {
+      let bool_type = LType { kind: TyBool, name: "", elem: nil, key: nil, fields: [], params: [], ret: nil, variants: [], type_args: [], bits: 0, is_exported: false }
+      let lv = self.lower_expr(left)
+
+      // Allocate result variable
+      let result_var = f"_sc{self.temp_id}"
+      self.temp_id = self.temp_id + 1
+      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: nil, mutable: false } })
+      self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: lv } })
+
+      // Condition: for &&, enter if-block when left is true; for ||, when left is false
+      let cond_val = LValue { kind: ValVar, name: result_var, typ: bool_type, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64, float_val: 0.0, str_val: "", bool_val: false }
+      let mut final_cond: LValue? = nil
+      if is_or {
+        let not_expr = LExpr { kind: ExUnOp, typ: bool_type, un_op: LUnOpData { op: UnNot, operand: cond_val } }
+        final_cond = self.emit_temp(not_expr)
+      } else {
+        final_cond = cond_val
+      }
+
+      // Save stmts, lower right side in new block
+      let saved = self.save_stmts()
+      let rv = self.lower_expr(right)
+      self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: rv } })
+      let then_body = self.stmts
+      self.restore_stmts(saved)
+
+      self.emit(LStmt { kind: StIf, if_data: LIfData { cond: final_cond, then_body: then_body, else_body: [] } })
+
+      return LValue { kind: ValVar, name: result_var, typ: bool_type, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64, float_val: 0.0, str_val: "", bool_val: false }
+    }
+
     let lv = self.lower_expr(left)
     let rv = self.lower_expr(right)
     let rt = self.expr_type(orig)

@@ -458,6 +458,16 @@ func cmdTest(args []string) error {
 		return nil
 	}
 
+	// Strip user's main() to avoid duplicate with test runner
+	filtered := make([]lir.LFuncDecl, 0, len(prog.Functions))
+	for _, f := range prog.Functions {
+		if f.Name == "main" && f.Receiver == "" {
+			continue
+		}
+		filtered = append(filtered, f)
+	}
+	prog.Functions = filtered
+
 	// Generate C source + test runner
 	cSrc := lir.EmitC(prog)
 	cSrc += lir.EmitTestRunner(testFuncs)
