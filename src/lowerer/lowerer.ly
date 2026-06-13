@@ -693,11 +693,20 @@ lyric lowerer {
 
     // Build rename key prefix: iface_name + @ + type_arg_names...
     let mut rename_prefix = iface_name
+    let mut type_arg_suffix = ""
     for tp in iface.type_params {
       let ta_entry = type_arg_map.get(sym(tp.name))
       if !isnull(ta_entry) {
-        rename_prefix = rename_prefix + "@" + ta_entry!.value
+        type_arg_suffix = type_arg_suffix + "@" + ta_entry!.value
       }
+    }
+    rename_prefix = iface_name + type_arg_suffix
+
+    // Build additional prefixes for embedded interfaces (e.g., OwningList embeds DoublyLinked)
+    // so that where-clause lookups on embedded interfaces find the correct renames.
+    let mut all_rename_prefixes: [string] = [rename_prefix]
+    for embed_name in iface.embeds {
+      all_rename_prefixes = append(all_rename_prefixes, embed_name + type_arg_suffix)
     }
 
     // Lower each mapping
@@ -786,8 +795,10 @@ lyric lowerer {
         Inline => {
           if !isnull(mapping.inline_func) {
             let wrapper_name = class_name + "_" + method_name
-            let rename_key = rename_prefix + "@" + class_name + "@" + method_name
-            self.impl_method_renames!.set(sym(rename_key), wrapper_name)
+            for rp in all_rename_prefixes {
+              let rename_key = rp + "@" + class_name + "@" + method_name
+              self.impl_method_renames!.set(sym(rename_key), wrapper_name)
+            }
             self.impl_method_renames!.set(sym(class_name + "." + method_name), wrapper_name)
             let lf = self.lower_func_with_receiver(mapping.inline_func, class_name)
             if !isnull(lf) {
@@ -806,9 +817,11 @@ lyric lowerer {
           let is_setter = len(iface_method.params) > 0
           let concrete_name = if is_setter { "set_" + target_member } else { target_member }
 
-          // Register rename with @-delimited key
-          let rename_key = rename_prefix + "@" + class_name + "@" + method_name
-          self.impl_method_renames!.set(sym(rename_key), concrete_name)
+          // Register rename with @-delimited key (all prefixes including embeds)
+          for rp in all_rename_prefixes {
+            let rename_key = rp + "@" + class_name + "@" + method_name
+            self.impl_method_renames!.set(sym(rename_key), concrete_name)
+          }
           self.impl_method_renames!.set(sym(class_name + "." + method_name), concrete_name)
 
           let self_param = LParam { name: "self", typ: self_type, mutable: false }

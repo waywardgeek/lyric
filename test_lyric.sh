@@ -17,10 +17,12 @@ trap "rm -rf $TMPDIR" EXIT
 
 VERBOSE=false
 PATTERN=""
+SOA=""
 
 for arg in "$@"; do
   case "$arg" in
     --verbose) VERBOSE=true ;;
+    --soa) SOA="--soa" ;;
     *) PATTERN="$arg" ;;
   esac
 done
@@ -80,7 +82,7 @@ for fg in testdata/*.ly; do
   out_bin="$TMPDIR/${base}"
 
   # Step 1: Compile .ly → .c
-  if ! $LYRIC $CMD "$fg" $DEPS -o "$out_c" 2>"$TMPDIR/err"; then
+  if ! $LYRIC $CMD "$fg" $DEPS $SOA -o "$out_c" 2>"$TMPDIR/err"; then
     FAIL=$((FAIL + 1))
     err=$(cat "$TMPDIR/err")
     FAILURES="$FAILURES\nFAIL  $name  (compile: $err)"

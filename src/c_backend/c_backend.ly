@@ -410,11 +410,17 @@ func CGen.c_type(self, t: LType?) -> string {
           name = ren!.value
         }
       }
+      if self.prog!.slab_mode_soa {
+        return name
+      }
       return f"{name}*"
     }
     TyOptional => {
       // Class handles are already pointers — NULL = none
       if !isnull(t!.elem) && t!.elem!.kind is TyClassHandle {
+        if self.prog!.slab_mode_soa {
+          return self.c_type(t!.elem)
+        }
         return self.c_type(t!.elem)
       }
       return self.opt_type_name(t!.elem)
@@ -591,9 +597,13 @@ func CGen.zero_value(self, t: LType?) -> string {
     TyF32 | TyF64 => { return "0.0" }
     TyBool => { return "false" }
     TyString => { return "LYRIC_STR_EMPTY" }
-    TyClassHandle => { return "NULL" }
+    TyClassHandle => {
+      if self.prog!.slab_mode_soa { return "0" }
+      return "NULL"
+    }
     TyOptional => {
       if !isnull(t!.elem) && t!.elem!.kind is TyClassHandle {
+        if self.prog!.slab_mode_soa { return "0" }
         return "NULL"
       }
       return f"lyric_none({self.opt_type_name(t!.elem)})"
@@ -601,6 +611,7 @@ func CGen.zero_value(self, t: LType?) -> string {
     TySlice => {
       return f"lyric_slice_empty({self.slice_type_name(t!.elem)})"
     }
+    TyMutex => { return "(pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER" }
     TyTuple => { return "{0}" }
     TyStruct | TyTaggedUnion => { return "{0}" }
     _ => { return "0" }
@@ -784,36 +795,29 @@ func CGen.emit_value(self, v: LValue?) -> string {
     }
     ValClassFieldRef => {
       let handle = self.emit_value(v!.collection)
+      if self.prog!.slab_mode_soa {
+        let recv_type = v!.collection!.typ
+        let mut cname = ""
+        if !isnull(recv_type) {
+          let mut inner = recv_type
+          if inner!.kind is TyOptional && !isnull(inner!.elem) {
+            inner = inner!.elem
+          }
+          cname = inner!.name
+        }
+        return f"_lyric_slab_{cname}.{v!.name}[{handle} - 1]"
+      }
       return f"{handle}->{v!.name}"
     }
   }
 }
 
-func CGen.zero_value(self, t: LType?) -> string {
-  if isnull(t) { return "0" }
-  match t!.kind {
-    TyI8 | TyI16 | TyI32 | TyI64 | TyPlatformInt => { return "0" }
-    TyU8 | TyU16 | TyU32 | TyU64 | TyPlatformUint => { return "0" }
-    TyF32 | TyF64 => { return "0.0" }
-    TyBool => { return "false" }
-    TyString => { return "LYRIC_STR_EMPTY" }
-    TyClassHandle => { return "NULL" }
-    TyOptional => {
-      if !isnull(t!.elem) && t!.elem!.kind is TyClassHandle {
-        return "NULL"
-      }
-      return f"lyric_none({self.opt_type_name(t!.elem)})"
-    }
-    TySlice => {
-      return f"lyric_slice_empty({self.slice_type_name(t!.elem)})"
-    }
-    TyStruct | TyTaggedUnion => { return "{0}" }
-    _ => { return "{0}" }
-  }
-}
-
 func CGen.emit_class_msg_data(self, v: LValue?, class_name: string) -> string {
   let val = self.emit_value(v)
+  if self.prog!.slab_mode_soa {
+    let cname = self.resolve_class_name(class_name, "emit_class_msg_data")
+    return f"(const char*)_lyric_slab_{cname}.msg[{val} - 1].data"
+  }
   return f"(const char*){val}->msg.data"
 }
 
@@ -1343,6 +1347,9 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
         )
         let is_error = arg_type!.kind is TyError
         if is_class || is_any || is_opt_class || is_error {
+          if self.prog!.slab_mode_soa && (is_class || is_opt_class) {
+            return f"({self.emit_value(args[0])} == 0)"
+          }
           return f"({self.emit_value(args[0])} == NULL)"
         }
       }
@@ -1713,6 +1720,10 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExClassGet => {
       let d = e!.class_get!
+      if self.prog!.slab_mode_soa {
+        let cname = self.resolve_class_name(d.class_name, "ExClassGet")
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{self.emit_value(d.handle)} - 1]"
+      }
       return f"{self.emit_value(d.handle)}->{d.field}"
     }
     ExIndexGet => {
@@ -1759,6 +1770,9 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
         )
         let is_error = val_type!.kind is TyError
         if is_class || is_any || is_opt_class || is_error {
+          if self.prog!.slab_mode_soa && (is_class || is_opt_class) {
+            return f"({self.emit_value(d.value)} == 0)"
+          }
           return f"({self.emit_value(d.value)} == NULL)"
         }
       }
@@ -1856,6 +1870,10 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     ExSlabGet => {
       let d = e!.slab_get!
       let ref = self.emit_value(d.handle)
+      if self.prog!.slab_mode_soa {
+        let cname = self.resolve_class_name(d.class_name, "ExSlabGet")
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1]"
+      }
       return f"{ref}->{d.field}"
     }
     ExSlabAlloc => {
@@ -1871,7 +1889,11 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
         class_fields = c_entry!.value.fields
       }
       let sb = new_string_builder()
-      sb.write(f"({{ {cname}* _p = _lyric_slab_alloc_{cname}(); ")
+      if self.prog!.slab_mode_soa {
+        sb.write(f"({{ uint32_t _p = _lyric_slab_alloc_{cname}(); ")
+      } else {
+        sb.write(f"({{ {cname}* _p = _lyric_slab_alloc_{cname}(); ")
+      }
       let mut j = 0
       while j < len(d.fields) {
         let f = d.fields[j]
@@ -1880,7 +1902,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
         if !isnull(field_type) && field_type!.kind is TyOptional {
           if !isnull(field_type!.elem) && field_type!.elem!.kind is TyClassHandle {
             if !isnull(f.value) && f.value!.kind is ValLitNull {
-              val = "NULL"
+              if self.prog!.slab_mode_soa { val = "0" } else { val = "NULL" }
             }
           } else if !isnull(f.value) && f.value!.kind is ValLitNull {
             let opt_n = self.opt_type_name(field_type!.elem)
@@ -1890,7 +1912,11 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
             val = f"lyric_some({val}, {opt_n})"
           }
         }
-        sb.write(f"_p->{lc_first(f.name)} = {val}; ")
+        if self.prog!.slab_mode_soa {
+          sb.write(f"_lyric_slab_{cname}.{lc_first(f.name)}[_p - 1] = {val}; ")
+        } else {
+          sb.write(f"_p->{lc_first(f.name)} = {val}; ")
+        }
         j = j + 1
       }
       sb.write("_p; })")
@@ -2174,6 +2200,10 @@ func CGen.emit_struct_field_expr(self, e: LExpr?) -> string {
   }
   if !isnull(inner_type) && inner_type!.kind is TyClassHandle {
     let recv = self.emit_value(d.receiver)
+    if self.prog!.slab_mode_soa {
+      let cname = inner_type!.name
+      return f"_lyric_slab_{cname}.{lc_first(d.field)}[{recv} - 1]"
+    }
     return f"{recv}->{d.field}"
   }
   if !isnull(recv_type) && recv_type!.kind is TyErrorResult {
@@ -2284,8 +2314,10 @@ func CGen.emit_args_boxed(self, func_name: string, args: [LValue?]) -> string {
         if !isnull(iface_e) {
           let concrete_class = self.resolve_concrete_class(args[i])
           if concrete_class != "" {
-            arg_str = f"({pt!.name}){{._data = {arg_str}, ._vtable = &{concrete_class}_as_{pt!.name}}}"
+            let data_val = if self.prog!.slab_mode_soa { f"(void*)(uintptr_t){arg_str}" } else { arg_str }
+            arg_str = f"({pt!.name}){{._data = {data_val}, ._vtable = &{concrete_class}_as_{pt!.name}}}"
           }
+
         }
       }
     }
@@ -2320,9 +2352,11 @@ func CGen.emit_args_boxed_mut(self, func_name: string, args: [LValue?], mut_args
         if !isnull(iface_e) {
           let concrete_class = self.resolve_concrete_class(args[i])
           if concrete_class != "" {
-            arg_str = f"({pt!.name}){{._data = {arg_str}, ._vtable = &{concrete_class}_as_{pt!.name}}}"
+            let data_val = if self.prog!.slab_mode_soa { f"(void*)(uintptr_t){arg_str}" } else { arg_str }
+            arg_str = f"({pt!.name}){{._data = {data_val}, ._vtable = &{concrete_class}_as_{pt!.name}}}"
           }
         }
+
       }
     }
     sb.write(arg_str)
@@ -2567,6 +2601,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StClassSet => {
       let d = s!.class_set!
+      let ref = self.emit_value(d.handle)
       let val = self.emit_value(d.value)
       // Auto-wrap non-optional value when field type is optional struct
       let mut wrapped_val = val
@@ -2588,7 +2623,12 @@ func CGen.emit_stmt(self, s: LStmt?) {
         }
         ci = ci + 1
       }
-      self.line(f"{self.emit_value(d.handle)}->{d.field} = {wrapped_val};")
+      if self.prog!.slab_mode_soa {
+        let cname = self.resolve_class_name(d.class_name, "StClassSet")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1] = {wrapped_val};")
+      } else {
+        self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
+      }
     }
     StSlabSet => {
       let d = s!.slab_set!
@@ -2614,7 +2654,12 @@ func CGen.emit_stmt(self, s: LStmt?) {
         }
         ci = ci + 1
       }
-      self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
+      if self.prog!.slab_mode_soa {
+        let cname = self.resolve_class_name(d.class_name, "StSlabSet")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1] = {wrapped_val};")
+      } else {
+        self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
+      }
     }
     StSlabFree => {
       let d = s!.slab_free!
@@ -2899,7 +2944,11 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
     if !isnull(self.current_func) && !isnull(self.current_func!.return_type) && self.current_func!.return_type!.kind is TyOptional {
       if self.is_class_optional(self.current_func!.return_type) {
         if !isnull(d.values[0]) && d.values[0]!.kind is ValLitNull {
-          self.line("return NULL;")
+          if self.prog!.slab_mode_soa {
+            self.line("return 0;")
+          } else {
+            self.line("return NULL;")
+          }
         } else {
           self.line(f"return {val};")
         }
@@ -3459,7 +3508,10 @@ func CGen.to_string_expr(self, v: LValue?) -> string {
     TyString => { return "lyric_sprintf(\"\\\"%.*s\\\"\", (int)" + val + ".len, (const char*)" + val + ".data)" }
     TyTaggedUnion => { return f"{t!.name}_to_string({val})" }
     TyStruct => { return f"{t!.name}_to_string({val})" }
-    TyClassHandle => { return f"({val} == NULL ? LYRIC_STR(\"null\") : {t!.name}_to_string({val}))" }
+    TyClassHandle => {
+      let null_check = if self.prog!.slab_mode_soa { "== 0" } else { "== NULL" }
+      return f"({val} {null_check} ? LYRIC_STR(\"null\") : {t!.name}_to_string({val}))"
+    }
     _ => { return f"LYRIC_STR(\"<{t!.name}>\")" }
   }
 }
@@ -3515,7 +3567,8 @@ func CGen.field_to_string_expr(self, t: LType?, val: string) -> string {
     }
     TyClassHandle => {
       let name = self.resolve_type_name(t!.name)
-      return f"({val} == NULL ? LYRIC_STR(\"null\") : {name}_to_string({val}))"
+      let null_check = if self.prog!.slab_mode_soa { "== 0" } else { "== NULL" }
+      return f"({val} {null_check} ? LYRIC_STR(\"null\") : {name}_to_string({val}))"
     }
     _ => { return f"LYRIC_STR(\"<{t!.name}>\")" }
   }
@@ -3965,6 +4018,13 @@ func CGen.emit_struct_decl(self, s: LStructDecl) {
 }
 
 func CGen.emit_class_decl(self, c: LClassDecl) {
+  if self.prog!.slab_mode_soa {
+    // SoA: no struct definition — fields are parallel arrays in slab
+    // Emit typedef for documentation
+    self.line(f"/* class {c.name}: SoA slab — no struct emitted */")
+    self.line("")
+    return
+  }
   self.line(f"struct {c.name} {{")
   self.indent = self.indent + 1
   if len(c.fields) == 0 && !self.prog!.slab_mode {
@@ -3990,6 +4050,10 @@ func CGen.emit_class_decl(self, c: LClassDecl) {
 // Each block holds LYRIC_SLAB_BLOCK objects; blocks form a linked list.
 // lyric_next field in each struct serves as the free-list link.
 func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
+  if self.prog!.slab_mode_soa {
+    self.emit_slab_infrastructure_soa(classes)
+    return
+  }
   self.line("/* Slab allocator infrastructure (AoS block-based) */")
 
   // Block type + slab type + global for each class
@@ -4051,6 +4115,109 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line("if (!p) return;")
     self.line(f"p->lyric_next = _lyric_slab_{name}.free;")
     self.line(f"_lyric_slab_{name}.free = p;")
+    self.indent = self.indent - 1
+    self.line("}")
+    self.line("")
+    i = i + 1
+  }
+}
+
+// SoA slab: parallel arrays per field, uint32_t handles, realloc growth
+func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
+  self.line("/* Slab allocator infrastructure (SoA parallel-array) */")
+
+  // Slab struct + global for each class
+  let mut i = 0
+  while i < len(classes) {
+    let name = classes[i].name
+    self.line(f"typedef struct {{")
+    self.indent = self.indent + 1
+    let mut j = 0
+    while j < len(classes[i].fields) {
+      let f = classes[i].fields[j]
+      self.line(f"{self.c_type(f.typ)}* {lc_first(f.name)};")
+      j = j + 1
+    }
+    self.line("uint32_t* lyric_next;")
+    self.line("uint32_t used;")
+    self.line("uint32_t cap;")
+    self.line("uint32_t free_head;")
+    self.indent = self.indent - 1
+    self.line(f"}} LyricSlab_{name};")
+    self.line(f"static LyricSlab_{name} _lyric_slab_{name} = {{0}};")
+    self.line("")
+    i = i + 1
+  }
+
+  // Alloc function for each class (returns uint32_t handle)
+  i = 0
+  while i < len(classes) {
+    let name = classes[i].name
+    self.line(f"static {name} _lyric_slab_alloc_{name}(void) {{")
+    self.indent = self.indent + 1
+    // Check free list first
+    self.line(f"if (_lyric_slab_{name}.free_head) {{")
+    self.indent = self.indent + 1
+    self.line(f"uint32_t h = _lyric_slab_{name}.free_head;")
+    self.line(f"_lyric_slab_{name}.free_head = _lyric_slab_{name}.lyric_next[h - 1];")
+    // Zero all field arrays at index h-1
+    let mut j = 0
+    while j < len(classes[i].fields) {
+      let f = classes[i].fields[j]
+      let ct = self.c_type(f.typ)
+      let zv = self.zero_value(f.typ)
+      if zv == "{0}" {
+        // Struct/tuple types can't use {0} in assignment — use memset
+        self.line(f"memset(&_lyric_slab_{name}.{lc_first(f.name)}[h - 1], 0, sizeof({ct}));")
+      } else {
+        self.line(f"_lyric_slab_{name}.{lc_first(f.name)}[h - 1] = {zv};")
+      }
+      j = j + 1
+    }
+    self.line("return h;")
+    self.indent = self.indent - 1
+    self.line("}")
+    // Grow if needed
+    self.line(f"if (_lyric_slab_{name}.used == _lyric_slab_{name}.cap) {{")
+    self.indent = self.indent + 1
+    self.line(f"uint32_t new_cap = _lyric_slab_{name}.cap ? _lyric_slab_{name}.cap * 2 : 8;")
+    // Realloc each field array
+    j = 0
+    while j < len(classes[i].fields) {
+      let f = classes[i].fields[j]
+      let ct = self.c_type(f.typ)
+      self.line(f"_lyric_slab_{name}.{lc_first(f.name)} = ({ct}*)realloc(_lyric_slab_{name}.{lc_first(f.name)}, new_cap * sizeof({ct}));")
+      j = j + 1
+    }
+    self.line(f"_lyric_slab_{name}.lyric_next = (uint32_t*)realloc(_lyric_slab_{name}.lyric_next, new_cap * sizeof(uint32_t));")
+    // Zero new capacity
+    j = 0
+    while j < len(classes[i].fields) {
+      let f = classes[i].fields[j]
+      self.line(f"memset(&_lyric_slab_{name}.{lc_first(f.name)}[_lyric_slab_{name}.cap], 0, (new_cap - _lyric_slab_{name}.cap) * sizeof({self.c_type(f.typ)}));")
+      j = j + 1
+    }
+    self.line(f"memset(&_lyric_slab_{name}.lyric_next[_lyric_slab_{name}.cap], 0, (new_cap - _lyric_slab_{name}.cap) * sizeof(uint32_t));")
+    self.line(f"_lyric_slab_{name}.cap = new_cap;")
+    self.indent = self.indent - 1
+    self.line("}")
+    // Allocate from used
+    self.line(f"return ++_lyric_slab_{name}.used;")
+    self.indent = self.indent - 1
+    self.line("}")
+    self.line("")
+    i = i + 1
+  }
+
+  // Free function for each class
+  i = 0
+  while i < len(classes) {
+    let name = classes[i].name
+    self.line(f"static void _lyric_slab_free_{name}({name} h) {{")
+    self.indent = self.indent + 1
+    self.line("if (!h) return;")
+    self.line(f"_lyric_slab_{name}.lyric_next[h - 1] = _lyric_slab_{name}.free_head;")
+    self.line(f"_lyric_slab_{name}.free_head = h;")
     self.indent = self.indent - 1
     self.line("}")
     self.line("")
@@ -4216,7 +4383,11 @@ func CGen.emit_to_string_functions(self) {
   while i < len(classes) {
     let name = classes[i].name
     if isnull(has_to_string.get(sym(name))) {
-      self.line(f"static lyric_string {name}_to_string({name}* v);")
+      if self.prog!.slab_mode_soa {
+        self.line(f"static lyric_string {name}_to_string({name} v);")
+      } else {
+        self.line(f"static lyric_string {name}_to_string({name}* v);")
+      }
     }
     i = i + 1
   }
@@ -4265,7 +4436,7 @@ func CGen.emit_to_string_functions(self) {
     }
     self.line(f"static lyric_string {name}_to_string({name} v) {{")
     self.indent = self.indent + 1
-    self.emit_field_dump_to_string(name, structs[i].fields, "v.")
+    self.emit_field_dump_to_string(name, structs[i].fields, "v.", "")
     self.indent = self.indent - 1
     self.line("}")
     self.line("")
@@ -4281,14 +4452,18 @@ func CGen.emit_to_string_functions(self) {
       // skip
       continue
     }
-    if self.prog!.slab_mode {
+    if self.prog!.slab_mode_soa {
+      self.line(f"static lyric_string {name}_to_string({name} v) {{")
+      self.indent = self.indent + 1
+      self.emit_field_dump_to_string(name, classes[i].fields, f"_lyric_slab_{name}.", "[v - 1]")
+    } else if self.prog!.slab_mode {
       self.line(f"static lyric_string {name}_to_string({name}* v) {{")
       self.indent = self.indent + 1
-      self.emit_field_dump_to_string(name, classes[i].fields, "v->")
+      self.emit_field_dump_to_string(name, classes[i].fields, "v->", "")
     } else {
       self.line(f"static lyric_string {name}_to_string({name}* v) {{")
       self.indent = self.indent + 1
-      self.emit_field_dump_to_string(name, classes[i].fields, "v->")
+      self.emit_field_dump_to_string(name, classes[i].fields, "v->", "")
     }
     self.indent = self.indent - 1
     self.line("}")
@@ -4297,7 +4472,7 @@ func CGen.emit_to_string_functions(self) {
   }
 }
 
-func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string) {
+func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string, suffix: string) {
   if len(fields) == 0 {
     self.line(f"return LYRIC_STR(\"{type_name}{{}}\");")
     return
@@ -4309,7 +4484,7 @@ func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], p
       self.line("_result = lyric_str_concat(_result, LYRIC_STR(\", \"));")
     }
     self.line(f"_result = lyric_str_concat(_result, LYRIC_STR(\"{fields[i].name}: \"));")
-    let field_val = f"{prefix}{c_safe_name(fields[i].name)}"
+    let field_val = f"{prefix}{c_safe_name(fields[i].name)}{suffix}"
     let field_str = self.field_to_string_expr(fields[i].typ, field_val)
     self.line(f"_result = lyric_str_concat(_result, {field_str});")
     i = i + 1
@@ -4708,7 +4883,11 @@ pub func emit_c(prog: LProgram?) -> string {
   let classes = prog_ref.classes
   i = 0
   while i < len(classes) {
-    g.line(f"typedef struct {classes[i].name} {classes[i].name};")
+    if prog_ref.slab_mode_soa {
+      g.line(f"typedef uint32_t {classes[i].name};")
+    } else {
+      g.line(f"typedef struct {classes[i].name} {classes[i].name};")
+    }
     i = i + 1
   }
   let enums = prog_ref.enums

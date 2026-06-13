@@ -577,7 +577,7 @@ func dump_lir_to_file(prog: LProgram, path: string) {
 // compile_pipeline — shared parse/check/lower/emit pipeline
 // ---------------------------------------------------------------------------
 
-func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string) -> bool {
+func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool) -> bool {
   // Parse all input files
   let mut all_files: [File?] = []
   let mut i = 0
@@ -657,6 +657,9 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
   eprintln("phase: rewrite")
   rewrite_impl_renames(prog)
   eprintln("phase: slab")
+  if soa {
+    prog!.slab_mode_soa = true
+  }
   slab_rewrite(prog!)
 
 
@@ -681,8 +684,8 @@ func cmd_compile(args: [string]) -> bool {
   let mut inputs: [string] = []
   let mut output = ""
   let mut lir_dump = ""
-  let mut i = 0
-  while i < len(args) {
+  let mut soa = false
+  let mut i = 0  while i < len(args) {
     if args[i] == "-o" {
       i = i + 1
       if i < len(args) {
@@ -695,6 +698,8 @@ func cmd_compile(args: [string]) -> bool {
       }
     } else if args[i] == "--c" {
       // accepted for backwards compat
+    } else if args[i] == "--soa" {
+      soa = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -752,7 +757,7 @@ func cmd_compile(args: [string]) -> bool {
     }
   }
 
-  return compile_pipeline(inputs, output, module_root, lir_dump)
+  return compile_pipeline(inputs, output, module_root, lir_dump, soa)
 }
 
 // ---------------------------------------------------------------------------
@@ -763,6 +768,7 @@ func cmd_test(args: [string]) -> bool {
   let mut inputs: [string] = []
   let mut output = ""
   let mut lir_dump = ""
+  let mut soa = false
   let mut i = 0
   while i < len(args) {
     if args[i] == "-o" {
@@ -775,6 +781,8 @@ func cmd_test(args: [string]) -> bool {
       if i < len(args) {
         lir_dump = args[i]
       }
+    } else if args[i] == "--soa" {
+      soa = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -850,6 +858,9 @@ func cmd_test(args: [string]) -> bool {
   monomorphize(prog)
   validate_post_mono(prog)
   rewrite_impl_renames(prog)
+  if soa {
+    prog!.slab_mode_soa = true
+  }
   slab_rewrite(prog!)
 
   // Discover test_* functions

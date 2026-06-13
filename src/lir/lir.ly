@@ -670,6 +670,7 @@ lyric lir {
     class_renames: Dict<Sym, string>?
     impl_method_renames: Dict<Sym, string>?
     slab_mode: bool
+    slab_mode_soa: bool
   }
 
 }
