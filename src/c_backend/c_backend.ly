@@ -805,7 +805,7 @@ func CGen.emit_value(self, v: LValue?) -> string {
           }
           cname = inner!.name
         }
-        return f"_lyric_slab_{cname}.{v!.name}[{handle} - 1]"
+        return f"_lyric_slab_{cname}.{v!.name}[{handle}]"
       }
       return f"{handle}->{v!.name}"
     }
@@ -816,7 +816,7 @@ func CGen.emit_class_msg_data(self, v: LValue?, class_name: string) -> string {
   let val = self.emit_value(v)
   if self.prog!.slab_mode_soa {
     let cname = self.resolve_class_name(class_name, "emit_class_msg_data")
-    return f"(const char*)_lyric_slab_{cname}.msg[{val} - 1].data"
+    return f"(const char*)_lyric_slab_{cname}.msg[{val}].data"
   }
   return f"(const char*){val}->msg.data"
 }
@@ -1722,7 +1722,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
       let d = e!.class_get!
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "ExClassGet")
-        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{self.emit_value(d.handle)} - 1]"
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{self.emit_value(d.handle)}]"
       }
       return f"{self.emit_value(d.handle)}->{d.field}"
     }
@@ -1872,7 +1872,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
       let ref = self.emit_value(d.handle)
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "ExSlabGet")
-        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1]"
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}]"
       }
       return f"{ref}->{d.field}"
     }
@@ -1913,7 +1913,7 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
           }
         }
         if self.prog!.slab_mode_soa {
-          sb.write(f"_lyric_slab_{cname}.{lc_first(f.name)}[_p - 1] = {val}; ")
+          sb.write(f"_lyric_slab_{cname}.{lc_first(f.name)}[_p] = {val}; ")
         } else {
           sb.write(f"_p->{lc_first(f.name)} = {val}; ")
         }
@@ -2202,7 +2202,7 @@ func CGen.emit_struct_field_expr(self, e: LExpr?) -> string {
     let recv = self.emit_value(d.receiver)
     if self.prog!.slab_mode_soa {
       let cname = inner_type!.name
-      return f"_lyric_slab_{cname}.{lc_first(d.field)}[{recv} - 1]"
+      return f"_lyric_slab_{cname}.{lc_first(d.field)}[{recv}]"
     }
     return f"{recv}->{d.field}"
   }
@@ -2625,7 +2625,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
       }
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "StClassSet")
-        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1] = {wrapped_val};")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}] = {wrapped_val};")
       } else {
         self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
       }
@@ -2656,7 +2656,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
       }
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "StSlabSet")
-        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref} - 1] = {wrapped_val};")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}] = {wrapped_val};")
       } else {
         self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
       }
@@ -4071,6 +4071,7 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     // Slab control: current block + free-list head
     self.line(f"typedef struct {{ LyricSlab_{name}_Block* cur; {name}* free; }} LyricSlab_{name};")
     self.line(f"static LyricSlab_{name} _lyric_slab_{name} = {{0}};")
+
     self.line("")
     i = i + 1
   }
@@ -4144,7 +4145,8 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.line("uint32_t free_head;")
     self.indent = self.indent - 1
     self.line(f"}} LyricSlab_{name};")
-    self.line(f"static LyricSlab_{name} _lyric_slab_{name} = {{0}};")
+    self.line(f"static LyricSlab_{name} _lyric_slab_{name} = {{ .used = 1 }};")
+
     self.line("")
     i = i + 1
   }
@@ -4159,7 +4161,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.line(f"if (_lyric_slab_{name}.free_head) {{")
     self.indent = self.indent + 1
     self.line(f"uint32_t h = _lyric_slab_{name}.free_head;")
-    self.line(f"_lyric_slab_{name}.free_head = _lyric_slab_{name}.lyric_next[h - 1];")
+    self.line(f"_lyric_slab_{name}.free_head = _lyric_slab_{name}.lyric_next[h];")
     // Zero all field arrays at index h-1
     let mut j = 0
     while j < len(classes[i].fields) {
@@ -4168,9 +4170,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       let zv = self.zero_value(f.typ)
       if zv == "{0}" {
         // Struct/tuple types can't use {0} in assignment — use memset
-        self.line(f"memset(&_lyric_slab_{name}.{lc_first(f.name)}[h - 1], 0, sizeof({ct}));")
+        self.line(f"memset(&_lyric_slab_{name}.{lc_first(f.name)}[h], 0, sizeof({ct}));")
       } else {
-        self.line(f"_lyric_slab_{name}.{lc_first(f.name)}[h - 1] = {zv};")
+        self.line(f"_lyric_slab_{name}.{lc_first(f.name)}[h] = {zv};")
       }
       j = j + 1
     }
@@ -4178,9 +4180,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.indent = self.indent - 1
     self.line("}")
     // Grow if needed
-    self.line(f"if (_lyric_slab_{name}.used == _lyric_slab_{name}.cap) {{")
+    self.line(f"if (_lyric_slab_{name}.used >= _lyric_slab_{name}.cap) {{")
     self.indent = self.indent + 1
-    self.line(f"uint32_t new_cap = _lyric_slab_{name}.cap ? _lyric_slab_{name}.cap * 2 : 8;")
+    self.line(f"uint32_t new_cap = _lyric_slab_{name}.cap ? _lyric_slab_{name}.cap * 2 : 64;")
     // Realloc each field array
     j = 0
     while j < len(classes[i].fields) {
@@ -4202,7 +4204,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.indent = self.indent - 1
     self.line("}")
     // Allocate from used
-    self.line(f"return ++_lyric_slab_{name}.used;")
+    self.line(f"return _lyric_slab_{name}.used++;")
     self.indent = self.indent - 1
     self.line("}")
     self.line("")
@@ -4216,7 +4218,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.line(f"static void _lyric_slab_free_{name}({name} h) {{")
     self.indent = self.indent + 1
     self.line("if (!h) return;")
-    self.line(f"_lyric_slab_{name}.lyric_next[h - 1] = _lyric_slab_{name}.free_head;")
+    self.line(f"_lyric_slab_{name}.lyric_next[h] = _lyric_slab_{name}.free_head;")
     self.line(f"_lyric_slab_{name}.free_head = h;")
     self.indent = self.indent - 1
     self.line("}")
@@ -4455,7 +4457,7 @@ func CGen.emit_to_string_functions(self) {
     if self.prog!.slab_mode_soa {
       self.line(f"static lyric_string {name}_to_string({name} v) {{")
       self.indent = self.indent + 1
-      self.emit_field_dump_to_string(name, classes[i].fields, f"_lyric_slab_{name}.", "[v - 1]")
+      self.emit_field_dump_to_string(name, classes[i].fields, f"_lyric_slab_{name}.", "[v]")
     } else if self.prog!.slab_mode {
       self.line(f"static lyric_string {name}_to_string({name}* v) {{")
       self.indent = self.indent + 1

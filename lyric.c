@@ -70779,7 +70779,7 @@ lyric_string CGen_emit_value(CGen* self, LValue* v) {
             }
             LValue* _t88 = v;
             lyric_string _t89 = _t88->name;
-            lyric_string _t90 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1]", (int)cname.len, (const char*)cname.data, (int)_t89.len, (const char*)_t89.data, (int)handle.len, (const char*)handle.data);
+            lyric_string _t90 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s]", (int)cname.len, (const char*)cname.data, (int)_t89.len, (const char*)_t89.data, (int)handle.len, (const char*)handle.data);
             return _t90;
         }
         LValue* _t91 = v;
@@ -70801,7 +70801,7 @@ lyric_string CGen_emit_class_msg_data(CGen* self, LValue* v, lyric_string class_
     if (_t3) {
         lyric_string _t4 = CGen_resolve_class_name(self, class_name, LYRIC_STR("emit_class_msg_data"));
         lyric_string cname = _t4;
-        lyric_string _t5 = lyric_sprintf("(const char*)_lyric_slab_%.*s.msg[%.*s - 1].data", (int)cname.len, (const char*)cname.data, (int)val.len, (const char*)val.data);
+        lyric_string _t5 = lyric_sprintf("(const char*)_lyric_slab_%.*s.msg[%.*s].data", (int)cname.len, (const char*)cname.data, (int)val.len, (const char*)val.data);
         return _t5;
     }
     lyric_string _t6 = lyric_sprintf("(const char*)%.*s->msg.data", (int)val.len, (const char*)val.data);
@@ -73471,7 +73471,7 @@ lyric_string CGen_emit_expr_str(CGen* self, LExpr* e) {
             lyric_string _t55 = lc_first(_t54);
             LValue* _t56 = d.handle;
             lyric_string _t57 = CGen_emit_value(self, _t56);
-            lyric_string _t58 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1]", (int)cname.len, (const char*)cname.data, (int)_t55.len, (const char*)_t55.data, (int)_t57.len, (const char*)_t57.data);
+            lyric_string _t58 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s]", (int)cname.len, (const char*)cname.data, (int)_t55.len, (const char*)_t55.data, (int)_t57.len, (const char*)_t57.data);
             return _t58;
         }
         LValue* _t59 = d.handle;
@@ -74063,7 +74063,7 @@ lyric_string CGen_emit_expr_str(CGen* self, LExpr* e) {
             lyric_string cname = _t386;
             lyric_string _t387 = d.field;
             lyric_string _t388 = lc_first(_t387);
-            lyric_string _t389 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1]", (int)cname.len, (const char*)cname.data, (int)_t388.len, (const char*)_t388.data, (int)ref.len, (const char*)ref.data);
+            lyric_string _t389 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s]", (int)cname.len, (const char*)cname.data, (int)_t388.len, (const char*)_t388.data, (int)ref.len, (const char*)ref.data);
             return _t389;
         }
         lyric_string _t390 = d.field;
@@ -74244,7 +74244,7 @@ lyric_string CGen_emit_expr_str(CGen* self, LExpr* e) {
             if (_t495) {
                 lyric_string _t496 = f.name;
                 lyric_string _t497 = lc_first(_t496);
-                lyric_string _t498 = lyric_sprintf("_lyric_slab_%.*s.%.*s[_p - 1] = %.*s; ", (int)cname.len, (const char*)cname.data, (int)_t497.len, (const char*)_t497.data, (int)val.len, (const char*)val.data);
+                lyric_string _t498 = lyric_sprintf("_lyric_slab_%.*s.%.*s[_p] = %.*s; ", (int)cname.len, (const char*)cname.data, (int)_t497.len, (const char*)_t497.data, (int)val.len, (const char*)val.data);
                 StringBuilder_write(sb, _t498);
             } else {
                 lyric_string _t500 = f.name;
@@ -75263,7 +75263,7 @@ lyric_string CGen_emit_struct_field_expr(CGen* self, LExpr* e) {
             lyric_string cname = _t32;
             lyric_string _t33 = d.field;
             lyric_string _t34 = lc_first(_t33);
-            lyric_string _t35 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1]", (int)cname.len, (const char*)cname.data, (int)_t34.len, (const char*)_t34.data, (int)recv.len, (const char*)recv.data);
+            lyric_string _t35 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s]", (int)cname.len, (const char*)cname.data, (int)_t34.len, (const char*)_t34.data, (int)recv.len, (const char*)recv.data);
             return _t35;
         }
         lyric_string _t36 = d.field;
@@ -76732,7 +76732,7 @@ void CGen_emit_stmt(CGen* self, LStmt* s) {
             lyric_string cname = _t258;
             lyric_string _t259 = d.field;
             lyric_string _t260 = lc_first(_t259);
-            lyric_string _t261 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1] = %.*s;", (int)cname.len, (const char*)cname.data, (int)_t260.len, (const char*)_t260.data, (int)ref.len, (const char*)ref.data, (int)wrapped_val.len, (const char*)wrapped_val.data);
+            lyric_string _t261 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s] = %.*s;", (int)cname.len, (const char*)cname.data, (int)_t260.len, (const char*)_t260.data, (int)ref.len, (const char*)ref.data, (int)wrapped_val.len, (const char*)wrapped_val.data);
             CGen_line(self, _t261);
         } else {
             lyric_string _t263 = d.field;
@@ -76846,7 +76846,7 @@ void CGen_emit_stmt(CGen* self, LStmt* s) {
             lyric_string cname = _t326;
             lyric_string _t327 = d.field;
             lyric_string _t328 = lc_first(_t327);
-            lyric_string _t329 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s - 1] = %.*s;", (int)cname.len, (const char*)cname.data, (int)_t328.len, (const char*)_t328.data, (int)ref.len, (const char*)ref.data, (int)wrapped_val.len, (const char*)wrapped_val.data);
+            lyric_string _t329 = lyric_sprintf("_lyric_slab_%.*s.%.*s[%.*s] = %.*s;", (int)cname.len, (const char*)cname.data, (int)_t328.len, (const char*)_t328.data, (int)ref.len, (const char*)ref.data, (int)wrapped_val.len, (const char*)wrapped_val.data);
             CGen_line(self, _t329);
         } else {
             lyric_string _t331 = d.field;
@@ -81218,7 +81218,7 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
         self->indent = _t28;
         lyric_string _t29 = lyric_sprintf("} LyricSlab_%.*s;", (int)name.len, (const char*)name.data);
         CGen_line(self, _t29);
-        lyric_string _t31 = lyric_sprintf("static LyricSlab_%.*s _lyric_slab_%.*s = {0};", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
+        lyric_string _t31 = lyric_sprintf("static LyricSlab_%.*s _lyric_slab_%.*s = { .used = 1 };", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
         CGen_line(self, _t31);
         CGen_line(self, LYRIC_STR(""));
         int32_t _t34 = (i + 1);
@@ -81244,7 +81244,7 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
         self->indent = _t46;
         lyric_string _t47 = lyric_sprintf("uint32_t h = _lyric_slab_%.*s.free_head;", (int)name.len, (const char*)name.data);
         CGen_line(self, _t47);
-        lyric_string _t49 = lyric_sprintf("_lyric_slab_%.*s.free_head = _lyric_slab_%.*s.lyric_next[h - 1];", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
+        lyric_string _t49 = lyric_sprintf("_lyric_slab_%.*s.free_head = _lyric_slab_%.*s.lyric_next[h];", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
         CGen_line(self, _t49);
         int32_t j = 0;
         while (1) {
@@ -81267,12 +81267,12 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
             if (_t62) {
                 lyric_string _t63 = f.name;
                 lyric_string _t64 = lc_first(_t63);
-                lyric_string _t65 = lyric_sprintf("memset(&_lyric_slab_%.*s.%.*s[h - 1], 0, sizeof(%.*s));", (int)name.len, (const char*)name.data, (int)_t64.len, (const char*)_t64.data, (int)ct.len, (const char*)ct.data);
+                lyric_string _t65 = lyric_sprintf("memset(&_lyric_slab_%.*s.%.*s[h], 0, sizeof(%.*s));", (int)name.len, (const char*)name.data, (int)_t64.len, (const char*)_t64.data, (int)ct.len, (const char*)ct.data);
                 CGen_line(self, _t65);
             } else {
                 lyric_string _t67 = f.name;
                 lyric_string _t68 = lc_first(_t67);
-                lyric_string _t69 = lyric_sprintf("_lyric_slab_%.*s.%.*s[h - 1] = %.*s;", (int)name.len, (const char*)name.data, (int)_t68.len, (const char*)_t68.data, (int)zv.len, (const char*)zv.data);
+                lyric_string _t69 = lyric_sprintf("_lyric_slab_%.*s.%.*s[h] = %.*s;", (int)name.len, (const char*)name.data, (int)_t68.len, (const char*)_t68.data, (int)zv.len, (const char*)zv.data);
                 CGen_line(self, _t69);
             }
             int32_t _t71 = (j + 1);
@@ -81283,12 +81283,12 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
         int32_t _t74 = (_t73 - 1);
         self->indent = _t74;
         CGen_line(self, LYRIC_STR("}"));
-        lyric_string _t76 = lyric_sprintf("if (_lyric_slab_%.*s.used == _lyric_slab_%.*s.cap) {", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
+        lyric_string _t76 = lyric_sprintf("if (_lyric_slab_%.*s.used >= _lyric_slab_%.*s.cap) {", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
         CGen_line(self, _t76);
         int32_t _t78 = self->indent;
         int32_t _t79 = (_t78 + 1);
         self->indent = _t79;
-        lyric_string _t80 = lyric_sprintf("uint32_t new_cap = _lyric_slab_%.*s.cap ? _lyric_slab_%.*s.cap * 2 : 8;", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
+        lyric_string _t80 = lyric_sprintf("uint32_t new_cap = _lyric_slab_%.*s.cap ? _lyric_slab_%.*s.cap * 2 : 64;", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
         CGen_line(self, _t80);
         j = 0;
         while (1) {
@@ -81343,7 +81343,7 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
         int32_t _t119 = (_t118 - 1);
         self->indent = _t119;
         CGen_line(self, LYRIC_STR("}"));
-        lyric_string _t121 = lyric_sprintf("return ++_lyric_slab_%.*s.used;", (int)name.len, (const char*)name.data);
+        lyric_string _t121 = lyric_sprintf("return _lyric_slab_%.*s.used++;", (int)name.len, (const char*)name.data);
         CGen_line(self, _t121);
         int32_t _t123 = self->indent;
         int32_t _t124 = (_t123 - 1);
@@ -81367,7 +81367,7 @@ void CGen_emit_slab_infrastructure_soa(CGen* self, LyricSlice_LClassDecl classes
         int32_t _t135 = (_t134 + 1);
         self->indent = _t135;
         CGen_line(self, LYRIC_STR("if (!h) return;"));
-        lyric_string _t137 = lyric_sprintf("_lyric_slab_%.*s.lyric_next[h - 1] = _lyric_slab_%.*s.free_head;", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
+        lyric_string _t137 = lyric_sprintf("_lyric_slab_%.*s.lyric_next[h] = _lyric_slab_%.*s.free_head;", (int)name.len, (const char*)name.data, (int)name.len, (const char*)name.data);
         CGen_line(self, _t137);
         lyric_string _t139 = lyric_sprintf("_lyric_slab_%.*s.free_head = h;", (int)name.len, (const char*)name.data);
         CGen_line(self, _t139);
@@ -81910,7 +81910,7 @@ void CGen_emit_to_string_functions(CGen* self) {
             LClassDecl _t150 = classes.data[i];
             LyricSlice_LField _t151 = _t150.fields;
             lyric_string _t152 = lyric_sprintf("_lyric_slab_%.*s.", (int)name.len, (const char*)name.data);
-            CGen_emit_field_dump_to_string(self, name, _t151, _t152, LYRIC_STR("[v - 1]"));
+            CGen_emit_field_dump_to_string(self, name, _t151, _t152, LYRIC_STR("[v]"));
         } else {
             LProgram* _t154 = self->prog;
             LProgram* _t155 = _t154;
