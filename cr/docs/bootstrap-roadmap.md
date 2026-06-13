@@ -1,114 +1,111 @@
-# Lyric Bootstrap Roadmap
+# Lyric Roadmap
 
-*Created 2026-06-09. Tracks work remaining to replace the Go compiler with the self-hosted Lyric compiler.*
-
----
-
-## Phase 2: Bootstrap .ly Alignment (IN PROGRESS)
-
-Rewrite bootstrap .ly files to match current Go compiler behavior. Dependency order:
-
-- [x] ast.ly — ConstDecl, Is/IfElse ExprKind, MatchArm.patterns, RelationSide.type_args
-- [x] lexer.ly — semicolons fixed, .lyric updated
-- [ ] parser.ly — ConstDecl parsing, contextual keywords (field/lock/implements), annotations (why/source), type alias parsing
-- [ ] expr_parser.ly — audit against Go expr_parser.go for missing operators/constructs
-- [ ] desugar.ly — audit against Go desugar.go
-- [ ] checker.ly — audit against Go checker.go (144 errors were fixed; may have new gaps)
-- [ ] lir.ly — audit against Go lir.go
-- [ ] lowerer.ly — audit against Go lowerer.go
+*Updated 2026-06-13. Tracks completed work and remaining priorities.*
 
 ---
 
-## Phase 3: main.ly + Self-Compilation Test
+## Completed
 
-- [ ] Write `bootstrap/main.ly` — CLI entry point (compile, test, fmt, verify subcommands)
-- [ ] File I/O stdlib — `read_file`, `write_file`, `os_args`, `os_exit` (C implementations)
-- [ ] Test: bootstrap compiler can compile a simple .ly file to C and produce working output
-- [ ] Test: bootstrap compiler can compile itself (self-hosting milestone)
+### Self-Hosting (Phases 1-3) ✅
+- Bootstrap compiler written in Lyric (~15K lines across 14 .ly files)
+- Three-stage self-compilation with fixed point verification
+- Go compiler retired to `legacy/go-compiler/`
+- 76/76 tests passing, 101K lines generated C
+
+### Memory Management ✅
+- **AoS slab allocator** — block-based, pointer handles, `lyric_next` free list
+- **SoA slab allocator** — parallel arrays, uint32_t handles, `--soa` flag
+- **Deterministic destruction** — cascade delete through ownership relations, slab free on destroy
+- **Benchmarks** (self-compile): SoA 0.20s / 295 MB vs AoS 0.22s / 344 MB
+
+### Language Features ✅
+- Module/import system (directory-based, `lyric.mod`)
+- String `+` concat, slice `+` concat, `.extend()`
+- `as` cast, `is` operator, if-expressions
+- `if let` / `let..else`
+- Multi-pattern match, match guards, nested enum match, destructuring
+- `mut` parameters (Swift `inout` pattern)
+- F-strings, triple-quote strings
+- Generators (Duff's device state machine)
+- `Dict<K,V>` with `Hashable` where-clause, `Sym` keys
+- Multi-class interfaces, `impl..for`, default impls, `embed`
+- Relations (owns/refs) with field injection and back-pointers
+- `spawn` with auto-capture-by-reference, channels, `select`, `lock(mu)`
 
 ---
 
-## Phase 4: Post-Bootstrap Language Improvements
+## Phase 4: Language Ergonomics
 
-Once the bootstrap compiler replaces Go, these can be implemented in Lyric itself:
+### Must-Fix (high friction)
 
-### Must-Fix (blocking or high-friction)
-
-- [ ] **UTF-8 support** — lexer uses ASCII-only (`is_letter`, `is_digit`). Need proper UTF-8 decoding for identifiers, string operations, and source files with non-ASCII content
 - [ ] **`lyric fmt` lexer bug** — keywords inside string literals are tokenized as keywords, breaking formatting. Showstopper for dogfooding
-- [ ] **Map literal codegen** — `{"key": val}` syntax parses but lowerer has `// TODO: implement map literal lowering`
-- [ ] **Module/import system** — currently all files merged into single compilation unit. Need per-directory modules with explicit imports for real projects
+- [ ] **String methods** — `.contains()`, `.starts_with()`, `.split()`, `.replace()`, `.trim()` etc. via stdlib
+- [ ] **Generic sort** — stdlib sort function
+- [ ] **Map literal codegen** — `{"key": val}` syntax parses but lowerer has `// TODO`
+- [ ] **`for..in` on maps** — `for key, value in m { ... }`
 
-### Should-Fix (significant ergonomic improvements)
+### Should-Fix
 
-- [ ] **`for..in` on maps** — `for key, value in m { ... }` (iteration over map entries)
-- [ ] **String methods** — `.contains()`, `.starts_with()`, `.split()`, `.replace()`, etc. via stdlib
-- [ ] **Sort** — generic sort function in stdlib
+- [ ] **UTF-8 support** — lexer is ASCII-only. Need proper UTF-8 decoding for identifiers and string ops
+- [ ] **Error stack traces** — currently errors are bare strings; add source location
 - [ ] **Generic HashMap** — `map[K]V` with non-string keys (currently Dict is string-keyed only)
-- [ ] **Error stack traces** — currently errors are bare strings; add source location to error interface
-- [ ] **Deep `==` for structs and slices** — `==` should work on structs (field-by-field) and slices (element-by-element), not just primitives. Currently forces workarounds like `str_has_prefix`/`str_has_suffix` builtins instead of simple slice comparison. Design decision from pre-bootstrap says deep `==` for structs/tuples/slices, pointer comparison for classes/functions
-- [ ] **Operator overloading** — custom `==`, `<`, etc. for user types (lower priority than deep `==`)
-- [ ] **`not` keyword** — `not x` as alternative to `!x` (readability)
+- [ ] **Deep `==` for structs and slices** — field-by-field / element-by-element comparison
+- [ ] **`not` keyword** — `not x` as alternative to `!x`
 
-### Nice-to-Have (quality of life)
+### Nice-to-Have
 
-- [ ] **LSP server** — IDE integration (completion, go-to-definition, diagnostics)
+- [ ] **Operator overloading** — custom `==`, `<`, etc.
+- [ ] **UFCS** — `x.foo()` as sugar for `foo(x)`
+- [ ] **Named impls** — `as byEmail` disambiguation
+- [ ] **First-arg-wins type inference** — reduce need for explicit `<T>`
+- [ ] **Checker-side generic constraint validation** — currently only at monomorphization
+
+---
+
+## Phase 5: Reference Counting
+
+Deterministic memory management for unowned classes. The slab allocator handles owned objects via relations; ref-counting covers the rest.
+
+- [ ] **Ref-count field injection** — compiler-inserted `_rc` field on unowned classes
+- [ ] **Automatic retain/release** — compiler inserts `_rc++` on assignment, `_rc--` on scope exit / overwrite
+- [ ] **Cycle detection strategy** — weak references, or accept leak-on-cycle with documentation
+- [ ] **Interaction with slab allocator** — ref-counted objects can live in slabs; free returns to free list when `_rc` hits 0
+- [ ] **`ref` / `mut ref` bindings** — zero-copy views (from memory management design doc)
+- [ ] **`trusted` blocks** — opt out of safety checks (chosen over `unsafe` to avoid Rust baggage)
+
+---
+
+## Phase 6: Concurrency (C Backend Polish)
+
+AST/LIR/C backend support exists for spawn/channels/select/lock. Needs hardening and real-world testing.
+
+- [ ] **Thread pool** — currently raw `pthread_create` per spawn; need bounded thread pool
+- [ ] **Channel correctness** — stress-test bounded/unbounded MPMC channels
+- [ ] **Select fairness** — current polling loop; consider proper blocking select
+- [ ] **Generator coroutines** — Duff's device works but fragile; evaluate stackful coroutines
+- [ ] **Race detector** — optional instrumentation mode
+
+---
+
+## Phase 7: Tooling & Ecosystem
+
+- [ ] **LSP server** — completion, go-to-definition, diagnostics
 - [ ] **Source maps** — map C output back to Lyric source for debugging
-- [ ] **LLVM backend** — optimization beyond what GCC provides; eventual replacement for C backend
-- [ ] **i128/i256 support** — via compiler-rt or __int128 on supported platforms
-- [ ] **UFCS** (Uniform Function Call Syntax) — `x.foo()` as sugar for `foo(x)`
-- [ ] **Named impls** — `as byEmail` disambiguation for multiple impls of same interface
-- [ ] **Checker-side generic constraint validation** — currently only validated at monomorphization time
-- [ ] **First-arg-wins type inference** — reduce need for explicit `<T>` on generic calls
+- [ ] **LLVM backend** — optimization beyond GCC; eventual C backend replacement
+- [ ] **Package manager** — dependency resolution, versioning
+- [ ] **i128/i256 support** — via compiler-rt or `__int128`
 
 ---
 
-## Phase 5: Concurrency (C Backend)
-
-The Go backend had channels/spawn/select/lock. C backend needs:
-
-- [ ] **pthreads-based spawn** — goroutine-style with thread pool
-- [ ] **Channels** — bounded/unbounded MPMC channels via pthreads
-- [ ] **Select** — multiplexed channel operations
-- [ ] **Lock** — scoped mutex (already has AST/LIR support, needs C codegen)
-- [ ] **Generators** — currently uses Duff's device; may need proper coroutine support
-
----
-
-## Known Go Compiler Bugs (fix in either Go or bootstrap)
+## Known Bugs
 
 - [ ] `any_type.ly` — int-to-void* needs boxing in C backend
-- [ ] `guarded_by.ly` — `Mutex` type undeclared in C (lock/threading not emitted)
-- [ ] `interfaces.ly` — where-clause generic `count_children<P,C>` monomorphizes `children()` return to `string` instead of `[File]` slice
-- [ ] `arraylist.ly` — pre-existing relation field injection bug in C backend test
-
----
-
-## Bootstrap TODOs in Code
-
-From `grep TODO bootstrap/`:
-
-| File | Line | Issue |
-|------|------|-------|
-| checker.ly | 482 | Apply type args for generics |
-| checker.ly | 1410 | Annotate ResolvedType (lowerer re-derives types) |
-| parser.ly | 61 | Allow annotation/keyword names as identifiers |
-| parser.ly | 159 | Store ConstDecl properly (now have AST type) |
-| parser.ly | 443 | Store `why` annotation |
-| parser.ly | 855 | Parse `source` annotation |
-| parser.ly | 948 | Parse function annotations |
-| expr_parser.ly | 212 | Store type_args on struct lit |
-| lowerer.ly | 395 | Implement map literal lowering |
-
----
-
-## Test Coverage Gaps
-
-- **37/44 testdata tests pass** (4 skipped: channels, spawn, select, lock)
-- **3 real GCC failures** in testdata (any_type, guarded_by, interfaces)
-- **51/52 bootstrap parser tests** (1 failure: interface field contextual keyword)
-- **8/12 bootstrap desugar tests** (contextual keyword mismatches)
-- No bootstrap-level unit tests yet (tests are in testdata/ run by Go test harness)
+- [ ] `interfaces.ly` — where-clause generic monomorphizes `children()` return type wrong
+- [ ] `arraylist.ly` — relation field injection bug in C backend test
+- [ ] `collectUsedTemps` walker incomplete (ExMakeSlice, ExFormat, etc.)
+- [ ] External methods not registered in global scope
+- [ ] `LTyError` → `const char*` wrong (should be `lyric_string`)
+- [ ] Several bootstrap TODOs in checker/parser (see `grep TODO src/`)
 
 ---
 
@@ -117,7 +114,11 @@ From `grep TODO bootstrap/`:
 | Decision | Rationale | Date |
 |----------|-----------|------|
 | C backend before LLVM | Clang gives free optimizations; C is debuggable | 2026-05 |
-| No GC — SoA + arena + deterministic destruction | Compiler doesn't need GC; relations handle ownership | 2026-05 |
-| ASCII-only bootstrap lexer | Simplifies C backend; UTF-8 is Phase 4 | 2026-06 |
-| `source`/`fake` omitted from bootstrap LyricBlock | Verifier-only metadata, not needed for compilation | 2026-06-09 |
+| No GC — slab + deterministic destruction | Compiler doesn't need GC; relations handle ownership | 2026-05 |
 | Monomorphization-first, vtables later | Simpler codegen; vtables for code size optimization | 2026-05 |
+| AoS pointer slab as default | Simpler codegen, proven correct first | 2026-06 |
+| SoA as opt-in `--soa` | Better perf but more complex codegen; let user choose | 2026-06 |
+| `trusted` over `unsafe` | Avoids Rust baggage | 2026-06 |
+| `mut` over `&` for pass-by-reference | Communicates intent, no pointer types in surface language | 2026-06 |
+| Block scoping over variable renaming | Bill's directive — cleaner generated C | 2026-06 |
+| Ref-counting for unowned classes | Deterministic, no GC pause, fits slab model | 2026-06 |

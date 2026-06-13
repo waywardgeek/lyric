@@ -837,9 +837,6 @@ lyric checker {
             append(new_args, substitute_type(a, bindings))
           }
           let result = Type { kind: t.kind, bits: t.bits, type_args: new_args }
-          if name == "DictEntry" {
-            eprintln(f"  -> substituted to {len(result.type_args)} args")
-          }
           return result
         }
         return t

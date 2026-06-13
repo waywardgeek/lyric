@@ -372,6 +372,11 @@ lyric lir {
     handle: LValue?
   }
 
+  struct LSliceFreeData {
+    name: string
+    typ: LType?
+  }
+
   // ==========================================================================
   // LIR Statements
   // ==========================================================================
@@ -403,6 +408,7 @@ lyric lir {
     StTypeSwitch
     StSlabSet
     StSlabFree
+    StSliceFree
   }
 
   class LStmt {
@@ -432,6 +438,7 @@ lyric lir {
     type_switch: LTypeSwitchData?
     slab_set: LSlabSetData?
     slab_free: LSlabFreeData?
+    slice_free: LSliceFreeData?
   }
 
   struct LTempDef {

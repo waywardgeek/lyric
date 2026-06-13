@@ -2667,6 +2667,10 @@ func CGen.emit_stmt(self, s: LStmt?) {
       let cname = self.resolve_class_name(d.class_name, "field_to_string")
       self.line(f"_lyric_slab_free_{cname}({ref});")
     }
+    StSliceFree => {
+      let d = s!.slice_free!
+      self.line(f"if ({d.name}.data) free({d.name}.data);")
+    }
     StIndexSet => {
       let d = s!.index_set!
       if d.field != "" {
@@ -4734,6 +4738,11 @@ func collect_used_vars_stmts(stmts: [LStmt?], used: Dict<Sym, bool>?) {
       StSlabFree => {
         let d = s!.slab_free!
         collect_val_vars(d.handle, used)
+      }
+      StSliceFree => {
+        // slice_free references a variable by name — mark it as used
+        let d = s!.slice_free!
+        used.set(`d.name`, true)
       }
       StIndexSet => {
         let d = s!.index_set!

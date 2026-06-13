@@ -68,6 +68,7 @@ typedef struct LSlabGetData LSlabGetData;
 typedef struct LSlabAllocData LSlabAllocData;
 typedef struct LSlabSetData LSlabSetData;
 typedef struct LSlabFreeData LSlabFreeData;
+typedef struct LSliceFreeData LSliceFreeData;
 typedef struct LTempDef LTempDef;
 typedef struct LVarDeclData LVarDeclData;
 typedef struct LAssignData LAssignData;
@@ -504,7 +505,8 @@ typedef enum {
     LStmtKind_StMultiAssign = 22,
     LStmtKind_StTypeSwitch = 23,
     LStmtKind_StSlabSet = 24,
-    LStmtKind_StSlabFree = 25
+    LStmtKind_StSlabFree = 25,
+    LStmtKind_StSliceFree = 26
 } LStmtKind;
 
 typedef enum {
@@ -1329,6 +1331,11 @@ struct LSlabFreeData {
     LValue* handle;
 };
 
+struct LSliceFreeData {
+    lyric_string name;
+    LType* typ;
+};
+
 struct LTempDef {
     int32_t id;
     LExpr* expr;
@@ -1648,6 +1655,7 @@ LYRIC_OPT_DEF(LMultiAssignData, LyricOpt_LMultiAssignData)
 LYRIC_OPT_DEF(LTypeSwitchData, LyricOpt_LTypeSwitchData)
 LYRIC_OPT_DEF(LSlabSetData, LyricOpt_LSlabSetData)
 LYRIC_OPT_DEF(LSlabFreeData, LyricOpt_LSlabFreeData)
+LYRIC_OPT_DEF(LSliceFreeData, LyricOpt_LSliceFreeData)
 LYRIC_OPT_DEF(LFuncDecl, LyricOpt_LFuncDecl)
 LYRIC_OPT_DEF(TokenKind, LyricOpt_TokenKind)
 LYRIC_OPT_DEF(ArgListResult, LyricOpt_ArgListResult)
@@ -2338,6 +2346,7 @@ struct LStmt {
     LyricOpt_LTypeSwitchData type_switch;
     LyricOpt_LSlabSetData slab_set;
     LyricOpt_LSlabFreeData slab_free;
+    LyricOpt_LSliceFreeData slice_free;
     struct LStmt* lyric_next;
 };
 
@@ -6196,6 +6205,7 @@ static lyric_string LSlabGetData_to_string(LSlabGetData v);
 static lyric_string LSlabAllocData_to_string(LSlabAllocData v);
 static lyric_string LSlabSetData_to_string(LSlabSetData v);
 static lyric_string LSlabFreeData_to_string(LSlabFreeData v);
+static lyric_string LSliceFreeData_to_string(LSliceFreeData v);
 static lyric_string LTempDef_to_string(LTempDef v);
 static lyric_string LVarDeclData_to_string(LVarDeclData v);
 static lyric_string LAssignData_to_string(LAssignData v);
@@ -6775,6 +6785,7 @@ static lyric_string LStmtKind_to_string(LStmtKind v) {
         case LStmtKind_StTypeSwitch: return LYRIC_STR("StTypeSwitch");
         case LStmtKind_StSlabSet: return LYRIC_STR("StSlabSet");
         case LStmtKind_StSlabFree: return LYRIC_STR("StSlabFree");
+        case LStmtKind_StSliceFree: return LYRIC_STR("StSliceFree");
         default: return LYRIC_STR("<unknown LStmtKind>");
     }
 }
@@ -7229,6 +7240,17 @@ static lyric_string LSlabFreeData_to_string(LSlabFreeData v) {
     _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v.class_name.len, (const char*)v.class_name.data));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("handle: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string LSliceFreeData_to_string(LSliceFreeData v) {
+    lyric_string _result = LYRIC_STR("LSliceFreeData{");
+    _result = lyric_str_concat(_result, LYRIC_STR("name: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v.name.len, (const char*)v.name.data));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("typ: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR("}"));
     return _result;
@@ -9216,6 +9238,9 @@ static lyric_string LStmt_to_string(LStmt* v) {
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("slab_free: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("slice_free: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR("}"));
     return _result;
 }
@@ -11181,11 +11206,29 @@ void rewrite_impl_renames(LProgram* prog);
 void rewrite_impl_stmts(LyricSlice_LStmtptr stmts, Dict_CSym_string* renames);
 void rewrite_impl_stmt(LStmt* s, Dict_CSym_string* renames);
 void rewrite_impl_expr(LExpr* e, Dict_CSym_string* renames);
+Dict_CSym_bool* compute_escape_map(LProgram* prog);
+Sym* escape_key(lyric_string func_name, lyric_string param_name);
+Sym* escape_key_idx(lyric_string func_name, int32_t idx);
+bool scan_escapes_in_stmts(LyricSlice_LStmtptr stmts, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map);
+bool scan_escapes_in_stmt(LStmt* s, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map);
+bool scan_escapes_in_expr(LExpr* e, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map);
+lyric_string resolve_method_callee_name(LMethodCallData* d);
+bool mark_value_escape(LValue* v, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map);
+bool check_call_escapes(lyric_string callee_name, LyricSlice_LValueptr args, int32_t param_offset, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map);
+bool var_escapes_via_call(lyric_string var_name, LyricSlice_LStmtptr stmts, Dict_CSym_bool* escape_map);
+bool var_escapes_in_stmt(lyric_string var_name, LStmt* s, Dict_CSym_bool* escape_map);
+bool var_escapes_in_expr(lyric_string var_name, LExpr* e, Dict_CSym_bool* escape_map);
+bool var_at_escaping_position(lyric_string var_name, lyric_string callee_name, LyricSlice_LValueptr args, int32_t param_offset, Dict_CSym_bool* escape_map);
+bool is_var_value(lyric_string var_name, LValue* v);
 void slab_rewrite(LProgram* prog);
-LyricSlice_LStmtptr slab_rewrite_stmts(LyricSlice_LStmtptr stmts);
-LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s);
-void slab_rewrite_expr(LExpr* e);
+LyricSlice_LStmtptr slab_rewrite_stmts(LyricSlice_LStmtptr stmts, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map);
+LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map);
+void slab_rewrite_expr(LExpr* e, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map);
 void slab_rewrite_value(LValue* v);
+bool is_fresh_slice_init(LValue* init, LyricSlice_int32_t fresh_temps);
+LyricSlice_lyric_string get_return_var_names(LStmt* s);
+void emit_slice_frees(LyricSlice_lyric_string names, LyricSlice_LTypeptr types, LyricSlice_lyric_string skip_names, LyricSlice_LStmtptr* out);
+bool should_skip(lyric_string name, LyricSlice_lyric_string skip_names);
 CGen* new_cgen(LProgram* prog);
 void CGen_line(CGen* self, lyric_string s);
 void CGen_write_raw(CGen* self, lyric_string s);
@@ -14775,6 +14818,12 @@ void merge_stdlib(File* file, File* std_file) {
         }
         free(_gen_iter_89);
     }
+    if (queue.data) free(queue.data);
+    if (std_ifaces.data) free(std_ifaces.data);
+    if (std_classes.data) free(std_classes.data);
+    if (std_funcs.data) free(std_funcs.data);
+    if (std_relations.data) free(std_relations.data);
+    if (std_constants.data) free(std_constants.data);
 }
 
 Sym* sym(lyric_string name) {
@@ -15138,6 +15187,7 @@ LyricSlice_lyric_string str_split(lyric_string s, lyric_string sep) {
         start = _t23;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 lyric_string str_trim(lyric_string s) {
@@ -17339,6 +17389,9 @@ LyricTuple_0 resolve_module_imports(lyric_string module_root, File* root_file) {
             array_append_CFile_CLyricBlock(_t81, _t82);
         }
         free(_gen_iter_96);
+        if (pkg_files.data) free(pkg_files.data);
+        if (cur_orig.data) free(cur_orig.data);
+        if (cur_prefixed.data) free(cur_prefixed.data);
     }
     free(_gen_iter_92);
     File* _t84 = root_file;
@@ -17355,7 +17408,15 @@ LyricTuple_0 resolve_module_imports(lyric_string module_root, File* root_file) {
         strip_imports(block);
     }
     free(_gen_iter_97);
+    if (imports.data) free(imports.data);
+    if (alias_names.data) free(alias_names.data);
+    if (orig_names.data) free(orig_names.data);
+    if (prefixed_names.data) free(prefixed_names.data);
     return (LyricTuple_0){ ._0 = root_file, ._1 = LYRIC_STR("") };
+    if (imports.data) free(imports.data);
+    if (alias_names.data) free(alias_names.data);
+    if (orig_names.data) free(orig_names.data);
+    if (prefixed_names.data) free(prefixed_names.data);
 }
 
 void strip_imports(LyricBlock* block) {
@@ -22356,6 +22417,7 @@ LyricResult_LyricSlice_TypeParamptr Parser_parse_type_params(Parser* self) {
         return lyric_err(_t52, LyricResult_LyricSlice_TypeParamptr);
     }
     return lyric_ok(params, LyricResult_LyricSlice_TypeParamptr);
+    if (params.data) free(params.data);
 }
 
 LyricResult_StructDeclptr Parser_parse_struct(Parser* self) {
@@ -24657,6 +24719,7 @@ LyricResult_LyricSlice_lyric_string Parser_parse_source(Parser* self) {
         return lyric_err(_t39, LyricResult_LyricSlice_lyric_string);
     }
     return lyric_ok(files, LyricResult_LyricSlice_lyric_string);
+    if (files.data) free(files.data);
 }
 
 LyricResult_lyric_string Parser_parse_fake(Parser* self) {
@@ -28883,6 +28946,7 @@ LyricResult_LyricSlice_MatchArmptr Parser_parse_match_arms(Parser* self) {
         return lyric_err(_t56, LyricResult_LyricSlice_MatchArmptr);
     }
     return lyric_ok(arms, LyricResult_LyricSlice_MatchArmptr);
+    if (arms.data) free(arms.data);
 }
 
 LyricResult_Patternptr Parser_parse_pattern(Parser* self) {
@@ -30172,6 +30236,7 @@ LyricOpt_LyricSlice_TypeExprptr Parser_try_parse_type_args(Parser* self) {
     }
     Parser_next(self);
     return lyric_some(type_args, LyricOpt_LyricSlice_TypeExprptr);
+    if (type_args.data) free(type_args.data);
 }
 
 void desugar_interface_embeds(File* file) {
@@ -30785,6 +30850,7 @@ void desugar_relations(File* file) {
                         ImplBlock* _t210 = existing;
                         array_append_CImplBlock_CImplMapping(_t210, m);
                     }
+                    if (to_add.data) free(to_add.data);
                 } else {
                     Sym* _t212 = rel->hint;
                     Span _t213 = rel->span;
@@ -30846,6 +30912,7 @@ void desugar_relations(File* file) {
                     array_append_CLyricBlock_CImplBlock(block, new_ib);
                 }
             }
+            if (mappings.data) free(mappings.data);
         }
     }
 }
@@ -31352,6 +31419,7 @@ void desugar_default_impls(File* file) {
                     }
                     array_append_CFuncDecl_CWhereClause(fn, wc);
                     array_append_CLyricBlock_CFuncDecl(block, fn);
+                    if (where_args.data) free(where_args.data);
                 } else {
                     LyricSlice_FuncDeclptr _t27 = ({ lyric_push(&kept, m, LyricSlice_FuncDeclptr); kept; });
                     kept = _t27;
@@ -31372,6 +31440,7 @@ void desugar_default_impls(File* file) {
                     array_remove_CInterfaceDecl_CFuncDecl(m);
                 }
             }
+            if (kept.data) free(kept.data);
         }
     }
 }
@@ -32354,6 +32423,7 @@ LyricSlice_TypeExprptr deep_copy_type_args(LyricSlice_TypeExprptr args) {
         i = _t9;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 LyricSlice_Exprptr deep_copy_expr_list(LyricSlice_Exprptr exprs) {
@@ -32372,6 +32442,7 @@ LyricSlice_Exprptr deep_copy_expr_list(LyricSlice_Exprptr exprs) {
         i = _t6;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void substitute_type_params_in_block(Block* block, Dict_CSym_string* type_map) {
@@ -33630,6 +33701,7 @@ void Checker_register_go_stdlib_modules(Checker* self) {
         Type* _t2 = make_module_type(m);
         Scope_define(_t1, m, _t2);
     }
+    if (modules.data) free(modules.data);
 }
 
 lyric_string type_name(Type* t) {
@@ -35090,41 +35162,34 @@ Type* substitute_type(Type* t, Dict_CSym_CType* bindings) {
             _t59->bits = _t58;
             _t59->type_args = new_args;
             Type* result = _t59;
-            bool _t60 = lyric_str_eq(name, LYRIC_STR("DictEntry"));
-            if (_t60) {
-                LyricSlice_Typeptr _t61 = result->type_args;
-                int32_t _t62 = _t61.len;
-                lyric_string _t63 = lyric_sprintf("  -> substituted to %d args", _t62);
-                fprintf(stderr, "%.*s\n", (int)_t63.len, (const char*)_t63.data);
-            }
             return result;
         }
         return t;
         break;
     }
     case 15: {
-        lyric_string _t65 = _t0.data.struct_.name;
-        lyric_string name = _t65;
-        LyricSlice_Typeptr _t66 = t->type_args;
-        int32_t _t67 = _t66.len;
-        bool _t68 = (_t67 > 0);
-        if (_t68) {
-            LyricSlice_Typeptr _t69 = lyric_slice_empty(LyricSlice_Typeptr);
-            LyricSlice_Typeptr new_args = _t69;
-            LyricSlice_Typeptr _t70 = t->type_args;
-            for (int32_t _idx = 0; _idx < _t70.len; _idx++) {
-                Type* a = _t70.data[_idx];
-                Type* _t71 = substitute_type(a, bindings);
-                LyricSlice_Typeptr _t72 = ({ lyric_push(&new_args, _t71, LyricSlice_Typeptr); new_args; });
-                _t72;
+        lyric_string _t60 = _t0.data.struct_.name;
+        lyric_string name = _t60;
+        LyricSlice_Typeptr _t61 = t->type_args;
+        int32_t _t62 = _t61.len;
+        bool _t63 = (_t62 > 0);
+        if (_t63) {
+            LyricSlice_Typeptr _t64 = lyric_slice_empty(LyricSlice_Typeptr);
+            LyricSlice_Typeptr new_args = _t64;
+            LyricSlice_Typeptr _t65 = t->type_args;
+            for (int32_t _idx = 0; _idx < _t65.len; _idx++) {
+                Type* a = _t65.data[_idx];
+                Type* _t66 = substitute_type(a, bindings);
+                LyricSlice_Typeptr _t67 = ({ lyric_push(&new_args, _t66, LyricSlice_Typeptr); new_args; });
+                _t67;
             }
-            TypeKind _t73 = t->kind;
-            int32_t _t74 = t->bits;
-            Type* _t75 = _lyric_slab_alloc_Type();
-            _t75->kind = _t73;
-            _t75->bits = _t74;
-            _t75->type_args = new_args;
-            return _t75;
+            TypeKind _t68 = t->kind;
+            int32_t _t69 = t->bits;
+            Type* _t70 = _lyric_slab_alloc_Type();
+            _t70->kind = _t68;
+            _t70->bits = _t69;
+            _t70->type_args = new_args;
+            return _t70;
         }
         return t;
         break;
@@ -36893,6 +36958,7 @@ void Checker_register_class(Checker* self, ClassDecl* cls) {
         Type* _t120 = make_func_type(_t119, ctor_return, tpnames);
         Scope_define(_t118, cname, _t120);
     }
+    if (tpconstraints.data) free(tpconstraints.data);
 }
 
 void Checker_register_enum(Checker* self, EnumDecl* e) {
@@ -40109,7 +40175,9 @@ Type* Checker_check_call(Checker* self, Expr* call_expr, Expr* func_expr, LyricS
                     }
                     propagate_arg_types(args, sub_params);
                     Type* _t55 = substitute_type(ret, bindings);
+                    if (sub_params.data) free(sub_params.data);
                     return _t55;
+                    if (sub_params.data) free(sub_params.data);
                 }
                 propagate_arg_types(args, params);
                 return ret;
@@ -41162,7 +41230,9 @@ Type* Checker_check_method_call(Checker* self, Expr* call_expr, Expr* receiver, 
                     }
                     propagate_arg_types(args, sub_params);
                     Type* _t132 = substitute_type(ret, bindings);
+                    if (sub_params.data) free(sub_params.data);
                     return _t132;
+                    if (sub_params.data) free(sub_params.data);
                     break;
                 }
                 default: {
@@ -41329,7 +41399,9 @@ Type* Checker_check_method_call(Checker* self, Expr* call_expr, Expr* receiver, 
     lyric_string _t206 = lyric_sprintf("checker: unknown method: %.*s at %d:%.*s:%.*s", (int)method_str.len, (const char*)method_str.data, _t195, (int)_t200.len, (const char*)_t200.data, (int)_t205.len, (const char*)_t205.data);
     fprintf(stderr, "%.*s\n", (int)_t206.len, (const char*)_t206.data);
     Type* _t209 = make_error_type();
+    if (arg_types.data) free(arg_types.data);
     return _t209;
+    if (arg_types.data) free(arg_types.data);
 }
 
 Type* Checker_check_builtin_method(Checker* self, Type* recv_type, lyric_string method, LyricSlice_Typeptr arg_types) {
@@ -46526,7 +46598,10 @@ LyricSlice_LFuncDecl Lowerer_lower_impl_block(Lowerer* self, ImplBlock* ib) {
         default: __builtin_unreachable();
         }
     }
+    if (all_rename_prefixes.data) free(all_rename_prefixes.data);
     return result;
+    if (result.data) free(result.data);
+    if (all_rename_prefixes.data) free(all_rename_prefixes.data);
 }
 
 LType* Lowerer_subst_impl_type(Lowerer* self, LType* t, Dict_CSym_CLType* argmap) {
@@ -47771,7 +47846,9 @@ LyricSlice_LStmtptr Lowerer_lower_else_ifs(Lowerer* self, LyricSlice_ElseIfptr e
     LyricSlice_LStmtptr _t27 = self->stmts;
     LyricSlice_LStmtptr result = _t27;
     Lowerer_restore_stmts(self, saved);
+    if (rest_eis.data) free(rest_eis.data);
     return result;
+    if (rest_eis.data) free(rest_eis.data);
 }
 
 void Lowerer_lower_else_ifs_with_result(Lowerer* self, LyricSlice_ElseIfptr else_ifs, Block* final_else, lyric_string result_name, LType* result_type) {
@@ -47829,6 +47906,7 @@ void Lowerer_lower_else_ifs_with_result(Lowerer* self, LyricSlice_ElseIfptr else
     _t29->kind = _t27;
     _t29->if_data = lyric_some(_t28, LyricOpt_LIfData);
     Lowerer_emit(self, _t29);
+    if (rest_eis.data) free(rest_eis.data);
 }
 
 void Lowerer_lower_while(Lowerer* self, Expr* condition, Block* body) {
@@ -49376,6 +49454,7 @@ void Lowerer_emit_nested_enum_match(Lowerer* self, LValue* val, lyric_string enu
     _t187->kind = _t185;
     _t187->switch_data = lyric_some(_t186, LyricOpt_LSwitchData);
     Lowerer_emit(self, _t187);
+    if (group_keys.data) free(group_keys.data);
 }
 
 void Lowerer_lower_match_as_if_else(Lowerer* self, LValue* val, LType* val_type, LyricSlice_MatchArmptr arms, lyric_string result_name, LType* result_type) {
@@ -49639,6 +49718,7 @@ void Lowerer_lower_match_as_if_else(Lowerer* self, LValue* val, LType* val_type,
         break;
     }
     }
+    if (rest.data) free(rest.data);
 }
 
 LValue* Lowerer_lower_expr(Lowerer* self, Expr* e) {
@@ -52476,7 +52556,9 @@ LValue* Lowerer_lower_struct_lit(Lowerer* self, Expr* orig, Sym* type_name, Lyri
     _t113->struct_lit = lyric_some(_t112, LyricOpt_LStructLitData);
     LExpr* sl = _t113;
     LValue* _t114 = Lowerer_emit_temp(self, sl);
+    if (field_order.data) free(field_order.data);
     return _t114;
+    if (field_order.data) free(field_order.data);
 }
 
 LValue* Lowerer_lower_lambda(Lowerer* self, Expr* orig, LyricSlice_Paramptr params, TypeExpr* return_type, Block* body) {
@@ -53463,6 +53545,7 @@ LyricSlice_LStmtptr fuse_side_effect_temps(LyricSlice_LStmtptr stmts) {
         }
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 bool is_side_effect_expr(LExpr* e) {
@@ -53758,6 +53841,7 @@ LyricSlice_LStmtptr destructure_multi_return(LyricSlice_LStmtptr stmts) {
         }
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 LyricSlice_LStmtptr destructure_extract_pairs(LyricSlice_LStmtptr stmts) {
@@ -54115,6 +54199,7 @@ LyricSlice_LStmtptr destructure_extract_pairs(LyricSlice_LStmtptr stmts) {
         _t202;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 LyricSlice_LStmtptr fix_nil_zero_values(LyricSlice_LStmtptr stmts) {
@@ -54675,6 +54760,7 @@ LyricSlice_LStmtptr eliminate_unused_temps(LyricSlice_LStmtptr stmts, Dict_CSym_
         _t74;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 bool is_numeric_str(lyric_string s) {
@@ -58099,6 +58185,7 @@ LyricSlice_LTypeptr get_inst_types(Dict_CSym_opt_CLType* types_dict, Dict_CSym_i
         i = _t18;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void MonoPass_collect_from_type(MonoPass* self, LType* t) {
@@ -58857,6 +58944,7 @@ void MonoPass_rewrite_impl_method_calls(MonoPass* self, LFuncDecl fn, LyricSlice
     }
     LyricSlice_LStmtptr _t75 = fn.body;
     rewrite_method_calls_in_stmts(_t75, renames);
+    if (renames.data) free(renames.data);
 }
 
 void rewrite_method_calls_in_stmts(LyricSlice_LStmtptr stmts, LyricSlice_ImplRenameEntry renames) {
@@ -59268,6 +59356,7 @@ Dict_CSym_string* MonoPass_build_class_rename_map(MonoPass* self, Dict_CSym_opt_
                         Dict_CSym_string_set(renames, name, _t39);
                     }
                 }
+                if (types.data) free(types.data);
             }
         }
         int32_t _t41 = (i + 1);
@@ -59338,6 +59427,7 @@ Dict_CSym_string* MonoPass_build_class_rename_map(MonoPass* self, Dict_CSym_opt_
                         Dict_CSym_string_set(renames, sname, _t79);
                     }
                 }
+                if (types.data) free(types.data);
             }
         }
         int32_t _t81 = (i + 1);
@@ -61296,6 +61386,7 @@ LyricSlice_LStmtptr clone_stmts(LyricSlice_LStmtptr stmts, Dict_CSym_opt_CLType*
         i = _t10;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 LStmt* clone_stmt(LStmt* s, Dict_CSym_opt_CLType* subst) {
@@ -65052,6 +65143,7 @@ LyricSlice_LFuncDecl filter_funcs(LyricSlice_LFuncDecl funcs, Dict_CSym_string* 
         i = _t24;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 LyricSlice_LClassDecl filter_classes(LyricSlice_LClassDecl classes, Dict_CSym_string* class_instances) {
@@ -65078,6 +65170,7 @@ LyricSlice_LClassDecl filter_classes(LyricSlice_LClassDecl classes, Dict_CSym_st
         i = _t10;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 LyricSlice_LStructDecl filter_structs(LyricSlice_LStructDecl structs, Dict_CSym_string* struct_instances) {
@@ -65104,6 +65197,7 @@ LyricSlice_LStructDecl filter_structs(LyricSlice_LStructDecl structs, Dict_CSym_
         i = _t10;
     }
     return out;
+    if (out.data) free(out.data);
 }
 
 void resolve_class_names(LProgram* prog) {
@@ -66927,6 +67021,9 @@ void monomorphize(LProgram* prog) {
     Dict_CSym_string* _t439 = m->class_renames;
     LProgram* _t440 = prog;
     _t440->class_renames = _t439;
+    if (new_funcs.data) free(new_funcs.data);
+    if (new_classes.data) free(new_classes.data);
+    if (new_structs.data) free(new_structs.data);
 }
 
 bool mono_starts_with(lyric_string s, lyric_string prefix) {
@@ -67323,117 +67420,1633 @@ void rewrite_impl_expr(LExpr* e, Dict_CSym_string* renames) {
     }
 }
 
-void slab_rewrite(LProgram* prog) {
-    prog->slab_mode = true;
+Dict_CSym_bool* compute_escape_map(LProgram* prog) {
+    Dict_CSym_bool* _t0 = _lyric_slab_alloc_Dict_CSym_bool();
+    Dict_CSym_bool* escape_map = _t0;
+    Dict_CSym_bool* _t1 = _lyric_slab_alloc_Dict_CSym_bool();
+    Dict_CSym_bool* param_names = _t1;
     int32_t fi = 0;
     while (1) {
-        LyricSlice_LFuncDecl _t0 = prog->functions;
-        int32_t _t1 = _t0.len;
-        bool _t2 = (fi < _t1);
-        if (!(_t2)) break;
-        LyricSlice_LFuncDecl _t3 = prog->functions;
-        LFuncDecl _t4 = _t3.data[fi];
-        LyricSlice_LStmtptr _t5 = _t4.body;
-        LyricSlice_LStmtptr body = _t5;
-        LyricSlice_LStmtptr _t6 = slab_rewrite_stmts(body);
-        LyricSlice_LStmtptr new_body = _t6;
-        LyricSlice_LFuncDecl _t7 = prog->functions;
-        _t7.data[fi].body = new_body;
-        LyricSlice_LFuncDecl _t8 = prog->functions;
-        LFuncDecl _t9 = _t8.data[fi];
-        lyric_string _t10 = _t9.name;
-        lyric_string fname = _t10;
-        bool _t11 = lyric_str_eq(fname, LYRIC_STR("destroy"));
-        if (_t11) {
-            LyricSlice_LFuncDecl _t12 = prog->functions;
-            LFuncDecl _t13 = _t12.data[fi];
-            LyricSlice_LParam _t14 = _t13.params;
-            int32_t _t15 = _t14.len;
-            bool _t16 = (_t15 > 0);
+        LyricSlice_LFuncDecl _t2 = prog->functions;
+        int32_t _t3 = _t2.len;
+        bool _t4 = (fi < _t3);
+        if (!(_t4)) break;
+        LyricSlice_LFuncDecl _t5 = prog->functions;
+        LFuncDecl _t6 = _t5.data[fi];
+        LFuncDecl f = _t6;
+        int32_t pi = 0;
+        while (1) {
+            LyricSlice_LParam _t7 = f.params;
+            int32_t _t8 = _t7.len;
+            bool _t9 = (pi < _t8);
+            if (!(_t9)) break;
+            lyric_string _t10 = f.name;
+            lyric_string _t11 = lyric_str_concat(_t10, LYRIC_STR(":"));
+            LyricSlice_LParam _t12 = f.params;
+            LParam _t13 = _t12.data[pi];
+            lyric_string _t14 = _t13.name;
+            lyric_string _t15 = lyric_str_concat(_t11, _t14);
+            Sym* _t16 = sym(_t15);
+            Dict_CSym_bool_set(param_names, _t16, true);
+            int32_t _t18 = (pi + 1);
+            pi = _t18;
+        }
+        int32_t _t19 = (fi + 1);
+        fi = _t19;
+    }
+    bool changed = true;
+    while (1) {
+        if (!(changed)) break;
+        changed = false;
+        fi = 0;
+        while (1) {
+            LyricSlice_LFuncDecl _t20 = prog->functions;
+            int32_t _t21 = _t20.len;
+            bool _t22 = (fi < _t21);
+            if (!(_t22)) break;
+            LyricSlice_LFuncDecl _t23 = prog->functions;
+            LFuncDecl _t24 = _t23.data[fi];
+            LFuncDecl f = _t24;
+            LyricSlice_LStmtptr _t25 = f.body;
+            lyric_string _t26 = f.name;
+            LyricSlice_LParam _t27 = f.params;
+            bool _t28 = scan_escapes_in_stmts(_t25, _t26, _t27, param_names, &escape_map);
+            if (_t28) {
+                changed = true;
+            }
+            int32_t _t29 = (fi + 1);
+            fi = _t29;
+        }
+    }
+    return escape_map;
+}
+
+Sym* escape_key(lyric_string func_name, lyric_string param_name) {
+    lyric_string _t0 = lyric_str_concat(func_name, LYRIC_STR(":"));
+    lyric_string _t1 = lyric_str_concat(_t0, param_name);
+    Sym* _t2 = sym(_t1);
+    return _t2;
+}
+
+Sym* escape_key_idx(lyric_string func_name, int32_t idx) {
+    lyric_string _t0 = lyric_sprintf("%.*s:%d", (int)func_name.len, (const char*)func_name.data, idx);
+    Sym* _t1 = sym(_t0);
+    return _t1;
+}
+
+bool scan_escapes_in_stmts(LyricSlice_LStmtptr stmts, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map) {
+    bool changed = false;
+    int32_t i = 0;
+    while (1) {
+        int32_t _t0 = stmts.len;
+        bool _t1 = (i < _t0);
+        if (!(_t1)) break;
+        LStmt* _t2 = stmts.data[i];
+        bool _t3 = (_t2 == NULL);
+        bool _t4 = (!_t3);
+        if (_t4) {
+            LStmt* _t5 = stmts.data[i];
+            LStmt* _t6 = _t5;
+            bool _t7 = scan_escapes_in_stmt(_t6, func_name, params, param_names, &(*escape_map));
+            if (_t7) {
+                changed = true;
+            }
+        }
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    return changed;
+}
+
+bool scan_escapes_in_stmt(LStmt* s, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map) {
+    bool changed = false;
+    LStmtKind _t0 = s->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 0);
+    if (_t2) {
+        LyricOpt_LTempDef _t3 = s->temp_def;
+        bool _t4 = lyric_isnull(_t3);
+        bool _t5 = (!_t4);
+        bool _sc6 = false;
+        _sc6 = _t5;
+        if (_sc6) {
+            LyricOpt_LTempDef _t7 = s->temp_def;
+            LTempDef _t8 = lyric_unwrap(_t7);
+            LExpr* _t9 = _t8.expr;
+            bool _t10 = (_t9 == NULL);
+            bool _t11 = (!_t10);
+            _sc6 = _t11;
+        }
+        if (_sc6) {
+            LyricOpt_LTempDef _t12 = s->temp_def;
+            LTempDef _t13 = lyric_unwrap(_t12);
+            LExpr* _t14 = _t13.expr;
+            LExpr* _t15 = _t14;
+            bool _t16 = scan_escapes_in_expr(_t15, func_name, params, param_names, &(*escape_map));
             if (_t16) {
-                LyricSlice_LFuncDecl _t17 = prog->functions;
-                LFuncDecl _t18 = _t17.data[fi];
-                LyricSlice_LParam _t19 = _t18.params;
-                LParam _t20 = _t19.data[0];
-                LParam p = _t20;
-                LType* _t21 = p.typ;
-                bool _t22 = (_t21 == NULL);
-                bool _t23 = (!_t22);
-                if (_t23) {
-                    LType* _t24 = p.typ;
-                    LType* _t25 = _t24;
-                    LTypeKind _t26 = _t25->kind;
-                    int32_t _t27 = _t26;
-                    bool _t28 = (_t27 == 17);
-                    if (_t28) {
-                        LStmtKind _t29 = LStmtKind_StSlabFree;
-                        LType* _t30 = p.typ;
-                        LType* _t31 = _t30;
-                        lyric_string _t32 = _t31->name;
-                        LValueKind _t33 = LValueKind_ValVar;
-                        lyric_string _t34 = p.name;
-                        LType* _t35 = p.typ;
-                        LValue* _t36 = _lyric_slab_alloc_LValue();
-                        _t36->kind = _t33;
-                        _t36->name = _t34;
-                        _t36->temp_id = 0;
-                        _t36->typ = _t35;
-                        LSlabFreeData _t37 = (LSlabFreeData){.class_name = _t32, .handle = _t36};
-                        LStmt* _t38 = _lyric_slab_alloc_LStmt();
-                        _t38->kind = _t29;
-                        _t38->slab_free = lyric_some(_t37, LyricOpt_LSlabFreeData);
-                        LStmt* free_stmt = _t38;
-                        LyricSlice_LFuncDecl _t39 = prog->functions;
-                        LFuncDecl _t40 = _t39.data[fi];
-                        LyricSlice_LStmtptr _t41 = _t40.body;
-                        LyricSlice_LStmtptr fn_body = _t41;
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t17 = s->kind;
+    int32_t _t18 = _t17;
+    bool _t19 = (_t18 == 24);
+    if (_t19) {
+        LyricOpt_LSlabSetData _t20 = s->slab_set;
+        bool _t21 = lyric_isnull(_t20);
+        bool _t22 = (!_t21);
+        bool _sc23 = false;
+        _sc23 = _t22;
+        if (_sc23) {
+            LyricOpt_LSlabSetData _t24 = s->slab_set;
+            LSlabSetData _t25 = lyric_unwrap(_t24);
+            LValue* _t26 = _t25.value;
+            bool _t27 = (_t26 == NULL);
+            bool _t28 = (!_t27);
+            _sc23 = _t28;
+        }
+        if (_sc23) {
+            LyricOpt_LSlabSetData _t29 = s->slab_set;
+            LSlabSetData _t30 = lyric_unwrap(_t29);
+            LValue* _t31 = _t30.value;
+            LValue* _t32 = _t31;
+            bool _t33 = mark_value_escape(_t32, func_name, params, param_names, &(*escape_map));
+            if (_t33) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t34 = s->kind;
+    int32_t _t35 = _t34;
+    bool _t36 = (_t35 == 4);
+    if (_t36) {
+        LyricOpt_LClassSetData _t37 = s->class_set;
+        bool _t38 = lyric_isnull(_t37);
+        bool _t39 = (!_t38);
+        bool _sc40 = false;
+        _sc40 = _t39;
+        if (_sc40) {
+            LyricOpt_LClassSetData _t41 = s->class_set;
+            LClassSetData _t42 = lyric_unwrap(_t41);
+            LValue* _t43 = _t42.value;
+            bool _t44 = (_t43 == NULL);
+            bool _t45 = (!_t44);
+            _sc40 = _t45;
+        }
+        if (_sc40) {
+            LyricOpt_LClassSetData _t46 = s->class_set;
+            LClassSetData _t47 = lyric_unwrap(_t46);
+            LValue* _t48 = _t47.value;
+            LValue* _t49 = _t48;
+            bool _t50 = mark_value_escape(_t49, func_name, params, param_names, &(*escape_map));
+            if (_t50) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t51 = s->kind;
+    int32_t _t52 = _t51;
+    bool _t53 = (_t52 == 3);
+    if (_t53) {
+        LyricOpt_LStructSetData _t54 = s->struct_set;
+        bool _t55 = lyric_isnull(_t54);
+        bool _t56 = (!_t55);
+        bool _sc57 = false;
+        _sc57 = _t56;
+        if (_sc57) {
+            LyricOpt_LStructSetData _t58 = s->struct_set;
+            LStructSetData _t59 = lyric_unwrap(_t58);
+            LValue* _t60 = _t59.value;
+            bool _t61 = (_t60 == NULL);
+            bool _t62 = (!_t61);
+            _sc57 = _t62;
+        }
+        if (_sc57) {
+            LyricOpt_LStructSetData _t63 = s->struct_set;
+            LStructSetData _t64 = lyric_unwrap(_t63);
+            LValue* _t65 = _t64.value;
+            LValue* _t66 = _t65;
+            bool _t67 = mark_value_escape(_t66, func_name, params, param_names, &(*escape_map));
+            if (_t67) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t68 = s->kind;
+    int32_t _t69 = _t68;
+    bool _t70 = (_t69 == 21);
+    if (_t70) {
+        LyricOpt_LSideEffectData _t71 = s->side_effect;
+        bool _t72 = lyric_isnull(_t71);
+        bool _t73 = (!_t72);
+        bool _sc74 = false;
+        _sc74 = _t73;
+        if (_sc74) {
+            LyricOpt_LSideEffectData _t75 = s->side_effect;
+            LSideEffectData _t76 = lyric_unwrap(_t75);
+            LExpr* _t77 = _t76.expr;
+            bool _t78 = (_t77 == NULL);
+            bool _t79 = (!_t78);
+            _sc74 = _t79;
+        }
+        if (_sc74) {
+            LyricOpt_LSideEffectData _t80 = s->side_effect;
+            LSideEffectData _t81 = lyric_unwrap(_t80);
+            LExpr* _t82 = _t81.expr;
+            LExpr* _t83 = _t82;
+            bool _t84 = scan_escapes_in_expr(_t83, func_name, params, param_names, &(*escape_map));
+            if (_t84) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t85 = s->kind;
+    int32_t _t86 = _t85;
+    bool _t87 = (_t86 == 6);
+    if (_t87) {
+        LyricOpt_LIfData _t88 = s->if_data;
+        bool _t89 = lyric_isnull(_t88);
+        bool _t90 = (!_t89);
+        if (_t90) {
+            LyricOpt_LIfData _t91 = s->if_data;
+            LIfData _t92 = lyric_unwrap(_t91);
+            LIfData d = _t92;
+            LyricSlice_LStmtptr _t93 = d.then_body;
+            bool _t94 = scan_escapes_in_stmts(_t93, func_name, params, param_names, &(*escape_map));
+            if (_t94) {
+                changed = true;
+            }
+            LyricSlice_LStmtptr _t95 = d.else_body;
+            bool _t96 = scan_escapes_in_stmts(_t95, func_name, params, param_names, &(*escape_map));
+            if (_t96) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t97 = s->kind;
+    int32_t _t98 = _t97;
+    bool _t99 = (_t98 == 7);
+    if (_t99) {
+        LyricOpt_LWhileData _t100 = s->while_data;
+        bool _t101 = lyric_isnull(_t100);
+        bool _t102 = (!_t101);
+        if (_t102) {
+            LyricOpt_LWhileData _t103 = s->while_data;
+            LWhileData _t104 = lyric_unwrap(_t103);
+            LyricSlice_LStmtptr _t105 = _t104.body;
+            bool _t106 = scan_escapes_in_stmts(_t105, func_name, params, param_names, &(*escape_map));
+            if (_t106) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t107 = s->kind;
+    int32_t _t108 = _t107;
+    bool _t109 = (_t108 == 8);
+    if (_t109) {
+        LyricOpt_LForData _t110 = s->for_data;
+        bool _t111 = lyric_isnull(_t110);
+        bool _t112 = (!_t111);
+        if (_t112) {
+            LyricOpt_LForData _t113 = s->for_data;
+            LForData _t114 = lyric_unwrap(_t113);
+            LyricSlice_LStmtptr _t115 = _t114.body;
+            bool _t116 = scan_escapes_in_stmts(_t115, func_name, params, param_names, &(*escape_map));
+            if (_t116) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t117 = s->kind;
+    int32_t _t118 = _t117;
+    bool _t119 = (_t118 == 10);
+    if (_t119) {
+        LyricOpt_LBlockData _t120 = s->block;
+        bool _t121 = lyric_isnull(_t120);
+        bool _t122 = (!_t121);
+        if (_t122) {
+            LyricOpt_LBlockData _t123 = s->block;
+            LBlockData _t124 = lyric_unwrap(_t123);
+            LyricSlice_LStmtptr _t125 = _t124.stmts;
+            bool _t126 = scan_escapes_in_stmts(_t125, func_name, params, param_names, &(*escape_map));
+            if (_t126) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t127 = s->kind;
+    int32_t _t128 = _t127;
+    bool _t129 = (_t128 == 9);
+    if (_t129) {
+        LyricOpt_LSwitchData _t130 = s->switch_data;
+        bool _t131 = lyric_isnull(_t130);
+        bool _t132 = (!_t131);
+        if (_t132) {
+            int32_t ci = 0;
+            while (1) {
+                LyricOpt_LSwitchData _t133 = s->switch_data;
+                LSwitchData _t134 = lyric_unwrap(_t133);
+                LyricSlice_LSwitchCase _t135 = _t134.cases;
+                int32_t _t136 = _t135.len;
+                bool _t137 = (ci < _t136);
+                if (!(_t137)) break;
+                LyricOpt_LSwitchData _t138 = s->switch_data;
+                LSwitchData _t139 = lyric_unwrap(_t138);
+                LyricSlice_LSwitchCase _t140 = _t139.cases;
+                LSwitchCase _t141 = _t140.data[ci];
+                LyricSlice_LStmtptr _t142 = _t141.body;
+                bool _t143 = scan_escapes_in_stmts(_t142, func_name, params, param_names, &(*escape_map));
+                if (_t143) {
+                    changed = true;
+                }
+                int32_t _t144 = (ci + 1);
+                ci = _t144;
+            }
+        }
+    }
+    LStmtKind _t145 = s->kind;
+    int32_t _t146 = _t145;
+    bool _t147 = (_t146 == 23);
+    if (_t147) {
+        LyricOpt_LTypeSwitchData _t148 = s->type_switch;
+        bool _t149 = lyric_isnull(_t148);
+        bool _t150 = (!_t149);
+        if (_t150) {
+            int32_t ci = 0;
+            while (1) {
+                LyricOpt_LTypeSwitchData _t151 = s->type_switch;
+                LTypeSwitchData _t152 = lyric_unwrap(_t151);
+                LyricSlice_LTypeSwitchCase _t153 = _t152.cases;
+                int32_t _t154 = _t153.len;
+                bool _t155 = (ci < _t154);
+                if (!(_t155)) break;
+                LyricOpt_LTypeSwitchData _t156 = s->type_switch;
+                LTypeSwitchData _t157 = lyric_unwrap(_t156);
+                LyricSlice_LTypeSwitchCase _t158 = _t157.cases;
+                LTypeSwitchCase _t159 = _t158.data[ci];
+                LyricSlice_LStmtptr _t160 = _t159.body;
+                bool _t161 = scan_escapes_in_stmts(_t160, func_name, params, param_names, &(*escape_map));
+                if (_t161) {
+                    changed = true;
+                }
+                int32_t _t162 = (ci + 1);
+                ci = _t162;
+            }
+        }
+    }
+    LStmtKind _t163 = s->kind;
+    int32_t _t164 = _t163;
+    bool _t165 = (_t164 == 16);
+    if (_t165) {
+        LyricOpt_LSpawnData _t166 = s->spawn_data;
+        bool _t167 = lyric_isnull(_t166);
+        bool _t168 = (!_t167);
+        if (_t168) {
+            LyricOpt_LSpawnData _t169 = s->spawn_data;
+            LSpawnData _t170 = lyric_unwrap(_t169);
+            LyricSlice_LStmtptr _t171 = _t170.body;
+            bool _t172 = scan_escapes_in_stmts(_t171, func_name, params, param_names, &(*escape_map));
+            if (_t172) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t173 = s->kind;
+    int32_t _t174 = _t173;
+    bool _t175 = (_t174 == 19);
+    if (_t175) {
+        LyricOpt_LSelectData _t176 = s->select_data;
+        bool _t177 = lyric_isnull(_t176);
+        bool _t178 = (!_t177);
+        if (_t178) {
+            int32_t ci = 0;
+            while (1) {
+                LyricOpt_LSelectData _t179 = s->select_data;
+                LSelectData _t180 = lyric_unwrap(_t179);
+                LyricSlice_LSelectCase _t181 = _t180.cases;
+                int32_t _t182 = _t181.len;
+                bool _t183 = (ci < _t182);
+                if (!(_t183)) break;
+                LyricOpt_LSelectData _t184 = s->select_data;
+                LSelectData _t185 = lyric_unwrap(_t184);
+                LyricSlice_LSelectCase _t186 = _t185.cases;
+                LSelectCase _t187 = _t186.data[ci];
+                LyricSlice_LStmtptr _t188 = _t187.body;
+                bool _t189 = scan_escapes_in_stmts(_t188, func_name, params, param_names, &(*escape_map));
+                if (_t189) {
+                    changed = true;
+                }
+                int32_t _t190 = (ci + 1);
+                ci = _t190;
+            }
+        }
+    }
+    LStmtKind _t191 = s->kind;
+    int32_t _t192 = _t191;
+    bool _t193 = (_t192 == 17);
+    if (_t193) {
+        LyricOpt_LLockData _t194 = s->lock_data;
+        bool _t195 = lyric_isnull(_t194);
+        bool _t196 = (!_t195);
+        if (_t196) {
+            LyricOpt_LLockData _t197 = s->lock_data;
+            LLockData _t198 = lyric_unwrap(_t197);
+            LyricSlice_LStmtptr _t199 = _t198.body;
+            bool _t200 = scan_escapes_in_stmts(_t199, func_name, params, param_names, &(*escape_map));
+            if (_t200) {
+                changed = true;
+            }
+        }
+    }
+    LStmtKind _t201 = s->kind;
+    int32_t _t202 = _t201;
+    bool _t203 = (_t202 == 15);
+    if (_t203) {
+        LyricOpt_LDeferData _t204 = s->defer_data;
+        bool _t205 = lyric_isnull(_t204);
+        bool _t206 = (!_t205);
+        if (_t206) {
+            LyricOpt_LDeferData _t207 = s->defer_data;
+            LDeferData _t208 = lyric_unwrap(_t207);
+            LyricSlice_LStmtptr _t209 = _t208.body;
+            bool _t210 = scan_escapes_in_stmts(_t209, func_name, params, param_names, &(*escape_map));
+            if (_t210) {
+                changed = true;
+            }
+        }
+    }
+    return changed;
+}
+
+bool scan_escapes_in_expr(LExpr* e, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map) {
+    bool changed = false;
+    LExprKind _t0 = e->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 10);
+    if (_t2) {
+        LyricOpt_LStructLitData _t3 = e->struct_lit;
+        bool _t4 = lyric_isnull(_t3);
+        bool _t5 = (!_t4);
+        if (_t5) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LStructLitData _t6 = e->struct_lit;
+                LStructLitData _t7 = lyric_unwrap(_t6);
+                LyricSlice_LFieldInit _t8 = _t7.fields;
+                int32_t _t9 = _t8.len;
+                bool _t10 = (i < _t9);
+                if (!(_t10)) break;
+                LyricOpt_LStructLitData _t11 = e->struct_lit;
+                LStructLitData _t12 = lyric_unwrap(_t11);
+                LyricSlice_LFieldInit _t13 = _t12.fields;
+                LFieldInit _t14 = _t13.data[i];
+                LValue* _t15 = _t14.value;
+                bool _t16 = (_t15 == NULL);
+                bool _t17 = (!_t16);
+                if (_t17) {
+                    LyricOpt_LStructLitData _t18 = e->struct_lit;
+                    LStructLitData _t19 = lyric_unwrap(_t18);
+                    LyricSlice_LFieldInit _t20 = _t19.fields;
+                    LFieldInit _t21 = _t20.data[i];
+                    LValue* _t22 = _t21.value;
+                    LValue* _t23 = _t22;
+                    bool _t24 = mark_value_escape(_t23, func_name, params, param_names, &(*escape_map));
+                    if (_t24) {
+                        changed = true;
+                    }
+                }
+                int32_t _t25 = (i + 1);
+                i = _t25;
+            }
+        }
+    }
+    LExprKind _t26 = e->kind;
+    int32_t _t27 = _t26;
+    bool _t28 = (_t27 == 11);
+    if (_t28) {
+        LClassAllocData* _t29 = e->class_alloc;
+        bool _t30 = (_t29 == NULL);
+        bool _t31 = (!_t30);
+        if (_t31) {
+            int32_t i = 0;
+            while (1) {
+                LClassAllocData* _t32 = e->class_alloc;
+                LClassAllocData* _t33 = _t32;
+                LyricSlice_LFieldInit _t34 = _t33->fields;
+                int32_t _t35 = _t34.len;
+                bool _t36 = (i < _t35);
+                if (!(_t36)) break;
+                LClassAllocData* _t37 = e->class_alloc;
+                LClassAllocData* _t38 = _t37;
+                LyricSlice_LFieldInit _t39 = _t38->fields;
+                LFieldInit _t40 = _t39.data[i];
+                LValue* _t41 = _t40.value;
+                bool _t42 = (_t41 == NULL);
+                bool _t43 = (!_t42);
+                if (_t43) {
+                    LClassAllocData* _t44 = e->class_alloc;
+                    LClassAllocData* _t45 = _t44;
+                    LyricSlice_LFieldInit _t46 = _t45->fields;
+                    LFieldInit _t47 = _t46.data[i];
+                    LValue* _t48 = _t47.value;
+                    LValue* _t49 = _t48;
+                    bool _t50 = mark_value_escape(_t49, func_name, params, param_names, &(*escape_map));
+                    if (_t50) {
+                        changed = true;
+                    }
+                }
+                int32_t _t51 = (i + 1);
+                i = _t51;
+            }
+        }
+    }
+    LExprKind _t52 = e->kind;
+    int32_t _t53 = _t52;
+    bool _t54 = (_t53 == 29);
+    if (_t54) {
+        LyricOpt_LSlabAllocData _t55 = e->slab_alloc;
+        bool _t56 = lyric_isnull(_t55);
+        bool _t57 = (!_t56);
+        if (_t57) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LSlabAllocData _t58 = e->slab_alloc;
+                LSlabAllocData _t59 = lyric_unwrap(_t58);
+                LyricSlice_LFieldInit _t60 = _t59.fields;
+                int32_t _t61 = _t60.len;
+                bool _t62 = (i < _t61);
+                if (!(_t62)) break;
+                LyricOpt_LSlabAllocData _t63 = e->slab_alloc;
+                LSlabAllocData _t64 = lyric_unwrap(_t63);
+                LyricSlice_LFieldInit _t65 = _t64.fields;
+                LFieldInit _t66 = _t65.data[i];
+                LValue* _t67 = _t66.value;
+                bool _t68 = (_t67 == NULL);
+                bool _t69 = (!_t68);
+                if (_t69) {
+                    LyricOpt_LSlabAllocData _t70 = e->slab_alloc;
+                    LSlabAllocData _t71 = lyric_unwrap(_t70);
+                    LyricSlice_LFieldInit _t72 = _t71.fields;
+                    LFieldInit _t73 = _t72.data[i];
+                    LValue* _t74 = _t73.value;
+                    LValue* _t75 = _t74;
+                    bool _t76 = mark_value_escape(_t75, func_name, params, param_names, &(*escape_map));
+                    if (_t76) {
+                        changed = true;
+                    }
+                }
+                int32_t _t77 = (i + 1);
+                i = _t77;
+            }
+        }
+    }
+    LExprKind _t78 = e->kind;
+    int32_t _t79 = _t78;
+    bool _t80 = (_t79 == 18);
+    if (_t80) {
+        LyricOpt_LVariantConstructData _t81 = e->variant_construct;
+        bool _t82 = lyric_isnull(_t81);
+        bool _t83 = (!_t82);
+        if (_t83) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LVariantConstructData _t84 = e->variant_construct;
+                LVariantConstructData _t85 = lyric_unwrap(_t84);
+                LyricSlice_LValueptr _t86 = _t85.fields;
+                int32_t _t87 = _t86.len;
+                bool _t88 = (i < _t87);
+                if (!(_t88)) break;
+                LyricOpt_LVariantConstructData _t89 = e->variant_construct;
+                LVariantConstructData _t90 = lyric_unwrap(_t89);
+                LyricSlice_LValueptr _t91 = _t90.fields;
+                LValue* _t92 = _t91.data[i];
+                bool _t93 = (_t92 == NULL);
+                bool _t94 = (!_t93);
+                if (_t94) {
+                    LyricOpt_LVariantConstructData _t95 = e->variant_construct;
+                    LVariantConstructData _t96 = lyric_unwrap(_t95);
+                    LyricSlice_LValueptr _t97 = _t96.fields;
+                    LValue* _t98 = _t97.data[i];
+                    LValue* _t99 = _t98;
+                    bool _t100 = mark_value_escape(_t99, func_name, params, param_names, &(*escape_map));
+                    if (_t100) {
+                        changed = true;
+                    }
+                }
+                int32_t _t101 = (i + 1);
+                i = _t101;
+            }
+        }
+    }
+    LExprKind _t102 = e->kind;
+    int32_t _t103 = _t102;
+    bool _t104 = (_t103 == 7);
+    if (_t104) {
+        LCallData* _t105 = e->call;
+        bool _t106 = (_t105 == NULL);
+        bool _t107 = (!_t106);
+        if (_t107) {
+            LCallData* _t108 = e->call;
+            LCallData* _t109 = _t108;
+            lyric_string _t110 = _t109->func_name;
+            LCallData* _t111 = e->call;
+            LCallData* _t112 = _t111;
+            LyricSlice_LValueptr _t113 = _t112->args;
+            bool _t114 = check_call_escapes(_t110, _t113, 0, func_name, params, param_names, &(*escape_map));
+            if (_t114) {
+                changed = true;
+            }
+        }
+    }
+    LExprKind _t115 = e->kind;
+    int32_t _t116 = _t115;
+    bool _t117 = (_t116 == 8);
+    if (_t117) {
+        LMethodCallData* _t118 = e->method_call;
+        bool _t119 = (_t118 == NULL);
+        bool _t120 = (!_t119);
+        if (_t120) {
+            LMethodCallData* _t121 = e->method_call;
+            LMethodCallData* _t122 = _t121;
+            lyric_string _t123 = _t122->method;
+            LMethodCallData* _t124 = e->method_call;
+            LMethodCallData* _t125 = _t124;
+            LyricSlice_LValueptr _t126 = _t125->args;
+            bool _t127 = check_call_escapes(_t123, _t126, 1, func_name, params, param_names, &(*escape_map));
+            if (_t127) {
+                changed = true;
+            }
+        }
+    }
+    return changed;
+}
+
+lyric_string resolve_method_callee_name(LMethodCallData* d) {
+    LValue* _t0 = d->receiver;
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    bool _sc3 = false;
+    _sc3 = _t2;
+    if (_sc3) {
+        LValue* _t4 = d->receiver;
+        LValue* _t5 = _t4;
+        LType* _t6 = _t5->typ;
+        bool _t7 = (_t6 == NULL);
+        bool _t8 = (!_t7);
+        _sc3 = _t8;
+    }
+    if (_sc3) {
+        LValue* _t9 = d->receiver;
+        LValue* _t10 = _t9;
+        LType* _t11 = _t10->typ;
+        LType* _t12 = _t11;
+        lyric_string _t13 = _t12->name;
+        lyric_string class_name = _t13;
+        LValue* _t14 = d->receiver;
+        LValue* _t15 = _t14;
+        LType* _t16 = _t15->typ;
+        LType* _t17 = _t16;
+        LTypeKind _t18 = _t17->kind;
+        int32_t _t19 = _t18;
+        bool _t20 = (_t19 == 24);
+        bool _sc21 = false;
+        _sc21 = _t20;
+        if (_sc21) {
+            LValue* _t22 = d->receiver;
+            LValue* _t23 = _t22;
+            LType* _t24 = _t23->typ;
+            LType* _t25 = _t24;
+            LType* _t26 = _t25->elem;
+            bool _t27 = (_t26 == NULL);
+            bool _t28 = (!_t27);
+            _sc21 = _t28;
+        }
+        if (_sc21) {
+            LValue* _t29 = d->receiver;
+            LValue* _t30 = _t29;
+            LType* _t31 = _t30->typ;
+            LType* _t32 = _t31;
+            LType* _t33 = _t32->elem;
+            LType* _t34 = _t33;
+            lyric_string _t35 = _t34->name;
+            class_name = _t35;
+        }
+        bool _t36 = (!lyric_str_eq(class_name, LYRIC_STR("")));
+        if (_t36) {
+            lyric_string _t37 = lyric_str_concat(class_name, LYRIC_STR("."));
+            lyric_string _t38 = d->method;
+            lyric_string _t39 = lyric_str_concat(_t37, _t38);
+            return _t39;
+        }
+    }
+    lyric_string _t40 = d->method;
+    return _t40;
+}
+
+bool mark_value_escape(LValue* v, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map) {
+    LValueKind _t0 = v->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 0);
+    if (_t2) {
+        lyric_string _t3 = lyric_str_concat(func_name, LYRIC_STR(":"));
+        lyric_string _t4 = v->name;
+        lyric_string _t5 = lyric_str_concat(_t3, _t4);
+        Sym* _t6 = sym(_t5);
+        DictEntry_CSym_bool* _t7 = Dict_CSym_bool_get(param_names, _t6);
+        DictEntry_CSym_bool* is_param = _t7;
+        bool _t8 = (is_param == NULL);
+        bool _t9 = (!_t8);
+        if (_t9) {
+            int32_t pi = 0;
+            while (1) {
+                int32_t _t10 = params.len;
+                bool _t11 = (pi < _t10);
+                if (!(_t11)) break;
+                LParam _t12 = params.data[pi];
+                lyric_string _t13 = _t12.name;
+                lyric_string _t14 = v->name;
+                bool _t15 = lyric_str_eq(_t13, _t14);
+                if (_t15) {
+                    Sym* _t16 = escape_key_idx(func_name, pi);
+                    Sym* key = _t16;
+                    DictEntry_CSym_bool* _t17 = Dict_CSym_bool_get((*escape_map), key);
+                    DictEntry_CSym_bool* already = _t17;
+                    bool _t18 = (already == NULL);
+                    if (_t18) {
+                        Dict_CSym_bool_set((*escape_map), key, true);
+                        return true;
+                    }
+                    return false;
+                }
+                int32_t _t20 = (pi + 1);
+                pi = _t20;
+            }
+        }
+    }
+    return false;
+}
+
+bool check_call_escapes(lyric_string callee_name, LyricSlice_LValueptr args, int32_t param_offset, lyric_string func_name, LyricSlice_LParam params, Dict_CSym_bool* param_names, Dict_CSym_bool** escape_map) {
+    bool changed = false;
+    int32_t ai = 0;
+    while (1) {
+        int32_t _t0 = args.len;
+        bool _t1 = (ai < _t0);
+        if (!(_t1)) break;
+        int32_t _t2 = (ai + param_offset);
+        Sym* _t3 = escape_key_idx(callee_name, _t2);
+        Sym* callee_key = _t3;
+        DictEntry_CSym_bool* _t4 = Dict_CSym_bool_get((*escape_map), callee_key);
+        DictEntry_CSym_bool* callee_escapes = _t4;
+        bool _t5 = (callee_escapes == NULL);
+        bool _t6 = (!_t5);
+        if (_t6) {
+            LValue* _t7 = args.data[ai];
+            bool _t8 = (_t7 == NULL);
+            bool _t9 = (!_t8);
+            if (_t9) {
+                LValue* _t10 = args.data[ai];
+                LValue* _t11 = _t10;
+                bool _t12 = mark_value_escape(_t11, func_name, params, param_names, &(*escape_map));
+                if (_t12) {
+                    changed = true;
+                }
+            }
+        }
+        int32_t _t13 = (ai + 1);
+        ai = _t13;
+    }
+    return changed;
+}
+
+bool var_escapes_via_call(lyric_string var_name, LyricSlice_LStmtptr stmts, Dict_CSym_bool* escape_map) {
+    int32_t i = 0;
+    while (1) {
+        int32_t _t0 = stmts.len;
+        bool _t1 = (i < _t0);
+        if (!(_t1)) break;
+        LStmt* _t2 = stmts.data[i];
+        bool _t3 = (_t2 == NULL);
+        bool _t4 = (!_t3);
+        if (_t4) {
+            LStmt* _t5 = stmts.data[i];
+            LStmt* _t6 = _t5;
+            bool _t7 = var_escapes_in_stmt(var_name, _t6, escape_map);
+            if (_t7) {
+                return true;
+            }
+        }
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    return false;
+}
+
+bool var_escapes_in_stmt(lyric_string var_name, LStmt* s, Dict_CSym_bool* escape_map) {
+    LStmtKind _t0 = s->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 0);
+    if (_t2) {
+        LyricOpt_LTempDef _t3 = s->temp_def;
+        bool _t4 = lyric_isnull(_t3);
+        bool _t5 = (!_t4);
+        bool _sc6 = false;
+        _sc6 = _t5;
+        if (_sc6) {
+            LyricOpt_LTempDef _t7 = s->temp_def;
+            LTempDef _t8 = lyric_unwrap(_t7);
+            LExpr* _t9 = _t8.expr;
+            bool _t10 = (_t9 == NULL);
+            bool _t11 = (!_t10);
+            _sc6 = _t11;
+        }
+        if (_sc6) {
+            LyricOpt_LTempDef _t12 = s->temp_def;
+            LTempDef _t13 = lyric_unwrap(_t12);
+            LExpr* _t14 = _t13.expr;
+            LExpr* _t15 = _t14;
+            bool _t16 = var_escapes_in_expr(var_name, _t15, escape_map);
+            if (_t16) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t17 = s->kind;
+    int32_t _t18 = _t17;
+    bool _t19 = (_t18 == 21);
+    if (_t19) {
+        LyricOpt_LSideEffectData _t20 = s->side_effect;
+        bool _t21 = lyric_isnull(_t20);
+        bool _t22 = (!_t21);
+        bool _sc23 = false;
+        _sc23 = _t22;
+        if (_sc23) {
+            LyricOpt_LSideEffectData _t24 = s->side_effect;
+            LSideEffectData _t25 = lyric_unwrap(_t24);
+            LExpr* _t26 = _t25.expr;
+            bool _t27 = (_t26 == NULL);
+            bool _t28 = (!_t27);
+            _sc23 = _t28;
+        }
+        if (_sc23) {
+            LyricOpt_LSideEffectData _t29 = s->side_effect;
+            LSideEffectData _t30 = lyric_unwrap(_t29);
+            LExpr* _t31 = _t30.expr;
+            LExpr* _t32 = _t31;
+            bool _t33 = var_escapes_in_expr(var_name, _t32, escape_map);
+            if (_t33) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t34 = s->kind;
+    int32_t _t35 = _t34;
+    bool _t36 = (_t35 == 2);
+    if (_t36) {
+        LyricOpt_LAssignData _t37 = s->assign;
+        bool _t38 = lyric_isnull(_t37);
+        bool _t39 = (!_t38);
+        bool _sc40 = false;
+        _sc40 = _t39;
+        if (_sc40) {
+            LyricOpt_LAssignData _t41 = s->assign;
+            LAssignData _t42 = lyric_unwrap(_t41);
+            LValue* _t43 = _t42.value;
+            bool _t44 = (_t43 == NULL);
+            bool _t45 = (!_t44);
+            _sc40 = _t45;
+        }
+        if (_sc40) {
+            LyricOpt_LAssignData _t46 = s->assign;
+            LAssignData _t47 = lyric_unwrap(_t46);
+            LValue* _t48 = _t47.value;
+            LValue* _t49 = _t48;
+            bool _t50 = is_var_value(var_name, _t49);
+            if (_t50) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t51 = s->kind;
+    int32_t _t52 = _t51;
+    bool _t53 = (_t52 == 1);
+    if (_t53) {
+        LyricOpt_LVarDeclData _t54 = s->var_decl;
+        bool _t55 = lyric_isnull(_t54);
+        bool _t56 = (!_t55);
+        bool _sc57 = false;
+        _sc57 = _t56;
+        if (_sc57) {
+            LyricOpt_LVarDeclData _t58 = s->var_decl;
+            LVarDeclData _t59 = lyric_unwrap(_t58);
+            LValue* _t60 = _t59.init;
+            bool _t61 = (_t60 == NULL);
+            bool _t62 = (!_t61);
+            _sc57 = _t62;
+        }
+        if (_sc57) {
+            LyricOpt_LVarDeclData _t63 = s->var_decl;
+            LVarDeclData _t64 = lyric_unwrap(_t63);
+            LValue* _t65 = _t64.init;
+            LValue* _t66 = _t65;
+            bool _t67 = is_var_value(var_name, _t66);
+            if (_t67) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t68 = s->kind;
+    int32_t _t69 = _t68;
+    bool _t70 = (_t69 == 24);
+    if (_t70) {
+        LyricOpt_LSlabSetData _t71 = s->slab_set;
+        bool _t72 = lyric_isnull(_t71);
+        bool _t73 = (!_t72);
+        bool _sc74 = false;
+        _sc74 = _t73;
+        if (_sc74) {
+            LyricOpt_LSlabSetData _t75 = s->slab_set;
+            LSlabSetData _t76 = lyric_unwrap(_t75);
+            LValue* _t77 = _t76.value;
+            bool _t78 = (_t77 == NULL);
+            bool _t79 = (!_t78);
+            _sc74 = _t79;
+        }
+        if (_sc74) {
+            LyricOpt_LSlabSetData _t80 = s->slab_set;
+            LSlabSetData _t81 = lyric_unwrap(_t80);
+            LValue* _t82 = _t81.value;
+            LValue* _t83 = _t82;
+            bool _t84 = is_var_value(var_name, _t83);
+            if (_t84) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t85 = s->kind;
+    int32_t _t86 = _t85;
+    bool _t87 = (_t86 == 4);
+    if (_t87) {
+        LyricOpt_LClassSetData _t88 = s->class_set;
+        bool _t89 = lyric_isnull(_t88);
+        bool _t90 = (!_t89);
+        bool _sc91 = false;
+        _sc91 = _t90;
+        if (_sc91) {
+            LyricOpt_LClassSetData _t92 = s->class_set;
+            LClassSetData _t93 = lyric_unwrap(_t92);
+            LValue* _t94 = _t93.value;
+            bool _t95 = (_t94 == NULL);
+            bool _t96 = (!_t95);
+            _sc91 = _t96;
+        }
+        if (_sc91) {
+            LyricOpt_LClassSetData _t97 = s->class_set;
+            LClassSetData _t98 = lyric_unwrap(_t97);
+            LValue* _t99 = _t98.value;
+            LValue* _t100 = _t99;
+            bool _t101 = is_var_value(var_name, _t100);
+            if (_t101) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t102 = s->kind;
+    int32_t _t103 = _t102;
+    bool _t104 = (_t103 == 3);
+    if (_t104) {
+        LyricOpt_LStructSetData _t105 = s->struct_set;
+        bool _t106 = lyric_isnull(_t105);
+        bool _t107 = (!_t106);
+        bool _sc108 = false;
+        _sc108 = _t107;
+        if (_sc108) {
+            LyricOpt_LStructSetData _t109 = s->struct_set;
+            LStructSetData _t110 = lyric_unwrap(_t109);
+            LValue* _t111 = _t110.value;
+            bool _t112 = (_t111 == NULL);
+            bool _t113 = (!_t112);
+            _sc108 = _t113;
+        }
+        if (_sc108) {
+            LyricOpt_LStructSetData _t114 = s->struct_set;
+            LStructSetData _t115 = lyric_unwrap(_t114);
+            LValue* _t116 = _t115.value;
+            LValue* _t117 = _t116;
+            bool _t118 = is_var_value(var_name, _t117);
+            if (_t118) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t119 = s->kind;
+    int32_t _t120 = _t119;
+    bool _t121 = (_t120 == 6);
+    if (_t121) {
+        LyricOpt_LIfData _t122 = s->if_data;
+        bool _t123 = lyric_isnull(_t122);
+        bool _t124 = (!_t123);
+        if (_t124) {
+            LyricOpt_LIfData _t125 = s->if_data;
+            LIfData _t126 = lyric_unwrap(_t125);
+            LyricSlice_LStmtptr _t127 = _t126.then_body;
+            bool _t128 = var_escapes_via_call(var_name, _t127, escape_map);
+            if (_t128) {
+                return true;
+            }
+            LyricOpt_LIfData _t129 = s->if_data;
+            LIfData _t130 = lyric_unwrap(_t129);
+            LyricSlice_LStmtptr _t131 = _t130.else_body;
+            bool _t132 = var_escapes_via_call(var_name, _t131, escape_map);
+            if (_t132) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t133 = s->kind;
+    int32_t _t134 = _t133;
+    bool _t135 = (_t134 == 7);
+    if (_t135) {
+        LyricOpt_LWhileData _t136 = s->while_data;
+        bool _t137 = lyric_isnull(_t136);
+        bool _t138 = (!_t137);
+        if (_t138) {
+            LyricOpt_LWhileData _t139 = s->while_data;
+            LWhileData _t140 = lyric_unwrap(_t139);
+            LyricSlice_LStmtptr _t141 = _t140.body;
+            bool _t142 = var_escapes_via_call(var_name, _t141, escape_map);
+            if (_t142) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t143 = s->kind;
+    int32_t _t144 = _t143;
+    bool _t145 = (_t144 == 8);
+    if (_t145) {
+        LyricOpt_LForData _t146 = s->for_data;
+        bool _t147 = lyric_isnull(_t146);
+        bool _t148 = (!_t147);
+        if (_t148) {
+            LyricOpt_LForData _t149 = s->for_data;
+            LForData _t150 = lyric_unwrap(_t149);
+            LyricSlice_LStmtptr _t151 = _t150.body;
+            bool _t152 = var_escapes_via_call(var_name, _t151, escape_map);
+            if (_t152) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t153 = s->kind;
+    int32_t _t154 = _t153;
+    bool _t155 = (_t154 == 10);
+    if (_t155) {
+        LyricOpt_LBlockData _t156 = s->block;
+        bool _t157 = lyric_isnull(_t156);
+        bool _t158 = (!_t157);
+        if (_t158) {
+            LyricOpt_LBlockData _t159 = s->block;
+            LBlockData _t160 = lyric_unwrap(_t159);
+            LyricSlice_LStmtptr _t161 = _t160.stmts;
+            bool _t162 = var_escapes_via_call(var_name, _t161, escape_map);
+            if (_t162) {
+                return true;
+            }
+        }
+    }
+    LStmtKind _t163 = s->kind;
+    int32_t _t164 = _t163;
+    bool _t165 = (_t164 == 9);
+    if (_t165) {
+        LyricOpt_LSwitchData _t166 = s->switch_data;
+        bool _t167 = lyric_isnull(_t166);
+        bool _t168 = (!_t167);
+        if (_t168) {
+            int32_t ci = 0;
+            while (1) {
+                LyricOpt_LSwitchData _t169 = s->switch_data;
+                LSwitchData _t170 = lyric_unwrap(_t169);
+                LyricSlice_LSwitchCase _t171 = _t170.cases;
+                int32_t _t172 = _t171.len;
+                bool _t173 = (ci < _t172);
+                if (!(_t173)) break;
+                LyricOpt_LSwitchData _t174 = s->switch_data;
+                LSwitchData _t175 = lyric_unwrap(_t174);
+                LyricSlice_LSwitchCase _t176 = _t175.cases;
+                LSwitchCase _t177 = _t176.data[ci];
+                LyricSlice_LStmtptr _t178 = _t177.body;
+                bool _t179 = var_escapes_via_call(var_name, _t178, escape_map);
+                if (_t179) {
+                    return true;
+                }
+                int32_t _t180 = (ci + 1);
+                ci = _t180;
+            }
+        }
+    }
+    LStmtKind _t181 = s->kind;
+    int32_t _t182 = _t181;
+    bool _t183 = (_t182 == 23);
+    if (_t183) {
+        LyricOpt_LTypeSwitchData _t184 = s->type_switch;
+        bool _t185 = lyric_isnull(_t184);
+        bool _t186 = (!_t185);
+        if (_t186) {
+            int32_t ci = 0;
+            while (1) {
+                LyricOpt_LTypeSwitchData _t187 = s->type_switch;
+                LTypeSwitchData _t188 = lyric_unwrap(_t187);
+                LyricSlice_LTypeSwitchCase _t189 = _t188.cases;
+                int32_t _t190 = _t189.len;
+                bool _t191 = (ci < _t190);
+                if (!(_t191)) break;
+                LyricOpt_LTypeSwitchData _t192 = s->type_switch;
+                LTypeSwitchData _t193 = lyric_unwrap(_t192);
+                LyricSlice_LTypeSwitchCase _t194 = _t193.cases;
+                LTypeSwitchCase _t195 = _t194.data[ci];
+                LyricSlice_LStmtptr _t196 = _t195.body;
+                bool _t197 = var_escapes_via_call(var_name, _t196, escape_map);
+                if (_t197) {
+                    return true;
+                }
+                int32_t _t198 = (ci + 1);
+                ci = _t198;
+            }
+        }
+    }
+    return false;
+}
+
+bool var_escapes_in_expr(lyric_string var_name, LExpr* e, Dict_CSym_bool* escape_map) {
+    LExprKind _t0 = e->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 10);
+    if (_t2) {
+        LyricOpt_LStructLitData _t3 = e->struct_lit;
+        bool _t4 = lyric_isnull(_t3);
+        bool _t5 = (!_t4);
+        if (_t5) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LStructLitData _t6 = e->struct_lit;
+                LStructLitData _t7 = lyric_unwrap(_t6);
+                LyricSlice_LFieldInit _t8 = _t7.fields;
+                int32_t _t9 = _t8.len;
+                bool _t10 = (i < _t9);
+                if (!(_t10)) break;
+                LyricOpt_LStructLitData _t11 = e->struct_lit;
+                LStructLitData _t12 = lyric_unwrap(_t11);
+                LyricSlice_LFieldInit _t13 = _t12.fields;
+                LFieldInit _t14 = _t13.data[i];
+                LValue* _t15 = _t14.value;
+                bool _t16 = (_t15 == NULL);
+                bool _t17 = (!_t16);
+                if (_t17) {
+                    LyricOpt_LStructLitData _t18 = e->struct_lit;
+                    LStructLitData _t19 = lyric_unwrap(_t18);
+                    LyricSlice_LFieldInit _t20 = _t19.fields;
+                    LFieldInit _t21 = _t20.data[i];
+                    LValue* _t22 = _t21.value;
+                    LValue* _t23 = _t22;
+                    bool _t24 = is_var_value(var_name, _t23);
+                    if (_t24) {
+                        return true;
+                    }
+                }
+                int32_t _t25 = (i + 1);
+                i = _t25;
+            }
+        }
+    }
+    LExprKind _t26 = e->kind;
+    int32_t _t27 = _t26;
+    bool _t28 = (_t27 == 11);
+    if (_t28) {
+        LClassAllocData* _t29 = e->class_alloc;
+        bool _t30 = (_t29 == NULL);
+        bool _t31 = (!_t30);
+        if (_t31) {
+            int32_t i = 0;
+            while (1) {
+                LClassAllocData* _t32 = e->class_alloc;
+                LClassAllocData* _t33 = _t32;
+                LyricSlice_LFieldInit _t34 = _t33->fields;
+                int32_t _t35 = _t34.len;
+                bool _t36 = (i < _t35);
+                if (!(_t36)) break;
+                LClassAllocData* _t37 = e->class_alloc;
+                LClassAllocData* _t38 = _t37;
+                LyricSlice_LFieldInit _t39 = _t38->fields;
+                LFieldInit _t40 = _t39.data[i];
+                LValue* _t41 = _t40.value;
+                bool _t42 = (_t41 == NULL);
+                bool _t43 = (!_t42);
+                if (_t43) {
+                    LClassAllocData* _t44 = e->class_alloc;
+                    LClassAllocData* _t45 = _t44;
+                    LyricSlice_LFieldInit _t46 = _t45->fields;
+                    LFieldInit _t47 = _t46.data[i];
+                    LValue* _t48 = _t47.value;
+                    LValue* _t49 = _t48;
+                    bool _t50 = is_var_value(var_name, _t49);
+                    if (_t50) {
+                        return true;
+                    }
+                }
+                int32_t _t51 = (i + 1);
+                i = _t51;
+            }
+        }
+    }
+    LExprKind _t52 = e->kind;
+    int32_t _t53 = _t52;
+    bool _t54 = (_t53 == 29);
+    if (_t54) {
+        LyricOpt_LSlabAllocData _t55 = e->slab_alloc;
+        bool _t56 = lyric_isnull(_t55);
+        bool _t57 = (!_t56);
+        if (_t57) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LSlabAllocData _t58 = e->slab_alloc;
+                LSlabAllocData _t59 = lyric_unwrap(_t58);
+                LyricSlice_LFieldInit _t60 = _t59.fields;
+                int32_t _t61 = _t60.len;
+                bool _t62 = (i < _t61);
+                if (!(_t62)) break;
+                LyricOpt_LSlabAllocData _t63 = e->slab_alloc;
+                LSlabAllocData _t64 = lyric_unwrap(_t63);
+                LyricSlice_LFieldInit _t65 = _t64.fields;
+                LFieldInit _t66 = _t65.data[i];
+                LValue* _t67 = _t66.value;
+                bool _t68 = (_t67 == NULL);
+                bool _t69 = (!_t68);
+                if (_t69) {
+                    LyricOpt_LSlabAllocData _t70 = e->slab_alloc;
+                    LSlabAllocData _t71 = lyric_unwrap(_t70);
+                    LyricSlice_LFieldInit _t72 = _t71.fields;
+                    LFieldInit _t73 = _t72.data[i];
+                    LValue* _t74 = _t73.value;
+                    LValue* _t75 = _t74;
+                    bool _t76 = is_var_value(var_name, _t75);
+                    if (_t76) {
+                        return true;
+                    }
+                }
+                int32_t _t77 = (i + 1);
+                i = _t77;
+            }
+        }
+    }
+    LExprKind _t78 = e->kind;
+    int32_t _t79 = _t78;
+    bool _t80 = (_t79 == 18);
+    if (_t80) {
+        LyricOpt_LVariantConstructData _t81 = e->variant_construct;
+        bool _t82 = lyric_isnull(_t81);
+        bool _t83 = (!_t82);
+        if (_t83) {
+            int32_t i = 0;
+            while (1) {
+                LyricOpt_LVariantConstructData _t84 = e->variant_construct;
+                LVariantConstructData _t85 = lyric_unwrap(_t84);
+                LyricSlice_LValueptr _t86 = _t85.fields;
+                int32_t _t87 = _t86.len;
+                bool _t88 = (i < _t87);
+                if (!(_t88)) break;
+                LyricOpt_LVariantConstructData _t89 = e->variant_construct;
+                LVariantConstructData _t90 = lyric_unwrap(_t89);
+                LyricSlice_LValueptr _t91 = _t90.fields;
+                LValue* _t92 = _t91.data[i];
+                bool _t93 = (_t92 == NULL);
+                bool _t94 = (!_t93);
+                if (_t94) {
+                    LyricOpt_LVariantConstructData _t95 = e->variant_construct;
+                    LVariantConstructData _t96 = lyric_unwrap(_t95);
+                    LyricSlice_LValueptr _t97 = _t96.fields;
+                    LValue* _t98 = _t97.data[i];
+                    LValue* _t99 = _t98;
+                    bool _t100 = is_var_value(var_name, _t99);
+                    if (_t100) {
+                        return true;
+                    }
+                }
+                int32_t _t101 = (i + 1);
+                i = _t101;
+            }
+        }
+    }
+    LExprKind _t102 = e->kind;
+    int32_t _t103 = _t102;
+    bool _t104 = (_t103 == 7);
+    if (_t104) {
+        LCallData* _t105 = e->call;
+        bool _t106 = (_t105 == NULL);
+        bool _t107 = (!_t106);
+        if (_t107) {
+            LCallData* _t108 = e->call;
+            LCallData* _t109 = _t108;
+            lyric_string _t110 = _t109->func_name;
+            LCallData* _t111 = e->call;
+            LCallData* _t112 = _t111;
+            LyricSlice_LValueptr _t113 = _t112->args;
+            bool _t114 = var_at_escaping_position(var_name, _t110, _t113, 0, escape_map);
+            if (_t114) {
+                return true;
+            }
+        }
+    }
+    LExprKind _t115 = e->kind;
+    int32_t _t116 = _t115;
+    bool _t117 = (_t116 == 8);
+    if (_t117) {
+        LMethodCallData* _t118 = e->method_call;
+        bool _t119 = (_t118 == NULL);
+        bool _t120 = (!_t119);
+        if (_t120) {
+            LMethodCallData* _t121 = e->method_call;
+            LMethodCallData* _t122 = _t121;
+            lyric_string _t123 = _t122->method;
+            LMethodCallData* _t124 = e->method_call;
+            LMethodCallData* _t125 = _t124;
+            LyricSlice_LValueptr _t126 = _t125->args;
+            bool _t127 = var_at_escaping_position(var_name, _t123, _t126, 1, escape_map);
+            if (_t127) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool var_at_escaping_position(lyric_string var_name, lyric_string callee_name, LyricSlice_LValueptr args, int32_t param_offset, Dict_CSym_bool* escape_map) {
+    int32_t ai = 0;
+    while (1) {
+        int32_t _t0 = args.len;
+        bool _t1 = (ai < _t0);
+        if (!(_t1)) break;
+        int32_t _t2 = (ai + param_offset);
+        Sym* _t3 = escape_key_idx(callee_name, _t2);
+        Sym* callee_key = _t3;
+        DictEntry_CSym_bool* _t4 = Dict_CSym_bool_get(escape_map, callee_key);
+        DictEntry_CSym_bool* callee_escapes = _t4;
+        bool _t5 = (callee_escapes == NULL);
+        bool _t6 = (!_t5);
+        if (_t6) {
+            LValue* _t7 = args.data[ai];
+            bool _t8 = (_t7 == NULL);
+            bool _t9 = (!_t8);
+            if (_t9) {
+                LValue* _t10 = args.data[ai];
+                LValue* _t11 = _t10;
+                bool _t12 = is_var_value(var_name, _t11);
+                if (_t12) {
+                    return true;
+                }
+            }
+        }
+        int32_t _t13 = (ai + 1);
+        ai = _t13;
+    }
+    return false;
+}
+
+bool is_var_value(lyric_string var_name, LValue* v) {
+    LValueKind _t0 = v->kind;
+    int32_t _t1 = _t0;
+    bool _t2 = (_t1 == 0);
+    if (_t2) {
+        lyric_string _t3 = v->name;
+        bool _t4 = lyric_str_eq(_t3, var_name);
+        return _t4;
+    }
+    return false;
+}
+
+void slab_rewrite(LProgram* prog) {
+    prog->slab_mode = true;
+    Dict_CSym_bool* _t0 = compute_escape_map(prog);
+    Dict_CSym_bool* escape_map = _t0;
+    int32_t fi = 0;
+    while (1) {
+        LyricSlice_LFuncDecl _t1 = prog->functions;
+        int32_t _t2 = _t1.len;
+        bool _t3 = (fi < _t2);
+        if (!(_t3)) break;
+        LyricSlice_LFuncDecl _t4 = prog->functions;
+        LFuncDecl _t5 = _t4.data[fi];
+        LFuncDecl f = _t5;
+        LyricSlice_LStmtptr _t6 = f.body;
+        LyricSlice_LStmtptr _t7 = f.body;
+        LyricSlice_LStmtptr _t8 = slab_rewrite_stmts(_t6, _t7, escape_map);
+        LyricSlice_LStmtptr new_body = _t8;
+        LyricSlice_LFuncDecl _t9 = prog->functions;
+        _t9.data[fi].body = new_body;
+        LyricSlice_LFuncDecl _t10 = prog->functions;
+        LFuncDecl _t11 = _t10.data[fi];
+        lyric_string _t12 = _t11.name;
+        lyric_string fname = _t12;
+        bool _t13 = lyric_str_eq(fname, LYRIC_STR("destroy"));
+        if (_t13) {
+            LyricSlice_LFuncDecl _t14 = prog->functions;
+            LFuncDecl _t15 = _t14.data[fi];
+            LyricSlice_LParam _t16 = _t15.params;
+            int32_t _t17 = _t16.len;
+            bool _t18 = (_t17 > 0);
+            if (_t18) {
+                LyricSlice_LFuncDecl _t19 = prog->functions;
+                LFuncDecl _t20 = _t19.data[fi];
+                LyricSlice_LParam _t21 = _t20.params;
+                LParam _t22 = _t21.data[0];
+                LParam p = _t22;
+                LType* _t23 = p.typ;
+                bool _t24 = (_t23 == NULL);
+                bool _t25 = (!_t24);
+                if (_t25) {
+                    LType* _t26 = p.typ;
+                    LType* _t27 = _t26;
+                    LTypeKind _t28 = _t27->kind;
+                    int32_t _t29 = _t28;
+                    bool _t30 = (_t29 == 17);
+                    if (_t30) {
+                        LStmtKind _t31 = LStmtKind_StSlabFree;
+                        LType* _t32 = p.typ;
+                        LType* _t33 = _t32;
+                        lyric_string _t34 = _t33->name;
+                        LValueKind _t35 = LValueKind_ValVar;
+                        lyric_string _t36 = p.name;
+                        LType* _t37 = p.typ;
+                        LValue* _t38 = _lyric_slab_alloc_LValue();
+                        _t38->kind = _t35;
+                        _t38->name = _t36;
+                        _t38->temp_id = 0;
+                        _t38->typ = _t37;
+                        LSlabFreeData _t39 = (LSlabFreeData){.class_name = _t34, .handle = _t38};
+                        LStmt* _t40 = _lyric_slab_alloc_LStmt();
+                        _t40->kind = _t31;
+                        _t40->slab_free = lyric_some(_t39, LyricOpt_LSlabFreeData);
+                        LStmt* free_stmt = _t40;
+                        LyricSlice_LFuncDecl _t41 = prog->functions;
+                        LFuncDecl _t42 = _t41.data[fi];
+                        LyricSlice_LStmtptr _t43 = _t42.body;
+                        LyricSlice_LStmtptr fn_body = _t43;
                         ({ lyric_push(&fn_body, free_stmt, LyricSlice_LStmtptr); fn_body; });
-                        LyricSlice_LFuncDecl _t43 = prog->functions;
-                        _t43.data[fi].body = fn_body;
+                        LyricSlice_LFuncDecl _t45 = prog->functions;
+                        _t45.data[fi].body = fn_body;
                     }
                 }
             }
         }
-        int32_t _t44 = (fi + 1);
-        fi = _t44;
+        int32_t _t46 = (fi + 1);
+        fi = _t46;
     }
 }
 
-LyricSlice_LStmtptr slab_rewrite_stmts(LyricSlice_LStmtptr stmts) {
+LyricSlice_LStmtptr slab_rewrite_stmts(LyricSlice_LStmtptr stmts, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map) {
     LyricSlice_LStmtptr _t0 = lyric_slice_empty(LyricSlice_LStmtptr);
     LyricSlice_LStmtptr result = _t0;
+    LyricSlice_lyric_string _t1 = lyric_slice_empty(LyricSlice_lyric_string);
+    LyricSlice_lyric_string slice_locals = _t1;
+    LyricSlice_LTypeptr _t2 = lyric_slice_empty(LyricSlice_LTypeptr);
+    LyricSlice_LTypeptr slice_types = _t2;
+    LyricSlice_int32_t _t3 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t fresh_temps = _t3;
     int32_t i = 0;
     while (1) {
-        int32_t _t1 = stmts.len;
-        bool _t2 = (i < _t1);
-        if (!(_t2)) break;
-        LStmt* _t3 = stmts.data[i];
-        bool _t4 = (_t3 == NULL);
-        if (_t4) {
+        int32_t _t4 = stmts.len;
+        bool _t5 = (i < _t4);
+        if (!(_t5)) break;
+        LStmt* _t6 = stmts.data[i];
+        bool _t7 = (_t6 == NULL);
+        if (_t7) {
             ({ lyric_push(&result, 0, LyricSlice_LStmtptr); result; });
         } else {
-            LStmt* _t6 = stmts.data[i];
-            LStmt* _t7 = _t6;
-            LyricSlice_LStmtptr _t8 = slab_rewrite_one_stmt(_t7);
-            LyricSlice_LStmtptr expanded = _t8;
+            LStmt* _t9 = stmts.data[i];
+            LStmt* _t10 = _t9;
+            LStmt* s = _t10;
+            LStmtKind _t11 = s->kind;
+            int32_t _t12 = _t11;
+            bool _t13 = (_t12 == 0);
+            if (_t13) {
+                LyricOpt_LTempDef _t14 = s->temp_def;
+                bool _t15 = lyric_isnull(_t14);
+                bool _t16 = (!_t15);
+                bool _sc17 = false;
+                _sc17 = _t16;
+                if (_sc17) {
+                    LyricOpt_LTempDef _t18 = s->temp_def;
+                    LTempDef _t19 = lyric_unwrap(_t18);
+                    LExpr* _t20 = _t19.expr;
+                    bool _t21 = (_t20 == NULL);
+                    bool _t22 = (!_t21);
+                    _sc17 = _t22;
+                }
+                if (_sc17) {
+                    LyricOpt_LTempDef _t23 = s->temp_def;
+                    LTempDef _t24 = lyric_unwrap(_t23);
+                    LExpr* _t25 = _t24.expr;
+                    LExpr* _t26 = _t25;
+                    LExprKind _t27 = _t26->kind;
+                    int32_t _t28 = _t27;
+                    bool _t29 = (_t28 == 12);
+                    if (_t29) {
+                        LyricOpt_LTempDef _t30 = s->temp_def;
+                        LTempDef _t31 = lyric_unwrap(_t30);
+                        int32_t _t32 = _t31.id;
+                        ({ lyric_push(&fresh_temps, _t32, LyricSlice_int32_t); fresh_temps; });
+                    }
+                }
+            }
+            LStmtKind _t34 = s->kind;
+            int32_t _t35 = _t34;
+            bool _t36 = (_t35 == 1);
+            if (_t36) {
+                LyricOpt_LVarDeclData _t37 = s->var_decl;
+                bool _t38 = lyric_isnull(_t37);
+                bool _t39 = (!_t38);
+                bool _sc40 = false;
+                _sc40 = _t39;
+                if (_sc40) {
+                    LyricOpt_LVarDeclData _t41 = s->var_decl;
+                    LVarDeclData _t42 = lyric_unwrap(_t41);
+                    LType* _t43 = _t42.typ;
+                    bool _t44 = (_t43 == NULL);
+                    bool _t45 = (!_t44);
+                    _sc40 = _t45;
+                }
+                if (_sc40) {
+                    LyricOpt_LVarDeclData _t46 = s->var_decl;
+                    LVarDeclData _t47 = lyric_unwrap(_t46);
+                    LType* _t48 = _t47.typ;
+                    LType* _t49 = _t48;
+                    LTypeKind _t50 = _t49->kind;
+                    int32_t _t51 = _t50;
+                    bool _t52 = (_t51 == 19);
+                    if (_t52) {
+                        LyricOpt_LVarDeclData _t53 = s->var_decl;
+                        LVarDeclData _t54 = lyric_unwrap(_t53);
+                        LValue* _t55 = _t54.init;
+                        bool _t56 = is_fresh_slice_init(_t55, fresh_temps);
+                        if (_t56) {
+                            LyricOpt_LVarDeclData _t57 = s->var_decl;
+                            LVarDeclData _t58 = lyric_unwrap(_t57);
+                            lyric_string _t59 = _t58.name;
+                            bool _t60 = var_escapes_via_call(_t59, all_stmts, escape_map);
+                            bool _t61 = (!_t60);
+                            if (_t61) {
+                                LyricOpt_LVarDeclData _t62 = s->var_decl;
+                                LVarDeclData _t63 = lyric_unwrap(_t62);
+                                lyric_string _t64 = _t63.name;
+                                ({ lyric_push(&slice_locals, _t64, LyricSlice_lyric_string); slice_locals; });
+                                LyricOpt_LVarDeclData _t66 = s->var_decl;
+                                LVarDeclData _t67 = lyric_unwrap(_t66);
+                                LType* _t68 = _t67.typ;
+                                ({ lyric_push(&slice_types, _t68, LyricSlice_LTypeptr); slice_types; });
+                            }
+                        }
+                    }
+                }
+            }
+            LStmtKind _t70 = s->kind;
+            int32_t _t71 = _t70;
+            bool _t72 = (_t71 == 11);
+            if (_t72) {
+                LyricSlice_lyric_string _t73 = get_return_var_names(s);
+                LyricSlice_lyric_string ret_names = _t73;
+                emit_slice_frees(slice_locals, slice_types, ret_names, &result);
+            }
+            LyricSlice_LStmtptr _t75 = slab_rewrite_one_stmt(s, all_stmts, escape_map);
+            LyricSlice_LStmtptr expanded = _t75;
             int32_t j = 0;
             while (1) {
-                int32_t _t9 = expanded.len;
-                bool _t10 = (j < _t9);
-                if (!(_t10)) break;
-                LStmt* _t11 = expanded.data[j];
-                ({ lyric_push(&result, _t11, LyricSlice_LStmtptr); result; });
-                int32_t _t13 = (j + 1);
-                j = _t13;
+                int32_t _t76 = expanded.len;
+                bool _t77 = (j < _t76);
+                if (!(_t77)) break;
+                LStmt* _t78 = expanded.data[j];
+                ({ lyric_push(&result, _t78, LyricSlice_LStmtptr); result; });
+                int32_t _t80 = (j + 1);
+                j = _t80;
             }
         }
-        int32_t _t14 = (i + 1);
-        i = _t14;
+        int32_t _t81 = (i + 1);
+        i = _t81;
     }
+    LyricSlice_lyric_string _t82 = lyric_slice_empty(LyricSlice_lyric_string);
+    LyricSlice_lyric_string no_skip = _t82;
+    emit_slice_frees(slice_locals, slice_types, no_skip, &result);
+    if (slice_locals.data) free(slice_locals.data);
+    if (slice_types.data) free(slice_types.data);
+    if (fresh_temps.data) free(fresh_temps.data);
+    if (no_skip.data) free(no_skip.data);
     return result;
+    if (result.data) free(result.data);
+    if (slice_locals.data) free(slice_locals.data);
+    if (slice_types.data) free(slice_types.data);
+    if (fresh_temps.data) free(fresh_temps.data);
+    if (no_skip.data) free(no_skip.data);
 }
 
-LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
+LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map) {
     LyricSlice_LStmtptr _t0 = lyric_slice_empty(LyricSlice_LStmtptr);
     LyricSlice_LStmtptr out = _t0;
     LStmtKind _t1 = s->kind;
@@ -67517,7 +69130,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 }
                 return out;
             } else {
-                slab_rewrite_expr(e);
+                slab_rewrite_expr(e, all_stmts, escape_map);
             }
         }
     }
@@ -67628,7 +69241,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LSideEffectData _t118 = lyric_unwrap(_t117);
             LExpr* _t119 = _t118.expr;
             LExpr* _t120 = _t119;
-            slab_rewrite_expr(_t120);
+            slab_rewrite_expr(_t120, all_stmts, escape_map);
         }
     }
     LStmtKind _t122 = s->kind;
@@ -67651,10 +69264,10 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 slab_rewrite_value(_t134);
             }
             LyricSlice_LStmtptr _t136 = d.then_body;
-            LyricSlice_LStmtptr _t137 = slab_rewrite_stmts(_t136);
+            LyricSlice_LStmtptr _t137 = slab_rewrite_stmts(_t136, all_stmts, escape_map);
             d.then_body = _t137;
             LyricSlice_LStmtptr _t138 = d.else_body;
-            LyricSlice_LStmtptr _t139 = slab_rewrite_stmts(_t138);
+            LyricSlice_LStmtptr _t139 = slab_rewrite_stmts(_t138, all_stmts, escape_map);
             d.else_body = _t139;
             s->if_data = lyric_some(d, LyricOpt_LIfData);
         }
@@ -67671,7 +69284,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LWhileData _t147 = lyric_unwrap(_t146);
             LWhileData d = _t147;
             LyricSlice_LStmtptr _t148 = d.cond_block;
-            LyricSlice_LStmtptr _t149 = slab_rewrite_stmts(_t148);
+            LyricSlice_LStmtptr _t149 = slab_rewrite_stmts(_t148, all_stmts, escape_map);
             d.cond_block = _t149;
             LValue* _t150 = d.cond_var;
             bool _t151 = (_t150 == NULL);
@@ -67682,7 +69295,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 slab_rewrite_value(_t154);
             }
             LyricSlice_LStmtptr _t156 = d.body;
-            LyricSlice_LStmtptr _t157 = slab_rewrite_stmts(_t156);
+            LyricSlice_LStmtptr _t157 = slab_rewrite_stmts(_t156, all_stmts, escape_map);
             d.body = _t157;
             s->while_data = lyric_some(d, LyricOpt_LWhileData);
         }
@@ -67707,7 +69320,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 slab_rewrite_value(_t170);
             }
             LyricSlice_LStmtptr _t172 = d.body;
-            LyricSlice_LStmtptr _t173 = slab_rewrite_stmts(_t172);
+            LyricSlice_LStmtptr _t173 = slab_rewrite_stmts(_t172, all_stmts, escape_map);
             d.body = _t173;
             s->for_data = lyric_some(d, LyricOpt_LForData);
         }
@@ -67724,7 +69337,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LBlockData _t181 = lyric_unwrap(_t180);
             LBlockData d = _t181;
             LyricSlice_LStmtptr _t182 = d.stmts;
-            LyricSlice_LStmtptr _t183 = slab_rewrite_stmts(_t182);
+            LyricSlice_LStmtptr _t183 = slab_rewrite_stmts(_t182, all_stmts, escape_map);
             d.stmts = _t183;
             s->block = lyric_some(d, LyricOpt_LBlockData);
         }
@@ -67757,7 +69370,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 LyricSlice_LSwitchCase _t201 = d.cases;
                 LSwitchCase _t202 = _t201.data[ci];
                 LyricSlice_LStmtptr _t203 = _t202.body;
-                LyricSlice_LStmtptr _t204 = slab_rewrite_stmts(_t203);
+                LyricSlice_LStmtptr _t204 = slab_rewrite_stmts(_t203, all_stmts, escape_map);
                 LyricSlice_LSwitchCase _t205 = d.cases;
                 _t205.data[ci].body = _t204;
                 int32_t _t206 = (ci + 1);
@@ -67794,7 +69407,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 LyricSlice_LTypeSwitchCase _t224 = d.cases;
                 LTypeSwitchCase _t225 = _t224.data[ci];
                 LyricSlice_LStmtptr _t226 = _t225.body;
-                LyricSlice_LStmtptr _t227 = slab_rewrite_stmts(_t226);
+                LyricSlice_LStmtptr _t227 = slab_rewrite_stmts(_t226, all_stmts, escape_map);
                 LyricSlice_LTypeSwitchCase _t228 = d.cases;
                 _t228.data[ci].body = _t227;
                 int32_t _t229 = (ci + 1);
@@ -67815,7 +69428,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LSpawnData _t237 = lyric_unwrap(_t236);
             LSpawnData d = _t237;
             LyricSlice_LStmtptr _t238 = d.body;
-            LyricSlice_LStmtptr _t239 = slab_rewrite_stmts(_t238);
+            LyricSlice_LStmtptr _t239 = slab_rewrite_stmts(_t238, all_stmts, escape_map);
             d.body = _t239;
             s->spawn_data = lyric_some(d, LyricOpt_LSpawnData);
         }
@@ -67859,7 +69472,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 LyricSlice_LSelectCase _t265 = d.cases;
                 LSelectCase _t266 = _t265.data[ci];
                 LyricSlice_LStmtptr _t267 = _t266.body;
-                LyricSlice_LStmtptr _t268 = slab_rewrite_stmts(_t267);
+                LyricSlice_LStmtptr _t268 = slab_rewrite_stmts(_t267, all_stmts, escape_map);
                 LyricSlice_LSelectCase _t269 = d.cases;
                 _t269.data[ci].body = _t268;
                 int32_t _t270 = (ci + 1);
@@ -67888,7 +69501,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
                 slab_rewrite_value(_t283);
             }
             LyricSlice_LStmtptr _t285 = d.body;
-            LyricSlice_LStmtptr _t286 = slab_rewrite_stmts(_t285);
+            LyricSlice_LStmtptr _t286 = slab_rewrite_stmts(_t285, all_stmts, escape_map);
             d.body = _t286;
             s->lock_data = lyric_some(d, LyricOpt_LLockData);
         }
@@ -67904,7 +69517,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LyricOpt_LDeferData _t293 = s->defer_data;
             LDeferData _t294 = lyric_unwrap(_t293);
             LyricSlice_LStmtptr _t295 = _t294.body;
-            LyricSlice_LStmtptr _t296 = slab_rewrite_stmts(_t295);
+            LyricSlice_LStmtptr _t296 = slab_rewrite_stmts(_t295, all_stmts, escape_map);
             LyricOpt_LDeferData _t297 = s->defer_data;
             LDeferData _t298 = lyric_unwrap(_t297);
             _t298.body = _t296;
@@ -67932,7 +69545,7 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
             LMultiAssignData _t312 = lyric_unwrap(_t311);
             LExpr* _t313 = _t312.expr;
             LExpr* _t314 = _t313;
-            slab_rewrite_expr(_t314);
+            slab_rewrite_expr(_t314, all_stmts, escape_map);
         }
     }
     LStmtKind _t316 = s->kind;
@@ -68067,9 +69680,10 @@ LyricSlice_LStmtptr slab_rewrite_one_stmt(LStmt* s) {
     }
     lyric_push(&out, s, LyricSlice_LStmtptr);
     return out;
+    if (out.data) free(out.data);
 }
 
-void slab_rewrite_expr(LExpr* e) {
+void slab_rewrite_expr(LExpr* e, LyricSlice_LStmtptr all_stmts, Dict_CSym_bool* escape_map) {
     LExprKind _t0 = e->kind;
     int32_t _t1 = _t0;
     switch (_t1) {
@@ -68787,29 +70401,32 @@ void slab_rewrite_expr(LExpr* e) {
             LyricOpt_LFuncLitData _t472 = e->func_lit;
             LFuncLitData _t473 = lyric_unwrap(_t472);
             LyricSlice_LStmtptr _t474 = _t473.body;
-            LyricSlice_LStmtptr _t475 = slab_rewrite_stmts(_t474);
-            LyricOpt_LFuncLitData _t476 = e->func_lit;
-            LFuncLitData _t477 = lyric_unwrap(_t476);
-            _t477.body = _t475;
+            LyricOpt_LFuncLitData _t475 = e->func_lit;
+            LFuncLitData _t476 = lyric_unwrap(_t475);
+            LyricSlice_LStmtptr _t477 = _t476.body;
+            LyricSlice_LStmtptr _t478 = slab_rewrite_stmts(_t474, _t477, escape_map);
+            LyricOpt_LFuncLitData _t479 = e->func_lit;
+            LFuncLitData _t480 = lyric_unwrap(_t479);
+            _t480.body = _t478;
         }
         break;
     }
     case 14: {
-        LyricOpt_LMakeChannelData _t478 = e->make_channel;
-        bool _t479 = lyric_isnull(_t478);
-        bool _t480 = (!_t479);
-        if (_t480) {
-            LyricOpt_LMakeChannelData _t481 = e->make_channel;
-            LMakeChannelData _t482 = lyric_unwrap(_t481);
-            LValue* _t483 = _t482.buf_size;
-            bool _t484 = (_t483 == NULL);
-            bool _t485 = (!_t484);
-            if (_t485) {
-                LyricOpt_LMakeChannelData _t486 = e->make_channel;
-                LMakeChannelData _t487 = lyric_unwrap(_t486);
-                LValue* _t488 = _t487.buf_size;
-                LValue* _t489 = _t488;
-                slab_rewrite_value(_t489);
+        LyricOpt_LMakeChannelData _t481 = e->make_channel;
+        bool _t482 = lyric_isnull(_t481);
+        bool _t483 = (!_t482);
+        if (_t483) {
+            LyricOpt_LMakeChannelData _t484 = e->make_channel;
+            LMakeChannelData _t485 = lyric_unwrap(_t484);
+            LValue* _t486 = _t485.buf_size;
+            bool _t487 = (_t486 == NULL);
+            bool _t488 = (!_t487);
+            if (_t488) {
+                LyricOpt_LMakeChannelData _t489 = e->make_channel;
+                LMakeChannelData _t490 = lyric_unwrap(_t489);
+                LValue* _t491 = _t490.buf_size;
+                LValue* _t492 = _t491;
+                slab_rewrite_value(_t492);
             }
         }
         break;
@@ -68837,6 +70454,121 @@ void slab_rewrite_value(LValue* v) {
         LValue* _t10 = _t9;
         slab_rewrite_value(_t10);
     }
+}
+
+bool is_fresh_slice_init(LValue* init, LyricSlice_int32_t fresh_temps) {
+    bool _t0 = (init == NULL);
+    if (_t0) {
+        return false;
+    }
+    LValue* _t1 = init;
+    LValue* v = _t1;
+    LValueKind _t2 = v->kind;
+    int32_t _t3 = _t2;
+    bool _t4 = (_t3 == 1);
+    if (_t4) {
+        int32_t i = 0;
+        while (1) {
+            int32_t _t5 = fresh_temps.len;
+            bool _t6 = (i < _t5);
+            if (!(_t6)) break;
+            int32_t _t7 = fresh_temps.data[i];
+            int32_t _t8 = v->temp_id;
+            bool _t9 = (_t7 == _t8);
+            if (_t9) {
+                return true;
+            }
+            int32_t _t10 = (i + 1);
+            i = _t10;
+        }
+    }
+    return false;
+}
+
+LyricSlice_lyric_string get_return_var_names(LStmt* s) {
+    LyricSlice_lyric_string _t0 = lyric_slice_empty(LyricSlice_lyric_string);
+    LyricSlice_lyric_string names = _t0;
+    LyricOpt_LReturnData _t1 = s->ret;
+    bool _t2 = lyric_isnull(_t1);
+    bool _t3 = (!_t2);
+    if (_t3) {
+        int32_t i = 0;
+        while (1) {
+            LyricOpt_LReturnData _t4 = s->ret;
+            LReturnData _t5 = lyric_unwrap(_t4);
+            LyricSlice_LValueptr _t6 = _t5.values;
+            int32_t _t7 = _t6.len;
+            bool _t8 = (i < _t7);
+            if (!(_t8)) break;
+            LyricOpt_LReturnData _t9 = s->ret;
+            LReturnData _t10 = lyric_unwrap(_t9);
+            LyricSlice_LValueptr _t11 = _t10.values;
+            LValue* _t12 = _t11.data[i];
+            bool _t13 = (_t12 == NULL);
+            bool _t14 = (!_t13);
+            if (_t14) {
+                LyricOpt_LReturnData _t15 = s->ret;
+                LReturnData _t16 = lyric_unwrap(_t15);
+                LyricSlice_LValueptr _t17 = _t16.values;
+                LValue* _t18 = _t17.data[i];
+                LValue* _t19 = _t18;
+                LValue* v = _t19;
+                LValueKind _t20 = v->kind;
+                int32_t _t21 = _t20;
+                bool _t22 = (_t21 == 0);
+                if (_t22) {
+                    lyric_string _t23 = v->name;
+                    ({ lyric_push(&names, _t23, LyricSlice_lyric_string); names; });
+                }
+            }
+            int32_t _t25 = (i + 1);
+            i = _t25;
+        }
+    }
+    return names;
+    if (names.data) free(names.data);
+}
+
+void emit_slice_frees(LyricSlice_lyric_string names, LyricSlice_LTypeptr types, LyricSlice_lyric_string skip_names, LyricSlice_LStmtptr* out) {
+    int32_t i = 0;
+    while (1) {
+        int32_t _t0 = names.len;
+        bool _t1 = (i < _t0);
+        if (!(_t1)) break;
+        lyric_string _t2 = names.data[i];
+        bool _t3 = should_skip(_t2, skip_names);
+        bool _t4 = (!_t3);
+        if (_t4) {
+            LStmtKind _t5 = LStmtKind_StSliceFree;
+            lyric_string _t6 = names.data[i];
+            LType* _t7 = types.data[i];
+            LSliceFreeData _t8 = (LSliceFreeData){.name = _t6, .typ = _t7};
+            LStmt* _t9 = _lyric_slab_alloc_LStmt();
+            _t9->kind = _t5;
+            _t9->slice_free = lyric_some(_t8, LyricOpt_LSliceFreeData);
+            LStmt* free_stmt = _t9;
+            ({ lyric_push(&(*out), free_stmt, LyricSlice_LStmtptr); (*out); });
+        }
+        int32_t _t11 = (i + 1);
+        i = _t11;
+    }
+}
+
+bool should_skip(lyric_string name, LyricSlice_lyric_string skip_names) {
+    int32_t i = 0;
+    while (1) {
+        int32_t _t0 = skip_names.len;
+        bool _t1 = (i < _t0);
+        if (!(_t1)) break;
+        lyric_string _t2 = skip_names.data[i];
+        bool _t3 = lyric_str_eq(name, _t2);
+        if (_t3) {
+            return true;
+        }
+        int32_t _t4 = (i + 1);
+        i = _t4;
+    }
+    return false;
 }
 
 CGen* new_cgen(LProgram* prog) {
@@ -74257,7 +75989,9 @@ lyric_string CGen_emit_expr_str(CGen* self, LExpr* e) {
         }
         StringBuilder_write(sb, LYRIC_STR("_p; })"));
         lyric_string _t506 = StringBuilder_to_string(sb);
+        if (class_fields.data) free(class_fields.data);
         return _t506;
+        if (class_fields.data) free(class_fields.data);
         break;
     }
     default: {
@@ -74813,7 +76547,9 @@ lyric_string CGen_emit_class_alloc_expr(CGen* self, LExpr* e) {
     }
     StringBuilder_write(sb, LYRIC_STR("}; _p; })"));
     lyric_string _t96 = StringBuilder_to_string(sb);
+    if (class_fields.data) free(class_fields.data);
     return _t96;
+    if (class_fields.data) free(class_fields.data);
 }
 
 lyric_string CGen_emit_struct_lit_expr(CGen* self, LExpr* e) {
@@ -76871,604 +78607,615 @@ void CGen_emit_stmt(CGen* self, LStmt* s) {
         CGen_line(self, _t342);
         break;
     }
-    case 5: {
+    case 26: {
         LStmt* _t344 = s;
-        LyricOpt_LIndexSetData _t345 = _t344->index_set;
-        LIndexSetData _t346 = lyric_unwrap(_t345);
-        LIndexSetData d = _t346;
-        lyric_string _t347 = d.field;
-        bool _t348 = (!lyric_str_eq(_t347, LYRIC_STR("")));
-        if (_t348) {
-            LValue* _t349 = d.collection;
-            lyric_string _t350 = CGen_emit_value(self, _t349);
-            LValue* _t351 = d.index;
-            lyric_string _t352 = CGen_emit_value(self, _t351);
-            lyric_string _t353 = d.field;
-            LValue* _t354 = d.value;
-            lyric_string _t355 = CGen_emit_value(self, _t354);
-            lyric_string _t356 = lyric_sprintf("%.*s.data[%.*s].%.*s = %.*s;", (int)_t350.len, (const char*)_t350.data, (int)_t352.len, (const char*)_t352.data, (int)_t353.len, (const char*)_t353.data, (int)_t355.len, (const char*)_t355.data);
-            CGen_line(self, _t356);
-        } else {
-            LValue* _t358 = d.collection;
+        LyricOpt_LSliceFreeData _t345 = _t344->slice_free;
+        LSliceFreeData _t346 = lyric_unwrap(_t345);
+        LSliceFreeData d = _t346;
+        lyric_string _t347 = d.name;
+        lyric_string _t348 = d.name;
+        lyric_string _t349 = lyric_sprintf("if (%.*s.data) free(%.*s.data);", (int)_t347.len, (const char*)_t347.data, (int)_t348.len, (const char*)_t348.data);
+        CGen_line(self, _t349);
+        break;
+    }
+    case 5: {
+        LStmt* _t351 = s;
+        LyricOpt_LIndexSetData _t352 = _t351->index_set;
+        LIndexSetData _t353 = lyric_unwrap(_t352);
+        LIndexSetData d = _t353;
+        lyric_string _t354 = d.field;
+        bool _t355 = (!lyric_str_eq(_t354, LYRIC_STR("")));
+        if (_t355) {
+            LValue* _t356 = d.collection;
+            lyric_string _t357 = CGen_emit_value(self, _t356);
+            LValue* _t358 = d.index;
             lyric_string _t359 = CGen_emit_value(self, _t358);
-            LValue* _t360 = d.index;
-            lyric_string _t361 = CGen_emit_value(self, _t360);
-            LValue* _t362 = d.value;
-            lyric_string _t363 = CGen_emit_value(self, _t362);
-            lyric_string _t364 = lyric_sprintf("%.*s.data[%.*s] = %.*s;", (int)_t359.len, (const char*)_t359.data, (int)_t361.len, (const char*)_t361.data, (int)_t363.len, (const char*)_t363.data);
-            CGen_line(self, _t364);
+            lyric_string _t360 = d.field;
+            LValue* _t361 = d.value;
+            lyric_string _t362 = CGen_emit_value(self, _t361);
+            lyric_string _t363 = lyric_sprintf("%.*s.data[%.*s].%.*s = %.*s;", (int)_t357.len, (const char*)_t357.data, (int)_t359.len, (const char*)_t359.data, (int)_t360.len, (const char*)_t360.data, (int)_t362.len, (const char*)_t362.data);
+            CGen_line(self, _t363);
+        } else {
+            LValue* _t365 = d.collection;
+            lyric_string _t366 = CGen_emit_value(self, _t365);
+            LValue* _t367 = d.index;
+            lyric_string _t368 = CGen_emit_value(self, _t367);
+            LValue* _t369 = d.value;
+            lyric_string _t370 = CGen_emit_value(self, _t369);
+            lyric_string _t371 = lyric_sprintf("%.*s.data[%.*s] = %.*s;", (int)_t366.len, (const char*)_t366.data, (int)_t368.len, (const char*)_t368.data, (int)_t370.len, (const char*)_t370.data);
+            CGen_line(self, _t371);
         }
         break;
     }
     case 11: {
-        LStmt* _t366 = s;
-        CGen_emit_return_stmt(self, _t366);
+        LStmt* _t373 = s;
+        CGen_emit_return_stmt(self, _t373);
         break;
     }
     case 6: {
-        LStmt* _t368 = s;
-        LyricOpt_LIfData _t369 = _t368->if_data;
-        LIfData _t370 = lyric_unwrap(_t369);
-        LIfData d = _t370;
-        LValue* _t371 = d.cond;
-        lyric_string _t372 = CGen_emit_value(self, _t371);
-        lyric_string _t373 = lyric_sprintf("if (%.*s) {", (int)_t372.len, (const char*)_t372.data);
-        CGen_line(self, _t373);
-        int32_t _t375 = self->indent;
-        int32_t _t376 = (_t375 + 1);
-        self->indent = _t376;
-        LyricSlice_LStmtptr _t377 = d.then_body;
-        CGen_emit_stmts(self, _t377);
-        int32_t _t379 = self->indent;
-        int32_t _t380 = (_t379 - 1);
-        self->indent = _t380;
-        LyricSlice_LStmtptr _t381 = d.else_body;
-        int32_t _t382 = _t381.len;
-        bool _t383 = (_t382 > 0);
-        if (_t383) {
-            lyric_string _t384 = LYRIC_STR("} else {");
-            CGen_line(self, _t384);
-            int32_t _t386 = self->indent;
-            int32_t _t387 = (_t386 + 1);
-            self->indent = _t387;
-            LyricSlice_LStmtptr _t388 = d.else_body;
-            CGen_emit_stmts(self, _t388);
-            int32_t _t390 = self->indent;
-            int32_t _t391 = (_t390 - 1);
-            self->indent = _t391;
+        LStmt* _t375 = s;
+        LyricOpt_LIfData _t376 = _t375->if_data;
+        LIfData _t377 = lyric_unwrap(_t376);
+        LIfData d = _t377;
+        LValue* _t378 = d.cond;
+        lyric_string _t379 = CGen_emit_value(self, _t378);
+        lyric_string _t380 = lyric_sprintf("if (%.*s) {", (int)_t379.len, (const char*)_t379.data);
+        CGen_line(self, _t380);
+        int32_t _t382 = self->indent;
+        int32_t _t383 = (_t382 + 1);
+        self->indent = _t383;
+        LyricSlice_LStmtptr _t384 = d.then_body;
+        CGen_emit_stmts(self, _t384);
+        int32_t _t386 = self->indent;
+        int32_t _t387 = (_t386 - 1);
+        self->indent = _t387;
+        LyricSlice_LStmtptr _t388 = d.else_body;
+        int32_t _t389 = _t388.len;
+        bool _t390 = (_t389 > 0);
+        if (_t390) {
+            lyric_string _t391 = LYRIC_STR("} else {");
+            CGen_line(self, _t391);
+            int32_t _t393 = self->indent;
+            int32_t _t394 = (_t393 + 1);
+            self->indent = _t394;
+            LyricSlice_LStmtptr _t395 = d.else_body;
+            CGen_emit_stmts(self, _t395);
+            int32_t _t397 = self->indent;
+            int32_t _t398 = (_t397 - 1);
+            self->indent = _t398;
         }
         CGen_line(self, LYRIC_STR("}"));
         break;
     }
     case 7: {
-        LStmt* _t393 = s;
-        LyricOpt_LWhileData _t394 = _t393->while_data;
-        LWhileData _t395 = lyric_unwrap(_t394);
-        LWhileData d = _t395;
-        lyric_string _t396 = LYRIC_STR("while (1) {");
-        CGen_line(self, _t396);
-        int32_t _t398 = self->indent;
-        int32_t _t399 = (_t398 + 1);
-        self->indent = _t399;
-        LyricSlice_LStmtptr _t400 = d.cond_block;
-        CGen_emit_stmts(self, _t400);
-        LValue* _t402 = d.cond_var;
-        lyric_string _t403 = CGen_emit_value(self, _t402);
-        lyric_string _t404 = lyric_sprintf("if (!(%.*s)) break;", (int)_t403.len, (const char*)_t403.data);
-        CGen_line(self, _t404);
-        LyricSlice_LStmtptr _t406 = d.body;
-        CGen_emit_stmts(self, _t406);
-        int32_t _t408 = self->indent;
-        int32_t _t409 = (_t408 - 1);
-        self->indent = _t409;
+        LStmt* _t400 = s;
+        LyricOpt_LWhileData _t401 = _t400->while_data;
+        LWhileData _t402 = lyric_unwrap(_t401);
+        LWhileData d = _t402;
+        lyric_string _t403 = LYRIC_STR("while (1) {");
+        CGen_line(self, _t403);
+        int32_t _t405 = self->indent;
+        int32_t _t406 = (_t405 + 1);
+        self->indent = _t406;
+        LyricSlice_LStmtptr _t407 = d.cond_block;
+        CGen_emit_stmts(self, _t407);
+        LValue* _t409 = d.cond_var;
+        lyric_string _t410 = CGen_emit_value(self, _t409);
+        lyric_string _t411 = lyric_sprintf("if (!(%.*s)) break;", (int)_t410.len, (const char*)_t410.data);
+        CGen_line(self, _t411);
+        LyricSlice_LStmtptr _t413 = d.body;
+        CGen_emit_stmts(self, _t413);
+        int32_t _t415 = self->indent;
+        int32_t _t416 = (_t415 - 1);
+        self->indent = _t416;
         CGen_line(self, LYRIC_STR("}"));
         break;
     }
     case 8: {
-        LStmt* _t411 = s;
-        CGen_emit_for_stmt(self, _t411);
+        LStmt* _t418 = s;
+        CGen_emit_for_stmt(self, _t418);
         break;
     }
     case 9: {
-        LStmt* _t413 = s;
-        CGen_emit_switch_stmt(self, _t413);
+        LStmt* _t420 = s;
+        CGen_emit_switch_stmt(self, _t420);
         break;
     }
     case 23: {
-        LStmt* _t415 = s;
-        CGen_emit_type_switch_stmt(self, _t415);
+        LStmt* _t422 = s;
+        CGen_emit_type_switch_stmt(self, _t422);
         break;
     }
     case 10: {
-        LStmt* _t417 = s;
-        LyricOpt_LBlockData _t418 = _t417->block;
-        LBlockData _t419 = lyric_unwrap(_t418);
-        LBlockData d = _t419;
-        lyric_string _t420 = LYRIC_STR("{");
-        CGen_line(self, _t420);
-        int32_t _t422 = self->indent;
-        int32_t _t423 = (_t422 + 1);
-        self->indent = _t423;
-        LyricSlice_LStmtptr _t424 = d.stmts;
-        CGen_emit_stmts(self, _t424);
-        int32_t _t426 = self->indent;
-        int32_t _t427 = (_t426 - 1);
-        self->indent = _t427;
+        LStmt* _t424 = s;
+        LyricOpt_LBlockData _t425 = _t424->block;
+        LBlockData _t426 = lyric_unwrap(_t425);
+        LBlockData d = _t426;
+        lyric_string _t427 = LYRIC_STR("{");
+        CGen_line(self, _t427);
+        int32_t _t429 = self->indent;
+        int32_t _t430 = (_t429 + 1);
+        self->indent = _t430;
+        LyricSlice_LStmtptr _t431 = d.stmts;
+        CGen_emit_stmts(self, _t431);
+        int32_t _t433 = self->indent;
+        int32_t _t434 = (_t433 - 1);
+        self->indent = _t434;
         CGen_line(self, LYRIC_STR("}"));
         break;
     }
     case 21: {
-        LStmt* _t429 = s;
-        LyricOpt_LSideEffectData _t430 = _t429->side_effect;
-        LSideEffectData _t431 = lyric_unwrap(_t430);
-        LSideEffectData d = _t431;
-        LExpr* _t432 = d.expr;
-        lyric_string _t433 = CGen_emit_side_effect(self, _t432);
-        lyric_string expr = _t433;
-        bool _t434 = (!lyric_str_eq(expr, LYRIC_STR("")));
-        if (_t434) {
-            lyric_string _t435 = lyric_sprintf("%.*s;", (int)expr.len, (const char*)expr.data);
-            CGen_line(self, _t435);
+        LStmt* _t436 = s;
+        LyricOpt_LSideEffectData _t437 = _t436->side_effect;
+        LSideEffectData _t438 = lyric_unwrap(_t437);
+        LSideEffectData d = _t438;
+        LExpr* _t439 = d.expr;
+        lyric_string _t440 = CGen_emit_side_effect(self, _t439);
+        lyric_string expr = _t440;
+        bool _t441 = (!lyric_str_eq(expr, LYRIC_STR("")));
+        if (_t441) {
+            lyric_string _t442 = lyric_sprintf("%.*s;", (int)expr.len, (const char*)expr.data);
+            CGen_line(self, _t442);
         }
         break;
     }
     case 22: {
-        LStmt* _t437 = s;
-        LyricOpt_LMultiAssignData _t438 = _t437->multi_assign;
-        LMultiAssignData _t439 = lyric_unwrap(_t438);
-        LMultiAssignData d = _t439;
-        LyricSlice_lyric_string _t440 = d.names;
-        LyricSlice_LTypeptr _t441 = d.types;
-        LExpr* _t442 = d.expr;
-        CGen_emit_multi_assign(self, _t440, _t441, _t442);
+        LStmt* _t444 = s;
+        LyricOpt_LMultiAssignData _t445 = _t444->multi_assign;
+        LMultiAssignData _t446 = lyric_unwrap(_t445);
+        LMultiAssignData d = _t446;
+        LyricSlice_lyric_string _t447 = d.names;
+        LyricSlice_LTypeptr _t448 = d.types;
+        LExpr* _t449 = d.expr;
+        CGen_emit_multi_assign(self, _t447, _t448, _t449);
         break;
     }
     case 18: {
-        LStmt* _t444 = s;
-        LyricOpt_LSendData _t445 = _t444->send_data;
-        LSendData _t446 = lyric_unwrap(_t445);
-        LSendData d = _t446;
-        LValue* _t447 = d.channel;
-        LType* _t448 = CGen_resolve_value_type(self, _t447);
-        LType* chan_type = _t448;
+        LStmt* _t451 = s;
+        LyricOpt_LSendData _t452 = _t451->send_data;
+        LSendData _t453 = lyric_unwrap(_t452);
+        LSendData d = _t453;
+        LValue* _t454 = d.channel;
+        LType* _t455 = CGen_resolve_value_type(self, _t454);
+        LType* chan_type = _t455;
         lyric_string suffix = LYRIC_STR("void");
-        bool _t449 = (chan_type == NULL);
-        bool _t450 = (!_t449);
-        bool _sc451 = false;
-        _sc451 = _t450;
-        if (_sc451) {
-            LType* _t452 = chan_type;
-            LTypeKind _t453 = _t452->kind;
-            int32_t _t454 = _t453;
-            bool _t455 = (_t454 == 21);
-            _sc451 = _t455;
+        bool _t456 = (chan_type == NULL);
+        bool _t457 = (!_t456);
+        bool _sc458 = false;
+        _sc458 = _t457;
+        if (_sc458) {
+            LType* _t459 = chan_type;
+            LTypeKind _t460 = _t459->kind;
+            int32_t _t461 = _t460;
+            bool _t462 = (_t461 == 21);
+            _sc458 = _t462;
         }
-        bool _sc456 = false;
-        _sc456 = _sc451;
-        if (_sc456) {
-            LType* _t457 = chan_type;
-            LType* _t458 = _t457->elem;
-            bool _t459 = (_t458 == NULL);
-            bool _t460 = (!_t459);
-            _sc456 = _t460;
+        bool _sc463 = false;
+        _sc463 = _sc458;
+        if (_sc463) {
+            LType* _t464 = chan_type;
+            LType* _t465 = _t464->elem;
+            bool _t466 = (_t465 == NULL);
+            bool _t467 = (!_t466);
+            _sc463 = _t467;
         }
-        if (_sc456) {
-            LType* _t461 = chan_type;
-            LType* _t462 = _t461->elem;
-            lyric_string _t463 = CGen_chan_suffix(self, _t462);
-            suffix = _t463;
+        if (_sc463) {
+            LType* _t468 = chan_type;
+            LType* _t469 = _t468->elem;
+            lyric_string _t470 = CGen_chan_suffix(self, _t469);
+            suffix = _t470;
         }
-        LValue* _t464 = d.channel;
-        lyric_string _t465 = CGen_emit_value(self, _t464);
-        LValue* _t466 = d.value;
-        lyric_string _t467 = CGen_emit_value(self, _t466);
-        lyric_string _t468 = lyric_sprintf("lyric_chan_send_%.*s(%.*s, %.*s);", (int)suffix.len, (const char*)suffix.data, (int)_t465.len, (const char*)_t465.data, (int)_t467.len, (const char*)_t467.data);
-        CGen_line(self, _t468);
+        LValue* _t471 = d.channel;
+        lyric_string _t472 = CGen_emit_value(self, _t471);
+        LValue* _t473 = d.value;
+        lyric_string _t474 = CGen_emit_value(self, _t473);
+        lyric_string _t475 = lyric_sprintf("lyric_chan_send_%.*s(%.*s, %.*s);", (int)suffix.len, (const char*)suffix.data, (int)_t472.len, (const char*)_t472.data, (int)_t474.len, (const char*)_t474.data);
+        CGen_line(self, _t475);
         break;
     }
     case 16: {
-        LStmt* _t470 = s;
-        LyricOpt_LSpawnData _t471 = _t470->spawn_data;
-        LSpawnData _t472 = lyric_unwrap(_t471);
-        LSpawnData d = _t472;
-        int32_t _t473 = self->spawn_id;
-        int32_t _t474 = (_t473 + 1);
-        self->spawn_id = _t474;
-        int32_t _t475 = self->spawn_id;
-        lyric_string _t476 = lyric_sprintf("_spawn_%d", _t475);
-        lyric_string func_name = _t476;
-        LyricSlice_LStmtptr _t477 = d.body;
-        Dict_CSym_bool* _t478 = collect_used_vars(_t477);
-        Dict_CSym_bool* used = _t478;
-        LyricSlice_LStmtptr _t479 = d.body;
-        Dict_CSym_bool* _t480 = collect_declared_vars(_t479);
-        Dict_CSym_bool* declared = _t480;
-        LyricSlice_CCapture _t481 = lyric_slice_empty(LyricSlice_CCapture);
-        LyricSlice_CCapture captures = _t481;
-        Dict_CSym_bool* _t482 = used;
-        LyricSlice_Symptr _t483 = Dict_CSym_bool_keys(_t482);
-        LyricSlice_Symptr used_keys = _t483;
+        LStmt* _t477 = s;
+        LyricOpt_LSpawnData _t478 = _t477->spawn_data;
+        LSpawnData _t479 = lyric_unwrap(_t478);
+        LSpawnData d = _t479;
+        int32_t _t480 = self->spawn_id;
+        int32_t _t481 = (_t480 + 1);
+        self->spawn_id = _t481;
+        int32_t _t482 = self->spawn_id;
+        lyric_string _t483 = lyric_sprintf("_spawn_%d", _t482);
+        lyric_string func_name = _t483;
+        LyricSlice_LStmtptr _t484 = d.body;
+        Dict_CSym_bool* _t485 = collect_used_vars(_t484);
+        Dict_CSym_bool* used = _t485;
+        LyricSlice_LStmtptr _t486 = d.body;
+        Dict_CSym_bool* _t487 = collect_declared_vars(_t486);
+        Dict_CSym_bool* declared = _t487;
+        LyricSlice_CCapture _t488 = lyric_slice_empty(LyricSlice_CCapture);
+        LyricSlice_CCapture captures = _t488;
+        Dict_CSym_bool* _t489 = used;
+        LyricSlice_Symptr _t490 = Dict_CSym_bool_keys(_t489);
+        LyricSlice_Symptr used_keys = _t490;
         int32_t ci = 0;
         while (1) {
-            int32_t _t484 = used_keys.len;
-            bool _t485 = (ci < _t484);
-            if (!(_t485)) break;
-            Sym* _t486 = used_keys.data[ci];
-            lyric_string _t487 = Sym_get_name(_t486);
-            lyric_string var_name = _t487;
-            Dict_CSym_bool* _t488 = declared;
-            Sym* _t489 = used_keys.data[ci];
-            DictEntry_CSym_bool* _t490 = Dict_CSym_bool_get(_t488, _t489);
-            DictEntry_CSym_bool* decl_entry = _t490;
-            bool _t491 = (decl_entry == NULL);
-            if (_t491) {
+            int32_t _t491 = used_keys.len;
+            bool _t492 = (ci < _t491);
+            if (!(_t492)) break;
+            Sym* _t493 = used_keys.data[ci];
+            lyric_string _t494 = Sym_get_name(_t493);
+            lyric_string var_name = _t494;
+            Dict_CSym_bool* _t495 = declared;
+            Sym* _t496 = used_keys.data[ci];
+            DictEntry_CSym_bool* _t497 = Dict_CSym_bool_get(_t495, _t496);
+            DictEntry_CSym_bool* decl_entry = _t497;
+            bool _t498 = (decl_entry == NULL);
+            if (_t498) {
                 lyric_string ctyp = LYRIC_STR("void*");
-                Dict_CSym_opt_CLType* _t492 = self->var_types;
-                Dict_CSym_opt_CLType* _t493 = _t492;
-                Sym* _t494 = used_keys.data[ci];
-                DictEntry_CSym_opt_CLType* _t495 = Dict_CSym_opt_CLType_get(_t493, _t494);
-                DictEntry_CSym_opt_CLType* vt_entry = _t495;
-                bool _t496 = (vt_entry == NULL);
-                bool _t497 = (!_t496);
-                bool _sc498 = false;
-                _sc498 = _t497;
-                if (_sc498) {
-                    DictEntry_CSym_opt_CLType* _t499 = vt_entry;
-                    LType* _t500 = _t499->value;
-                    bool _t501 = (_t500 == NULL);
-                    bool _t502 = (!_t501);
-                    _sc498 = _t502;
+                Dict_CSym_opt_CLType* _t499 = self->var_types;
+                Dict_CSym_opt_CLType* _t500 = _t499;
+                Sym* _t501 = used_keys.data[ci];
+                DictEntry_CSym_opt_CLType* _t502 = Dict_CSym_opt_CLType_get(_t500, _t501);
+                DictEntry_CSym_opt_CLType* vt_entry = _t502;
+                bool _t503 = (vt_entry == NULL);
+                bool _t504 = (!_t503);
+                bool _sc505 = false;
+                _sc505 = _t504;
+                if (_sc505) {
+                    DictEntry_CSym_opt_CLType* _t506 = vt_entry;
+                    LType* _t507 = _t506->value;
+                    bool _t508 = (_t507 == NULL);
+                    bool _t509 = (!_t508);
+                    _sc505 = _t509;
                 }
-                if (_sc498) {
-                    DictEntry_CSym_opt_CLType* _t503 = vt_entry;
-                    LType* _t504 = _t503->value;
-                    lyric_string _t505 = CGen_c_type(self, _t504);
-                    ctyp = _t505;
+                if (_sc505) {
+                    DictEntry_CSym_opt_CLType* _t510 = vt_entry;
+                    LType* _t511 = _t510->value;
+                    lyric_string _t512 = CGen_c_type(self, _t511);
+                    ctyp = _t512;
                 }
-                CCapture _t506 = (CCapture){.name = var_name, .typ = ctyp};
-                LyricSlice_CCapture _t507 = ({ lyric_push(&captures, _t506, LyricSlice_CCapture); captures; });
-                _t507;
+                CCapture _t513 = (CCapture){.name = var_name, .typ = ctyp};
+                LyricSlice_CCapture _t514 = ({ lyric_push(&captures, _t513, LyricSlice_CCapture); captures; });
+                _t514;
             }
-            int32_t _t508 = (ci + 1);
-            ci = _t508;
+            int32_t _t515 = (ci + 1);
+            ci = _t515;
         }
-        StringBuilder* _t509 = self->buf;
-        StringBuilder* saved_buf = _t509;
-        int32_t _t510 = self->indent;
-        int32_t saved_indent = _t510;
-        Dict_CSym_bool* _t511 = self->spawn_captures;
-        Dict_CSym_bool* saved_captures = _t511;
-        StringBuilder* _t512 = new_string_builder();
-        self->buf = _t512;
+        StringBuilder* _t516 = self->buf;
+        StringBuilder* saved_buf = _t516;
+        int32_t _t517 = self->indent;
+        int32_t saved_indent = _t517;
+        Dict_CSym_bool* _t518 = self->spawn_captures;
+        Dict_CSym_bool* saved_captures = _t518;
+        StringBuilder* _t519 = new_string_builder();
+        self->buf = _t519;
         self->indent = 1;
-        Dict_CSym_bool* _t513 = _lyric_slab_alloc_Dict_CSym_bool();
-        Dict_CSym_bool* capture_set = _t513;
+        Dict_CSym_bool* _t520 = _lyric_slab_alloc_Dict_CSym_bool();
+        Dict_CSym_bool* capture_set = _t520;
         int32_t ci2 = 0;
         while (1) {
-            int32_t _t514 = captures.len;
-            bool _t515 = (ci2 < _t514);
-            if (!(_t515)) break;
-            CCapture _t516 = captures.data[ci2];
-            lyric_string _t517 = _t516.name;
-            Sym* _t518 = sym(_t517);
-            Dict_CSym_bool_set(capture_set, _t518, true);
-            int32_t _t520 = (ci2 + 1);
-            ci2 = _t520;
+            int32_t _t521 = captures.len;
+            bool _t522 = (ci2 < _t521);
+            if (!(_t522)) break;
+            CCapture _t523 = captures.data[ci2];
+            lyric_string _t524 = _t523.name;
+            Sym* _t525 = sym(_t524);
+            Dict_CSym_bool_set(capture_set, _t525, true);
+            int32_t _t527 = (ci2 + 1);
+            ci2 = _t527;
         }
         self->spawn_captures = capture_set;
-        LyricSlice_LStmtptr _t521 = d.body;
-        CGen_emit_stmts(self, _t521);
-        StringBuilder* _t523 = self->buf;
-        StringBuilder* _t524 = _t523;
-        lyric_string _t525 = StringBuilder_to_string(_t524);
-        lyric_string body_str = _t525;
+        LyricSlice_LStmtptr _t528 = d.body;
+        CGen_emit_stmts(self, _t528);
+        StringBuilder* _t530 = self->buf;
+        StringBuilder* _t531 = _t530;
+        lyric_string _t532 = StringBuilder_to_string(_t531);
+        lyric_string body_str = _t532;
         self->buf = saved_buf;
         self->indent = saved_indent;
         self->spawn_captures = saved_captures;
-        LyricSlice_CSpawnFunc _t526 = self->spawn_funcs;
-        CSpawnFunc _t527 = (CSpawnFunc){.name = func_name, .body_str = body_str, .captures = captures};
-        lyric_push(&_t526, _t527, LyricSlice_CSpawnFunc);
-        self->spawn_funcs = _t526;
-        int32_t _t529 = captures.len;
-        bool _t530 = (_t529 > 0);
-        if (_t530) {
+        LyricSlice_CSpawnFunc _t533 = self->spawn_funcs;
+        CSpawnFunc _t534 = (CSpawnFunc){.name = func_name, .body_str = body_str, .captures = captures};
+        lyric_push(&_t533, _t534, LyricSlice_CSpawnFunc);
+        self->spawn_funcs = _t533;
+        int32_t _t536 = captures.len;
+        bool _t537 = (_t536 > 0);
+        if (_t537) {
             CGen_line(self, LYRIC_STR("{"));
-            int32_t _t532 = self->indent;
-            int32_t _t533 = (_t532 + 1);
-            self->indent = _t533;
-            lyric_string _t534 = lyric_sprintf("%.*s_ctx* _ctx = (%.*s_ctx*)malloc(sizeof(%.*s_ctx));", (int)func_name.len, (const char*)func_name.data, (int)func_name.len, (const char*)func_name.data, (int)func_name.len, (const char*)func_name.data);
-            CGen_line(self, _t534);
+            int32_t _t539 = self->indent;
+            int32_t _t540 = (_t539 + 1);
+            self->indent = _t540;
+            lyric_string _t541 = lyric_sprintf("%.*s_ctx* _ctx = (%.*s_ctx*)malloc(sizeof(%.*s_ctx));", (int)func_name.len, (const char*)func_name.data, (int)func_name.len, (const char*)func_name.data, (int)func_name.len, (const char*)func_name.data);
+            CGen_line(self, _t541);
             int32_t ci3 = 0;
             while (1) {
-                int32_t _t536 = captures.len;
-                bool _t537 = (ci3 < _t536);
-                if (!(_t537)) break;
-                CCapture _t538 = captures.data[ci3];
-                lyric_string _t539 = _t538.name;
-                CCapture _t540 = captures.data[ci3];
-                lyric_string _t541 = _t540.name;
-                lyric_string _t542 = lyric_sprintf("_ctx->%.*s = &%.*s;", (int)_t539.len, (const char*)_t539.data, (int)_t541.len, (const char*)_t541.data);
-                CGen_line(self, _t542);
-                int32_t _t544 = (ci3 + 1);
-                ci3 = _t544;
+                int32_t _t543 = captures.len;
+                bool _t544 = (ci3 < _t543);
+                if (!(_t544)) break;
+                CCapture _t545 = captures.data[ci3];
+                lyric_string _t546 = _t545.name;
+                CCapture _t547 = captures.data[ci3];
+                lyric_string _t548 = _t547.name;
+                lyric_string _t549 = lyric_sprintf("_ctx->%.*s = &%.*s;", (int)_t546.len, (const char*)_t546.data, (int)_t548.len, (const char*)_t548.data);
+                CGen_line(self, _t549);
+                int32_t _t551 = (ci3 + 1);
+                ci3 = _t551;
             }
-            lyric_string _t545 = lyric_sprintf("lyric_spawn(%.*s, _ctx);", (int)func_name.len, (const char*)func_name.data);
-            CGen_line(self, _t545);
-            int32_t _t547 = self->indent;
-            int32_t _t548 = (_t547 - 1);
-            self->indent = _t548;
+            lyric_string _t552 = lyric_sprintf("lyric_spawn(%.*s, _ctx);", (int)func_name.len, (const char*)func_name.data);
+            CGen_line(self, _t552);
+            int32_t _t554 = self->indent;
+            int32_t _t555 = (_t554 - 1);
+            self->indent = _t555;
             CGen_line(self, LYRIC_STR("}"));
         } else {
-            lyric_string _t550 = lyric_sprintf("lyric_spawn(%.*s, NULL);", (int)func_name.len, (const char*)func_name.data);
-            CGen_line(self, _t550);
+            lyric_string _t557 = lyric_sprintf("lyric_spawn(%.*s, NULL);", (int)func_name.len, (const char*)func_name.data);
+            CGen_line(self, _t557);
         }
         break;
     }
     case 19: {
-        LStmt* _t552 = s;
-        LyricOpt_LSelectData _t553 = _t552->select_data;
-        LSelectData _t554 = lyric_unwrap(_t553);
-        LSelectData d = _t554;
-        int32_t _t555 = self->select_id;
-        int32_t sid = _t555;
-        int32_t _t556 = self->select_id;
-        int32_t _t557 = (_t556 + 1);
-        self->select_id = _t557;
-        lyric_string _t558 = lyric_sprintf("_sel_done_%d", sid);
-        lyric_string label = _t558;
+        LStmt* _t559 = s;
+        LyricOpt_LSelectData _t560 = _t559->select_data;
+        LSelectData _t561 = lyric_unwrap(_t560);
+        LSelectData d = _t561;
+        int32_t _t562 = self->select_id;
+        int32_t sid = _t562;
+        int32_t _t563 = self->select_id;
+        int32_t _t564 = (_t563 + 1);
+        self->select_id = _t564;
+        lyric_string _t565 = lyric_sprintf("_sel_done_%d", sid);
+        lyric_string label = _t565;
         CGen_line(self, LYRIC_STR("for (;;) {"));
-        int32_t _t560 = self->indent;
-        int32_t _t561 = (_t560 + 1);
-        self->indent = _t561;
+        int32_t _t567 = self->indent;
+        int32_t _t568 = (_t567 + 1);
+        self->indent = _t568;
         int32_t si = 0;
         while (1) {
-            LyricSlice_LSelectCase _t562 = d.cases;
-            int32_t _t563 = _t562.len;
-            bool _t564 = (si < _t563);
-            if (!(_t564)) break;
-            LyricSlice_LSelectCase _t565 = d.cases;
-            LSelectCase _t566 = _t565.data[si];
-            LSelectCase sc = _t566;
-            LSelectKind _t567 = sc.kind;
-            int32_t _t568 = _t567;
-            switch (_t568) {
+            LyricSlice_LSelectCase _t569 = d.cases;
+            int32_t _t570 = _t569.len;
+            bool _t571 = (si < _t570);
+            if (!(_t571)) break;
+            LyricSlice_LSelectCase _t572 = d.cases;
+            LSelectCase _t573 = _t572.data[si];
+            LSelectCase sc = _t573;
+            LSelectKind _t574 = sc.kind;
+            int32_t _t575 = _t574;
+            switch (_t575) {
             case 2: {
-                LyricSlice_LStmtptr _t569 = sc.body;
-                CGen_emit_stmts(self, _t569);
-                lyric_string _t571 = lyric_sprintf("goto %.*s;", (int)label.len, (const char*)label.data);
-                CGen_line(self, _t571);
+                LyricSlice_LStmtptr _t576 = sc.body;
+                CGen_emit_stmts(self, _t576);
+                lyric_string _t578 = lyric_sprintf("goto %.*s;", (int)label.len, (const char*)label.data);
+                CGen_line(self, _t578);
                 break;
             }
             case 0: {
-                LValue* _t573 = sc.channel;
-                LType* _t574 = CGen_resolve_value_type(self, _t573);
-                LType* chan_type = _t574;
+                LValue* _t580 = sc.channel;
+                LType* _t581 = CGen_resolve_value_type(self, _t580);
+                LType* chan_type = _t581;
                 lyric_string suffix = LYRIC_STR("void");
-                bool _t575 = (chan_type == NULL);
-                bool _t576 = (!_t575);
-                bool _sc577 = false;
-                _sc577 = _t576;
-                if (_sc577) {
-                    LType* _t578 = chan_type;
-                    LTypeKind _t579 = _t578->kind;
-                    int32_t _t580 = _t579;
-                    bool _t581 = (_t580 == 21);
-                    _sc577 = _t581;
+                bool _t582 = (chan_type == NULL);
+                bool _t583 = (!_t582);
+                bool _sc584 = false;
+                _sc584 = _t583;
+                if (_sc584) {
+                    LType* _t585 = chan_type;
+                    LTypeKind _t586 = _t585->kind;
+                    int32_t _t587 = _t586;
+                    bool _t588 = (_t587 == 21);
+                    _sc584 = _t588;
                 }
-                bool _sc582 = false;
-                _sc582 = _sc577;
-                if (_sc582) {
-                    LType* _t583 = chan_type;
-                    LType* _t584 = _t583->elem;
-                    bool _t585 = (_t584 == NULL);
-                    bool _t586 = (!_t585);
-                    _sc582 = _t586;
+                bool _sc589 = false;
+                _sc589 = _sc584;
+                if (_sc589) {
+                    LType* _t590 = chan_type;
+                    LType* _t591 = _t590->elem;
+                    bool _t592 = (_t591 == NULL);
+                    bool _t593 = (!_t592);
+                    _sc589 = _t593;
                 }
-                if (_sc582) {
-                    LType* _t587 = chan_type;
-                    LType* _t588 = _t587->elem;
-                    lyric_string _t589 = CGen_chan_suffix(self, _t588);
-                    suffix = _t589;
+                if (_sc589) {
+                    LType* _t594 = chan_type;
+                    LType* _t595 = _t594->elem;
+                    lyric_string _t596 = CGen_chan_suffix(self, _t595);
+                    suffix = _t596;
                 }
-                LValue* _t590 = sc.channel;
-                lyric_string _t591 = CGen_emit_value(self, _t590);
-                lyric_string ch_val = _t591;
-                lyric_string _t592 = sc.binding;
-                bool _t593 = (!lyric_str_eq(_t592, LYRIC_STR("")));
-                if (_t593) {
-                    lyric_string __ifexpr_594 = LYRIC_STR_EMPTY;
-                    bool _t595 = (chan_type == NULL);
-                    bool _t596 = (!_t595);
-                    bool _sc597 = false;
-                    _sc597 = _t596;
-                    if (_sc597) {
-                        LType* _t598 = chan_type;
-                        LTypeKind _t599 = _t598->kind;
-                        int32_t _t600 = _t599;
-                        bool _t601 = (_t600 == 21);
-                        _sc597 = _t601;
+                LValue* _t597 = sc.channel;
+                lyric_string _t598 = CGen_emit_value(self, _t597);
+                lyric_string ch_val = _t598;
+                lyric_string _t599 = sc.binding;
+                bool _t600 = (!lyric_str_eq(_t599, LYRIC_STR("")));
+                if (_t600) {
+                    lyric_string __ifexpr_601 = LYRIC_STR_EMPTY;
+                    bool _t602 = (chan_type == NULL);
+                    bool _t603 = (!_t602);
+                    bool _sc604 = false;
+                    _sc604 = _t603;
+                    if (_sc604) {
+                        LType* _t605 = chan_type;
+                        LTypeKind _t606 = _t605->kind;
+                        int32_t _t607 = _t606;
+                        bool _t608 = (_t607 == 21);
+                        _sc604 = _t608;
                     }
-                    bool _sc602 = false;
-                    _sc602 = _sc597;
-                    if (_sc602) {
-                        LType* _t603 = chan_type;
-                        LType* _t604 = _t603->elem;
-                        bool _t605 = (_t604 == NULL);
-                        bool _t606 = (!_t605);
-                        _sc602 = _t606;
+                    bool _sc609 = false;
+                    _sc609 = _sc604;
+                    if (_sc609) {
+                        LType* _t610 = chan_type;
+                        LType* _t611 = _t610->elem;
+                        bool _t612 = (_t611 == NULL);
+                        bool _t613 = (!_t612);
+                        _sc609 = _t613;
                     }
-                    if (_sc602) {
-                        LType* _t607 = chan_type;
-                        LType* _t608 = _t607->elem;
-                        lyric_string _t609 = CGen_c_type(self, _t608);
-                        __ifexpr_594 = _t609;
+                    if (_sc609) {
+                        LType* _t614 = chan_type;
+                        LType* _t615 = _t614->elem;
+                        lyric_string _t616 = CGen_c_type(self, _t615);
+                        __ifexpr_601 = _t616;
                     } else {
-                        __ifexpr_594 = LYRIC_STR("int32_t");
+                        __ifexpr_601 = LYRIC_STR("int32_t");
                     }
-                    lyric_string elem_ctype = __ifexpr_594;
-                    lyric_string _t610 = lyric_sprintf("{ %.*s _sel_val; if (lyric_chan_tryrecv_%.*s(%.*s, &_sel_val)) {", (int)elem_ctype.len, (const char*)elem_ctype.data, (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data);
-                    CGen_line(self, _t610);
-                    int32_t _t612 = self->indent;
-                    int32_t _t613 = (_t612 + 1);
-                    self->indent = _t613;
-                    lyric_string _t614 = sc.binding;
-                    lyric_string _t615 = c_safe_name(_t614);
-                    lyric_string _t616 = lyric_sprintf("%.*s %.*s = _sel_val;", (int)elem_ctype.len, (const char*)elem_ctype.data, (int)_t615.len, (const char*)_t615.data);
-                    CGen_line(self, _t616);
-                    LyricSlice_LStmtptr _t618 = sc.body;
-                    CGen_emit_stmts(self, _t618);
-                    int32_t _t620 = self->indent;
-                    int32_t _t621 = (_t620 - 1);
-                    self->indent = _t621;
-                    lyric_string _t622 = lyric_sprintf("goto %.*s; } }", (int)label.len, (const char*)label.data);
-                    CGen_line(self, _t622);
+                    lyric_string elem_ctype = __ifexpr_601;
+                    lyric_string _t617 = lyric_sprintf("{ %.*s _sel_val; if (lyric_chan_tryrecv_%.*s(%.*s, &_sel_val)) {", (int)elem_ctype.len, (const char*)elem_ctype.data, (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data);
+                    CGen_line(self, _t617);
+                    int32_t _t619 = self->indent;
+                    int32_t _t620 = (_t619 + 1);
+                    self->indent = _t620;
+                    lyric_string _t621 = sc.binding;
+                    lyric_string _t622 = c_safe_name(_t621);
+                    lyric_string _t623 = lyric_sprintf("%.*s %.*s = _sel_val;", (int)elem_ctype.len, (const char*)elem_ctype.data, (int)_t622.len, (const char*)_t622.data);
+                    CGen_line(self, _t623);
+                    LyricSlice_LStmtptr _t625 = sc.body;
+                    CGen_emit_stmts(self, _t625);
+                    int32_t _t627 = self->indent;
+                    int32_t _t628 = (_t627 - 1);
+                    self->indent = _t628;
+                    lyric_string _t629 = lyric_sprintf("goto %.*s; } }", (int)label.len, (const char*)label.data);
+                    CGen_line(self, _t629);
                 } else {
-                    lyric_string _t624 = lyric_sprintf("if (lyric_chan_tryrecv_%.*s(%.*s, NULL)) {", (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data);
-                    CGen_line(self, _t624);
-                    int32_t _t626 = self->indent;
-                    int32_t _t627 = (_t626 + 1);
-                    self->indent = _t627;
-                    LyricSlice_LStmtptr _t628 = sc.body;
-                    CGen_emit_stmts(self, _t628);
-                    int32_t _t630 = self->indent;
-                    int32_t _t631 = (_t630 - 1);
-                    self->indent = _t631;
-                    lyric_string _t632 = lyric_sprintf("goto %.*s; }", (int)label.len, (const char*)label.data);
-                    CGen_line(self, _t632);
+                    lyric_string _t631 = lyric_sprintf("if (lyric_chan_tryrecv_%.*s(%.*s, NULL)) {", (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data);
+                    CGen_line(self, _t631);
+                    int32_t _t633 = self->indent;
+                    int32_t _t634 = (_t633 + 1);
+                    self->indent = _t634;
+                    LyricSlice_LStmtptr _t635 = sc.body;
+                    CGen_emit_stmts(self, _t635);
+                    int32_t _t637 = self->indent;
+                    int32_t _t638 = (_t637 - 1);
+                    self->indent = _t638;
+                    lyric_string _t639 = lyric_sprintf("goto %.*s; }", (int)label.len, (const char*)label.data);
+                    CGen_line(self, _t639);
                 }
                 break;
             }
             case 1: {
-                LValue* _t634 = sc.channel;
-                LType* _t635 = CGen_resolve_value_type(self, _t634);
-                LType* chan_type = _t635;
+                LValue* _t641 = sc.channel;
+                LType* _t642 = CGen_resolve_value_type(self, _t641);
+                LType* chan_type = _t642;
                 lyric_string suffix = LYRIC_STR("void");
-                bool _t636 = (chan_type == NULL);
-                bool _t637 = (!_t636);
-                bool _sc638 = false;
-                _sc638 = _t637;
-                if (_sc638) {
-                    LType* _t639 = chan_type;
-                    LTypeKind _t640 = _t639->kind;
-                    int32_t _t641 = _t640;
-                    bool _t642 = (_t641 == 21);
-                    _sc638 = _t642;
+                bool _t643 = (chan_type == NULL);
+                bool _t644 = (!_t643);
+                bool _sc645 = false;
+                _sc645 = _t644;
+                if (_sc645) {
+                    LType* _t646 = chan_type;
+                    LTypeKind _t647 = _t646->kind;
+                    int32_t _t648 = _t647;
+                    bool _t649 = (_t648 == 21);
+                    _sc645 = _t649;
                 }
-                bool _sc643 = false;
-                _sc643 = _sc638;
-                if (_sc643) {
-                    LType* _t644 = chan_type;
-                    LType* _t645 = _t644->elem;
-                    bool _t646 = (_t645 == NULL);
-                    bool _t647 = (!_t646);
-                    _sc643 = _t647;
+                bool _sc650 = false;
+                _sc650 = _sc645;
+                if (_sc650) {
+                    LType* _t651 = chan_type;
+                    LType* _t652 = _t651->elem;
+                    bool _t653 = (_t652 == NULL);
+                    bool _t654 = (!_t653);
+                    _sc650 = _t654;
                 }
-                if (_sc643) {
-                    LType* _t648 = chan_type;
-                    LType* _t649 = _t648->elem;
-                    lyric_string _t650 = CGen_chan_suffix(self, _t649);
-                    suffix = _t650;
+                if (_sc650) {
+                    LType* _t655 = chan_type;
+                    LType* _t656 = _t655->elem;
+                    lyric_string _t657 = CGen_chan_suffix(self, _t656);
+                    suffix = _t657;
                 }
-                LValue* _t651 = sc.channel;
-                lyric_string _t652 = CGen_emit_value(self, _t651);
-                lyric_string ch_val = _t652;
-                LValue* _t653 = sc.value;
-                lyric_string _t654 = CGen_emit_value(self, _t653);
-                lyric_string send_val = _t654;
-                lyric_string _t655 = lyric_sprintf("if (lyric_chan_trysend_%.*s(%.*s, %.*s)) {", (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data, (int)send_val.len, (const char*)send_val.data);
-                CGen_line(self, _t655);
-                int32_t _t657 = self->indent;
-                int32_t _t658 = (_t657 + 1);
-                self->indent = _t658;
-                LyricSlice_LStmtptr _t659 = sc.body;
-                CGen_emit_stmts(self, _t659);
-                int32_t _t661 = self->indent;
-                int32_t _t662 = (_t661 - 1);
-                self->indent = _t662;
-                lyric_string _t663 = lyric_sprintf("goto %.*s; }", (int)label.len, (const char*)label.data);
-                CGen_line(self, _t663);
+                LValue* _t658 = sc.channel;
+                lyric_string _t659 = CGen_emit_value(self, _t658);
+                lyric_string ch_val = _t659;
+                LValue* _t660 = sc.value;
+                lyric_string _t661 = CGen_emit_value(self, _t660);
+                lyric_string send_val = _t661;
+                lyric_string _t662 = lyric_sprintf("if (lyric_chan_trysend_%.*s(%.*s, %.*s)) {", (int)suffix.len, (const char*)suffix.data, (int)ch_val.len, (const char*)ch_val.data, (int)send_val.len, (const char*)send_val.data);
+                CGen_line(self, _t662);
+                int32_t _t664 = self->indent;
+                int32_t _t665 = (_t664 + 1);
+                self->indent = _t665;
+                LyricSlice_LStmtptr _t666 = sc.body;
+                CGen_emit_stmts(self, _t666);
+                int32_t _t668 = self->indent;
+                int32_t _t669 = (_t668 - 1);
+                self->indent = _t669;
+                lyric_string _t670 = lyric_sprintf("goto %.*s; }", (int)label.len, (const char*)label.data);
+                CGen_line(self, _t670);
                 break;
             }
             default: __builtin_unreachable();
             }
-            int32_t _t665 = (si + 1);
-            si = _t665;
+            int32_t _t672 = (si + 1);
+            si = _t672;
         }
         CGen_line(self, LYRIC_STR("usleep(100);"));
-        int32_t _t667 = self->indent;
-        int32_t _t668 = (_t667 - 1);
-        self->indent = _t668;
+        int32_t _t674 = self->indent;
+        int32_t _t675 = (_t674 - 1);
+        self->indent = _t675;
         CGen_line(self, LYRIC_STR("}"));
-        lyric_string _t670 = lyric_sprintf("%.*s:;", (int)label.len, (const char*)label.data);
-        CGen_line(self, _t670);
+        lyric_string _t677 = lyric_sprintf("%.*s:;", (int)label.len, (const char*)label.data);
+        CGen_line(self, _t677);
         break;
     }
     case 15: {
-        LStmt* _t672 = s;
-        LyricOpt_LDeferData _t673 = _t672->defer_data;
-        LDeferData _t674 = lyric_unwrap(_t673);
-        LDeferData d = _t674;
+        LStmt* _t679 = s;
+        LyricOpt_LDeferData _t680 = _t679->defer_data;
+        LDeferData _t681 = lyric_unwrap(_t680);
+        LDeferData d = _t681;
         CGen_line(self, LYRIC_STR("/* defer (executed inline): */"));
-        LyricSlice_LStmtptr _t676 = d.body;
-        CGen_emit_stmts(self, _t676);
+        LyricSlice_LStmtptr _t683 = d.body;
+        CGen_emit_stmts(self, _t683);
         break;
     }
     case 17: {
-        LStmt* _t678 = s;
-        LyricOpt_LLockData _t679 = _t678->lock_data;
-        LLockData _t680 = lyric_unwrap(_t679);
-        LLockData d = _t680;
-        LValue* _t681 = d.mutex;
-        lyric_string _t682 = CGen_emit_value(self, _t681);
-        lyric_string mutex_val = _t682;
-        lyric_string _t683 = lyric_sprintf("pthread_mutex_lock(&%.*s);", (int)mutex_val.len, (const char*)mutex_val.data);
-        CGen_line(self, _t683);
-        LyricSlice_LStmtptr _t685 = d.body;
-        CGen_emit_stmts(self, _t685);
-        lyric_string _t687 = lyric_sprintf("pthread_mutex_unlock(&%.*s);", (int)mutex_val.len, (const char*)mutex_val.data);
-        CGen_line(self, _t687);
+        LStmt* _t685 = s;
+        LyricOpt_LLockData _t686 = _t685->lock_data;
+        LLockData _t687 = lyric_unwrap(_t686);
+        LLockData d = _t687;
+        LValue* _t688 = d.mutex;
+        lyric_string _t689 = CGen_emit_value(self, _t688);
+        lyric_string mutex_val = _t689;
+        lyric_string _t690 = lyric_sprintf("pthread_mutex_lock(&%.*s);", (int)mutex_val.len, (const char*)mutex_val.data);
+        CGen_line(self, _t690);
+        LyricSlice_LStmtptr _t692 = d.body;
+        CGen_emit_stmts(self, _t692);
+        lyric_string _t694 = lyric_sprintf("pthread_mutex_unlock(&%.*s);", (int)mutex_val.len, (const char*)mutex_val.data);
+        CGen_line(self, _t694);
         break;
     }
     case 14: {
-        LStmt* _t689 = s;
-        LyricOpt_LExprStmtData _t690 = _t689->expr_stmt;
-        LExprStmtData _t691 = lyric_unwrap(_t690);
-        LExprStmtData d = _t691;
-        Dict_CSym_opt_CLType* _t692 = self->temp_types;
-        Dict_CSym_opt_CLType* _t693 = _t692;
-        int32_t _t694 = d.temp_id;
-        lyric_string _t695 = lyric_sprintf("%d", _t694);
-        Sym* _t696 = sym(_t695);
-        DictEntry_CSym_opt_CLType* _t697 = Dict_CSym_opt_CLType_get(_t693, _t696);
-        DictEntry_CSym_opt_CLType* ty_entry = _t697;
-        bool _t698 = (ty_entry == NULL);
-        bool _t699 = (!_t698);
-        bool _sc700 = false;
-        _sc700 = _t699;
-        if (_sc700) {
-            DictEntry_CSym_opt_CLType* _t701 = ty_entry;
-            LType* _t702 = _t701->value;
-            bool _t703 = (_t702 == NULL);
-            bool _t704 = (!_t703);
-            _sc700 = _t704;
+        LStmt* _t696 = s;
+        LyricOpt_LExprStmtData _t697 = _t696->expr_stmt;
+        LExprStmtData _t698 = lyric_unwrap(_t697);
+        LExprStmtData d = _t698;
+        Dict_CSym_opt_CLType* _t699 = self->temp_types;
+        Dict_CSym_opt_CLType* _t700 = _t699;
+        int32_t _t701 = d.temp_id;
+        lyric_string _t702 = lyric_sprintf("%d", _t701);
+        Sym* _t703 = sym(_t702);
+        DictEntry_CSym_opt_CLType* _t704 = Dict_CSym_opt_CLType_get(_t700, _t703);
+        DictEntry_CSym_opt_CLType* ty_entry = _t704;
+        bool _t705 = (ty_entry == NULL);
+        bool _t706 = (!_t705);
+        bool _sc707 = false;
+        _sc707 = _t706;
+        if (_sc707) {
+            DictEntry_CSym_opt_CLType* _t708 = ty_entry;
+            LType* _t709 = _t708->value;
+            bool _t710 = (_t709 == NULL);
+            bool _t711 = (!_t710);
+            _sc707 = _t711;
         }
-        bool _sc705 = false;
-        _sc705 = _sc700;
-        if (_sc705) {
-            DictEntry_CSym_opt_CLType* _t706 = ty_entry;
-            LType* _t707 = _t706->value;
-            LType* _t708 = _t707;
-            LTypeKind _t709 = _t708->kind;
-            int32_t _t710 = _t709;
-            bool _t711 = (_t710 == 12);
-            _sc705 = _t711;
+        bool _sc712 = false;
+        _sc712 = _sc707;
+        if (_sc712) {
+            DictEntry_CSym_opt_CLType* _t713 = ty_entry;
+            LType* _t714 = _t713->value;
+            LType* _t715 = _t714;
+            LTypeKind _t716 = _t715->kind;
+            int32_t _t717 = _t716;
+            bool _t718 = (_t717 == 12);
+            _sc712 = _t718;
         }
-        if (_sc705) {
+        if (_sc712) {
             return;
         }
-        int32_t _t712 = d.temp_id;
-        lyric_string _t713 = lyric_sprintf("_t%d;", _t712);
-        CGen_line(self, _t713);
+        int32_t _t719 = d.temp_id;
+        lyric_string _t720 = lyric_sprintf("_t%d;", _t719);
+        CGen_line(self, _t720);
         break;
     }
     case 12: {
@@ -77480,24 +79227,24 @@ void CGen_emit_stmt(CGen* self, LStmt* s) {
         break;
     }
     case 20: {
-        LStmt* _t717 = s;
-        LyricOpt_LYieldData _t718 = _t717->yield_data;
-        LYieldData _t719 = lyric_unwrap(_t718);
-        LYieldData d = _t719;
-        int32_t _t720 = self->gen_yield_count;
-        int32_t _t721 = (_t720 + 1);
-        self->gen_yield_count = _t721;
-        int32_t _t722 = self->gen_yield_count;
-        int32_t state_num = _t722;
-        LValue* _t723 = d.value;
-        lyric_string _t724 = CGen_emit_value(self, _t723);
-        lyric_string _t725 = lyric_sprintf("_gen->_value = %.*s;", (int)_t724.len, (const char*)_t724.data);
-        CGen_line(self, _t725);
-        lyric_string _t727 = lyric_sprintf("_gen->_state = %d;", state_num);
-        CGen_line(self, _t727);
+        LStmt* _t724 = s;
+        LyricOpt_LYieldData _t725 = _t724->yield_data;
+        LYieldData _t726 = lyric_unwrap(_t725);
+        LYieldData d = _t726;
+        int32_t _t727 = self->gen_yield_count;
+        int32_t _t728 = (_t727 + 1);
+        self->gen_yield_count = _t728;
+        int32_t _t729 = self->gen_yield_count;
+        int32_t state_num = _t729;
+        LValue* _t730 = d.value;
+        lyric_string _t731 = CGen_emit_value(self, _t730);
+        lyric_string _t732 = lyric_sprintf("_gen->_value = %.*s;", (int)_t731.len, (const char*)_t731.data);
+        CGen_line(self, _t732);
+        lyric_string _t734 = lyric_sprintf("_gen->_state = %d;", state_num);
+        CGen_line(self, _t734);
         CGen_line(self, LYRIC_STR("return true;"));
-        lyric_string _t730 = lyric_sprintf("_gen_s%d:;", state_num);
-        CGen_line(self, _t730);
+        lyric_string _t737 = lyric_sprintf("_gen_s%d:;", state_num);
+        CGen_line(self, _t737);
         break;
     }
     default: {
@@ -78621,6 +80368,7 @@ LyricSlice_LVarDeclData CGen_collect_gen_vars(CGen* self, LyricSlice_LStmtptr st
         i = _t69;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 int32_t CGen_count_yields(CGen* self, LyricSlice_LStmtptr stmts) {
@@ -79981,6 +81729,7 @@ LyricSlice_LStructDecl dedup_structs(LyricSlice_LStructDecl items) {
         i = _t15;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 LyricSlice_LClassDecl dedup_classes(LyricSlice_LClassDecl items) {
@@ -80012,6 +81761,7 @@ LyricSlice_LClassDecl dedup_classes(LyricSlice_LClassDecl items) {
         i = _t15;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 LyricSlice_LEnumDecl dedup_enums(LyricSlice_LEnumDecl items) {
@@ -80043,6 +81793,7 @@ LyricSlice_LEnumDecl dedup_enums(LyricSlice_LEnumDecl items) {
         i = _t15;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 LyricSlice_LFuncDecl dedup_funcs(LyricSlice_LFuncDecl items) {
@@ -80084,6 +81835,7 @@ LyricSlice_LFuncDecl dedup_funcs(LyricSlice_LFuncDecl items) {
         i = _t21;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 lyric_string struct_type_name(LType* t) {
@@ -80285,7 +82037,16 @@ LyricSlice_LStructDecl topo_sort_structs(LyricSlice_LStructDecl structs) {
             i = _t94;
         }
     }
+    if (in_deg.data) free(in_deg.data);
+    if (rev_deps_flat.data) free(rev_deps_flat.data);
+    if (rev_deps_offsets.data) free(rev_deps_offsets.data);
+    if (queue.data) free(queue.data);
     return result;
+    if (in_deg.data) free(in_deg.data);
+    if (rev_deps_flat.data) free(rev_deps_flat.data);
+    if (rev_deps_offsets.data) free(rev_deps_offsets.data);
+    if (queue.data) free(queue.data);
+    if (result.data) free(result.data);
 }
 
 lyric_string str_to_lower(lyric_string s) {
@@ -82474,25 +84235,34 @@ void collect_used_vars_stmts(LyricSlice_LStmtptr stmts, Dict_CSym_bool* used) {
             collect_val_vars(_t106, used);
             break;
         }
-        case 5: {
+        case 26: {
             LStmt* _t108 = s;
-            LyricOpt_LIndexSetData _t109 = _t108->index_set;
-            LIndexSetData _t110 = lyric_unwrap(_t109);
-            LIndexSetData d = _t110;
-            LValue* _t111 = d.collection;
-            collect_val_vars(_t111, used);
-            LValue* _t113 = d.index;
-            collect_val_vars(_t113, used);
-            LValue* _t115 = d.value;
-            collect_val_vars(_t115, used);
+            LyricOpt_LSliceFreeData _t109 = _t108->slice_free;
+            LSliceFreeData _t110 = lyric_unwrap(_t109);
+            LSliceFreeData d = _t110;
+            Sym* _t111 = sym(LYRIC_STR("d.name"));
+            Dict_CSym_bool_set(used, _t111, true);
+            break;
+        }
+        case 5: {
+            LStmt* _t113 = s;
+            LyricOpt_LIndexSetData _t114 = _t113->index_set;
+            LIndexSetData _t115 = lyric_unwrap(_t114);
+            LIndexSetData d = _t115;
+            LValue* _t116 = d.collection;
+            collect_val_vars(_t116, used);
+            LValue* _t118 = d.index;
+            collect_val_vars(_t118, used);
+            LValue* _t120 = d.value;
+            collect_val_vars(_t120, used);
             break;
         }
         default: {
             break;
         }
         }
-        int32_t _t117 = (i + 1);
-        i = _t117;
+        int32_t _t122 = (i + 1);
+        i = _t122;
     }
 }
 
@@ -83724,7 +85494,11 @@ lyric_str_bool_t resolve_command(lyric_string prefix) {
         lyric_string _t33 = lyric_sprintf("unknown command: %.*s", (int)prefix.len, (const char*)prefix.data);
         fprintf(stderr, "%.*s\n", (int)_t33.len, (const char*)_t33.data);
     }
+    if (commands.data) free(commands.data);
+    if (matches.data) free(matches.data);
     return (lyric_str_bool_t){ ._0 = LYRIC_STR(""), ._1 = false };
+    if (commands.data) free(commands.data);
+    if (matches.data) free(matches.data);
 }
 
 lyric_string str_join(LyricSlice_lyric_string parts, lyric_string sep) {
@@ -85423,8 +87197,23 @@ void dump_stmts(StringBuilder* sb, LyricSlice_LStmtptr stmts, lyric_string inden
                                                                                                                     StringBuilder_write(sb, _t361);
                                                                                                                 }
                                                                                                             } else {
-                                                                                                                lyric_string _t363 = lyric_sprintf("%.*sLStmt(?)\n", (int)indent.len, (const char*)indent.data);
-                                                                                                                StringBuilder_write(sb, _t363);
+                                                                                                                int32_t _t363 = k;
+                                                                                                                bool _t364 = (_t363 == 26);
+                                                                                                                if (_t364) {
+                                                                                                                    LyricOpt_LSliceFreeData _t365 = s->slice_free;
+                                                                                                                    bool _t366 = lyric_isnull(_t365);
+                                                                                                                    bool _t367 = (!_t366);
+                                                                                                                    if (_t367) {
+                                                                                                                        LyricOpt_LSliceFreeData _t368 = s->slice_free;
+                                                                                                                        LSliceFreeData _t369 = lyric_unwrap(_t368);
+                                                                                                                        lyric_string _t370 = _t369.name;
+                                                                                                                        lyric_string _t371 = lyric_sprintf("%.*sSliceFree %.*s\n", (int)indent.len, (const char*)indent.data, (int)_t370.len, (const char*)_t370.data);
+                                                                                                                        StringBuilder_write(sb, _t371);
+                                                                                                                    }
+                                                                                                                } else {
+                                                                                                                    lyric_string _t373 = lyric_sprintf("%.*sLStmt(?)\n", (int)indent.len, (const char*)indent.data);
+                                                                                                                    StringBuilder_write(sb, _t373);
+                                                                                                                }
                                                                                                             }
                                                                                                         }
                                                                                                     }
@@ -85451,8 +87240,8 @@ void dump_stmts(StringBuilder* sb, LyricSlice_LStmtptr stmts, lyric_string inden
                 }
             }
         }
-        int32_t _t365 = (i + 1);
-        i = _t365;
+        int32_t _t375 = (i + 1);
+        i = _t375;
     }
 }
 
@@ -85826,7 +87615,9 @@ bool compile_pipeline(LyricSlice_lyric_string inputs, lyric_string output, lyric
     }
     lyric_string _t80 = lyric_sprintf("wrote %.*s", (int)output.len, (const char*)output.data);
     fprintf(stdout, "%.*s\n", (int)_t80.len, (const char*)_t80.data);
+    if (all_files.data) free(all_files.data);
     return true;
+    if (all_files.data) free(all_files.data);
 }
 
 bool cmd_compile(LyricSlice_lyric_string args) {
@@ -85981,7 +87772,9 @@ bool cmd_compile(LyricSlice_lyric_string args) {
         }
     }
     bool _t72 = compile_pipeline(inputs, output, module_root, lir_dump, soa);
+    if (inputs.data) free(inputs.data);
     return _t72;
+    if (inputs.data) free(inputs.data);
 }
 
 bool cmd_test(LyricSlice_lyric_string args) {
@@ -86249,7 +88042,15 @@ bool cmd_test(LyricSlice_lyric_string args) {
     lyric_string _t143 = test_result._0;
     fprintf(stdout, "%.*s", (int)_t143.len, (const char*)_t143.data);
     bool _t145 = test_result._1;
+    if (inputs.data) free(inputs.data);
+    if (all_files.data) free(all_files.data);
+    if (test_funcs.data) free(test_funcs.data);
+    if (empty_args.data) free(empty_args.data);
     return _t145;
+    if (inputs.data) free(inputs.data);
+    if (all_files.data) free(all_files.data);
+    if (test_funcs.data) free(test_funcs.data);
+    if (empty_args.data) free(empty_args.data);
 }
 
 lyric_string find_runtime_dir(void) {
@@ -86271,7 +88072,9 @@ lyric_string find_runtime_dir(void) {
         int32_t _t8 = (i + 1);
         i = _t8;
     }
+    if (candidates.data) free(candidates.data);
     return LYRIC_STR("");
+    if (candidates.data) free(candidates.data);
 }
 
 bool cmd_fmt(LyricSlice_lyric_string args) {
@@ -86733,6 +88536,7 @@ void fmt_block(StringBuilder* sb, LyricBlock* block, LyricSlice_Commentptr comme
     int32_t _t180 = emit_comments_before(sb, comments, ci, _t179, LYRIC_STR("  "));
     ci = _t180;
     StringBuilder_write(sb, LYRIC_STR("}\n"));
+    if (items.data) free(items.data);
 }
 
 void sort_decl_items(LyricSlice_DeclItem items) {
@@ -87819,6 +89623,7 @@ int main(int _argc, char** _argv) {
     if (_t27) {
         exit(1);
     }
+    if (sub_args.data) free(sub_args.data);
     return 0;
 }
 
@@ -89503,6 +91308,7 @@ LyricSlice_Symptr Dict_CSym_ETokenKind_keys(Dict_CSym_ETokenKind* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_ETokenKind_destroy(Dict_CSym_ETokenKind* self) {
@@ -89602,6 +91408,7 @@ LyricSlice_Symptr Dict_CSym_CType_keys(Dict_CSym_CType* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CType_destroy(Dict_CSym_CType* self) {
@@ -89701,6 +91508,7 @@ LyricSlice_Symptr Dict_CSym_CVariantInfo_keys(Dict_CSym_CVariantInfo* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CVariantInfo_destroy(Dict_CSym_CVariantInfo* self) {
@@ -89800,6 +91608,7 @@ LyricSlice_Symptr Dict_CSym_CTypeInfo_keys(Dict_CSym_CTypeInfo* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CTypeInfo_destroy(Dict_CSym_CTypeInfo* self) {
@@ -89899,6 +91708,7 @@ LyricSlice_Symptr Dict_CSym_CInterfaceDecl_keys(Dict_CSym_CInterfaceDecl* self) 
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CInterfaceDecl_destroy(Dict_CSym_CInterfaceDecl* self) {
@@ -89998,6 +91808,7 @@ LyricSlice_Symptr Dict_CSym_CDict_CSym_CType_keys(Dict_CSym_CDict_CSym_CType* se
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CDict_CSym_CType_destroy(Dict_CSym_CDict_CSym_CType* self) {
@@ -90097,6 +91908,7 @@ LyricSlice_Symptr Dict_CSym_string_keys(Dict_CSym_string* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_string_destroy(Dict_CSym_string* self) {
@@ -90196,6 +92008,7 @@ LyricSlice_Symptr Dict_CSym_CStructDecl_keys(Dict_CSym_CStructDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CStructDecl_destroy(Dict_CSym_CStructDecl* self) {
@@ -90295,6 +92108,7 @@ LyricSlice_Symptr Dict_CSym_CClassDecl_keys(Dict_CSym_CClassDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CClassDecl_destroy(Dict_CSym_CClassDecl* self) {
@@ -90394,6 +92208,7 @@ LyricSlice_Symptr Dict_CSym_CEnumDecl_keys(Dict_CSym_CEnumDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CEnumDecl_destroy(Dict_CSym_CEnumDecl* self) {
@@ -90493,6 +92308,7 @@ LyricSlice_Symptr Dict_CSym_CTypeExpr_keys(Dict_CSym_CTypeExpr* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CTypeExpr_destroy(Dict_CSym_CTypeExpr* self) {
@@ -90592,6 +92408,7 @@ LyricSlice_Symptr Dict_CSym_CFuncDecl_keys(Dict_CSym_CFuncDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CFuncDecl_destroy(Dict_CSym_CFuncDecl* self) {
@@ -90691,6 +92508,7 @@ LyricSlice_Symptr Dict_CSym_CLType_keys(Dict_CSym_CLType* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CLType_destroy(Dict_CSym_CLType* self) {
@@ -90790,6 +92608,7 @@ LyricSlice_Symptr Dict_CSym_CDict_CSym_CLType_keys(Dict_CSym_CDict_CSym_CLType* 
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CDict_CSym_CLType_destroy(Dict_CSym_CDict_CSym_CLType* self) {
@@ -90889,6 +92708,7 @@ LyricSlice_Symptr Dict_CSym_CExpr_keys(Dict_CSym_CExpr* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CExpr_destroy(Dict_CSym_CExpr* self) {
@@ -90988,6 +92808,7 @@ LyricSlice_Symptr Dict_CSym_bool_keys(Dict_CSym_bool* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_bool_destroy(Dict_CSym_bool* self) {
@@ -91087,6 +92908,7 @@ LyricSlice_Symptr Dict_CSym_i32_keys(Dict_CSym_i32* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_i32_destroy(Dict_CSym_i32* self) {
@@ -91186,6 +93008,7 @@ LyricSlice_Symptr Dict_CSym_slice_CTupleField_keys(Dict_CSym_slice_CTupleField* 
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_slice_CTupleField_destroy(Dict_CSym_slice_CTupleField* self) {
@@ -91285,6 +93108,7 @@ LyricSlice_Symptr Dict_CSym_SLInterfaceDecl_keys(Dict_CSym_SLInterfaceDecl* self
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_SLInterfaceDecl_destroy(Dict_CSym_SLInterfaceDecl* self) {
@@ -91384,6 +93208,7 @@ LyricSlice_Symptr Dict_CSym_opt_CLType_keys(Dict_CSym_opt_CLType* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_opt_CLType_destroy(Dict_CSym_opt_CLType* self) {
@@ -91483,6 +93308,7 @@ LyricSlice_Symptr Dict_CSym_SLFuncDecl_keys(Dict_CSym_SLFuncDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_SLFuncDecl_destroy(Dict_CSym_SLFuncDecl* self) {
@@ -91582,6 +93408,7 @@ LyricSlice_Symptr Dict_CSym_SLClassDecl_keys(Dict_CSym_SLClassDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_SLClassDecl_destroy(Dict_CSym_SLClassDecl* self) {
@@ -91681,6 +93508,7 @@ LyricSlice_Symptr Dict_CSym_SLStructDecl_keys(Dict_CSym_SLStructDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_SLStructDecl_destroy(Dict_CSym_SLStructDecl* self) {
@@ -91780,6 +93608,7 @@ LyricSlice_Symptr Dict_CSym_slice_SLFuncDecl_keys(Dict_CSym_slice_SLFuncDecl* se
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_slice_SLFuncDecl_destroy(Dict_CSym_slice_SLFuncDecl* self) {
@@ -91879,6 +93708,7 @@ LyricSlice_Symptr Dict_CSym_slice_string_keys(Dict_CSym_slice_string* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_slice_string_destroy(Dict_CSym_slice_string* self) {
@@ -91978,6 +93808,7 @@ LyricSlice_Symptr Dict_CSym_CConstDecl_keys(Dict_CSym_CConstDecl* self) {
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_CConstDecl_destroy(Dict_CSym_CConstDecl* self) {
@@ -92077,6 +93908,7 @@ LyricSlice_Symptr Dict_CSym_slice_CMatchArm_keys(Dict_CSym_slice_CMatchArm* self
         _t3;
     }
     return result;
+    if (result.data) free(result.data);
 }
 
 void Dict_CSym_slice_CMatchArm_destroy(Dict_CSym_slice_CMatchArm* self) {

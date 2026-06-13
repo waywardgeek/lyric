@@ -475,6 +475,10 @@ func dump_stmts(sb: StringBuilder, stmts: [LStmt?], indent: string) {
       if !isnull(s.slab_free) {
         sb.write(f"{indent}SlabFree {dump_value_str(s.slab_free!.handle)} ({s.slab_free!.class_name})\n")
       }
+    } else if k is StSliceFree {
+      if !isnull(s.slice_free) {
+        sb.write(f"{indent}SliceFree {s.slice_free!.name}\n")
+      }
     } else {
       sb.write(f"{indent}LStmt(?)\n")
     }
