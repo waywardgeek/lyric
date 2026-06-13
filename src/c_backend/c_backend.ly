@@ -4157,34 +4157,20 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     let name = classes[i].name
     self.line(f"static {name} _lyric_slab_alloc_{name}(void) {{")
     self.indent = self.indent + 1
+    self.line("uint32_t h;")
     // Check free list first
     self.line(f"if (_lyric_slab_{name}.free_head) {{")
     self.indent = self.indent + 1
-    self.line(f"uint32_t h = _lyric_slab_{name}.free_head;")
+    self.line(f"h = _lyric_slab_{name}.free_head;")
     self.line(f"_lyric_slab_{name}.free_head = _lyric_slab_{name}.lyric_next[h];")
-    // Zero all field arrays at index h-1
-    let mut j = 0
-    while j < len(classes[i].fields) {
-      let f = classes[i].fields[j]
-      let ct = self.c_type(f.typ)
-      let zv = self.zero_value(f.typ)
-      if zv == "{0}" {
-        // Struct/tuple types can't use {0} in assignment — use memset
-        self.line(f"memset(&_lyric_slab_{name}.{lc_first(f.name)}[h], 0, sizeof({ct}));")
-      } else {
-        self.line(f"_lyric_slab_{name}.{lc_first(f.name)}[h] = {zv};")
-      }
-      j = j + 1
-    }
-    self.line("return h;")
     self.indent = self.indent - 1
-    self.line("}")
+    self.line("} else {")
+    self.indent = self.indent + 1
     // Grow if needed
     self.line(f"if (_lyric_slab_{name}.used >= _lyric_slab_{name}.cap) {{")
     self.indent = self.indent + 1
     self.line(f"uint32_t new_cap = _lyric_slab_{name}.cap ? _lyric_slab_{name}.cap * 2 : 64;")
-    // Realloc each field array
-    j = 0
+    let mut j = 0
     while j < len(classes[i].fields) {
       let f = classes[i].fields[j]
       let ct = self.c_type(f.typ)
@@ -4192,14 +4178,13 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       j = j + 1
     }
     self.line(f"_lyric_slab_{name}.lyric_next = (uint32_t*)realloc(_lyric_slab_{name}.lyric_next, new_cap * sizeof(uint32_t));")
-
     self.line(f"_lyric_slab_{name}.cap = new_cap;")
     self.indent = self.indent - 1
     self.line("}")
-    // Allocate from used — zero all fields at the new slot
-    self.line("{")
-    self.indent = self.indent + 1
-    self.line(f"uint32_t h = _lyric_slab_{name}.used++;")
+    self.line(f"h = _lyric_slab_{name}.used++;")
+    self.indent = self.indent - 1
+    self.line("}")
+    // Zero all fields at the allocated slot
     j = 0
     while j < len(classes[i].fields) {
       let f = classes[i].fields[j]
@@ -4215,8 +4200,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.line("return h;")
     self.indent = self.indent - 1
     self.line("}")
-    self.indent = self.indent - 1
-    self.line("}")
+    self.line("")
     self.line("")
     i = i + 1
   }
