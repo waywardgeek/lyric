@@ -136,11 +136,12 @@ typedef LyricSlice_uint8_t lyric_string;
 LYRIC_SLICE_DEF(lyric_string, LyricSlice_lyric_string)
 #endif
 
-/* Create a string from a C string literal (compile-time length via sizeof) */
+/* Create a string from a C string literal (compile-time length via sizeof).
+ * cap=0 marks this as static/non-owned data — free() must not be called. */
 #define LYRIC_STR(lit) ((lyric_string){ \
     .data = (uint8_t*)(lit), \
     .len = (int32_t)(sizeof(lit) - 1), \
-    .cap = (int32_t)(sizeof(lit) - 1) \
+    .cap = 0 \
 })
 
 #define LYRIC_STR_EMPTY ((lyric_string){.data = NULL, .len = 0, .cap = 0})

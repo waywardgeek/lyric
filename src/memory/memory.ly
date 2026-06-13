@@ -1227,8 +1227,9 @@ func slab_rewrite_value(v: LValue) {
 // ==========================================================================
 
 // Check if an expression produces a freshly-allocated string.
-// Only expressions that ALWAYS allocate are considered fresh.
-// ExCall/ExMethodCall are NOT included because they might return string literals.
+// Only expressions that ALWAYS allocate new backing are considered fresh.
+// Function/method calls are excluded because they may return borrowed references
+// to existing strings (e.g., c_safe_name returns its input unchanged sometimes).
 func is_fresh_string_expr(e: LExpr) -> bool {
   // f-strings produce freshly allocated strings via sprintf
   if e.kind is ExFormat {

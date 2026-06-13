@@ -2669,7 +2669,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StSliceFree => {
       let d = s!.slice_free!
-      self.line(f"if ({d.name}.data) free({d.name}.data);")
+      self.line(f"if ({d.name}.cap > 0 && {d.name}.data) free({d.name}.data);")
     }
     StIndexSet => {
       let d = s!.index_set!
