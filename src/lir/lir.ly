@@ -604,14 +604,14 @@ lyric lir {
     path: string
   }
 
-  struct LStructDecl {
+  class LStructDecl {
     name: string
     fields: [LField]
     type_params: [LTypeParam]
     is_exported: bool
   }
 
-  struct LClassDecl {
+  class LClassDecl {
     name: string
     fields: [LField]
     type_params: [LTypeParam]
@@ -619,7 +619,7 @@ lyric lir {
     implements: [string]
   }
 
-  struct LEnumDecl {
+  class LEnumDecl {
     name: string
     variants: [LVariant]
     is_exported: bool
@@ -632,7 +632,7 @@ lyric lir {
     return_type: LType?
   }
 
-  struct LInterfaceDecl {
+  class LInterfaceDecl {
     name: string
     type_params: [LTypeParam]
     methods: [LInterfaceMethod]
@@ -645,7 +645,7 @@ lyric lir {
     type_args: [string]
   }
 
-  struct LFuncDecl {
+  class LFuncDecl {
     name: string
     type_params: [LTypeParam]
     params: [LParam]
@@ -658,7 +658,7 @@ lyric lir {
     class_rename_map: Dict<Sym, string>?
   }
 
-  struct LTypeDef {
+  class LTypeDef {
     name: string
     typ: LType?
     is_exported: bool
