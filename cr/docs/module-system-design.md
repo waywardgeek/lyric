@@ -1,20 +1,20 @@
-# Forge Module System — Design
+# Lyric Module System — Design
 
 *Updated 2026-06-12 (originally 2026-06-04)*
 
 ## Model
 
-- **Package** = directory of `.fg` files. Package name = directory name. `pub` controls exports.
-- **Module** = project root with `forge.mod`. Defines module path. Unit of compilation = one program or one `.so`.
+- **Package** = directory of `.ly` files. Package name = directory name. `pub` controls exports.
+- **Module** = project root with `lyric.mod`. Defines module path. Unit of compilation = one program or one `.so`.
 - **Compilation** = whole-program. All packages resolved at compile time, merged into one C output, compiled to one binary.
 
 ## Syntax
 
-```forge
+```lyric
 import ast
 import parser
 
-let file = parser.parse("hello.fg")
+let file = parser.parse("hello.ly")
 let node = ast.Node { name: "root" }
 ```
 
@@ -23,22 +23,22 @@ let node = ast.Node { name: "root" }
 ## Entry Point
 
 ```bash
-forge compile .                    # directory → find forge.mod, find main(), compile
-forge compile myproject/           # same, explicit path
-forge compile main.fg -o program   # single-file, no module needed
-forge compile main.fg ast.fg       # multi-file, no module needed
+lyric compile .                    # directory → find lyric.mod, find main(), compile
+lyric compile myproject/           # same, explicit path
+lyric compile main.ly -o program   # single-file, no module needed
+lyric compile main.ly ast.ly       # multi-file, no module needed
 ```
 
-When given a directory, the compiler looks for `forge.mod` and finds `main()` in the root package. When given a `.fg` file, it checks parent directories for `forge.mod` — if found, module mode; otherwise, single-file mode.
+When given a directory, the compiler looks for `lyric.mod` and finds `main()` in the root package. When given a `.ly` file, it checks parent directories for `lyric.mod` — if found, module mode; otherwise, single-file mode.
 
 ## Compilation Pipeline
 
 ```
-1. Find forge.mod, determine module root
-2. Parse root package (all .fg files in module root dir)
+1. Find lyric.mod, determine module root
+2. Parse root package (all .ly files in module root dir)
 3. Scan for import statements, resolve to directories
 4. Recursively parse all imported packages (cycle detection)
-5. For each package: merge all .fg files in directory → one AST
+5. For each package: merge all .ly files in directory → one AST
 6. Merge stdlib into each package
 7. Desugar all packages
 8. Merge all packages into one AST with namespace prefixing
@@ -51,8 +51,8 @@ When given a directory, the compiler looks for `forge.mod` and finds `main()` in
 
 When merging packages, all declarations get prefixed with the package name in the C output to avoid collisions. The checker resolves qualified names (`ast.Node` → `ast_Node`) transparently.
 
-Example: `ast/ast.fg` defines `pub struct Node` → C gets `ast_Node`.
-`parser/parser.fg` defines `func helper()` → C gets `parser_helper`.
+Example: `ast/ast.ly` defines `pub struct Node` → C gets `ast_Node`.
+`parser/parser.ly` defines `func helper()` → C gets `parser_helper`.
 
 Within a package, no prefixing — all declarations are directly visible.
 
@@ -61,12 +61,12 @@ Within a package, no prefixing — all declarations are directly visible.
 1. **`import ast`** — just the name, no alias, no quoted path. Simple as possible.
 2. **Directory = package** (like Go). Filename is irrelevant to package identity.
 3. **Whole-program compilation**. No separate compilation, no linking. The days of compiling one file at a time are over.
-4. **Directory or file as entry point**. `forge compile .` or `forge compile main.fg` both work. Directory mode uses `forge.mod`.
+4. **Directory or file as entry point**. `lyric compile .` or `lyric compile main.ly` both work. Directory mode uses `lyric.mod`.
 5. **Cycle detection** via tracking packages-in-progress during recursive resolution.
 6. **Nested packages** use `import alias from "path"` (extended syntax, only when needed).
-7. **Auto-detect module mode**. If a `.fg` file is given, walk up to find `forge.mod`.
+7. **Auto-detect module mode**. If a `.ly` file is given, walk up to find `lyric.mod`.
 
-## forge.mod Format
+## lyric.mod Format
 
 ```
 module github.com/user/mycompiler
@@ -77,9 +77,9 @@ module github.com/user/mycompiler
 
 ## Implementation Plan
 
-1. Add `forge.mod` parsing (one `module` line for now)
+1. Add `lyric.mod` parsing (one `module` line for now)
 2. Update parser: `import <ident>` (no `from` required for simple case)
-3. Update `cmdCompile` to accept directories, find `forge.mod`, resolve packages
+3. Update `cmdCompile` to accept directories, find `lyric.mod`, resolve packages
 4. Recursive import resolution with cycle detection (checker has `CheckModuleFile` foundation)
 5. Package-level AST merging (reuse `MergeFiles`)
 6. Namespace prefixing during cross-package merge

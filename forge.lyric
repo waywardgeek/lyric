@@ -1,0 +1,227 @@
+// lyric.lyric — project-level understanding of the Lyric toolchain
+lyric Lyric {
+  why: "Self-hosting language toolchain. The compiler is written in Lyric, compiled to C (lyric.c), and builds with just GCC. Pipeline: parser → checker → LIR → monomorphizer → C backend. The Go compiler lives in legacy/go-compiler/ and is no longer maintained."
+
+  doc "Build System": """
+    lyric.c is the checked-in canonical compiler output (~88K lines C).
+    Building requires only GCC: `make` or `gcc -std=gnu11 -O2 -w -I runtime -o lyric lyric.c -lm`
+    
+    make          — build lyric binary from lyric.c
+    make test     — run test suite (test_lyric.sh)
+    make self-test — verify fixed-point (lyric compiles itself to identical C)
+    make update   — regenerate lyric.c from bootstrap .ly source
+    
+    The bootstrap .ly source (26K+ lines) lives in bootstrap/*/. 
+    The Go compiler in legacy/go-compiler/ is preserved for reference but not maintained.
+  """
+
+  doc "Invariants — Cross-Cutting": """
+    These invariants affect multiple modules and are the most common source of
+    multi-session debugging cycles. Read these first.
+
+    1. AST Expr is a VALUE TYPE. Structs containing Expr fields (StructLitField.Value,
+    CallExpr.Args []Expr, BinaryExpr.Left/Right, AssignStmt.Target/Value) store by
+    value. The checker annotates ResolvedType via pointer (&expr). Any COPY of the
+    containing struct (Go range loop, function arg, interface boxing) creates a new
+    Expr whose ResolvedType won't have the checker's annotation. Use index-based
+    iteration: `for i := range slice` with `&slice[i]`, never `for _, x := range`.
+    The dataAs[T] helper's `case T: return &v` also returns pointer to local copy.
+
+    2. ClassRenames after monomorphization. LIR expressions carry ORIGINAL generic
+    class names (e.g., 'DictEntry'). The program's class/struct lists contain only
+    MONOMORPHIZED names ('DictEntry_i32'). Per-function ClassRenameMap (set by
+    Phase 6 ResolveClassNames) maps bare generic names to their specialized
+    versions within each function's scope. The old global ClassRenames map was
+    last-writer-wins, causing Dict destroy methods to all use the wrong type.
+    Any function that looks up fields, emits types, or resolves methods by
+    class name MUST check the per-function map first, then fall back to global.
+
+    3. MergeStdlib into block 0 ONLY. Merging into every block creates duplicate
+    struct definitions in generated C. Must also merge RELATIONS (not just
+    classes/functions) and transitively pull called functions. The two collection
+    functions (collectFuncCallNamesStmt/Expr) MUST handle ALL StmtKind/ExprKind
+    variants with a default panic — missing cases silently drop function calls,
+    preventing stdlib functions from being pulled (the match-arm bug, 2026-06-07).
+
+    4. Desugar order matters: InterfaceEmbeds → InterfaceFields → Relations →
+    Destructors → DefaultImpls. Each pass creates AST consumed by the next.
+    DesugarDestructors wraps each relation's body in StmtBlock (block scoping)
+    to avoid variable name collisions. deepCopyBlock MUST deep copy TypeArgs
+    slices (not share) — destructor bodies are copied per-relation and type
+    substitution mutates TypeArgs in place.
+  """
+
+  doc "System Architecture": """
+    Classic compiler pipeline with a parallel verification track:
+
+    Source → Parser → AST → Desugar → Checker → Lowerer → LIR → C backend
+
+    ↑
+    .lyric → Parser → AST → Verifier ← Go source (go/ast)    [mono pass for C]
+
+    Strictly layered, unidirectional dependency graph:
+    ast (leaf) ← parser ← checker ← lir (lowerer + optimizer + mono + backends)
+    ← verifier
+
+    Each module resolves one class of problems:
+    - Parser: syntax/grammar → AST
+    - AST + Desugar: expand relations/interface fields/default impls/destructors
+    - Checker: types, scopes, constraints → annotated AST
+    - LIR Lowerer: flatten expressions to SSA-like temps, resolve all sugar
+    - LIR Optimizer: eliminate redundant temps, destructure multi-returns
+    - LIR Monomorphizer: specialize generics (6-phase, required for C)
+    - C Backend: thin C syntax emitter (~1700 LOC)
+  """
+
+  doc "Compilation Pipeline": """
+    1. Parser: lexes + parses .ly into ast.File (FuncDecl.Body populated)
+    2. Desugar: InterfaceEmbeds → InterfaceFields → Relations → Destructors → DefaultImpls
+    3. Checker: type inference, scope validation, generic substitution,
+    constraint satisfaction, relational method grants. Annotates AST
+    Expr nodes with ResolvedType.
+    4. Lowerer: AST → LProgram. Flattens all expressions to SSA temps,
+    resolves enums to tagged unions, classes to heap handles, try to
+    extract+check+early-return, impl blocks to forwarding wrappers.
+    5. Optimizer: side-effect temp elimination, multi-return destructuring,
+    unused variable removal. Three-phase: structural → collection → elimination.
+    6. Monomorphize (optional, required for C): collect instantiations →
+    specialize → remove generics → rewrite call sites. Name mangling:
+    Stack[i32] → Stack_i32.
+    7. C Backend: runtime macros for slices/optionals/errors, lambda hoisting,
+    malloc for classes, __builtin_unreachable() for exhaustive switches.
+  """
+
+  doc "Verification Pipeline": """
+    1. Parser produces ast.File from .lyric source
+    2. Verifier inspects source: annotations to locate Go files
+    3. go/parser + go/ast extract types into goTypeInfo registry
+    (aggregated across all source files per lyric block)
+    4. Structural comparison: normalize naming (snake→Pascal/camel/exact),
+    convert Lyric types to Go format (T?→*T, [T]→[]T, any≡interface{}),
+    strip package prefixes recursively
+    5. Completeness check: all exported Go symbols must appear in .lyric
+    6. Result with Finding records at Error/Warning/Info severity
+  """
+
+  doc "Relations and Multi-Class Interfaces": """
+    Lyric supports explicit ownership/reference modeling:
+    - relation Interface Parent[:label] (owns|refs) [Child[:label]]
+    - Owns = lifetime control (cascade delete), Refs = reference only
+    - Labels prefix injected fields to avoid collisions
+    - Interface field declarations: field T.name: Type → getter/setter methods
+    - Impl blocks: alias (=), field binding (<->), default implementations
+    - Destructor blocks: destructor T { body } in interfaces, copied to
+    concrete class destroy methods for owns relations
+
+    Desugaring order: InterfaceFields → Relations → DefaultImpls → Destructors
+    Each pass generates AST consumed by later passes and the checker.
+  """
+
+  doc "Generics": """
+    Explicit type params on declarations: func max<T: Comparable>(a: T, b: T) -> T
+    Call-site inference via inferTypeArgs (first-arg-wins, recursive matching).
+    Explicit type args take priority when provided.
+
+    Constraint mapping: Comparable → cmp.Ordered, Equatable/Hashable → comparable.
+    Relational constraints: where Graph<G, N, E> grants interface methods to
+    type variables within function scope.
+
+    C backend: monomorphize to concrete specialized copies.
+  """
+
+  doc "Contracts": """
+    1. ast.File — primary structural contract. Parser produces; checker, LIR,
+    verifier consume.
+    2. checker.Type + ResolvedType — semantic annotations on AST Expr nodes.
+    Uses `any` to avoid import cycles. LIR lowerer consumes for typed lowering.
+    3. LProgram — fully resolved flat representation. Backends consume.
+    4. Result/Finding — verifier output. CLI/CI consumers.
+    5. lyric_runtime.h — C execution environment contract. C backend emits code
+    depending on runtime macros for slices, optionals, errors, unions.
+
+    6. Post-checker validators — validateAllExprsResolved and
+    validateFieldAndMethodAccess ensure no nil ResolvedType or invalid
+    field/method access reaches the lowerer.
+
+    7. ValidatePostMono — invariant checker verifying no LTyTypeVar or
+    generic funcs/classes survive monomorphization Phase 3.
+  """
+
+  doc "UDD Methodology": """
+    Understanding-Driven Development (UDD) — formerly Grok-Driven Development.
+    .lyric files are the primary design artifact: compressed understanding that
+    fits in AI context for any system size. Code is a projection of understanding.
+
+    Key properties:
+    - AI writes .lyric files as post-process, human reviews them
+    - Structural verifier catches signature/type drift at commit time
+    - .lyric files replace design.md — they have a forcing function for accuracy
+    (AI is the primary consumer; stale .lyric → wrong design decisions)
+    - Read .lyric BEFORE modifying source in that directory
+    - Zone 2 function index enables surgical file reads (line number jumps)
+
+    Three zones in .lyric files:
+    1. Human-reviewed declarations + doc blocks (the "why" and "what")
+    2. Auto-generated function index (lyric update)
+    3. Auto-generated dependencies (lyric update)
+
+    Critical addition: doc "Invariants" blocks capture operational contracts
+    that prevent cross-session rediscovery of module behaviors. These are
+    the knowledge that, if lost, causes multi-iteration debugging cycles.
+  """
+
+  doc "Module Map": """
+    pkg/ast/         — AST nodes + desugaring engine. Leaf package.
+    pkg/parser/      — Lexer + recursive descent/Pratt parser.
+    pkg/checker/     — Type checker, inference, constraints, scope validation.
+    pkg/lir/         — Lowerer, optimizer, monomorphizer, C backend.
+    pkg/verifier/    — .lyric vs Go structural comparison engine.
+    runtime/         — C runtime header (slices, optionals, errors, unions).
+    cmd/lyric/       — Unified CLI: verify, update, gen, fmt, compile.
+  """
+
+  doc "Future Roadmap": """
+    - Module system (POST-BOOTSTRAP): import "checker" resolving to directories,
+    cross-module name resolution, pub visibility enforcement across boundaries,
+    automatic file discovery within module directories. Design this IN Lyric
+    after self-hosting — touches parser, checker, lowerer, and C backend.
+    Flat namespace is fine through bootstrap (~12 files); pain starts at 20+.
+    - C backend: lock body scoping, garbage collection (Boehm GC)
+    - LLVM backend (after C backend is mature)
+    - Expression parsing for requires/ensures annotations
+    - Language server: AST + Span for IDE integration
+    - CI integration: lyric verify as pre-commit hook
+    - Bootstrap: rewrite Lyric compiler in Lyric (IN PROGRESS)
+  """
+
+  doc "Known Failures": """
+    As of 2026-06-09, ALL tests pass (249+ Go tests, 100/100 C tests).
+    Bootstrap: 0 GCC errors, 0 GCC warnings, 0 void* LIR violations.
+    8,049 lines Lyric → 30,094 lines C.
+  """
+
+  source: ["cmd/lyric/main.go", "cmd/lyric/shared.go", "cmd/lyric/fmt.go", "cmd/lyric/update.go"]
+}
+// --- index ---
+//
+// Auto-generated function/method index with signatures in Go syntax.
+// DO NOT EDIT below this line — regenerated by `lyric update`.
+//
+// file: cmd/lyric/main.go
+//
+// file: cmd/lyric/shared.go
+//
+// file: cmd/lyric/fmt.go
+//
+// file: cmd/lyric/update.go
+
+// --- dependencies ---
+//
+// Auto-generated internal package dependencies.
+// DO NOT EDIT below this line — regenerated by `lyric update`.
+//
+// pkg/ast
+// pkg/checker
+// pkg/lir
+// pkg/parser
+// pkg/verifier

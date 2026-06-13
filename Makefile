@@ -1,13 +1,13 @@
-# Forge Compiler — Makefile
+# Lyric Compiler — Makefile
 #
-# The Forge compiler is self-hosting. forge.c is the checked-in canonical
+# The Lyric compiler is self-hosting. lyric.c is the checked-in canonical
 # compiler output (88K+ lines of C). Building requires only GCC and libc.
 #
 # Usage:
-#   make            — build the forge binary
+#   make            — build the lyric binary
 #   make test       — run test suite
-#   make self-test  — verify fixed-point (forge compiles itself to identical C)
-#   make update     — regenerate forge.c from src source
+#   make self-test  — verify fixed-point (lyric compiles itself to identical C)
+#   make update     — regenerate lyric.c from src source
 #   make clean      — remove build artifacts
 
 CC      ?= gcc
@@ -15,36 +15,36 @@ CFLAGS  ?= -std=gnu11 -O2 -w
 RUNTIME  = runtime
 
 BOOTSTRAP_FILES = \
-  src/ast/ast.fg src/ast/modules.fg \
-  src/lexer/lexer.fg \
-  src/parser/parser.fg src/parser/expr_parser.fg \
-  src/desugar/desugar.fg \
-  src/checker/checker.fg \
-  src/lir/lir.fg \
-  src/lowerer/lowerer.fg \
-  src/optimizer/optimizer.fg \
-  src/monomorphizer/monomorphizer.fg \
-  src/memory/memory.fg \
-  src/c_backend/c_backend.fg \
-  src/main/main.fg
+  src/ast/ast.ly src/ast/modules.ly \
+  src/lexer/lexer.ly \
+  src/parser/parser.ly src/parser/expr_parser.ly \
+  src/desugar/desugar.ly \
+  src/checker/checker.ly \
+  src/lir/lir.ly \
+  src/lowerer/lowerer.ly \
+  src/optimizer/optimizer.ly \
+  src/monomorphizer/monomorphizer.ly \
+  src/memory/memory.ly \
+  src/c_backend/c_backend.ly \
+  src/main/main.ly
 
 .PHONY: all test self-test update clean
 
-all: forge
+all: lyric
 
-forge: forge.c runtime/forge_runtime.h
-	$(CC) $(CFLAGS) -I $(RUNTIME) -o $@ forge.c -lm
+lyric: lyric.c runtime/lyric_runtime.h
+	$(CC) $(CFLAGS) -I $(RUNTIME) -o $@ lyric.c -lm
 
-test: forge
-	@bash test_forge.sh
+test: lyric
+	@bash test_lyric.sh
 
-self-test: forge
+self-test: lyric
 	@bash test_self_compile.sh
 
-# Regenerate forge.c from src Forge source using the current forge binary
-update: forge
-	./forge compile $(BOOTSTRAP_FILES) -o forge.c
-	@echo "forge.c updated ($$(wc -l < forge.c) lines)"
+# Regenerate lyric.c from src Lyric source using the current lyric binary
+update: lyric
+	./lyric compile $(BOOTSTRAP_FILES) -o lyric.c
+	@echo "lyric.c updated ($$(wc -l < lyric.c) lines)"
 
 clean:
-	rm -f forge
+	rm -f lyric

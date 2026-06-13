@@ -3,25 +3,25 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-FORGE_GO="/tmp/forge-go"
-FORGE_BS="./forge"
+LYRIC_GO="/tmp/lyric-go"
+LYRIC_BS="./lyric"
 RUNTIME_DIR="runtime"
-TMPDIR=$(mktemp -d -t forge_golden_XXXXXX)
+TMPDIR=$(mktemp -d -t lyric_golden_XXXXXX)
 GOLDEN_DIR="testdata/golden"
 mkdir -p "$GOLDEN_DIR"
 
 trap "rm -rf $TMPDIR" EXIT
 
-SKIP_FILES="guarded_by.fg"
+SKIP_FILES="guarded_by.ly"
 
 go_pass=0
 go_fail=0
 bs_pass=0
 bs_fail=0
 
-for fg in testdata/*.fg; do
+for fg in testdata/*.ly; do
   name=$(basename "$fg")
-  base="${name%.fg}"
+  base="${name%.ly}"
   
   # Skip
   skip=false
@@ -39,12 +39,12 @@ for fg in testdata/*.fg; do
   # Try Go compiler first
   go_ok=false
   if [ "$CMD" = "test" ]; then
-    # forge test files — Go compiler
-    if $FORGE_GO test "$fg" -o "$TMPDIR/${base}_go.c" 2>"$TMPDIR/${base}_go.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}_go.out"; then
+    # lyric test files — Go compiler
+    if $LYRIC_GO test "$fg" -o "$TMPDIR/${base}_go.c" 2>"$TMPDIR/${base}_go.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}_go.out"; then
       go_ok=true
     fi
   else
-    if $FORGE_GO compile "$fg" -o "$TMPDIR/${base}_go.c" 2>"$TMPDIR/${base}_go.err"; then
+    if $LYRIC_GO compile "$fg" -o "$TMPDIR/${base}_go.c" 2>"$TMPDIR/${base}_go.err"; then
       if gcc -std=gnu11 -O2 -w -o "$TMPDIR/${base}_go" "$TMPDIR/${base}_go.c" -I "$RUNTIME_DIR" -lm -lpthread 2>>"$TMPDIR/${base}_go.err"; then
         if "$TMPDIR/${base}_go" >"$TMPDIR/${base}_go.out" 2>>"$TMPDIR/${base}_go.err"; then
           go_ok=true
@@ -66,16 +66,16 @@ for fg in testdata/*.fg; do
   if [ "$CMD" = "test" ]; then
     DEPS=""
     case "$name" in
-      test_lexer.fg) DEPS="src/lexer/lexer.fg src/ast/ast.fg src/parser/parser.fg src/parser/expr_parser.fg" ;;
-      test_parser.fg) DEPS="src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
-      test_desugar.fg) DEPS="src/desugar/desugar.fg src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
-      test_min.fg) DEPS="src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
+      test_lexer.ly) DEPS="src/lexer/lexer.ly src/ast/ast.ly src/parser/parser.ly src/parser/expr_parser.ly" ;;
+      test_parser.ly) DEPS="src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
+      test_desugar.ly) DEPS="src/desugar/desugar.ly src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
+      test_min.ly) DEPS="src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
     esac
-    if $FORGE_BS test "$fg" $DEPS -o "$TMPDIR/${base}_bs.c" 2>"$TMPDIR/${base}_bs.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}_bs.out"; then
+    if $LYRIC_BS test "$fg" $DEPS -o "$TMPDIR/${base}_bs.c" 2>"$TMPDIR/${base}_bs.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}_bs.out"; then
       bs_ok=true
     fi
   else
-    if $FORGE_BS compile "$fg" -o "$TMPDIR/${base}_bs.c" 2>"$TMPDIR/${base}_bs.err"; then
+    if $LYRIC_BS compile "$fg" -o "$TMPDIR/${base}_bs.c" 2>"$TMPDIR/${base}_bs.err"; then
       if gcc -std=gnu11 -O2 -w -o "$TMPDIR/${base}_bs" "$TMPDIR/${base}_bs.c" -I "$RUNTIME_DIR" -lm -lpthread 2>>"$TMPDIR/${base}_bs.err"; then
         if "$TMPDIR/${base}_bs" >"$TMPDIR/${base}_bs.out" 2>>"$TMPDIR/${base}_bs.err"; then
           bs_ok=true

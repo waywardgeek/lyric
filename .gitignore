@@ -1,7 +1,7 @@
 # Binaries
-/forge
+/lyric
 /bootstrap1
-/bforge
+/blyric
 *.exe
 std.o
 
@@ -23,9 +23,9 @@ Thumbs.db
 /grok-gen
 /grok
 
-# Generated C output from .fg compilation (except checked-in forge.c)
+# Generated C output from .ly compilation (except checked-in lyric.c)
 *.c
-!forge.c
+!lyric.c
 !runtime/*.c
 
 # Generated Go output (legacy)

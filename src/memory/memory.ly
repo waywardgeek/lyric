@@ -1,0 +1,586 @@
+// memory.ly — Memory management pass
+//
+// Runs after monomorphization, before C backend emission.
+// Rewrites class allocations to slab-based equivalents.
+// After this pass, class allocs use ExSlabAlloc; field inits use StSlabSet.
+// Class handles remain ClassName* pointers (AoS slab, pointer-stable blocks).
+//
+// Design: ClassName* — NULL = none, valid = non-null pointer into slab block.
+// The C backend emits slab infrastructure based on LProgram.classes + slab_mode.
+
+// Rewrite the entire program from malloc-based classes to slab-based allocation.
+func slab_rewrite(prog: LProgram) {
+  prog.slab_mode = true
+
+  // Rewrite all functions
+  let mut fi = 0
+  while fi < len(prog.functions) {
+    let body = prog.functions[fi].body
+    let new_body = slab_rewrite_stmts(body)
+    prog.functions[fi].body = new_body
+
+    // Inject slab_free(self) at end of destroy methods
+    let fname = prog.functions[fi].name
+    if fname == "destroy" {
+      if len(prog.functions[fi].params) > 0 {
+        let p = prog.functions[fi].params[0]
+        if !isnull(p.typ) {
+          if p.typ!.kind is TyClassHandle {
+            let free_stmt = LStmt {
+              kind: StSlabFree,
+              slab_free: LSlabFreeData {
+                class_name: p.typ!.name,
+                handle: LValue {
+                  kind: ValVar,
+                  name: p.name,
+                  temp_id: 0,
+                  typ: p.typ,
+                },
+              },
+            }
+            let mut fn_body = prog.functions[fi].body
+            fn_body.push(free_stmt)
+            prog.functions[fi].body = fn_body
+          }
+        }
+      }
+    }
+    fi = fi + 1
+  }
+}
+
+// Rewrite a list of statements, returning potentially expanded list
+// (ExClassAlloc splits into alloc + field sets)
+func slab_rewrite_stmts(stmts: [LStmt?]) -> [LStmt?] {
+  let mut result: [LStmt?] = []
+  let mut i = 0
+  while i < len(stmts) {
+    if isnull(stmts[i]) {
+      result.push(null)
+    } else {
+      // Process each statement; may expand to multiple
+      let expanded = slab_rewrite_one_stmt(stmts[i]!)
+      let mut j = 0
+      while j < len(expanded) {
+        result.push(expanded[j])
+        j = j + 1
+      }
+    }
+    i = i + 1
+  }
+  return result
+}
+
+// Rewrite a single statement, returning one or more stmts.
+// StTempDef with ExClassAlloc expands into alloc + field sets (StSlabSet).
+func slab_rewrite_one_stmt(s: LStmt) -> [LStmt?] {
+  let mut out: [LStmt?] = []
+
+  // StTempDef with ExClassAlloc → slab alloc + StSlabSet for each field
+  if s.kind is StTempDef {
+    if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
+      let e = s.temp_def!.expr!
+      if e.kind is ExClassAlloc {
+        let d = e.class_alloc!
+        let temp_id = s.temp_def!.id
+
+        // Rewrite the expr to ExSlabAlloc (no fields — just returns ptr)
+        e.kind = ExSlabAlloc
+        e.slab_alloc = LSlabAllocData {
+          class_name: d.class_name,
+          fields: [],
+        }
+        e.class_alloc = null
+        out.push(s)
+
+        // Emit StSlabSet for each field (ptr->field = val)
+        let mut fi = 0
+        while fi < len(d.fields) {
+          let f = d.fields[fi]
+          let handle = LValue {
+            kind: ValTemp,
+            name: "",
+            temp_id: temp_id,
+            int_val: 0,
+            uint_val: 0,
+            float_val: 0.0,
+            str_val: "",
+            bool_val: false,
+            typ: e.typ,
+            collection: null,
+            index: null,
+          }
+          let set_stmt = LStmt {
+            kind: StSlabSet,
+            slab_set: LSlabSetData {
+              class_name: d.class_name,
+              field: f.name,
+              handle: handle,
+              value: f.value,
+            },
+          }
+          out.push(set_stmt)
+          fi = fi + 1
+        }
+        return out
+      } else {
+        slab_rewrite_expr(e)
+      }
+    }
+  }
+
+  if s.kind is StVarDecl {
+    if !isnull(s.var_decl) && !isnull(s.var_decl!.init) {
+      slab_rewrite_value(s.var_decl!.init!)
+    }
+  }
+  if s.kind is StAssign {
+    if !isnull(s.assign) && !isnull(s.assign!.value) {
+      slab_rewrite_value(s.assign!.value!)
+    }
+  }
+  if s.kind is StReturn {
+    if !isnull(s.ret) {
+      let mut i = 0
+      while i < len(s.ret!.values) {
+        if !isnull(s.ret!.values[i]) {
+          slab_rewrite_value(s.ret!.values[i]!)
+        }
+        i = i + 1
+      }
+    }
+  }
+
+  // Recurse into sub-statements that contain expressions
+  if s.kind is StSideEffect {
+    if !isnull(s.side_effect) && !isnull(s.side_effect!.expr) {
+      slab_rewrite_expr(s.side_effect!.expr!)
+    }
+  }
+
+  // Recurse into sub-statements that contain blocks
+  // NOTE: LIfData, LWhileData, LForData, etc. are structs (value types).
+  // s.if_data! gives a COPY. Must read → modify → write back.
+  if s.kind is StIf {
+    if !isnull(s.if_data) {
+      let mut d = s.if_data!
+      if !isnull(d.cond) {
+        slab_rewrite_value(d.cond!)
+      }
+      d.then_body = slab_rewrite_stmts(d.then_body)
+      d.else_body = slab_rewrite_stmts(d.else_body)
+      s.if_data = d
+    }
+  }
+  if s.kind is StWhile {
+    if !isnull(s.while_data) {
+      let mut d = s.while_data!
+      d.cond_block = slab_rewrite_stmts(d.cond_block)
+      if !isnull(d.cond_var) {
+        slab_rewrite_value(d.cond_var!)
+      }
+      d.body = slab_rewrite_stmts(d.body)
+      s.while_data = d
+    }
+  }
+  if s.kind is StFor {
+    if !isnull(s.for_data) {
+      let mut d = s.for_data!
+      if !isnull(d.collection) {
+        slab_rewrite_value(d.collection!)
+      }
+      d.body = slab_rewrite_stmts(d.body)
+      s.for_data = d
+    }
+  }
+  if s.kind is StBlock {
+    if !isnull(s.block) {
+      let mut d = s.block!
+      d.stmts = slab_rewrite_stmts(d.stmts)
+      s.block = d
+    }
+  }
+  if s.kind is StSwitch {
+    if !isnull(s.switch_data) {
+      let mut d = s.switch_data!
+      if !isnull(d.tag) {
+        slab_rewrite_value(d.tag!)
+      }
+      let mut ci = 0
+      while ci < len(d.cases) {
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body)
+        ci = ci + 1
+      }
+      s.switch_data = d
+    }
+  }
+  if s.kind is StTypeSwitch {
+    if !isnull(s.type_switch) {
+      let mut d = s.type_switch!
+      if !isnull(d.value) {
+        slab_rewrite_value(d.value!)
+      }
+      let mut ci = 0
+      while ci < len(d.cases) {
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body)
+        ci = ci + 1
+      }
+      s.type_switch = d
+    }
+  }
+  if s.kind is StSpawn {
+    if !isnull(s.spawn_data) {
+      let mut d = s.spawn_data!
+      d.body = slab_rewrite_stmts(d.body)
+      s.spawn_data = d
+    }
+  }
+  if s.kind is StSelect {
+    if !isnull(s.select_data) {
+      let mut d = s.select_data!
+      let mut ci = 0
+      while ci < len(d.cases) {
+        let c = d.cases[ci]
+        if !isnull(c.channel) {
+          slab_rewrite_value(c.channel!)
+        }
+        if !isnull(c.value) {
+          slab_rewrite_value(c.value!)
+        }
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body)
+        ci = ci + 1
+      }
+      s.select_data = d
+    }
+  }
+  if s.kind is StLock {
+    if !isnull(s.lock_data) {
+      let mut d = s.lock_data!
+      if !isnull(d.mutex) {
+        slab_rewrite_value(d.mutex!)
+      }
+      d.body = slab_rewrite_stmts(d.body)
+      s.lock_data = d
+    }
+  }
+  if s.kind is StDefer {
+    if !isnull(s.defer_data) {
+      s.defer_data!.body = slab_rewrite_stmts(s.defer_data!.body)
+    }
+  }
+  if s.kind is StMultiAssign {
+    if !isnull(s.multi_assign) && !isnull(s.multi_assign!.expr) {
+      slab_rewrite_expr(s.multi_assign!.expr!)
+    }
+  }
+  if s.kind is StSend {
+    if !isnull(s.send_data) {
+      if !isnull(s.send_data!.channel) {
+        slab_rewrite_value(s.send_data!.channel!)
+      }
+      if !isnull(s.send_data!.value) {
+        slab_rewrite_value(s.send_data!.value!)
+      }
+    }
+  }
+  if s.kind is StYield {
+    if !isnull(s.yield_data) && !isnull(s.yield_data!.value) {
+      slab_rewrite_value(s.yield_data!.value!)
+    }
+  }
+  if s.kind is StStructSet {
+    if !isnull(s.struct_set) {
+      if !isnull(s.struct_set!.receiver) {
+        slab_rewrite_value(s.struct_set!.receiver!)
+      }
+      if !isnull(s.struct_set!.value) {
+        slab_rewrite_value(s.struct_set!.value!)
+      }
+    }
+  }
+  if s.kind is StIndexSet {
+    if !isnull(s.index_set) {
+      let is_data = s.index_set!
+      if !isnull(is_data.collection) {
+        slab_rewrite_value(is_data.collection!)
+      }
+      if !isnull(is_data.index) {
+        slab_rewrite_value(is_data.index!)
+      }
+      if !isnull(is_data.value) {
+        slab_rewrite_value(is_data.value!)
+      }
+    }
+  }
+
+  out.push(s)
+  return out
+}
+
+// Rewrite a single expression, converting class allocs to slab allocs
+func slab_rewrite_expr(e: LExpr) {
+  match e.kind {
+    ExClassAlloc => {
+      if !isnull(e.class_alloc) {
+        let d = e.class_alloc!
+        e.kind = ExSlabAlloc
+        e.slab_alloc = LSlabAllocData {
+          class_name: d.class_name,
+          fields: d.fields,
+        }
+        e.class_alloc = null
+        // Recurse into fields
+        let mut i = 0
+        while i < len(e.slab_alloc!.fields) {
+          if !isnull(e.slab_alloc!.fields[i].value) {
+            slab_rewrite_value(e.slab_alloc!.fields[i].value!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExCall => {
+      if !isnull(e.call) {
+        let mut i = 0
+        while i < len(e.call!.args) {
+          if !isnull(e.call!.args[i]) {
+            slab_rewrite_value(e.call!.args[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExMethodCall => {
+      if !isnull(e.method_call) {
+        let mc = e.method_call!
+        if !isnull(mc.receiver) {
+          slab_rewrite_value(mc.receiver!)
+        }
+        let mut i = 0
+        while i < len(mc.args) {
+          if !isnull(mc.args[i]) {
+            slab_rewrite_value(mc.args[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExBinOp => {
+      if !isnull(e.bin_op) {
+        if !isnull(e.bin_op!.left) {
+          slab_rewrite_value(e.bin_op!.left!)
+        }
+        if !isnull(e.bin_op!.right) {
+          slab_rewrite_value(e.bin_op!.right!)
+        }
+      }
+    }
+    ExUnOp => {
+      if !isnull(e.un_op) {
+        if !isnull(e.un_op!.operand) {
+          slab_rewrite_value(e.un_op!.operand!)
+        }
+      }
+    }
+    ExCast => {
+      if !isnull(e.cast) {
+        if !isnull(e.cast!.operand) {
+          slab_rewrite_value(e.cast!.operand!)
+        }
+      }
+    }
+    ExBuiltin => {
+      if !isnull(e.builtin) {
+        let mut i = 0
+        while i < len(e.builtin!.args) {
+          if !isnull(e.builtin!.args[i]) {
+            slab_rewrite_value(e.builtin!.args[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExMakeSlice => {
+      if !isnull(e.builtin) {
+        let mut i = 0
+        while i < len(e.builtin!.args) {
+          if !isnull(e.builtin!.args[i]) {
+            slab_rewrite_value(e.builtin!.args[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExMakeMap => {
+      if !isnull(e.builtin) {
+        let mut i = 0
+        while i < len(e.builtin!.args) {
+          if !isnull(e.builtin!.args[i]) {
+            slab_rewrite_value(e.builtin!.args[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExStructLit => {
+      if !isnull(e.struct_lit) {
+        let mut i = 0
+        while i < len(e.struct_lit!.fields) {
+          if !isnull(e.struct_lit!.fields[i].value) {
+            slab_rewrite_value(e.struct_lit!.fields[i].value!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExStructField => {
+      if !isnull(e.struct_field) {
+        if !isnull(e.struct_field!.receiver) {
+          slab_rewrite_value(e.struct_field!.receiver!)
+        }
+      }
+    }
+    ExIndexGet => {
+      if !isnull(e.index_get) {
+        if !isnull(e.index_get!.collection) {
+          slab_rewrite_value(e.index_get!.collection!)
+        }
+        if !isnull(e.index_get!.index) {
+          slab_rewrite_value(e.index_get!.index!)
+        }
+      }
+    }
+    ExSlice => {
+      if !isnull(e.slice_data) {
+        if !isnull(e.slice_data!.collection) {
+          slab_rewrite_value(e.slice_data!.collection!)
+        }
+        if !isnull(e.slice_data!.low) {
+          slab_rewrite_value(e.slice_data!.low!)
+        }
+        if !isnull(e.slice_data!.high) {
+          slab_rewrite_value(e.slice_data!.high!)
+        }
+      }
+    }
+    ExWrapOptional => {
+      if !isnull(e.wrap_opt) {
+        if !isnull(e.wrap_opt!.value) {
+          slab_rewrite_value(e.wrap_opt!.value!)
+        }
+      }
+    }
+    ExUnwrapOptional => {
+      if !isnull(e.unwrap_opt) {
+        if !isnull(e.unwrap_opt!.value) {
+          slab_rewrite_value(e.unwrap_opt!.value!)
+        }
+      }
+    }
+    ExIsNull => {
+      if !isnull(e.is_null) {
+        if !isnull(e.is_null!.value) {
+          slab_rewrite_value(e.is_null!.value!)
+        }
+      }
+    }
+    ExVariantConstruct => {
+      if !isnull(e.variant_construct) {
+        let mut i = 0
+        while i < len(e.variant_construct!.fields) {
+          if !isnull(e.variant_construct!.fields[i]) {
+            slab_rewrite_value(e.variant_construct!.fields[i]!)
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExVariantTag => {
+      if !isnull(e.variant_tag) {
+        if !isnull(e.variant_tag!.value) {
+          slab_rewrite_value(e.variant_tag!.value!)
+        }
+      }
+    }
+    ExVariantData => {
+      if !isnull(e.variant_data) {
+        if !isnull(e.variant_data!.value) {
+          slab_rewrite_value(e.variant_data!.value!)
+        }
+      }
+    }
+    ExExtractValue => {
+      if !isnull(e.extract_value) {
+        if !isnull(e.extract_value!.value) {
+          slab_rewrite_value(e.extract_value!.value!)
+        }
+      }
+    }
+    ExExtractError => {
+      if !isnull(e.extract_error) {
+        if !isnull(e.extract_error!.value) {
+          slab_rewrite_value(e.extract_error!.value!)
+        }
+      }
+    }
+    ExMakeResult => {
+      if !isnull(e.make_result) {
+        if !isnull(e.make_result!.value) {
+          slab_rewrite_value(e.make_result!.value!)
+        }
+        if !isnull(e.make_result!.err) {
+          slab_rewrite_value(e.make_result!.err!)
+        }
+      }
+    }
+    ExFormat => {
+      if !isnull(e.format) {
+        let mut i = 0
+        while i < len(e.format!.parts) {
+          if !e.format!.parts[i].is_literal {
+            if !isnull(e.format!.parts[i].value) {
+              slab_rewrite_value(e.format!.parts[i].value!)
+            }
+          }
+          i = i + 1
+        }
+      }
+    }
+    ExEnvGet => {
+      if !isnull(e.env_get) {
+        if !isnull(e.env_get!.env) {
+          slab_rewrite_value(e.env_get!.env!)
+        }
+      }
+    }
+    ExFuncRef => {
+      if !isnull(e.func_ref) {
+        if !isnull(e.func_ref!.env) {
+          slab_rewrite_value(e.func_ref!.env!)
+        }
+      }
+    }
+    ExFuncLit => {
+      if !isnull(e.func_lit) {
+        e.func_lit!.body = slab_rewrite_stmts(e.func_lit!.body)
+      }
+    }
+    ExMakeChannel => {
+      if !isnull(e.make_channel) {
+        if !isnull(e.make_channel!.buf_size) {
+          slab_rewrite_value(e.make_channel!.buf_size!)
+        }
+      }
+    }
+    _ => {}
+  }
+}
+
+func slab_rewrite_value(v: LValue) {
+  if !isnull(v.collection) {
+    slab_rewrite_value(v.collection!)
+  }
+  if !isnull(v.index) {
+    slab_rewrite_value(v.index!)
+  }
+}

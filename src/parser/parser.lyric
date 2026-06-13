@@ -1,0 +1,79 @@
+// parser.lyric — understanding doc for the bootstrap parser package
+lyric parser {
+  why: "Statement and expression parsing. Two files: parser.ly (statements, declarations) and expr_parser.ly (Pratt precedence climbing for expressions). Recursive descent for declarations, Pratt for expressions."
+
+  doc "Architecture": """
+    Linear pipeline: Token stream → AST.
+
+    1. Declaration Parsing (parser.ly): Recursive descent for top-level
+       constructs (struct, class, enum, func, interface, relation, impl).
+       Each has a parse_* method. LL(1) with state save/restore for
+       ambiguous cases.
+
+    2. Expression Parsing (expr_parser.ly): Pratt/precedence-climbing with
+       10 binary precedence levels. Unary prefix handled before the
+       precedence loop. Postfix ops (field access, method call, index,
+       function call) in a tight loop.
+
+    3. Statement Parsing (expr_parser.ly): Dispatches on current token
+       kind to parse_var_decl, parse_if, parse_for, parse_while,
+       parse_match_stmt, etc.
+  """
+
+  doc "Invariants — For Loops": """
+    Idiomatic Lyric uses `for item in collection` and `for item, idx in collection`.
+    The stdlib provides `range(start, end)` as a generator for index iteration.
+    Do NOT use C-style while loops for iteration.
+  """
+
+  doc "Invariants — Parser/ExprParser Split": """
+    parser.ly and expr_parser.ly share the Parser class (same lyric block name).
+    parser.ly handles top-level declarations and statements.
+    expr_parser.ly handles expression parsing via Pratt precedence climbing.
+    Both files are in the same package and compiled together.
+  """
+
+  doc "Invariants — Struct Literal Ambiguity": """
+    `Ident {` is ambiguous: struct literal vs variable + block. Resolution
+    via noStructLit flag (Rust approach):
+    - for/while/if/match condition expressions set noStructLit=true
+    - When noStructLit is true, is_struct_lit_ahead() always returns false
+    - This means struct literals in these positions require parens:
+      `for x in (Point {}) { }` not `for x in Point {} { }`
+    - Everywhere else (let, return, args, etc.) struct literals work normally
+
+    The exprDepth counter (incremented in arg lists and brackets) is a
+    separate mechanism for positional struct literals inside expressions.
+  """
+
+  doc "Invariants — Lookahead and State Restoration": """
+    For constructs that aren't LL(1), the parser saves the entire Lexer state
+    (via lex.save_state()), performs a trial parse, and restores on failure.
+    Used for:
+    - Generic call-site disambiguation: try_parse_type_args() attempts to
+      parse <TypeExpr, ...> followed by `(`. If `>` isn't followed by `(`,
+      backtracks and treats `<` as comparison.
+    - Struct literal detection
+    - Annotation vs field detection (is_why_annotation)
+  """
+
+  doc "Invariants — Pratt Precedence Levels": """
+    Level  1: || (logical or)
+    Level  2: && (logical and)
+    Level  3: == != (equality)
+    Level  4: < <= > >= (comparison)
+    Level  5: | (bitwise or)
+    Level  6: ^ (bitwise xor)
+    Level  7: & (bitwise and)
+    Level  8: << >> (shifts)
+    Level  9: + - (additive)
+    Level 10: * / % (multiplicative)
+  """
+
+  doc "Invariants — Compound Assignment Desugaring": """
+    Compound assignment (+=, -=, *=, /=) is desugared in the parser:
+    `x += y` becomes `x = x + y` at the AST level.
+  """
+
+  source: ["parser.ly", "expr_parser.ly"]
+}

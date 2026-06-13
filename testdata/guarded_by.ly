@@ -1,0 +1,33 @@
+// guarded_by.ly — tests guarded_by enforcement
+
+lyric guarded_demo {
+
+  class Counter {
+    count: i32 guarded_by(mu)
+    mu: lock
+    label: string
+
+    pub func increment(mut self) {
+      lock(self.mu) {
+        self.count = self.count + 1
+      }
+    }
+
+    pub func get_label(self) -> string {
+      return self.label
+    }
+  }
+
+  func main() {
+    let c = Counter {}
+
+    // Access guarded field inside lock — should be fine
+    lock(c.mu) {
+      let val = c.count
+      println(val)
+    }
+
+    // Access non-guarded field — always fine
+    println(c.get_label())
+  }
+}

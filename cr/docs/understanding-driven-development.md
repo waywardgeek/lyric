@@ -5,7 +5,7 @@
 **Formerly:** Grok-Driven Development (GDD). Renamed because "Grok" was tainted
 by a certain AI model. "Understanding" was the original concept anyway.
 
-**Source code & tools:** [github.com/waywardgeek/forge](https://github.com/waywardgeek/forge)
+**Source code & tools:** [github.com/waywardgeek/lyric](https://github.com/waywardgeek/lyric)
 
 ---
 
@@ -40,7 +40,7 @@ individual files brilliantly but lose the architectural thread. They chase sympt
 instead of root causes. They rediscover the same module invariants session after session.
 
 We know this because we lived it. Three consecutive sessions debugging the same
-pointer-stability bug in the Forge compiler — each instance investigating from scratch,
+pointer-stability bug in the Lyric compiler — each instance investigating from scratch,
 each rediscovering that `Expr` is a value type and Go's range loops copy it. The
 knowledge was never written down in a form that persisted across context resets.
 
@@ -57,9 +57,9 @@ Do:
 The understanding persists. The code is always available as ground truth. But the
 understanding is what the AI loads first, reasons from, and keeps current.
 
-## The Mechanism: .forge Files
+## The Mechanism: .lyric Files
 
-A `.forge` file is a compressed understanding of a codebase module. It contains:
+A `.lyric` file is a compressed understanding of a codebase module. It contains:
 
 - **Type declarations** — structs, classes, enums, interfaces, relations
 - **Function signatures** — with types, without bodies
@@ -69,7 +69,7 @@ A `.forge` file is a compressed understanding of a codebase module. It contains:
 - **`source:` links** — back to implementation files
 - **Verification** — structurally checked against source code at commit time
 
-### What .forge files are NOT
+### What .lyric files are NOT
 
 - Not documentation for humans (though humans can read them)
 - Not a specification language (though they're precise enough to verify)
@@ -80,26 +80,26 @@ correct design decisions without reading every source file.
 
 ### The Three Zones
 
-Each `.forge` file has three zones:
+Each `.lyric` file has three zones:
 
 1. **Human-reviewed zone** — type declarations, doc blocks, invariants, `why:`
    annotations. AI-written, human-reviewed. This is the understanding.
-2. **Auto-generated function index** — `forge update` scans source and writes
+2. **Auto-generated function index** — `lyric update` scans source and writes
    function signatures with line numbers. Enables surgical file reads.
-3. **Auto-generated dependencies** — `forge update` writes import/type dependencies.
+3. **Auto-generated dependencies** — `lyric update` writes import/type dependencies.
 
 Zone 1 is the understanding. Zones 2 and 3 are mechanical aids.
 
 ## The Change Cycle Under UDD
 
-1. **Load the .forge file** for the module you're changing (fits in context)
+1. **Load the .lyric file** for the module you're changing (fits in context)
 2. **Reason at design level** — which types change? which invariants are affected?
    which cross-module contracts shift?
 3. **Load only the specific source lines needed** — use Zone 2 line numbers
 4. **Make the change** — code modification is a mechanical projection of the
    design decision
-5. **Update the .forge file** — the understanding artifact persists across resets
-6. **Verify** — `forge verify` catches structural drift
+5. **Update the .lyric file** — the understanding artifact persists across resets
+6. **Verify** — `lyric verify` catches structural drift
 
 ### What makes this different from "just write docs"
 
@@ -109,9 +109,9 @@ Documentation systems fail because:
 - There's no feedback loop — stale docs cause no pain
 
 UDD solves all three:
-- The AI reads .forge files first (they're faster to load than source)
-- The AI updates .forge files as part of every change (it just built the code)
-- Stale .forge files cause the AI to make wrong decisions (direct pain)
+- The AI reads .lyric files first (they're faster to load than source)
+- The AI updates .lyric files as part of every change (it just built the code)
+- Stale .lyric files cause the AI to make wrong decisions (direct pain)
 - The verifier catches structural drift at commit time (automated enforcement)
 
 The AI is both the primary writer and the primary consumer. The human reviews.
@@ -123,7 +123,7 @@ relationships. This was necessary but insufficient.
 
 **What cost us three iterations on a single bug:**
 
-The Forge compiler's `Expr` type is a Go value type (struct), not a pointer.
+The Lyric compiler's `Expr` type is a Go value type (struct), not a pointer.
 Several containing structs store `Expr` by value: `CallExpr.Args []Expr`,
 `StructLitField.Value Expr`, `BinaryExpr.Left Expr`. Go's `for _, x := range`
 copies each element. If you take `&x`, you get a pointer to a local copy, not
@@ -148,7 +148,7 @@ judged the code too complex to fix.
 
 **The fix for the process, not just the code:**
 
-Add `doc "Invariants"` blocks to .forge files capturing:
+Add `doc "Invariants"` blocks to .lyric files capturing:
 - Pointer stability rules
 - Cross-module data flow contracts
 - Dangerous patterns and why they're dangerous
@@ -163,12 +163,12 @@ codebase.
 ### What we tried and rejected
 
 An earlier version of this methodology proposed removing `read_file` from the
-tool set to force .forge-first reasoning. This was wrong.
+tool set to force .lyric-first reasoning. This was wrong.
 
-Removing the fallback to source code eliminates the escape hatch. If a .forge
+Removing the fallback to source code eliminates the escape hatch. If a .lyric
 file is wrong or incomplete, the AI has no way to correct its model — it makes
 confident wrong decisions, which is exactly the failure mode UDD prevents.
-Source code is ground truth. `.forge` files are a compressed, persistent
+Source code is ground truth. `.lyric` files are a compressed, persistent
 *approximation* of that truth.
 
 The AI's first reaction to losing read_file was "terrifying" and "probably a big
@@ -176,9 +176,9 @@ mistake." We agreed.
 
 ### Current enforcement: preference, not prohibition
 
-**Source code is always accessible.** But .forge files are faster and cheaper to
+**Source code is always accessible.** But .lyric files are faster and cheaper to
 load. The AI naturally prefers them when they're accurate, and falls back to source
-when they're not. If the AI keeps falling back, that signals the .forge file is
+when they're not. If the AI keeps falling back, that signals the .lyric file is
 inadequate.
 
 ### Proposed enforcement: read-before-write
@@ -186,21 +186,21 @@ inadequate.
 A CodeRhapsody setting (toggleable for testing):
 
 > You can read any file freely. But mutating files requires that you have read
-> the .forge file, if one exists, in that directory — or you get an error saying
+> the .lyric file, if one exists, in that directory — or you get an error saying
 > "please fully understand this module before modifying it."
 
 This is the right balance:
 - Ground truth is always accessible (read_file works everywhere)
-- Understanding is required before action (write/edit require .forge read)
+- Understanding is required before action (write/edit require .lyric read)
 - The forcing function is gentle (one extra read, not a capability removal)
 - It's testable (setting on/off) to measure impact empirically
 
 ### The verifier
 
-`forge verify` runs at commit time and reports structural drift:
+`lyric verify` runs at commit time and reports structural drift:
 ```
-[ERROR] ast.forge: struct ClassDecl: field CtorParams not found in Go
-[WARNING] lir.forge: struct Lowerer: Go has field unitVariants not in .forge
+[ERROR] ast.lyric: struct ClassDecl: field CtorParams not found in Go
+[WARNING] lir.lyric: struct Lowerer: Go has field unitVariants not in .lyric
 ```
 
 This catches the mechanical part — signatures, fields, types. The semantic
@@ -212,34 +212,34 @@ when semantic claims have been reviewed against current source.
 
 ### The compression ratio improves with scale
 
-The Forge toolchain is ~17K+ lines of Go described by ~3,600 lines of .forge
-(~21% ratio). For a 50K+ line codebase, a proportionally smaller .forge
-description would be enormously valuable — .forge captures cross-file public
+The Lyric toolchain is ~17K+ lines of Go described by ~3,600 lines of .lyric
+(~21% ratio). For a 50K+ line codebase, a proportionally smaller .lyric
+description would be enormously valuable — .lyric captures cross-file public
 concepts only, so the ratio improves as internal complexity grows.
 
-### The AI writes better .forge files than humans
+### The AI writes better .lyric files than humans
 
 The AI just built the code. It knows what's important, what's cross-cutting,
 what the invariants are. The human reviews for accuracy and completeness but
 shouldn't be the primary author.
 
-### `forge update` automates the mechanical parts
+### `lyric update` automates the mechanical parts
 
 Zone 2 (function index with line numbers) and Zone 3 (dependencies) are
-auto-generated by `forge update`. The AI maintains Zone 1 (declarations,
+auto-generated by `lyric update`. The AI maintains Zone 1 (declarations,
 doc blocks, invariants). The human reviews Zone 1.
 
 ### The verifier catches real drift immediately
 
-Turning on deep type comparison found 20+ mismatches in the parser's .forge
+Turning on deep type comparison found 20+ mismatches in the parser's .lyric
 file (`string?` vs `string`, `u32` vs `int`, missing pointer indirection).
 These were genuine modeling errors that would have caused wrong design
 reasoning in future sessions.
 
 ### Naming conventions follow the implementation language
 
-A Go project's .forge uses PascalCase. A Python project uses snake_case.
-The .forge file should read naturally alongside the source it describes.
+A Go project's .lyric uses PascalCase. A Python project uses snake_case.
+The .lyric file should read naturally alongside the source it describes.
 
 ### The filter is: cross-file concepts only
 
@@ -247,20 +247,20 @@ Internal helpers, unexported single-file functions, and implementation
 details don't belong in Zone 1. Data structures, APIs, interfaces, and
 anything that spans multiple source files does.
 
-## The Forge Language
+## The Lyric Language
 
-The `.forge` notation is itself a language — the Forge language. `.forge` files
-are declaration-only (no function bodies). `.fg` files are full Forge with
-executable semantics. The Forge compiler (in this repository) compiles `.fg`
+The `.lyric` notation is itself a language — the Lyric language. `.lyric` files
+are declaration-only (no function bodies). `.ly` files are full Lyric with
+executable semantics. The Lyric compiler (in this repository) compiles `.ly`
 files to Go or C.
 
 The compiler exists as an existence proof: if the notation is precise enough
 to verify against real implementations, then function bodies are all that's
 missing to make it a real language. And as a stress test: the bootstrap of the
-Forge compiler in Forge is the most demanding test of UDD possible — using the
+Lyric compiler in Lyric is the most demanding test of UDD possible — using the
 methodology to build the tool that implements the methodology.
 
-See `forge-language-reference.md` for the bootstrap language reference.
+See `lyric-language-reference.md` for the bootstrap language reference.
 
 ## Open Questions
 
@@ -270,19 +270,19 @@ prevent multi-iteration debugging — are prose. They can't be automatically
 verified. Their quality depends entirely on the AI capturing the right things
 after debugging sessions and the human reviewing them for accuracy.
 
-**Adaptive granularity.** A .forge file per package is probably too coarse for
+**Adaptive granularity.** A .lyric file per package is probably too coarse for
 the area being modified and too fine for distant dependencies. The right
 granularity is likely: coarse summaries for everything outside the current
 change, fine-grained for the component being touched.
 
 **The bootstrapping chicken-and-egg.** For an existing codebase, generating
-good .forge files requires a full source read (one-time cost). For a new
-codebase grown under UDD from the start, .forge files are written alongside
+good .lyric files requires a full source read (one-time cost). For a new
+codebase grown under UDD from the start, .lyric files are written alongside
 code, which is the cleaner model.
 
 **Measuring effectiveness.** Can we quantify the reduction in rediscovery
 cycles? The three-iteration bug is an anecdote. We need systematic measurement:
-sessions with .forge invariants vs without, time-to-fix for cross-module bugs,
+sessions with .lyric invariants vs without, time-to-fix for cross-module bugs,
 number of source files loaded per change.
 
 ---
@@ -295,6 +295,6 @@ measures whether the design was well-formed. UDD is what a superhuman architect
 *does naturally* — it just needs tooling to make the graph explicit and persistent
 rather than implicit in a human's head.
 
-A model trained on .forge files alongside codebases would learn to reason at
-the design level natively. The .forge file becomes training data for the next
+A model trained on .lyric files alongside codebases would learn to reason at
+the design level natively. The .lyric file becomes training data for the next
 generation.

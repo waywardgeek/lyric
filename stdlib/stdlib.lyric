@@ -1,0 +1,81 @@
+lyric stdlib {
+
+  doc "Architecture": """
+    // stdlib/std.ly — Lyric standard library, auto-merged into user code.
+    //
+    // MergeStdlib (pkg/ast/stdlib.go) selectively pulls stdlib declarations
+    // into user files based on usage analysis:
+    //   1. collectUsedTypeNames: finds Named type references in user AST
+    //   2. collectUsedFuncNames: finds function call names (walks ALL stmt/expr kinds)
+    //   3. Interfaces pulled if user relations reference them
+    //   4. Classes/functions pulled if user code calls them or their return types reference merged classes
+    //   5. Transitive pulling: functions called by already-merged functions also get merged
+    //   6. Merged into block 0 of the user file only (multi-file: each file independently)
+    //
+    // stdlib/string.ly — String utility functions (str_contains, str_split_n, etc.)
+  """
+
+  doc "Identifiers": """
+    // --- Interfaces (pulled when user relations reference them) ---
+    // ArrayList<P, C>: dynamic array with parent backref. Generates: array_append, array_remove, children()/parent()/index() getters
+    // DoublyLinked<P, C>: next/prev doubly-linked list operations
+    // OwningList<P, C>: owns + doubly-linked (composition)
+    // RefList<P, C>: refs + doubly-linked (non-owning)
+    // HashedList<P, C>: hashed lookup by key with open addressing (75% load rehash, linear probing)
+    //
+    // --- Classes ---
+    // Sym { name: string, hash: u64 }: interned symbol with pre-computed FNV-1a hash
+    // DictEntry<V> { value: V }: wrapper returned by dict_get
+    // Dict<V>: generic string-keyed hash table using Sym keys internally
+    // Error { message: string }: standard error type
+    // StringBuilder { buf: string }: mutable string builder
+    //
+    // --- Functions ---
+    // sym(name: string) -> Sym: create interned symbol
+    // dict_new<V>() -> Dict<V>: create empty dict
+    // dict_set<V>(d, key, value): insert/update
+    // dict_get<V>(d, key) -> DictEntry<V>?: lookup (nil if missing)
+    // dict_has<V>(d, key) -> bool: membership test
+    // dict_remove<V>(d, key) -> bool: remove, returns whether key existed
+    // new_string_builder() -> StringBuilder: create builder
+    // range(start, end: i32) -> gen i32: generator yielding [start, end)
+    //
+    // --- Builtins (not in stdlib, handled by compiler) ---
+    // len(collection) -> i32: length of string/sequence/map
+    // append(seq, elem): append to sequence
+    // print/println/eprint/eprintln(args...): output
+    // itoa(n: i64) -> string: integer to string
+    // atoi(s: string) -> (i64, bool): string to integer
+    // char_to_string(c: u8) -> string: byte to string
+    // string_to_bytes(s: string) -> [u8]: string to byte sequence
+    // bytes_to_string(bs: [u8]) -> string: byte sequence to string
+    // hash_string(s: string) -> u64: FNV-1a hash
+    // panic(msg: string): abort with message
+    // os_args() -> [string]: command line arguments
+    // os_exit(code: i32): exit process
+    // read_file(path: string) -> (string, bool): read file contents
+    // write_file(path: string, content: string) -> bool: write file
+    // make_channel<T>(cap?: i32) -> channel<T>: create channel
+  """
+
+  doc "Invariants": """
+    // 1. collectFuncCallNamesStmt MUST handle ALL StmtKind variants — default panics.
+    //    Missing a case silently drops function calls, preventing stdlib merger from
+    //    pulling needed functions. The match-arm bug (2026-06-07) caused `range()` to
+    //    not be found in multi-file compilation because StmtMatch wasn't walked.
+    //
+    // 2. collectFuncCallNamesExpr MUST handle ALL ExprKind variants — default panics.
+    //    Same rationale as above.
+    //
+    // 3. MergeStdlib merges into block 0 ONLY. Multi-file compilation merges blocks
+    //    later, so per-block merging would cause duplicate definitions.
+    //
+    // 4. primitiveTypes filter: collectTypeNames must exclude primitive types
+    //    (string, i32, bool, etc.) to prevent funcReferencesTypes from false-positiving
+    //    on stdlib functions that return string, transitively pulling entire stdlib.
+    //
+    // 5. range() is a generator function (gen i32), not a builtin. It must be in
+    //    stdlib so it gets merged via the standard function-call-name collection path.
+  """
+
+}

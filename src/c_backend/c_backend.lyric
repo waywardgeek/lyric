@@ -1,0 +1,31 @@
+lyric c_backend {
+
+  doc "Invariants" {
+    "CGen state is per-compilation — temp_types/var_types reset per function"
+    "Class handle optionals are pointers (NULL = none), not LyricOpt wrapped"
+    "LYRIC_OPT_DEF must come AFTER struct defs but BEFORE class defs"
+    "LYRIC_SLICE_DEF uses pointers so can come before struct defs"
+    "Forward decls → slice defs → structs (topo sorted) → opt/result defs → classes"
+    "Lambdas are hoisted to top-level static functions"
+    "Generators use Duff's device state machine pattern"
+    "Simple enums (all unit variants) emit typedef enum, not tagged union"
+    "Function bodies collected to separate buffer for lambda hoisting"
+    "spawn_captures redirect variable references to (*_ctx->name)"
+    "in_generator redirects variable references to _gen->name"
+    "mut params: emit_value returns (*name) for all types, StAssign targets (*name)"
+    "escape_printf doubles % in f-string literal text for C printf format strings"
+    "field_to_string_expr must NOT use f-strings with format specs — use string concat to avoid escape_printf double-escaping"
+  }
+
+  doc "Architecture" {
+    "Port of pkg/lir/c_backend.go (~4057 lines Go → ~3800 lines Lyric)"
+    "Entry point: emit_c(prog: LProgram?) -> string"
+    "CGen class holds all generator state"
+    "Expression emission returns string, statement emission writes directly"
+    "Type mapping: c_type() handles all LType→C type conversions"
+    "Composite types (slice/opt/result/chan) registered on first use"
+    "Interface vtable dispatch for named LTyAny types"
+  }
+
+  source: ["pkg/lir/c_backend.go"]
+}

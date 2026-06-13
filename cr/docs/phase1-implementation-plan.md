@@ -1,4 +1,4 @@
-# Forge Phase 1 — Implementation Plan
+# Lyric Phase 1 — Implementation Plan
 
 *All changes from phase1-language-review.md, ordered by dependency and priority.*
 
@@ -27,13 +27,13 @@
 **C backend** (`pkg/lir/c_backend.go`):
 - No change — emits `((target_type)value)`.
 
-**Bootstrap lexer** (`bootstrap/lexer/lexer.fg`):
+**Bootstrap lexer** (`bootstrap/lexer/lexer.ly`):
 - Add `TAs` to `TokenKind` enum and keyword map.
 
-**Bootstrap parser** (`bootstrap/parser/expr_parser.fg`):
+**Bootstrap parser** (`bootstrap/parser/expr_parser.ly`):
 - Mirror the Go parser changes.
 
-**Testdata**: Update `testdata/advanced.fg`, `testdata/features.fg`, and any other files using `<T>()` syntax.
+**Testdata**: Update `testdata/advanced.ly`, `testdata/features.ly`, and any other files using `<T>()` syntax.
 
 **Estimated effort**: 2-3 hours.
 
@@ -52,15 +52,15 @@
 - In the `?` lowering: currently produces an optional result. Change to produce the unwrapped `T` directly. The error check + early return stays the same; the difference is the final temp holds `T` not `T?`.
 - Remove `hoistNestedTry`'s optional wrapping if applicable.
 
-**Bootstrap checker** (`bootstrap/checker/checker.fg`):
+**Bootstrap checker** (`bootstrap/checker/checker.ly`):
 - Mirror Go checker change.
 
-**Bootstrap lowerer** (`bootstrap/lowerer/lowerer.fg`):
+**Bootstrap lowerer** (`bootstrap/lowerer/lowerer.ly`):
 - Mirror Go lowerer change.
 
-**Testdata**: Update `testdata/try_operator.fg`, `testdata/nested_try.fg`, `testdata/errors.fg`. Remove all `x!` unwraps after `?` calls.
+**Testdata**: Update `testdata/try_operator.ly`, `testdata/nested_try.ly`, `testdata/errors.ly`. Remove all `x!` unwraps after `?` calls.
 
-**Bootstrap .fg files**: Remove all `x!` after `?` in lexer.fg, parser.fg, expr_parser.fg, checker.fg, lowerer.fg, desugar.fg. This will be a substantial cleanup (dozens of sites).
+**Bootstrap .ly files**: Remove all `x!` after `?` in lexer.ly, parser.ly, expr_parser.ly, checker.ly, lowerer.ly, desugar.ly. This will be a substantial cleanup (dozens of sites).
 
 **Estimated effort**: 3-4 hours.
 
@@ -89,9 +89,9 @@
 
 **C backend**: No change — already handles tag comparisons.
 
-**Bootstrap**: Add `ExprIs` to ast.fg, `TIs` to lexer.fg, parser support in expr_parser.fg, checker and lowerer support.
+**Bootstrap**: Add `ExprIs` to ast.ly, `TIs` to lexer.ly, parser support in expr_parser.ly, checker and lowerer support.
 
-**Testdata**: Add `testdata/is_operator.fg` with comprehensive tests.
+**Testdata**: Add `testdata/is_operator.ly` with comprehensive tests.
 
 **Estimated effort**: 3-4 hours.
 
@@ -117,15 +117,15 @@
 
 **C backend**: No change — uses existing if/temp pattern.
 
-**Bootstrap**: Add `ExprIf` to ast.fg, parser support, checker/lowerer support.
+**Bootstrap**: Add `ExprIf` to ast.ly, parser support, checker/lowerer support.
 
-**Testdata**: Add `testdata/if_expr.fg` with tests including nested if-expressions, type mismatch errors, missing else errors.
+**Testdata**: Add `testdata/if_expr.ly` with tests including nested if-expressions, type mismatch errors, missing else errors.
 
 **Estimated effort**: 3-4 hours.
 
 ---
 
-## Change 5: Fix `forge fmt` String Literal Bug
+## Change 5: Fix `lyric fmt` String Literal Bug
 
 **What**: Lexer tokenizes keywords inside string literals as keywords, breaking the formatter.
 
@@ -185,16 +185,16 @@ Already completed in this session:
 - Lower map index-assign to runtime insert call.
 
 **C backend** (`pkg/lir/c_backend.go`):
-- Emit map as a generic hash table struct. Options: (a) use existing `HashedList` runtime machinery, (b) add a new `forge_map` runtime type in `grok_runtime.h`.
-- `forge_map_new()`, `forge_map_get()`, `forge_map_set()`, `forge_map_delete()`, `forge_map_len()`.
+- Emit map as a generic hash table struct. Options: (a) use existing `HashedList` runtime machinery, (b) add a new `lyric_map` runtime type in `grok_runtime.h`.
+- `lyric_map_new()`, `lyric_map_get()`, `lyric_map_set()`, `lyric_map_delete()`, `lyric_map_len()`.
 - Map iteration: emit as a for loop over buckets.
 
 **Runtime** (`grok_runtime.h`):
 - Add generic map implementation. Open-addressing hash table with FNV-1a for string keys, identity hash for integers. Monomorphizer specializes per `K,V` pair.
 
-**Bootstrap**: Add `TMap` to lexer.fg, map type parsing to parser, map lit to expr_parser. Not needed immediately in bootstrap .fg files (they use Dict<V>).
+**Bootstrap**: Add `TMap` to lexer.ly, map type parsing to parser, map lit to expr_parser. Not needed immediately in bootstrap .ly files (they use Dict<V>).
 
-**Testdata**: Add `testdata/maps.fg` with construction, lookup, insert, delete, iteration, type inference, nested maps.
+**Testdata**: Add `testdata/maps.ly` with construction, lookup, insert, delete, iteration, type inference, nested maps.
 
 **Estimated effort**: 6-8 hours. This is the largest single change — touches parser, checker, lowerer, C backend, and runtime.
 
@@ -202,7 +202,7 @@ Already completed in this session:
 
 ## Change 8: Stdlib Additions (Future)
 
-These are needed before `main.fg` but not blocking the immediate compiler changes:
+These are needed before `main.ly` but not blocking the immediate compiler changes:
 
 ### 7a. File I/O stdlib
 - `File.open()`, `File.create()`, `File.read_all()`, `File.write_string()`
@@ -213,8 +213,8 @@ These are needed before `main.fg` but not blocking the immediate compiler change
 - `sort<T>(slice: [T], less: fn(T, T) -> bool)` generic sort
 - C backend: qsort wrapper with closure context
 
-### 7c. String→number parsing in stdlib .fg files
-- Move `atoi`/`parse_float`/`itoa` from hardcoded builtins to stdlib .fg declarations
+### 7c. String→number parsing in stdlib .ly files
+- Move `atoi`/`parse_float`/`itoa` from hardcoded builtins to stdlib .ly declarations
 
 ---
 
@@ -226,13 +226,13 @@ These are needed before `main.fg` but not blocking the immediate compiler change
 | 2 | `is` operator | None | 3-4h | **High** — needed for compiler code |
 | 3 | `as` cast syntax | None | 2-3h | **High** — cleaner syntax |
 | 4 | If-expression | None | 3-4h | **Medium** — ergonomic improvement |
-| 5 | `forge fmt` fix | None | 1-2h | **Medium** — needed for dogfooding |
+| 5 | `lyric fmt` fix | None | 1-2h | **Medium** — needed for dogfooding |
 | 6 | Spec cleanup | None | Done | ✅ |
 | 7 | `map[K]V` + literals | None | 6-8h | **High** — needed for compiler tables |
-| 8 | Stdlib I/O | None | 4-6h | **Later** — before main.fg |
+| 8 | Stdlib I/O | None | 4-6h | **Later** — before main.ly |
 
-Changes 1-5 and 7 are independent and can be done in any order. I'd recommend doing `?` first since it has the biggest impact on existing code — the bootstrap .fg files will get significantly cleaner.
+Changes 1-5 and 7 are independent and can be done in any order. I'd recommend doing `?` first since it has the biggest impact on existing code — the bootstrap .ly files will get significantly cleaner.
 
 **Total estimated effort: 19-27 hours across changes 1-5 and 7.**
 
-After these changes, all bootstrap .fg files should be rewritten to use the new syntax (Phase 2).
+After these changes, all bootstrap .ly files should be rewritten to use the new syntax (Phase 2).

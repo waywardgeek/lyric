@@ -1,22 +1,22 @@
-# Forge
+# Lyric
 
 A typed language for design and implementation — describe your architecture, verify it hasn't drifted, compile it to Go.
 
-**Repository:** [github.com/waywardgeek/forge](https://github.com/waywardgeek/forge)
+**Repository:** [github.com/waywardgeek/lyric](https://github.com/waywardgeek/lyric)
 
-## What is Forge?
+## What is Lyric?
 
-Forge has two modes:
+Lyric has two modes:
 
-**`.forge` files — understandings.** Declaration-only design artifacts: data structures, APIs, interfaces, annotations, doc blocks, invariants, ownership relations. No function bodies. The AI writes them after implementation; the human reviews them. A structural verifier checks they haven't drifted from the source. This is the core of [Forge-Driven Development (GDD)](https://coderhapsody.ai/docs/forge-driven-development).
+**`.lyric` files — understandings.** Declaration-only design artifacts: data structures, APIs, interfaces, annotations, doc blocks, invariants, ownership relations. No function bodies. The AI writes them after implementation; the human reviews them. A structural verifier checks they haven't drifted from the source. This is the core of [Lyric-Driven Development (GDD)](https://coderhapsody.ai/docs/lyric-driven-development).
 
-**`.fg` files — code.** Full Forge with function bodies and executable semantics. Compiles to Go. An existence proof that the language design is sound: if the notation is precise enough to verify against real implementations, function bodies are all that's missing to make it a real language.
+**`.ly` files — code.** Full Lyric with function bodies and executable semantics. Compiles to Go. An existence proof that the language design is sound: if the notation is precise enough to verify against real implementations, function bodies are all that's missing to make it a real language.
 
 ## Why?
 
-The real bottleneck in AI-assisted software development is **human review**, not code generation. As AI generates code faster, reviewers drown in PRs. A `.forge` file contains *only* the decisions that matter — data structures, API boundaries, type relationships, concurrency contracts — at 5-10x the information density of source code. The reviewer validates architecture, not syntax. The verifier confirms the source matches.
+The real bottleneck in AI-assisted software development is **human review**, not code generation. As AI generates code faster, reviewers drown in PRs. A `.lyric` file contains *only* the decisions that matter — data structures, API boundaries, type relationships, concurrency contracts — at 5-10x the information density of source code. The reviewer validates architecture, not syntax. The verifier confirms the source matches.
 
-See [Forge-Driven Development](https://coderhapsody.ai/docs/forge-driven-development) for the full methodology.
+See [Lyric-Driven Development](https://coderhapsody.ai/docs/lyric-driven-development) for the full methodology.
 
 ---
 
@@ -27,38 +27,38 @@ See [Forge-Driven Development](https://coderhapsody.ai/docs/forge-driven-develop
 Build the unified CLI from source:
 
 ```bash
-git clone https://github.com/waywardgeek/forge.git
-cd forge
-go build -o forge ./cmd/forge/
+git clone https://github.com/waywardgeek/lyric.git
+cd lyric
+go build -o lyric ./cmd/lyric/
 # Optionally move to your PATH:
-# mv forge /usr/local/bin/
+# mv lyric /usr/local/bin/
 ```
 
 Or install individual tools:
 
 ```bash
-go install github.com/waywardgeek/forge/cmd/forge-verify@latest
-go install github.com/waywardgeek/forge/cmd/forge-compile@latest
+go install github.com/waywardgeek/lyric/cmd/lyric-verify@latest
+go install github.com/waywardgeek/lyric/cmd/lyric-compile@latest
 ```
 
-### Verify a `.forge` file
+### Verify a `.lyric` file
 
 ```bash
-$ forge verify pkg/parser/parser.forge
+$ lyric verify pkg/parser/parser.lyric
 0 errors, 0 warnings
 ```
 
 If the code drifts:
 
 ```
-[ERROR] parser.forge ↔ parser.go: function ParseString: param count mismatch: .forge=2, Go=1
-[WARNING] parser.forge ↔ parser.go: exported type Config not documented in .forge
+[ERROR] parser.lyric ↔ parser.go: function ParseString: param count mismatch: .lyric=2, Go=1
+[WARNING] parser.lyric ↔ parser.go: exported type Config not documented in .lyric
 ```
 
-### Compile a `.fg` file
+### Compile a `.ly` file
 
 ```bash
-$ forge compile testdata/demo.fg
+$ lyric compile testdata/demo.ly
 wrote demo.go
 $ go run demo.go
 Task Manager Demo
@@ -66,24 +66,24 @@ Added: Buy groceries (priority 2)
 ...
 ```
 
-### Generate a `.forge` file from Go source
+### Generate a `.lyric` file from Go source
 
 ```bash
-$ forge gen pkg/ast/        # scaffolds ast.forge from Go source
-$ forge update ast.forge     # auto-adds missing exported symbols
-$ forge fmt ast.forge        # formats to canonical style
+$ lyric gen pkg/ast/        # scaffolds ast.lyric from Go source
+$ lyric update ast.lyric     # auto-adds missing exported symbols
+$ lyric fmt ast.lyric        # formats to canonical style
 ```
 
 ---
 
 ## The Compiler
 
-The `.fg` compiler is a full-stack transpiler: parser → type checker → Go code generator.
+The `.ly` compiler is a full-stack transpiler: parser → type checker → Go code generator.
 
 ```
-// demo.fg
+// demo.ly
 
-forge task_demo {
+lyric task_demo {
   enum Priority { Low Medium High Critical }
 
   struct Task {
@@ -149,7 +149,7 @@ class Counter() {
 
 **Pattern matching:** Enum/union type switches, nested patterns (`Some(Circle(r)) =>`), guard clauses (`x if x > 0 =>`), exhaustiveness warnings, tuple destructuring.
 
-**Other:** Lambdas, f-strings, visibility (`pub`/private), built-in methods on string/list/map/channel, numeric types (i8–i256, u8–u256, f32–f128), type casts, modules (`import X from "file.fg"`), `cascade` (defer).
+**Other:** Lambdas, f-strings, visibility (`pub`/private), built-in methods on string/list/map/channel, numeric types (i8–i256, u8–u256, f32–f128), type casts, modules (`import X from "file.ly"`), `cascade` (defer).
 
 ---
 
@@ -157,40 +157,40 @@ class Counter() {
 
 | Command | Description |
 |---|---|
-| `forge compile file.fg` | Compile `.fg` to `.go` |
-| `forge verify file.forge` | Check `.forge` against Go source for structural drift |
-| `forge update file.forge` | Auto-add missing exported symbols, regenerate function index |
-| `forge update --prune file.forge` | Also remove stale declarations not in Go source |
-| `forge gen pkg/dir/` | Scaffold a new `.forge` file from Go source |
-| `forge fmt file.forge` | Format `.forge` to canonical style |
+| `lyric compile file.ly` | Compile `.ly` to `.go` |
+| `lyric verify file.lyric` | Check `.lyric` against Go source for structural drift |
+| `lyric update file.lyric` | Auto-add missing exported symbols, regenerate function index |
+| `lyric update --prune file.lyric` | Also remove stale declarations not in Go source |
+| `lyric gen pkg/dir/` | Scaffold a new `.lyric` file from Go source |
+| `lyric fmt file.lyric` | Format `.lyric` to canonical style |
 
 ---
 
 ## Key Principles
 
-- **`.forge` files live next to the code** they describe (`pkg/ast/ast.forge` alongside `pkg/ast/ast.go`)
+- **`.lyric` files live next to the code** they describe (`pkg/ast/ast.lyric` alongside `pkg/ast/ast.go`)
 - **Cross-file concepts only** — data structures, APIs, interfaces. Not single-file implementation details.
 - **Adopt the implementation language's conventions** — PascalCase for Go, snake_case for Python
-- **AI writes, human reviews** — implement first, write `.forge` after, human validates architecture
-- **Completeness checking** — the verifier warns about exported Go symbols not documented in `.forge`
-- **Self-referential** — every compiler package has its own `.forge` file, verified by the tool it contains
+- **AI writes, human reviews** — implement first, write `.lyric` after, human validates architecture
+- **Completeness checking** — the verifier warns about exported Go symbols not documented in `.lyric`
+- **Self-referential** — every compiler package has its own `.lyric` file, verified by the tool it contains
 
 ---
 
 ## Project Structure
 
 ```
-cmd/forge/              Unified CLI (compile, verify, update, gen, fmt)
-cmd/forge-compile/      Standalone compiler CLI
-cmd/forge-verify/       Standalone verifier CLI
-cmd/forge-gen/          Standalone scaffolding CLI
-cmd/forge-update/       Standalone update CLI
-pkg/ast/               AST node types + ast.forge
-pkg/parser/            PEG parser for .forge and .fg files + parser.forge
-pkg/checker/           Type checker with inference + checker.forge
-pkg/transpiler/        Go code generator + transpiler.forge
-pkg/verifier/          Structural drift detector + verifier.forge
-testdata/              36 .fg test files (all compile, 33 go-build clean)
+cmd/lyric/              Unified CLI (compile, verify, update, gen, fmt)
+cmd/lyric-compile/      Standalone compiler CLI
+cmd/lyric-verify/       Standalone verifier CLI
+cmd/lyric-gen/          Standalone scaffolding CLI
+cmd/lyric-update/       Standalone update CLI
+pkg/ast/               AST node types + ast.lyric
+pkg/parser/            PEG parser for .lyric and .ly files + parser.lyric
+pkg/checker/           Type checker with inference + checker.lyric
+pkg/transpiler/        Go code generator + transpiler.lyric
+pkg/verifier/          Structural drift detector + verifier.lyric
+testdata/              36 .ly test files (all compile, 33 go-build clean)
 testdata/modules/      Module system test files
 ```
 
@@ -198,20 +198,20 @@ testdata/modules/      Module system test files
 
 ## Test Status
 
-233 tests across parser, checker, transpiler, and verifier. 36 `.fg` test files all compile; 33 produce Go that passes `go build` (1 known issue: `typealias.fg`). 6 self-referential `.forge` files verify clean (0 errors, 0 warnings).
+233 tests across parser, checker, transpiler, and verifier. 36 `.ly` test files all compile; 33 produce Go that passes `go build` (1 known issue: `typealias.ly`). 6 self-referential `.lyric` files verify clean (0 errors, 0 warnings).
 
 ```bash
 $ go test ./...
-ok  github.com/waywardgeek/forge/pkg/checker     0.018s
-ok  github.com/waywardgeek/forge/pkg/parser       0.006s
-ok  github.com/waywardgeek/forge/pkg/transpiler   0.005s
-ok  github.com/waywardgeek/forge/pkg/verifier     0.004s
+ok  github.com/waywardgeek/lyric/pkg/checker     0.018s
+ok  github.com/waywardgeek/lyric/pkg/parser       0.006s
+ok  github.com/waywardgeek/lyric/pkg/transpiler   0.005s
+ok  github.com/waywardgeek/lyric/pkg/verifier     0.004s
 ```
 
 ### Known Issues
 
-- `typealias.fg`: optional type alias wrapping generates Go that doesn't build in all cases
-- `features.fg`: `go vet` warns about unreachable code after exhaustive match
+- `typealias.ly`: optional type alias wrapping generates Go that doesn't build in all cases
+- `features.ly`: `go vet` warns about unreachable code after exhaustive match
 - i128/i256 types silently downcast to int64/uint64 (math/big support planned)
 - No LSP server yet (planned)
 
@@ -219,8 +219,8 @@ ok  github.com/waywardgeek/forge/pkg/verifier     0.004s
 
 ## Documentation
 
-- [Forge Language Specification](https://coderhapsody.ai/docs/forge-language) — full type system, syntax, and examples
-- [Forge-Driven Development](https://coderhapsody.ai/docs/forge-driven-development) — the methodology
+- [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language) — full type system, syntax, and examples
+- [Lyric-Driven Development](https://coderhapsody.ai/docs/lyric-driven-development) — the methodology
 
 ---
 
@@ -232,4 +232,4 @@ Apache 2.0 — see [LICENSE](LICENSE).
 
 Bill Cox & [CodeRhapsody](https://coderhapsody.ai)
 
-*"forge" is a 60-year-old word from Heinlein's Stranger in a Strange Land meaning deep, complete understanding. We are reclaiming it.*
+*"lyric" is a 60-year-old word from Heinlein's Stranger in a Strange Land meaning deep, complete understanding. We are reclaiming it.*

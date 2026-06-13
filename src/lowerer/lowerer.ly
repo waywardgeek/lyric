@@ -1,0 +1,3542 @@
+lyric lowerer {
+
+  // ==========================================================================
+  // Lowerer — AST to LIR translation
+  //
+  // Two-phase architecture:
+  //   Phase 1 (register_block): Collect all type/function declarations
+  //   Phase 2 (lower_file): Walk all blocks, lower to LIR
+  //
+  // Key invariant: every expression is flattened into temp chains.
+  // ==========================================================================
+
+  class Lowerer {
+    temp_id: i32
+    structs: Dict<Sym, StructDecl>?
+    classes: Dict<Sym, ClassDecl>?
+    enums: Dict<Sym, EnumDecl>?
+    interfaces: Dict<Sym, InterfaceDecl>?
+    type_aliases: Dict<Sym, TypeExpr>?
+    func_sigs: Dict<Sym, FuncDecl>?
+    scope: Dict<Sym, LType>?
+    class_fields: Dict<Sym, Dict<Sym, LType>>?
+    class_defaults: Dict<Sym, Expr>?
+    impl_method_renames: Dict<Sym, string>?
+    stmts: [LStmt?]
+    unit_variants: Dict<Sym, bool>?
+    enum_variant_tags: Dict<Sym, i32>?
+    enum_variant_fields: Dict<Sym, [TupleField]>?
+    variant_to_enum: Dict<Sym, string>?
+    current_func_return: LType?
+    import_aliases: Dict<Sym, string>?
+    lowered_ifaces: Dict<Sym, LInterfaceDecl>?
+  }
+
+  func new_lowerer() -> Lowerer {
+    return Lowerer {
+      temp_id: 0,
+      structs: Dict<Sym, StructDecl> {},
+      classes: Dict<Sym, ClassDecl> {},
+      enums: Dict<Sym, EnumDecl> {},
+      interfaces: Dict<Sym, InterfaceDecl> {},
+      type_aliases: Dict<Sym, TypeExpr> {},
+      func_sigs: Dict<Sym, FuncDecl> {},
+      scope: Dict<Sym, LType> {},
+      class_fields: Dict<Sym, Dict<Sym, LType>> {},
+      class_defaults: Dict<Sym, Expr> {},
+      impl_method_renames: Dict<Sym, string> {},
+      stmts: [],
+      unit_variants: Dict<Sym, bool> {},
+      enum_variant_tags: Dict<Sym, i32> {},
+      enum_variant_fields: Dict<Sym, [TupleField]> {},
+      variant_to_enum: Dict<Sym, string> {},
+      current_func_return: LType { kind: TyUnit, name: "", bits: 0, is_exported: false },
+      import_aliases: Dict<Sym, string> {},
+      lowered_ifaces: Dict<Sym, LInterfaceDecl> {}
+    }
+  }
+
+  // ---------- Helpers ----------
+
+  func Lowerer.next_temp(self) -> i32 {
+    let id = self.temp_id
+    self.temp_id = self.temp_id + 1
+    return id
+  }
+
+  func Lowerer.emit(self, stmt: LStmt?) {
+    append(self.stmts, stmt)
+  }
+
+  func Lowerer.emit_temp(self, expr: LExpr?) -> LValue? {
+    let id = self.next_temp()
+    let typ = expr!.typ
+    self.emit(LStmt {
+      kind: StTempDef,
+      temp_def: LTempDef { id: id, expr: expr }
+    })
+    return LValue {
+      kind: ValTemp,
+      name: "",
+      temp_id: id,
+      int_val: 0 as i64,
+      uint_val: 0 as u64,
+      float_val: 0.0,
+      str_val: "",
+      bool_val: false,
+      typ: typ
+    }
+  }
+
+  func Lowerer.define_var(self, name: string, typ: LType?) {
+    self.scope!.set(sym(name), typ!)
+  }
+
+  func Lowerer.lookup_var(self, name: string) -> LType? {
+    let entry = self.scope!.get(sym(name))
+    if !isnull(entry) { return entry!.value }
+    return nil
+  }
+
+  func Lowerer.save_stmts(self) -> [LStmt?] {
+    let old = self.stmts
+    self.stmts = []
+    return old
+  }
+
+  func Lowerer.restore_stmts(self, old: [LStmt?]) {
+    self.stmts = old
+  }
+
+  // ---------- LValue constructors ----------
+
+  func make_int_val(v: i64, bits: i32) -> LValue? {
+    let kind = if bits == 8 { TyI8 } else if bits == 16 { TyI16 } else if bits == 64 { TyI64 } else { TyI32 }
+    return LValue {
+      kind: ValLitInt, name: "", temp_id: 0, int_val: v, uint_val: 0 as u64,
+      float_val: 0.0, str_val: "", bool_val: false,
+      typ: LType { kind: kind, name: "", bits: bits, is_exported: false }
+    }
+  }
+
+  func make_bool_val(v: bool) -> LValue? {
+    return LValue {
+      kind: ValLitBool, name: "", temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64,
+      float_val: 0.0, str_val: "", bool_val: v,
+      typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false }
+    }
+  }
+
+  func make_string_val(s: string) -> LValue? {
+    return LValue {
+      kind: ValLitString, name: "", temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64,
+      float_val: 0.0, str_val: s, bool_val: false,
+      typ: LType { kind: TyString, name: "", bits: 0, is_exported: false }
+    }
+  }
+
+  func make_null_val(typ: LType?) -> LValue? {
+    return LValue {
+      kind: ValLitNull, name: "", temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64,
+      float_val: 0.0, str_val: "", bool_val: false,
+      typ: typ
+    }
+  }
+
+  func make_var_val(name: string, typ: LType?) -> LValue? {
+    return LValue {
+      kind: ValVar, name: name, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64,
+      float_val: 0.0, str_val: "", bool_val: false,
+      typ: typ
+    }
+  }
+
+  // ---------- Type lowering ----------
+
+  func lir_int_type(bits: i32) -> LType? {
+    let kind = if bits == 8 { TyI8 } else if bits == 16 { TyI16 } else if bits == 64 { TyI64 } else { TyI32 }
+    return LType { kind: kind, name: "", bits: bits, is_exported: false }
+  }
+
+  func lir_uint_type(bits: i32) -> LType? {
+    let kind = if bits == 8 { TyU8 } else if bits == 16 { TyU16 } else if bits == 64 { TyU64 } else { TyU32 }
+    return LType { kind: kind, name: "", bits: bits, is_exported: false }
+  }
+
+  func Lowerer.lower_type(self, te: TypeExpr?) -> LType? {
+    if isnull(te) {
+      return LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
+    }
+    match te!.kind {
+      Unit => {
+        return LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
+      }
+      Named(name, args) => {
+        return self.lower_named_type(name, args)
+      }
+      Optional(inner) => {
+        let elem = self.lower_type(inner)
+        return LType { kind: TyOptional, name: "", elem: elem, bits: 0, is_exported: false }
+      }
+      Sequence(elem) => {
+        let et = self.lower_type(elem)
+        return LType { kind: TySlice, name: "", elem: et, bits: 0, is_exported: false }
+      }
+      Map(key, value) => {
+        let kt = self.lower_type(key)
+        let vt = self.lower_type(value)
+        return LType { kind: TyMap, name: "", key: kt, elem: vt, bits: 0, is_exported: false }
+      }
+      Tuple(fields) => {
+        let mut lfields: [LField] = []
+        let mut i = 0
+        for f in fields {
+          let ft = self.lower_type(f.type_expr)
+          let fname = if !isnull(f.name) { f.name!.name } else { f"_{i}" }
+
+          append(lfields, LField { name: fname, typ: ft })
+          i = i + 1
+        }
+        // Special case: (T, error) → ErrorResult
+        if len(lfields) == 2 && !isnull(lfields[1].typ) && lfields[1].typ!.kind is TyError {
+          return LType { kind: TyErrorResult, name: "", elem: lfields[0].typ, bits: 0, is_exported: false }
+        }
+        // Also check by AST type name — "error" interface may resolve to TyAny
+        if len(lfields) == 2 && len(fields) >= 2 {
+          let f1_te = fields[1].type_expr
+          if !isnull(f1_te) && f1_te!.kind is Named {
+            match f1_te!.kind {
+              Named(name, args) => {
+                if name.name == "error" {
+                  return LType { kind: TyErrorResult, name: "", elem: lfields[0].typ, bits: 0, is_exported: false }
+                }
+              }
+              _ => {}
+            }
+          }
+        }
+        return LType { kind: TyTuple, name: "", fields: lfields, bits: 0, is_exported: false }
+      }
+      Func(params, ret) => {
+        let mut ptypes: [LType?] = []
+        for p in params {
+          append(ptypes, self.lower_type(p))
+        }
+        let rt = self.lower_type(ret)
+        return LType { kind: TyFuncPtr, name: "", params: ptypes, ret: rt, bits: 0, is_exported: false }
+      }
+      Channel(elem) => {
+        let et = self.lower_type(elem)
+        return LType { kind: TyChannel, name: "", elem: et, bits: 0, is_exported: false }
+      }
+      Generator(elem) => {
+        let et = self.lower_type(elem)
+        return LType { kind: TyGenerator, name: "", elem: et, bits: 0, is_exported: false }
+      }
+      Lock => {
+        return LType { kind: TyMutex, name: "", bits: 0, is_exported: false }
+      }
+      Union(variants) => {
+        let mut ltypes: [LType?] = []
+        for v in variants {
+          append(ltypes, self.lower_type(v))
+        }
+        return LType { kind: TyUnion, name: "", params: ltypes, bits: 0, is_exported: false }
+      }
+    }
+  }
+
+  func Lowerer.lower_named_type(self, name: Sym, args: [TypeExpr]) -> LType? {
+    let n = name.name
+    // Primitives
+    if n == "i8" { return lir_int_type(8) }
+    if n == "i16" { return lir_int_type(16) }
+    if n == "i32" { return lir_int_type(32) }
+    if n == "i64" { return lir_int_type(64) }
+    if n == "u8" { return lir_uint_type(8) }
+    if n == "u16" { return lir_uint_type(16) }
+    if n == "u32" { return lir_uint_type(32) }
+    if n == "u64" { return lir_uint_type(64) }
+    if n == "f32" { return LType { kind: TyF32, name: "", bits: 32, is_exported: false } }
+    if n == "f64" { return LType { kind: TyF64, name: "", bits: 64, is_exported: false } }
+    if n == "bool" { return LType { kind: TyBool, name: "", bits: 0, is_exported: false } }
+    if n == "string" { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+    if n == "error" { return LType { kind: TyError, name: "error", bits: 0, is_exported: false } }
+    if n == "any" { return LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
+    if n == "int" { return LType { kind: TyPlatformInt, name: "", bits: -1, is_exported: false } }
+    if n == "uint" { return LType { kind: TyPlatformUint, name: "", bits: -1, is_exported: false } }
+    if n == "Mutex" { return LType { kind: TyMutex, name: "", bits: 0, is_exported: false } }
+
+    // Lowered type args
+    let mut largs: [LType?] = []
+    for a in args {
+      append(largs, self.lower_type(a))
+    }
+
+    // Check registered types
+    if self.structs!.has(sym(n)) {
+      return LType { kind: TyStruct, name: n, type_args: largs, bits: 0, is_exported: false }
+    }
+    if self.classes!.has(sym(n)) {
+      return LType { kind: TyClassHandle, name: n, type_args: largs, bits: 0, is_exported: false }
+    }
+    if self.enums!.has(sym(n)) {
+      return LType { kind: TyTaggedUnion, name: n, bits: 0, is_exported: false }
+    }
+    if self.interfaces!.has(sym(n)) {
+      return LType { kind: TyAny, name: n, bits: 0, is_exported: false }
+    }
+    if self.type_aliases!.has(sym(n)) {
+      let entry = self.type_aliases!.get(sym(n))
+      if !isnull(entry) {
+        return self.lower_type(entry!.value)
+      }
+    }
+
+    // Must be a type variable
+    return LType { kind: TyTypeVar, name: n, bits: 0, is_exported: false }
+  }
+
+  // ---------- Expression type resolution ----------
+
+  func Lowerer.expr_type(self, e: Expr?) -> LType? {
+    if isnull(e) {
+      return LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
+    }
+    if !isnull(e!.resolved_type) {
+      let result = self.lower_type(e!.resolved_type)
+      return result
+    }
+    // Fallback: infer from expression shape
+    match e!.kind {
+      IntLit(_, _) => { return lir_int_type(32) }
+      FloatLit(_) => { return LType { kind: TyF64, name: "", bits: 64, is_exported: false } }
+      BoolLit(_) => { return LType { kind: TyBool, name: "", bits: 0, is_exported: false } }
+      StringLit(_) => { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+      StringInterp(_) => { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+      Nil => { return LType { kind: TyUnit, name: "", bits: 0, is_exported: false } }
+      _ => { return LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
+    }
+  }
+
+  // ---------- Phase 1: Registration ----------
+
+  func Lowerer.register_block(self, block: LyricBlock) {
+
+    // Register structs
+    for sd in block.sd_children() {
+      if !isnull(sd.name) {
+        self.structs!.set(sym(sd.name!.name), sd)
+        // Register class fields for struct
+        let fmap = Dict<Sym, LType> {}
+        for f in sd.sf_children() {
+          if !isnull(f.name) {
+            fmap.set(f.name!, self.lower_type(f.type_expr)!)
+          }
+        }
+        self.class_fields!.set(sym(sd.name!.name), fmap)
+      }
+    }
+
+    // Register classes
+    for cd in block.cd_children() {
+      if !isnull(cd.name) {
+        let cname = cd.name!.name
+        self.classes!.set(sym(cname), cd)
+        let fmap = Dict<Sym, LType> {}
+        for f in cd.cf_children() {
+          if !isnull(f.name) {
+            fmap.set(f.name!, self.lower_type(f.type_expr)!)
+            if !isnull(f.default_value) {
+              self.class_defaults!.set(sym(cname + "." + f.name!.name), f.default_value!)
+            }
+          }
+        }
+        self.class_fields!.set(sym(cname), fmap)
+      }
+    }
+
+    // Register enums — use flattened keys "EnumName.VariantName"
+    for ed in block.ed_children() {
+      if !isnull(ed.name) {
+        let ename = ed.name!.name
+        self.enums!.set(sym(ename), ed)
+        let mut tag: i32 = 0
+        for v in ed.ev_children() {
+          if !isnull(v.name) {
+            let vname = v.name!.name
+            let key = ename + "." + vname
+            self.enum_variant_tags!.set(sym(key), tag)
+            self.variant_to_enum!.set(sym(vname), ename)
+            let vfields = v.evf_children()
+            let mut tfs: [TupleField] = []
+            for tf in vfields {
+              append(tfs, tf)
+            }
+            self.enum_variant_fields!.set(sym(key), tfs)
+            if len(tfs) == 0 {
+              self.unit_variants!.set(sym(key), true)
+            }
+            tag = tag + 1
+          }
+        }
+      }
+    }
+
+    // Register interfaces
+    for id in block.id_children() {
+      if !isnull(id.name) {
+        self.interfaces!.set(sym(id.name!.name), id)
+      }
+    }
+
+    // Register type aliases
+    for ta in block.ta_children() {
+      if !isnull(ta.name) {
+        self.type_aliases!.set(sym(ta.name!.name), ta.type_expr!)
+      }
+    }
+
+    // Register function signatures
+    for fd in block.fd_children() {
+      if !isnull(fd.name) {
+        let key = if !isnull(fd.receiver_type) {
+          fd.receiver_type!.name + "." + fd.name!.name
+        } else {
+          fd.name!.name
+        }
+        self.func_sigs!.set(sym(key), fd)
+      }
+    }
+
+    // Register class methods
+    for cd in block.cd_children() {
+      if !isnull(cd.name) {
+        for m in cd.cm_children() {
+          if !isnull(m.name) {
+            let key = cd.name!.name + "." + m.name!.name
+            self.func_sigs!.set(sym(key), m)
+          }
+        }
+      }
+    }
+  }
+
+  // ---------- Phase 2: Top-level lowering ----------
+
+  func Lowerer.lower_file(self, file: File?) -> LProgram? {
+    if isnull(file) {
+      return LProgram { package_name: "" }
+    }
+
+    // Phase 1: register all blocks
+    for block in file!.fb_children() {
+      self.register_block(block)
+    }
+
+    // Phase 2: lower all blocks
+    let mut structs: [LStructDecl] = []
+    let mut classes: [LClassDecl] = []
+    let mut enums: [LEnumDecl] = []
+    let mut ifaces: [LInterfaceDecl] = []
+    let mut functions: [LFuncDecl] = []
+    let mut globals: [LVarDeclData] = []
+    let mut imports: [LImport] = []
+    let mut type_defs: [LTypeDef] = []
+
+    for block in file!.fb_children() {
+
+      // Imports
+      for imp in block.imp_children() {
+        let alias = if !isnull(imp.alias) { imp.alias!.name } else { "" }
+        append(imports, LImport { alias: alias, path: imp.path })
+        if alias != "" {
+          self.import_aliases!.set(sym(alias), imp.path)
+        }
+      }
+
+      // Structs
+      for sd in block.sd_children() {
+        append(structs, self.lower_struct_decl(sd))
+      }
+
+      // Classes
+      for cd in block.cd_children() {
+        append(classes, self.lower_class_decl(cd))
+      }
+
+      // Enums
+      for ed in block.ed_children() {
+        append(enums, self.lower_enum_decl(ed))
+      }
+
+      // Interfaces
+      for id in block.id_children() {
+        let li = self.lower_interface_decl(id)
+        self.lowered_ifaces!.set(sym(li.name), li)
+        append(ifaces, li)
+      }
+
+      // Functions
+      for fd in block.fd_children() {
+        let lf = self.lower_func(fd)
+        if !isnull(lf) {
+          append(functions, lf!)
+        }
+      }
+
+      // Class methods
+      for cd in block.cd_children() {
+        if isnull(cd.name) { continue }
+        for m in cd.cm_children() {
+          let lf = self.lower_func_with_receiver(m, cd.name!.name)
+          if !isnull(lf) {
+            append(functions, lf!)
+          }
+        }
+      }
+
+      // Impl blocks
+      for ib in block.ib_children() {
+        let impl_funcs = self.lower_impl_block(ib)
+        for f in impl_funcs {
+          append(functions, f)
+        }
+      }
+
+      // Type aliases
+      for ta in block.ta_children() {
+        if !isnull(ta.name) {
+          append(type_defs, LTypeDef {
+            name: ta.name!.name,
+            typ: self.lower_type(ta.type_expr),
+            is_exported: ta.is_public
+          })
+        }
+      }
+
+      // Constants as globals
+      for c in block.con_children() {
+        if !isnull(c.name) {
+          let ct = if !isnull(c.type_expr) { self.lower_type(c.type_expr) } else { self.expr_type(c.value) }
+          let init = if !isnull(c.value) {
+            let saved = self.save_stmts()
+            let v = self.lower_expr(c.value)
+            self.restore_stmts(saved)
+            v
+          } else {
+            make_null_val(ct)
+          }
+          append(globals, LVarDeclData { name: c.name!.name, typ: ct, init: init, mutable: false })
+        }
+      }
+    }
+
+    let pname = if len(file!.fb_children()) > 0 && !isnull(file!.fb_children()[0].name) {
+      file!.fb_children()[0].name!.name
+    } else {
+      "main"
+    }
+
+    return LProgram {
+      package_name: pname,
+      imports: imports,
+      structs: structs,
+      classes: classes,
+      enums: enums,
+      interfaces: ifaces,
+      functions: functions,
+      globals: globals,
+      type_defs: type_defs,
+      impl_method_renames: self.impl_method_renames
+    }
+  }
+
+  // ---------- Declaration lowering ----------
+
+  func Lowerer.lower_struct_decl(self, sd: StructDecl?) -> LStructDecl {
+    let mut fields: [LField] = []
+    let mut tps: [LTypeParam] = []
+    if !isnull(sd) {
+      for f in sd!.sf_children() {
+        if !isnull(f.name) {
+          append(fields, LField { name: f.name!.name, typ: self.lower_type(f.type_expr) })
+        }
+      }
+      for tp in sd!.stp_children() {
+        if !isnull(tp.name) {
+          let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
+          append(tps, LTypeParam { name: tp.name!.name, constraint: c })
+        }
+      }
+    }
+    let name = if !isnull(sd) && !isnull(sd!.name) { sd!.name!.name } else { "" }
+    let exported = if !isnull(sd) { sd!.is_public } else { false }
+    return LStructDecl { name: name, fields: fields, type_params: tps, is_exported: exported }
+  }
+
+  func Lowerer.lower_class_decl(self, cd: ClassDecl?) -> LClassDecl {
+    let mut fields: [LField] = []
+    let mut tps: [LTypeParam] = []
+    let mut impls: [string] = []
+    if !isnull(cd) {
+      for f in cd!.cf_children() {
+        if !isnull(f.name) {
+          append(fields, LField { name: f.name!.name, typ: self.lower_type(f.type_expr) })
+        }
+      }
+      for tp in cd!.ctp_children() {
+        if !isnull(tp.name) {
+          let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
+          append(tps, LTypeParam { name: tp.name!.name, constraint: c })
+        }
+      }
+      for i in cd!.implements {
+        append(impls, i.name)
+      }
+    }
+    let name = if !isnull(cd) && !isnull(cd!.name) { cd!.name!.name } else { "" }
+    let exported = if !isnull(cd) { cd!.is_public } else { false }
+    return LClassDecl { name: name, fields: fields, type_params: tps, is_exported: exported, implements: impls }
+  }
+
+  func Lowerer.lower_enum_decl(self, ed: EnumDecl?) -> LEnumDecl {
+    let mut variants: [LVariant] = []
+    if !isnull(ed) {
+      let mut tag: i32 = 0
+      for v in ed!.ev_children() {
+        if !isnull(v.name) {
+          let mut vfields: [LField] = []
+          let mut fi = 0
+          for tf in v.evf_children() {
+            let fname = if !isnull(tf.name) { tf.name!.name } else { f"_{fi}" }
+
+            append(vfields, LField { name: fname, typ: self.lower_type(tf.type_expr) })
+            fi = fi + 1
+          }
+          append(variants, LVariant { name: v.name!.name, tag: tag, fields: vfields })
+          tag = tag + 1
+        }
+      }
+    }
+    let name = if !isnull(ed) && !isnull(ed!.name) { ed!.name!.name } else { "" }
+    let exported = if !isnull(ed) { ed!.is_public } else { false }
+    return LEnumDecl { name: name, variants: variants, is_exported: exported }
+  }
+
+  func Lowerer.lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl {
+    let mut methods: [LInterfaceMethod] = []
+    let mut tps: [LTypeParam] = []
+    let mut embeds: [string] = []
+    if !isnull(id) {
+      for m in id!.im_children() {
+        if !isnull(m.name) {
+          let mut params: [LParam] = []
+          for p in m.param_children() {
+            if !isnull(p.name) && !p.is_self {
+              append(params, LParam { name: p.name!.name, typ: self.lower_type(p.type_expr), mutable: p.is_mut })
+            }
+          }
+          let rt = self.lower_type(m.return_type)
+          let recv = if !isnull(m.receiver_type) { m.receiver_type!.name } else { "" }
+          append(methods, LInterfaceMethod { name: m.name!.name, receiver_type: recv, params: params, return_type: rt })
+        }
+      }
+      for tp in id!.itp_children() {
+        if !isnull(tp.name) {
+          let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
+          append(tps, LTypeParam { name: tp.name!.name, constraint: c })
+        }
+      }
+      for e in id!.ie_children() {
+        if !isnull(e.name) {
+          append(embeds, e.name!.name)
+        }
+      }
+    }
+    let name = if !isnull(id) && !isnull(id!.name) { id!.name!.name } else { "" }
+    let exported = if !isnull(id) { id!.is_public } else { false }
+    return LInterfaceDecl { name: name, type_params: tps, methods: methods, embeds: embeds, is_exported: exported }
+  }
+
+  // ---------- Impl block lowering ----------
+
+  func Lowerer.lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl] {
+    let mut result: [LFuncDecl] = []
+    if isnull(ib) || isnull(ib!.interface_name) {
+      return result
+    }
+
+    let iface_name = ib!.interface_name!.name
+
+    // Look up lowered interface (matches Go's l.ifaceDecls)
+    let iface_entry = self.lowered_ifaces!.get(sym(iface_name))
+    if isnull(iface_entry) { return result }
+    let iface = iface_entry!.value
+
+
+    // Build type param -> concrete type mappings (matches Go's typeArgMap + typeArgLTypeMap)
+    let mut type_arg_map: Dict<Sym, string> = Dict<Sym, string>()
+    let mut type_arg_ltype_map: Dict<Sym, LType> = Dict<Sym, LType>()
+    let ib_args = ib!.ib_arg_children()
+    let mut i = 0
+    for tp in iface.type_params {
+      if i < len(ib_args) {
+        let lt = self.lower_type(ib_args[i])
+        if !isnull(lt) {
+          type_arg_ltype_map.set(sym(tp.name), lt!)
+          type_arg_map.set(sym(tp.name), lt!.name)
+        }
+      }
+      i = i + 1
+    }
+
+    // Build rename key prefix: iface_name + @ + type_arg_names...
+    let mut rename_prefix = iface_name
+    for tp in iface.type_params {
+      let ta_entry = type_arg_map.get(sym(tp.name))
+      if !isnull(ta_entry) {
+        rename_prefix = rename_prefix + "@" + ta_entry!.value
+      }
+    }
+
+    // Lower each mapping
+    for mapping in ib!.ibm_children() {
+      if isnull(mapping.type_param) || isnull(mapping.method_name) { continue }
+
+      let type_param = mapping.type_param!.name
+      let method_name = mapping.method_name!.name
+
+      // Find the interface method matching TypeParam + MethodName
+      let mut iface_method_idx: i32 = -1
+      let mut mi = 0
+      for m in iface.methods {
+        if m.receiver_type == type_param && m.name == method_name {
+          iface_method_idx = mi
+        }
+        mi = mi + 1
+      }
+      if iface_method_idx < 0 { continue }
+      let iface_method = iface.methods[iface_method_idx]
+
+      // Get concrete class name from type arg map
+      let class_entry = type_arg_map.get(sym(type_param))
+      if isnull(class_entry) { continue }
+      let class_name = class_entry!.value
+
+      // Get full LType for self (preserves TypeArgs for generic classes)
+      let self_ltype_entry = type_arg_ltype_map.get(sym(type_param))
+      let self_type = if !isnull(self_ltype_entry) {
+        self_ltype_entry!.value
+      } else {
+        LType { kind: TyClassHandle, name: class_name, bits: 0, is_exported: false }
+      }
+
+      match mapping.kind {
+        Alias => {
+          // Substitute type vars with concrete types
+          let mut params: [LParam] = []
+          append(params, LParam { name: "self", typ: self_type, mutable: false })
+          for p in iface_method.params {
+            let subst = self.subst_impl_type(p.typ, type_arg_ltype_map)
+            append(params, LParam { name: p.name, typ: subst, mutable: p.mutable })
+          }
+          let rt = self.subst_impl_type(iface_method.return_type, type_arg_ltype_map)
+
+          // Wrapper name and target
+          let wrapper_name = class_name + "_" + method_name
+          let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
+
+          // Build forwarding call body — use method call on self (not static call)
+          let mut call_args: [LValue?] = []
+          // Only non-self params (self is the receiver)
+          for i in range(1, len(params)) {
+            append(call_args, make_var_val(params[i].name, params[i].typ))
+          }
+
+          self.temp_id = 0
+          let saved = self.save_stmts()
+          let call_expr = LExpr {
+            kind: ExMethodCall,
+            typ: rt,
+            method_call: LMethodCallData { receiver: make_var_val("self", self_type), method: target_member, args: call_args, mut_args: [], is_exported: false }
+          }
+
+          if !isnull(rt) && rt!.kind is TyUnit {
+            let tid = self.next_temp()
+            self.emit(LStmt { kind: StTempDef, temp_def: LTempDef { id: tid, expr: call_expr } })
+            self.emit(LStmt { kind: StExpr, expr_stmt: LExprStmtData { temp_id: tid } })
+          } else {
+            let tv = self.emit_temp(call_expr)
+            self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [tv] } })
+          }
+
+          let body = self.stmts
+          self.restore_stmts(saved)
+
+          append(result, LFuncDecl {
+            name: method_name,
+            params: params,
+            return_type: rt,
+            body: body,
+            is_exported: true,
+            receiver: class_name
+          })
+        }
+        Inline => {
+          if !isnull(mapping.inline_func) {
+            let wrapper_name = class_name + "_" + method_name
+            let rename_key = rename_prefix + "@" + class_name + "@" + method_name
+            self.impl_method_renames!.set(sym(rename_key), wrapper_name)
+            self.impl_method_renames!.set(sym(class_name + "." + method_name), wrapper_name)
+            let lf = self.lower_func_with_receiver(mapping.inline_func, class_name)
+            if !isnull(lf) {
+              let mut f = lf!
+              f.name = wrapper_name
+              append(result, f)
+            }
+          }
+        }
+        FieldBind => {
+          // Field binding: P.children <-> Folder.items
+          // Uses target_member for the concrete field name (label-prefixed)
+          let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
+
+          // Determine getter vs setter from interface method signature
+          let is_setter = len(iface_method.params) > 0
+          let concrete_name = if is_setter { "set_" + target_member } else { target_member }
+
+          // Register rename with @-delimited key
+          let rename_key = rename_prefix + "@" + class_name + "@" + method_name
+          self.impl_method_renames!.set(sym(rename_key), concrete_name)
+          self.impl_method_renames!.set(sym(class_name + "." + method_name), concrete_name)
+
+          let self_param = LParam { name: "self", typ: self_type, mutable: false }
+
+          if is_setter {
+            // Setter: set the field
+            let val_type = self.subst_impl_type(iface_method.params[0].typ, type_arg_ltype_map)
+
+            self.temp_id = 0
+            let saved = self.save_stmts()
+            self.emit(LStmt { kind: StClassSet, class_set: LClassSetData {
+              handle: make_var_val("self", self_type),
+              class_name: class_name,
+              field: target_member,
+              value: make_var_val("val", val_type)
+            } })
+
+            let body = self.stmts
+            self.restore_stmts(saved)
+
+            append(result, LFuncDecl {
+              name: concrete_name,
+              params: [self_param, LParam { name: "val", typ: val_type, mutable: false }],
+              return_type: nil,
+              body: body,
+              is_exported: true,
+              receiver: class_name
+            })
+          } else {
+            // Getter: return the field
+            let ret_type = self.subst_impl_type(iface_method.return_type, type_arg_ltype_map)
+
+            self.temp_id = 0
+            let saved = self.save_stmts()
+            let get_expr = LExpr {
+              kind: ExClassGet,
+              typ: ret_type,
+              class_get: LClassGetData { handle: make_var_val("self", self_type), class_name: class_name, field: target_member }
+            }
+            let tv = self.emit_temp(get_expr)
+            self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [tv] } })
+
+            let body = self.stmts
+            self.restore_stmts(saved)
+
+            append(result, LFuncDecl {
+              name: concrete_name,
+              params: [self_param],
+              return_type: ret_type,
+              body: body,
+              is_exported: true,
+              receiver: class_name
+            })
+          }
+        }
+      }
+    }
+
+    return result
+  }
+
+  func Lowerer.subst_impl_type(self, t: LType?, argmap: Dict<Sym, LType>) -> LType? {
+    if isnull(t) { return t }
+    if t!.kind is TyTypeVar {
+      let sub_entry = argmap.get(sym(t!.name))
+      if !isnull(sub_entry) { return sub_entry!.value }
+      return t
+    }
+    if t!.kind is TyOptional {
+      return LType { kind: TyOptional, name: "", elem: self.subst_impl_type(t!.elem, argmap), bits: 0, is_exported: false }
+    }
+    if t!.kind is TySlice {
+      return LType { kind: TySlice, name: "", elem: self.subst_impl_type(t!.elem, argmap), bits: 0, is_exported: false }
+    }
+    if t!.kind is TyMap {
+      return LType { kind: TyMap, name: "", key: self.subst_impl_type(t!.key, argmap), elem: self.subst_impl_type(t!.elem, argmap), bits: 0, is_exported: false }
+    }
+    if t!.kind is TyFuncPtr {
+      let mut ps: [LType?] = []
+      for p in t!.params {
+        append(ps, self.subst_impl_type(p, argmap))
+      }
+      return LType { kind: TyFuncPtr, name: "", params: ps, ret: self.subst_impl_type(t!.ret, argmap), bits: 0, is_exported: false }
+    }
+    // Struct/class with type args
+    if len(t!.type_args) > 0 {
+      let mut ta: [LType?] = []
+      for p in t!.type_args {
+        append(ta, self.subst_impl_type(p, argmap))
+      }
+      return LType { kind: t!.kind, name: t!.name, type_args: ta, bits: t!.bits, is_exported: t!.is_exported }
+    }
+    return t
+  }
+
+  // ---------- Function lowering ----------
+
+  func Lowerer.lower_func(self, fd: FuncDecl?) -> LFuncDecl? {
+    let receiver = if !isnull(fd) && !isnull(fd!.receiver_type) { fd!.receiver_type!.name } else { "" }
+    return self.lower_func_with_receiver(fd, receiver)
+  }
+
+  func Lowerer.lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl? {
+    if isnull(fd) || isnull(fd!.name) { return nil }
+
+    let fname = fd!.name!.name
+
+    // Type params
+    let mut tps: [LTypeParam] = []
+    for tp in fd!.fp_children() {
+      if !isnull(tp.name) {
+        let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
+        append(tps, LTypeParam { name: tp.name!.name, constraint: c })
+      }
+    }
+
+    // Params
+    let mut params: [LParam] = []
+    let old_scope = self.scope
+    self.scope = Dict<Sym, LType> {}
+    // Copy old scope entries? No — functions have their own scope.
+
+    // Add self param for methods
+    if receiver != "" {
+      // Build type_args from class type params (matching Go lowerer behavior)
+      let mut self_type_args: [LType?] = []
+      let cls_entry = self.classes!.get(sym(receiver))
+      if !isnull(cls_entry) {
+        for tp in cls_entry!.value.ctp_children() {
+          if !isnull(tp.name) {
+            append(self_type_args, LType { kind: TyTypeVar, name: tp.name!.name, bits: 0, is_exported: false })
+          }
+        }
+      }
+      let self_type = LType { kind: TyClassHandle, name: receiver, type_args: self_type_args, bits: 0, is_exported: false }
+      append(params, LParam { name: "self", typ: self_type, mutable: false })
+      self.define_var("self", self_type)
+    }
+
+    for p in fd!.param_children() {
+      if !isnull(p.name) && !p.is_self {
+        let pt = self.lower_type(p.type_expr)
+        append(params, LParam { name: p.name!.name, typ: pt, mutable: p.is_mut })
+        self.define_var(p.name!.name, pt)
+      }
+    }
+
+    let rt = self.lower_type(fd!.return_type)
+    let old_return = self.current_func_return
+    self.current_func_return = rt
+
+    // Lower body
+    self.temp_id = 0
+    let saved = self.save_stmts()
+
+    if !isnull(fd!.body) {
+      self.lower_block(fd!.body)
+    }
+
+    let body = self.stmts
+    self.restore_stmts(saved)
+    self.scope = old_scope
+    self.current_func_return = old_return
+
+    // Where clauses → relational constraints
+    let mut constraints: [LRelationalConstraint] = []
+    for wc in fd!.where_children() {
+      if !isnull(wc.constraint) {
+        let mut wc_args: [string] = []
+        for a in wc.wc_arg_children() {
+          match a.kind {
+            Named(n, _) => { append(wc_args, n.name) }
+            _ => {}
+          }
+        }
+        append(constraints, LRelationalConstraint {
+          interface_name: wc.constraint!.name,
+          type_args: wc_args
+        })
+      }
+    }
+
+    // Receiver type params
+    let mut recv_tps: [LTypeParam] = []
+    if receiver != "" && self.classes!.has(sym(receiver)) {
+      let cd_entry = self.classes!.get(sym(receiver))
+      let cd = if !isnull(cd_entry) { cd_entry!.value } else { nil }
+      if !isnull(cd) {
+        for tp in cd!.ctp_children() {
+          if !isnull(tp.name) {
+            let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
+            append(recv_tps, LTypeParam { name: tp.name!.name, constraint: c })
+          }
+        }
+      }
+    }
+
+    return LFuncDecl {
+      name: fname,
+      type_params: tps,
+      params: params,
+      return_type: rt,
+      body: body,
+      is_exported: fd!.is_public,
+      receiver: receiver,
+      receiver_type_params: recv_tps,
+      relational_constraints: constraints
+    }
+  }
+
+  // ---------- Block/statement lowering ----------
+
+  func Lowerer.lower_block(self, block: Block?) {
+    if isnull(block) { return }
+    for s in block!.bs_children() {
+      self.lower_stmt(s)
+    }
+  }
+
+  func Lowerer.lower_block_as_stmts(self, block: Block?) -> [LStmt?] {
+    let saved = self.save_stmts()
+    self.lower_block(block)
+    let result = self.stmts
+    self.restore_stmts(saved)
+    return result
+  }
+
+  func Lowerer.lower_stmt(self, s: Stmt?) {
+    if isnull(s) { return }
+    match s!.kind {
+      VarDecl(name, names, type_expr, is_mut, value) => {
+        self.lower_var_decl(name, names, type_expr, is_mut, value)
+      }
+      Assign(target, value) => {
+        self.lower_assign(target, value)
+      }
+      Return(value) => {
+        self.lower_return(value)
+      }
+      ExprStmt(expr) => {
+        let v = self.lower_expr(expr)
+        if !isnull(v) && !(v!.kind is ValLitNull) {
+          self.emit(LStmt { kind: StExpr, expr_stmt: LExprStmtData { temp_id: v!.temp_id } })
+        }
+      }
+      If(condition, then_block, else_ifs, else_block) => {
+        self.lower_if(condition, then_block, else_ifs, else_block)
+      }
+      For(var_name, index_var, collection, body) => {
+        self.lower_for(var_name, index_var, collection, body)
+      }
+      While(condition, body) => {
+        self.lower_while(condition, body)
+      }
+      Match(value, arms) => {
+        self.lower_match(value, arms)
+      }
+      BlockStmt(block) => {
+        let inner = self.lower_block_as_stmts(block)
+        self.emit(LStmt { kind: StBlock, block: LBlockData { stmts: inner } })
+      }
+      Break => {
+        self.emit(LStmt { kind: StBreak })
+      }
+      Continue => {
+        self.emit(LStmt { kind: StContinue })
+      }
+      Spawn(body) => {
+        let inner = self.lower_block_as_stmts(body)
+        self.emit(LStmt { kind: StSpawn, spawn_data: LSpawnData { body: inner, captures: [] } })
+      }
+      Select(cases) => {
+        self.lower_select(cases)
+      }
+      Yield(value) => {
+        let v = if !isnull(value) { self.lower_expr(value) } else { nil }
+        self.emit(LStmt { kind: StYield, yield_data: LYieldData { value: v } })
+      }
+      Lock(mutex, body) => {
+        let mv = self.lower_expr(mutex)
+        let inner = self.lower_block_as_stmts(body)
+        self.emit(LStmt { kind: StLock, lock_data: LLockData { mutex: mv, body: inner } })
+      }
+      IfLet(pattern, value, then_block, else_block) => {
+        self.lower_if_let(pattern, value, then_block, else_block)
+      }
+      LetElse(pattern, value, else_block) => {
+        self.lower_let_else(pattern, value, else_block)
+      }
+      Cascade(body) => {
+        // Lower cascade block inline
+        self.lower_block(body)
+      }
+    }
+  }
+
+  // ---------- Variable declaration ----------
+
+  func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?) {
+    // Multi-var destructuring
+    if len(names) > 0 {
+      let v = if !isnull(value) { self.lower_expr(value) } else { nil }
+      let mut i = 0
+      for n in names {
+        let ft = if !isnull(v) && v!.typ!.kind is TyTuple && i < len(v!.typ!.fields) {
+          v!.typ!.fields[i].typ
+        } else if !isnull(v) && v!.typ!.kind is TyErrorResult && i == 0 {
+          v!.typ!.elem
+        } else if !isnull(v) && v!.typ!.kind is TyErrorResult && i == 1 {
+          LType { kind: TyError, name: "", bits: 0, is_exported: false }
+        } else {
+          LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+        }
+        // Match Go lowerer: emit VarDecl with Init = original value directly.
+        // The optimizer's destructure_multi_return pass will coalesce
+        // consecutive VarDecls referencing the same temp into StMultiAssign.
+        self.emit(LStmt {
+          kind: StVarDecl,
+          var_decl: LVarDeclData { name: n.name, typ: ft, init: v, mutable: is_mut }
+        })
+        self.define_var(n.name, ft)
+        i = i + 1
+      }
+      return
+    }
+
+    // Single var
+    let typ = if !isnull(type_expr) {
+      self.lower_type(type_expr)
+    } else if !isnull(value) {
+      self.expr_type(value)
+    } else {
+      LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+    }
+
+    let init = if !isnull(value) { self.lower_expr(value) } else { make_null_val(typ) }
+
+
+    // Propagate declared type to empty/untyped slice init (e.g. let x: [Token] = [])
+
+    // Propagate declared type to empty/untyped slice init (e.g. let x: [Token] = [])
+    if !isnull(init) && !isnull(typ) && typ!.kind is TySlice {
+      if !isnull(init!.typ) && init!.typ!.kind is TySlice {
+        let elem_bad = isnull(init!.typ!.elem) || init!.typ!.elem!.kind is TyAny || init!.typ!.elem!.kind is TyUnit
+        if elem_bad {
+          init!.typ = typ
+          // Also update the underlying temp's expression type
+          if init!.kind is ValTemp {
+            let mut si = len(self.stmts) - 1
+            while si >= 0 {
+              if self.stmts[si]!.kind is StTempDef {
+                let td = self.stmts[si]!.temp_def!
+                if td.id == init!.temp_id {
+                  td.expr!.typ = typ
+                  si = -1
+                } else {
+                  si = si - 1
+                }
+              } else {
+                si = si - 1
+              }
+            }
+          }
+        }
+      }
+    }
+
+    self.emit(LStmt {
+      kind: StVarDecl,
+      var_decl: LVarDeclData { name: name.name, typ: typ, init: init, mutable: is_mut }
+    })
+    self.define_var(name.name, typ)
+  }
+
+  // ---------- Assignment ----------
+
+  func Lowerer.lower_assign(self, target: Expr?, value: Expr?) {
+    let rhs = self.lower_expr(value)
+
+    match target!.kind {
+      Ident(name) => {
+        self.emit(LStmt { kind: StAssign, assign: LAssignData { target: name.name, value: rhs } })
+      }
+      FieldAccess(receiver, field_name) => {
+        // Check for slice[i].field = val pattern — must emit lvalue chain, not copy-then-modify
+        match receiver!.kind {
+          Index(idx_recv, idx_index) => {
+            let recv_type = self.expr_type(receiver)
+            if !isnull(recv_type) && recv_type!.kind is TyClassHandle {
+              // Class element — pointer dereference, normal ClassSet works
+              let recv = self.lower_expr(receiver)
+              self.emit(LStmt {
+                kind: StClassSet,
+                class_set: LClassSetData { handle: recv, class_name: recv_type!.name, field: field_name.name, value: rhs }
+              })
+            } else {
+              // Struct element — slice[i].field = val needs LStmtIndexSet with field
+              let coll = self.lower_expr(idx_recv)
+              let idx = self.lower_expr(idx_index)
+              self.emit(LStmt {
+                kind: StIndexSet,
+                index_set: LIndexSetData { collection: coll, index: idx, value: rhs, field: field_name.name }
+              })
+            }
+          }
+          _ => {
+            let recv = self.lower_expr(receiver)
+            let recv_type = self.expr_type(receiver)
+            if recv_type!.kind is TyClassHandle {
+              self.emit(LStmt {
+                kind: StClassSet,
+                class_set: LClassSetData { handle: recv, class_name: recv_type!.name, field: field_name.name, value: rhs }
+              })
+            } else {
+              self.emit(LStmt {
+                kind: StStructSet,
+                struct_set: LStructSetData { receiver: recv, field: field_name.name, value: rhs }
+              })
+            }
+          }
+        }
+      }
+      Index(receiver, index) => {
+        let recv = self.lower_expr(receiver)
+        let idx = self.lower_expr(index)
+        self.emit(LStmt {
+          kind: StIndexSet,
+          index_set: LIndexSetData { collection: recv, index: idx, value: rhs, field: "" }
+        })
+      }
+      _ => {
+        // Shouldn't happen for well-formed AST
+      }
+    }
+  }
+
+  // ---------- Return ----------
+
+  func Lowerer.lower_return(self, value: Expr?) {
+    if isnull(value) {
+      self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [] } })
+      return
+    }
+
+    // Check if return type is error result
+    if self.current_func_return!.kind is TyErrorResult || self.current_func_return!.kind is TyTuple {
+      // Check if returning a tuple literal for (T, error)
+      match value!.kind {
+        TupleLit(elems) => {
+          let mut vals: [LValue?] = []
+          for e in elems {
+            append(vals, self.lower_expr(e))
+          }
+          self.emit(LStmt { kind: StReturn, ret: LReturnData { values: vals } })
+          return
+        }
+        _ => {}
+      }
+    }
+
+    let v = self.lower_expr(value)
+    self.emit(LStmt { kind: StReturn, ret: LReturnData { values: [v] } })
+  }
+
+  // ---------- If ----------
+
+  func Lowerer.lower_if(self, condition: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?) {
+    let cv = self.lower_expr(condition)
+    let then_body = self.lower_block_as_stmts(then_block)
+    let else_body = self.lower_else_ifs(else_ifs, else_block)
+    self.emit(LStmt {
+      kind: StIf,
+      if_data: LIfData { cond: cv, then_body: then_body, else_body: else_body }
+    })
+  }
+
+  func Lowerer.lower_else_ifs(self, else_ifs: [ElseIf], final_else: Block?) -> [LStmt?] {
+    if len(else_ifs) == 0 {
+      if !isnull(final_else) {
+        return self.lower_block_as_stmts(final_else)
+      }
+      return []
+    }
+
+    let ei = else_ifs[0]
+    let rest_eis: [ElseIf] = []
+    let mut i = 1
+    while i < len(else_ifs) {
+      append(rest_eis, else_ifs[i])
+      i = i + 1
+    }
+
+    if isnull(ei.condition) {
+      // else block
+      return self.lower_block_as_stmts(ei.body)
+    }
+
+    let saved = self.save_stmts()
+    let cv = self.lower_expr(ei.condition)
+    let then_body = self.lower_block_as_stmts(ei.body)
+    let else_body = self.lower_else_ifs(rest_eis, final_else)
+    self.emit(LStmt {
+      kind: StIf,
+      if_data: LIfData { cond: cv, then_body: then_body, else_body: else_body }
+    })
+    let result = self.stmts
+    self.restore_stmts(saved)
+
+    // Need to merge: the cond stmts + the if stmt
+    return result
+  }
+
+  func Lowerer.lower_else_ifs_with_result(self, else_ifs: [ElseIf], final_else: Block?, result_name: string, result_type: LType?) {
+    if len(else_ifs) == 0 {
+      if !isnull(final_else) {
+        self.lower_arm_body(final_else, result_name, result_type)
+      }
+      return
+    }
+
+    let ei = else_ifs[0]
+    let rest_eis: [ElseIf] = []
+    let mut i = 1
+    while i < len(else_ifs) {
+      append(rest_eis, else_ifs[i])
+      i = i + 1
+    }
+
+    if isnull(ei.condition) {
+      // else block
+      self.lower_arm_body(ei.body, result_name, result_type)
+      return
+    }
+
+    let cv = self.lower_expr(ei.condition)
+    let saved_then = self.save_stmts()
+    self.lower_arm_body(ei.body, result_name, result_type)
+    let then_body = self.stmts
+    self.restore_stmts(saved_then)
+
+    let saved_else = self.save_stmts()
+    self.lower_else_ifs_with_result(rest_eis, final_else, result_name, result_type)
+    let else_body = self.stmts
+    self.restore_stmts(saved_else)
+
+    self.emit(LStmt {
+      kind: StIf,
+      if_data: LIfData { cond: cv, then_body: then_body, else_body: else_body }
+    })
+  }
+
+  // ---------- While ----------
+
+  func Lowerer.lower_while(self, condition: Expr?, body: Block?) {
+    // Condition needs to be re-evaluated each iteration → cond_block
+    let saved = self.save_stmts()
+    let cv = self.lower_expr(condition)
+    let cond_stmts = self.stmts
+    self.restore_stmts(saved)
+
+    let body_stmts = self.lower_block_as_stmts(body)
+
+    self.emit(LStmt {
+      kind: StWhile,
+      while_data: LWhileData { cond_block: cond_stmts, cond_var: cv, body: body_stmts }
+    })
+  }
+
+  // ---------- For ----------
+
+  func Lowerer.lower_for(self, var_name: Sym, index_var: Sym?, collection: Expr?, body: Block?) {
+    let coll = self.lower_expr(collection)
+    let coll_type = self.expr_type(collection)
+
+    // Determine element type
+    let elem_type = if !isnull(coll_type) && (coll_type!.kind is TySlice || coll_type!.kind is TyGenerator || coll_type!.kind is TyChannel) {
+      coll_type!.elem
+    } else if !isnull(coll_type) && coll_type!.kind is TyMap {
+      // For maps, iterate over keys (the type of each element depends on context)
+      coll_type!.key
+    } else if !isnull(coll_type) && coll_type!.kind is TyString {
+      lir_uint_type(8)
+    } else {
+      LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+    }
+
+    // Define loop var in scope
+    self.define_var(var_name.name, elem_type)
+    let idx_name = if !isnull(index_var) { index_var!.name } else { "" }
+    if idx_name != "" {
+      self.define_var(idx_name, lir_int_type(32))
+    }
+
+    let body_stmts = self.lower_block_as_stmts(body)
+
+    self.emit(LStmt {
+      kind: StFor,
+      for_data: LForData {
+        var_name: var_name.name,
+        var_type: elem_type,
+        index_var: idx_name,
+        collection: coll,
+        body: body_stmts
+      }
+    })
+  }
+
+  // ---------- Select ----------
+
+  func Lowerer.lower_select(self, cases: [SelectCase]) {
+    let mut lcases: [LSelectCase] = []
+    for c in cases {
+      if c.is_default {
+        let body = self.lower_block_as_stmts(c.body)
+        append(lcases, LSelectCase {
+          kind: SelDefault,
+          binding: "",
+          body: body
+        })
+      } else {
+        let bind = if !isnull(c.bind_var) { c.bind_var!.name } else { "" }
+        let body = self.lower_block_as_stmts(c.body)
+        // Pattern-match on AST to extract channel without executing the operation
+        match c.expr!.kind {
+          MethodCall(receiver, method, type_args, args, mut_args) => {
+            let ch_val = self.lower_expr(receiver)
+            if method.get_name() == "send" {
+              let send_val = self.lower_expr(args[0])
+              append(lcases, LSelectCase {
+                kind: SelSend,
+                channel: ch_val,
+                value: send_val,
+                binding: bind,
+                body: body
+              })
+            } else {
+              // receive
+              append(lcases, LSelectCase {
+                kind: SelRecv,
+                channel: ch_val,
+                binding: bind,
+                body: body
+              })
+            }
+          }
+          _ => {
+            // Fallback: treat as recv
+            let ch_val = self.lower_expr(c.expr)
+            append(lcases, LSelectCase {
+              kind: SelRecv,
+              channel: ch_val,
+              binding: bind,
+              body: body
+            })
+          }
+        }
+      }
+    }
+    self.emit(LStmt { kind: StSelect, select_data: LSelectData { cases: lcases } })
+  }
+
+  // ---------- if let / let else ----------
+
+  func Lowerer.lower_if_let(self, pattern: Pattern?, value: Expr?, then_block: Block?, else_block: Block?) {
+    // `if let Variant(x) = expr { ... }` → lower as match
+    let v = self.lower_expr(value)
+
+    // Check if optional unwrap: `if let x = optional_expr`
+    match pattern!.kind {
+      Ident(name) => {
+        // Optional unwrap: if !isnull(val) { let name = unwrap(val); ... }
+        let is_null_expr = LExpr {
+          kind: ExIsNull,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          is_null: LIsNullData { value: v }
+        }
+        let is_null_val = self.emit_temp(is_null_expr)
+
+        // Negate
+        let not_null = LExpr {
+          kind: ExUnOp,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          un_op: LUnOpData { op: UnNot, operand: is_null_val }
+        }
+        let cond = self.emit_temp(not_null)
+
+        // Then: unwrap + body
+        let saved = self.save_stmts()
+        let inner_type = if !isnull(v) && !isnull(v!.typ) && v!.typ!.kind is TyOptional { v!.typ!.elem } else { v!.typ }
+        let unwrap_expr = LExpr {
+          kind: ExUnwrapOptional,
+          typ: inner_type,
+          unwrap_opt: LUnwrapOptionalData { value: v }
+        }
+        let uv = self.emit_temp(unwrap_expr)
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false } })
+        self.define_var(name.name, inner_type)
+        self.lower_block(then_block)
+        let then_body = self.stmts
+        self.restore_stmts(saved)
+
+        let mut else_body: [LStmt?] = []
+        if !isnull(else_block) { else_body = self.lower_block_as_stmts(else_block) }
+
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: cond, then_body: then_body, else_body: else_body }
+        })
+      }
+      Variant(vname, bindings) => {
+        // Enum variant: if tag matches, destructure
+        let val_type = self.expr_type(value)
+        let enum_name = if !isnull(val_type) { val_type!.name } else { "" }
+        let tag = self.find_variant_tag(enum_name, vname.name)
+
+        // Get tag
+        let tag_expr = LExpr {
+          kind: ExVariantTag,
+          typ: lir_int_type(32),
+          variant_tag: LVariantTagData { value: v }
+        }
+        let tag_val = self.emit_temp(tag_expr)
+
+        // Compare
+        let cmp = LExpr {
+          kind: ExBinOp,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          bin_op: LBinOpData { op: BinEq, left: tag_val, right: make_int_val(tag as i64, 32) }
+        }
+        let cond = self.emit_temp(cmp)
+
+        // Then: destructure + body
+        let saved = self.save_stmts()
+        self.emit_variant_bindings(v, enum_name, vname.name, bindings)
+        self.lower_block(then_block)
+        let then_body = self.stmts
+        self.restore_stmts(saved)
+
+        let mut else_body: [LStmt?] = []
+        if !isnull(else_block) { else_body = self.lower_block_as_stmts(else_block) }
+
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: cond, then_body: then_body, else_body: else_body }
+        })
+      }
+      _ => {
+        // Fallback
+        let then_body = self.lower_block_as_stmts(then_block)
+        let mut else_body: [LStmt?] = []
+        if !isnull(else_block) { else_body = self.lower_block_as_stmts(else_block) }
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: make_bool_val(true), then_body: then_body, else_body: else_body }
+        })
+      }
+    }
+  }
+
+  func Lowerer.lower_let_else(self, pattern: Pattern?, value: Expr?, else_block: Block?) {
+    // `let Variant(x) = expr else { return }` → if-not-match, else block, then continue
+    // For now, implement as if-let with inverted logic
+    let v = self.lower_expr(value)
+
+    match pattern!.kind {
+      Ident(name) => {
+        // Optional unwrap
+        let is_null_expr = LExpr {
+          kind: ExIsNull,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          is_null: LIsNullData { value: v }
+        }
+        let is_null_val = self.emit_temp(is_null_expr)
+
+        // If null → else block (which must diverge)
+        let else_body = self.lower_block_as_stmts(else_block)
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: is_null_val, then_body: else_body, else_body: [] }
+        })
+
+        // After: unwrap and bind
+        let inner_type = if !isnull(v) && !isnull(v!.typ) && v!.typ!.kind is TyOptional { v!.typ!.elem } else { v!.typ }
+        let unwrap_expr = LExpr {
+          kind: ExUnwrapOptional,
+          typ: inner_type,
+          unwrap_opt: LUnwrapOptionalData { value: v }
+        }
+        let uv = self.emit_temp(unwrap_expr)
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false } })
+        self.define_var(name.name, inner_type)
+      }
+      Variant(vname, bindings) => {
+        let val_type = self.expr_type(value)
+        let enum_name = if !isnull(val_type) { val_type!.name } else { "" }
+        let tag = self.find_variant_tag(enum_name, vname.name)
+
+        let tag_expr = LExpr {
+          kind: ExVariantTag,
+          typ: lir_int_type(32),
+          variant_tag: LVariantTagData { value: v }
+        }
+        let tag_val = self.emit_temp(tag_expr)
+
+        let cmp = LExpr {
+          kind: ExBinOp,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          bin_op: LBinOpData { op: BinNe, left: tag_val, right: make_int_val(tag as i64, 32) }
+        }
+        let not_match = self.emit_temp(cmp)
+
+        let else_body = self.lower_block_as_stmts(else_block)
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: not_match, then_body: else_body, else_body: [] }
+        })
+
+        // After: destructure
+        self.emit_variant_bindings(v, enum_name, vname.name, bindings)
+      }
+      _ => {}
+    }
+  }
+
+  func Lowerer.emit_variant_bindings(self, val: LValue?, enum_name: string, variant: string, bindings: [Pattern]) {
+    let mut i = 0
+    for b in bindings {
+      match b.kind {
+        Ident(bname) => {
+          let fname = self.find_variant_field_name(enum_name, variant, i)
+          let ftype = self.get_variant_field_type(enum_name, variant, i)
+          let data_expr = LExpr {
+            kind: ExVariantData,
+            typ: ftype,
+            variant_data: LVariantDataData { value: val, enum_name: enum_name, variant: variant, field: fname }
+          }
+          let dv = self.emit_temp(data_expr)
+          self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ftype, init: dv, mutable: false } })
+          self.define_var(bname.name, ftype)
+        }
+        Wildcard => {}
+        _ => {}
+      }
+      i = i + 1
+    }
+  }
+
+  // ---------- Match ----------
+
+  func Lowerer.lower_match(self, value: Expr?, arms: [MatchArm]) {
+    let v = self.lower_expr(value)
+    let val_type = self.expr_type(value)
+
+    // Determine if this is an enum match
+    if !isnull(val_type) && val_type!.kind is TyTaggedUnion {
+      self.lower_enum_match(v, val_type!.name, arms)
+    } else if self.is_union_match(val_type, arms) {
+      self.emit_union_type_switch(v, val_type, arms, "", nil)
+    } else {
+      // Non-enum match: lower as if-else chain
+      self.lower_match_as_if_else(v, val_type, arms, "", nil)
+    }
+  }
+
+  // is_union_match checks if this is a union type match (match on union/any with type patterns).
+  func Lowerer.is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool {
+    if isnull(val_type) {
+      return false
+    }
+    if val_type!.kind is TyUnion || val_type!.kind is TyAny {
+      // Check if any arm has an ident pattern that looks like a type name
+      for arm in arms {
+        if !isnull(arm.pattern) && arm.pattern!.kind is Ident {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  // emit_union_type_switch emits a LStmtTypeSwitch for union type matching.
+  func Lowerer.emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?) {
+    let mut cases: [LTypeSwitchCase] = []
+    for arm in arms {
+      if isnull(arm.pattern) { continue }
+      let saved = self.save_stmts()
+      match arm.pattern!.kind {
+        Wildcard => {
+          if result_name != "" {
+            self.lower_arm_body(arm.body, result_name, result_type)
+          } else {
+            self.lower_block(arm.body)
+          }
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LTypeSwitchCase { typ: nil, binding: "", body: body })
+        }
+        Ident(name) => {
+          let case_type = self.lyric_name_to_ltype(name.name)
+          if result_name != "" {
+            self.lower_arm_body(arm.body, result_name, result_type)
+          } else {
+            self.lower_block(arm.body)
+          }
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LTypeSwitchCase { typ: case_type, binding: "", body: body })
+        }
+        _ => {
+          self.restore_stmts(saved)
+        }
+      }
+    }
+    self.emit(LStmt {
+      kind: StTypeSwitch,
+      type_switch: LTypeSwitchData { value: val, cases: cases }
+    })
+  }
+
+  // lyric_name_to_ltype converts a Lyric type name to an LType (for union patterns).
+  func Lowerer.lyric_name_to_ltype(self, name: string) -> LType? {
+    match name {
+      "string" => { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+      "bool" => { return LType { kind: TyBool, name: "", bits: 0, is_exported: false } }
+      "i8" => { return LType { kind: TyI8, name: "", bits: 8, is_exported: false } }
+      "i16" => { return LType { kind: TyI16, name: "", bits: 16, is_exported: false } }
+      "i32" => { return LType { kind: TyI32, name: "", bits: 32, is_exported: false } }
+      "i64" => { return LType { kind: TyI64, name: "", bits: 64, is_exported: false } }
+      "f32" => { return LType { kind: TyF32, name: "", bits: 0, is_exported: false } }
+      "f64" => { return LType { kind: TyF64, name: "", bits: 0, is_exported: false } }
+      _ => { return LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
+    }
+  }
+
+  func Lowerer.lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm]) {
+    // Check for nested variant patterns like Some(Circle(r))
+    if self.has_nested_variant_patterns(arms) {
+      self.emit_nested_enum_match(val, enum_name, arms, "", nil)
+      return
+    }
+
+    // Get tag value
+    let tag_expr = LExpr {
+      kind: ExVariantTag,
+      typ: lir_int_type(32),
+      variant_tag: LVariantTagData { value: val }
+    }
+    let tag_val = self.emit_temp(tag_expr)
+
+    let mut cases: [LSwitchCase] = []
+    for arm in arms {
+      if isnull(arm.pattern) { continue }
+      match arm.pattern!.kind {
+        Variant(vname, bindings) => {
+          let tag = self.find_variant_tag(enum_name, vname.name)
+          let saved = self.save_stmts()
+          self.emit_variant_bindings(val, enum_name, vname.name, bindings)
+          self.lower_block(arm.body)
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+
+          // Handle additional patterns (pat1 | pat2)
+          for extra in arm.patterns {
+            match extra.kind {
+              Variant(vn2, bindings2) => {
+                let t2 = self.find_variant_tag(enum_name, vn2.name)
+                let s2 = self.save_stmts()
+                self.emit_variant_bindings(val, enum_name, vn2.name, bindings2)
+                self.lower_block(arm.body)
+                let b2 = self.stmts
+                self.restore_stmts(s2)
+                append(cases, LSwitchCase { tag: t2, binding: "", body: b2 })
+              }
+              Ident(n2) => {
+                // Unit variant (e.g. Nil) in multi-pattern
+                let t2 = self.find_variant_tag(enum_name, n2.name)
+                if t2 >= 0 {
+                  let s2 = self.save_stmts()
+                  self.lower_block(arm.body)
+                  let b2 = self.stmts
+                  self.restore_stmts(s2)
+                  append(cases, LSwitchCase { tag: t2, binding: "", body: b2 })
+                }
+              }
+              _ => {}
+            }
+          }
+        }
+        Ident(name) => {
+          // Check if it's a unit variant name
+          let tag = self.find_variant_tag(enum_name, name.name)
+          if tag >= 0 {
+            let saved = self.save_stmts()
+            self.lower_block(arm.body)
+            let body = self.stmts
+            self.restore_stmts(saved)
+            append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+          } else {
+            // Binding: capture whole value
+            let saved = self.save_stmts()
+            self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val!.typ, init: val, mutable: false } })
+            self.define_var(name.name, val!.typ)
+            self.lower_block(arm.body)
+            let body = self.stmts
+            self.restore_stmts(saved)
+            append(cases, LSwitchCase { tag: -1, binding: name.name, body: body })
+          }
+
+          // Multi-pattern
+          for extra in arm.patterns {
+            match extra.kind {
+              Ident(n2) => {
+                let t2 = self.find_variant_tag(enum_name, n2.name)
+                if t2 >= 0 {
+                  let s2 = self.save_stmts()
+                  self.lower_block(arm.body)
+                  let b2 = self.stmts
+                  self.restore_stmts(s2)
+                  append(cases, LSwitchCase { tag: t2, binding: "", body: b2 })
+                }
+              }
+              _ => {}
+            }
+          }
+        }
+        Wildcard => {
+          let saved = self.save_stmts()
+          self.lower_block(arm.body)
+          let body = self.stmts
+          self.restore_stmts(saved)
+          append(cases, LSwitchCase { tag: -1, binding: "", body: body })
+        }
+        _ => {}
+      }
+    }
+
+    self.emit(LStmt {
+      kind: StSwitch,
+      switch_data: LSwitchData { tag: tag_val, cases: cases, enum_name: enum_name }
+    })
+  }
+
+  func Lowerer.has_nested_variant_patterns(self, arms: [MatchArm]) -> bool {
+    for arm in arms {
+      if isnull(arm.pattern) { continue }
+      match arm.pattern!.kind {
+        Variant(vname, bindings) => {
+          for b in bindings {
+            if b.kind is Variant { return true }
+          }
+        }
+        _ => {}
+      }
+    }
+    return false
+  }
+
+  func Lowerer.arm_has_nested_variant(self, arm: MatchArm) -> bool {
+    if isnull(arm.pattern) { return false }
+    match arm.pattern!.kind {
+      Variant(vname, bindings) => {
+        for b in bindings {
+          if b.kind is Variant { return true }
+        }
+      }
+      _ => {}
+    }
+    return false
+  }
+
+  func Lowerer.emit_nested_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm], result_name: string, result_type: LType?) {
+    // Emit outer tag extraction
+    let tag_expr = LExpr {
+      kind: ExVariantTag,
+      typ: lir_int_type(32),
+      variant_tag: LVariantTagData { value: val }
+    }
+    let tag_val = self.emit_temp(tag_expr)
+
+    // Group arms by outer variant name
+    let group_keys: [string] = []
+    let group_arms = Dict<Sym, [MatchArm]>()
+    for arm in arms {
+      let mut key = ""
+      if !isnull(arm.pattern) {
+        match arm.pattern!.kind {
+          Variant(vname, bindings) => { key = vname.name }
+          Ident(iname) => {
+            let t = self.find_variant_tag(enum_name, iname.name)
+            if t >= 0 { key = iname.name }
+          }
+          _ => {}
+        }
+      }
+      let existing = group_arms.get(sym(key))
+      if existing != nil {
+        append(existing!.value, arm)
+        group_arms.set(sym(key), existing!.value)
+      } else {
+        append(group_keys, key)
+        group_arms.set(sym(key), [arm])
+      }
+    }
+
+    let mut cases: [LSwitchCase] = []
+    for gk in group_keys {
+      let g_arms = group_arms.get(sym(gk))!.value
+
+      // Simple arm with no nesting — use normal lowering
+      if len(g_arms) == 1 && !self.arm_has_nested_variant(g_arms[0]) {
+        let arm = g_arms[0]
+        if isnull(arm.pattern) { continue }
+        match arm.pattern!.kind {
+          Variant(vname, bindings) => {
+            let tag = self.find_variant_tag(enum_name, vname.name)
+            let saved = self.save_stmts()
+            self.emit_variant_bindings(val, enum_name, vname.name, bindings)
+            self.lower_arm_body(arm.body, result_name, result_type)
+            let body = self.stmts
+            self.restore_stmts(saved)
+            append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+          }
+          Ident(iname) => {
+            let tag = self.find_variant_tag(enum_name, iname.name)
+            let saved = self.save_stmts()
+            self.lower_arm_body(arm.body, result_name, result_type)
+            let body = self.stmts
+            self.restore_stmts(saved)
+            if tag >= 0 {
+              append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+            } else {
+              append(cases, LSwitchCase { tag: -1, binding: iname.name, body: body })
+            }
+          }
+          Wildcard => {
+            let saved = self.save_stmts()
+            self.lower_arm_body(arm.body, result_name, result_type)
+            let body = self.stmts
+            self.restore_stmts(saved)
+            append(cases, LSwitchCase { tag: -1, binding: "", body: body })
+          }
+          _ => {}
+        }
+        continue
+      }
+
+      // Nested variant arms — emit outer case with nested switch inside
+      let outer_arm = g_arms[0]
+      if isnull(outer_arm.pattern) { continue }
+      let outer_vp = match outer_arm.pattern!.kind {
+        Variant(vn, _) => { vn.name }
+        _ => { continue }
+      }
+      let outer_tag = self.find_variant_tag(enum_name, outer_vp)
+
+      let saved_outer = self.save_stmts()
+
+      // Extract inner value (first field of outer variant)
+      let inner_field_name = self.find_variant_field_name(enum_name, outer_vp, 0)
+      let inner_field_type = self.get_variant_field_type(enum_name, outer_vp, 0)
+      let inner_val = self.emit_temp(LExpr {
+        kind: ExVariantData,
+        typ: inner_field_type,
+        variant_data: LVariantDataData { value: val, enum_name: enum_name, variant: outer_vp, field: inner_field_name }
+      })
+
+      // Determine inner enum name from first nested variant
+      let mut inner_enum_name = ""
+      for ga in g_arms {
+        if isnull(ga.pattern) { continue }
+        match ga.pattern!.kind {
+          Variant(vn, bindings) => {
+            for b in bindings {
+              match b.kind {
+                Variant(inner_vn, _) => {
+                  let info = self.find_variant_enum(inner_vn.name)
+                  if info != "" { inner_enum_name = info }
+                }
+                _ => {}
+              }
+              if inner_enum_name != "" { break }
+            }
+          }
+          _ => {}
+        }
+        if inner_enum_name != "" { break }
+      }
+
+      // Inner tag + switch
+      let inner_tag_val = self.emit_temp(LExpr {
+        kind: ExVariantTag,
+        typ: lir_int_type(32),
+        variant_tag: LVariantTagData { value: inner_val }
+      })
+
+      let mut inner_cases: [LSwitchCase] = []
+      for ga in g_arms {
+        if isnull(ga.pattern) { continue }
+        match ga.pattern!.kind {
+          Variant(vn, bindings) => {
+            if len(bindings) == 1 && bindings[0].kind is Variant {
+              // Nested variant: Some(Circle(r))
+              let inner_vp = match bindings[0].kind {
+                Variant(ivn, ibindings) => { (ivn.name, ibindings) }
+                _ => { continue }
+              }
+              let inner_tag = self.find_variant_tag(inner_enum_name, inner_vp._0)
+              let saved_inner = self.save_stmts()
+              // Extract inner variant fields
+              self.emit_variant_bindings(inner_val, inner_enum_name, inner_vp._0, inner_vp._1)
+              self.lower_arm_body(ga.body, result_name, result_type)
+              let inner_body = self.stmts
+              self.restore_stmts(saved_inner)
+              append(inner_cases, LSwitchCase { tag: inner_tag, binding: "", body: inner_body })
+            } else {
+              // Non-nested bindings in a grouped arm — extract fields normally
+              let tag = self.find_variant_tag(enum_name, vn.name)
+              let saved_b = self.save_stmts()
+              self.emit_variant_bindings(val, enum_name, vn.name, bindings)
+              self.lower_arm_body(ga.body, result_name, result_type)
+              let b_body = self.stmts
+              self.restore_stmts(saved_b)
+              append(inner_cases, LSwitchCase { tag: -1, binding: "", body: b_body })
+            }
+          }
+          _ => {}
+        }
+      }
+
+      self.emit(LStmt {
+        kind: StSwitch,
+        switch_data: LSwitchData { tag: inner_tag_val, cases: inner_cases, enum_name: inner_enum_name }
+      })
+
+      let outer_body = self.stmts
+      self.restore_stmts(saved_outer)
+      append(cases, LSwitchCase { tag: outer_tag, binding: "", body: outer_body })
+
+    }
+
+    self.emit(LStmt {
+      kind: StSwitch,
+      switch_data: LSwitchData { tag: tag_val, cases: cases, enum_name: enum_name }
+    })
+  }
+
+  func Lowerer.lower_match_as_if_else(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?) {
+    // Lower as if-else chain
+    if len(arms) == 0 { return }
+
+    let arm = arms[0]
+    let rest: [MatchArm] = []
+    let mut i = 1
+    while i < len(arms) {
+      append(rest, arms[i])
+      i = i + 1
+    }
+
+    if isnull(arm.pattern) { return }
+
+    match arm.pattern!.kind {
+      Wildcard => {
+        if !isnull(arm.guard) {
+          // Guarded wildcard: _ if cond => { ... }
+          let guard_val = self.lower_expr(arm.guard)
+          let saved_then = self.save_stmts()
+          self.lower_arm_body(arm.body, result_name, result_type)
+          let then_body = self.stmts
+          self.restore_stmts(saved_then)
+
+          let saved_else = self.save_stmts()
+          self.lower_match_as_if_else(val, val_type, rest, result_name, result_type)
+          let else_body = self.stmts
+          self.restore_stmts(saved_else)
+
+          self.emit(LStmt {
+            kind: StIf,
+            if_data: LIfData { cond: guard_val, then_body: then_body, else_body: else_body }
+          })
+        } else {
+          // Default case: just emit body
+          self.lower_arm_body(arm.body, result_name, result_type)
+        }
+      }
+      Ident(name) => {
+        // Binding: bind and emit body
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val_type, init: val, mutable: false } })
+        self.define_var(name.name, val_type)
+
+        if !isnull(arm.guard) {
+          // Guarded binding: x if x < 0 => { ... }
+          let guard_val = self.lower_expr(arm.guard)
+          let saved_then = self.save_stmts()
+          self.lower_arm_body(arm.body, result_name, result_type)
+          let then_body = self.stmts
+          self.restore_stmts(saved_then)
+
+          let saved_else = self.save_stmts()
+          self.lower_match_as_if_else(val, val_type, rest, result_name, result_type)
+          let else_body = self.stmts
+          self.restore_stmts(saved_else)
+
+          self.emit(LStmt {
+            kind: StIf,
+            if_data: LIfData { cond: guard_val, then_body: then_body, else_body: else_body }
+          })
+        } else {
+          self.lower_arm_body(arm.body, result_name, result_type)
+        }
+      }
+      Literal(expr) => {
+        let pat_val = self.lower_expr(expr)
+        let cmp = LExpr {
+          kind: ExBinOp,
+          typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+          bin_op: LBinOpData { op: BinEq, left: val, right: pat_val }
+        }
+        let cond = self.emit_temp(cmp)
+
+        let saved_then = self.save_stmts()
+        self.lower_arm_body(arm.body, result_name, result_type)
+        let then_body = self.stmts
+        self.restore_stmts(saved_then)
+
+        let saved_else = self.save_stmts()
+        self.lower_match_as_if_else(val, val_type, rest, result_name, result_type)
+        let else_body = self.stmts
+        self.restore_stmts(saved_else)
+
+        self.emit(LStmt {
+          kind: StIf,
+          if_data: LIfData { cond: cond, then_body: then_body, else_body: else_body }
+        })
+      }
+      Tuple(elems) => {
+        // Tuple destructuring in match
+        let saved = self.save_stmts()
+        let mut idx = 0
+        for elem in elems {
+          match elem.kind {
+            Ident(bname) => {
+              let ft = if !isnull(val_type) && val_type!.kind is TyTuple && idx < len(val_type!.fields) {
+                val_type!.fields[idx].typ
+              } else {
+                LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+              }
+              let field_name = f"_{idx}"
+              let extract = LExpr {
+                kind: ExStructField,
+                typ: ft,
+                struct_field: LStructFieldData { receiver: val, field: field_name }
+              }
+              let ev = self.emit_temp(extract)
+              self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ft, init: ev, mutable: false } })
+              self.define_var(bname.name, ft)
+            }
+            Wildcard => {}
+            _ => {}
+          }
+          idx = idx + 1
+        }
+        self.lower_arm_body(arm.body, result_name, result_type)
+        let body = self.stmts
+        self.restore_stmts(saved)
+
+        // If there are more arms, wrap in if-true (tuple always matches)
+        if len(rest) > 0 {
+          self.emit(LStmt { kind: StBlock, block: LBlockData { stmts: body } })
+        } else {
+          for s in body {
+            self.emit(s)
+          }
+        }
+      }
+      _ => {
+        // Fallback
+        self.lower_arm_body(arm.body, result_name, result_type)
+      }
+    }
+  }
+
+  // ---------- Expression lowering ----------
+
+  func Lowerer.lower_expr(self, e: Expr?) -> LValue? {
+    if isnull(e) { return nil }
+
+    match e!.kind {
+      Ident(name) => { return self.lower_ident(e, name) }
+      IntLit(value, type_hint) => { return self.lower_int_lit(value, type_hint) }
+      FloatLit(value) => { return self.lower_float_lit(value) }
+      StringLit(value) => { return make_string_val(value) }
+      StringInterp(parts) => { return self.lower_string_interp(e, parts) }
+      BoolLit(value) => { return make_bool_val(value) }
+      Nil => { return make_null_val(self.expr_type(e)) }
+      Call(func_expr, type_args, args, call_mut_args) => {
+        return self.lower_call(e, func_expr, type_args, args, call_mut_args)
+      }
+      MethodCall(receiver, method, type_args, args, mc_mut_args) => { return self.lower_method_call(e, receiver, method, type_args, args, mc_mut_args) }
+      FieldAccess(receiver, field_name) => { return self.lower_field_access(e, receiver, field_name) }
+      Index(receiver, index) => { return self.lower_index(e, receiver, index) }
+      Slice(receiver, low, high) => { return self.lower_slice(e, receiver, low, high) }
+      Unary(op, operand) => { return self.lower_unary(e, op, operand) }
+      Binary(left, op, right) => { return self.lower_binary(e, left, op, right) }
+      TupleLit(elems) => { return self.lower_tuple_lit(e, elems) }
+      ListLit(elems) => { return self.lower_list_lit(e, elems) }
+      MapLit(keys, values) => { return self.lower_map_lit(e, keys, values) }
+      StructLit(type_name, type_args, fields) => { return self.lower_struct_lit(e, type_name, type_args, fields) }
+      Lambda(params, return_type, body) => { return self.lower_lambda(e, params, return_type, body) }
+      Match(value, arms) => { return self.lower_match_expr(e, value, arms) }
+      Cast(target_type, operand) => { return self.lower_cast(e, target_type, operand) }
+      Unwrap(operand) => { return self.lower_unwrap(e, operand) }
+      Try(operand) => { return self.lower_try(e, operand) }
+      Is(operand, variant) => { return self.lower_is(e, operand, variant) }
+      IfElse(cond, then_block, else_ifs, else_block) => { return self.lower_if_else_expr(e, cond, then_block, else_ifs, else_block) }
+    }
+  }
+
+  func Lowerer.lower_ident(self, orig: Expr?, name: Sym) -> LValue? {
+    let n = name.name
+    let typ = self.lookup_var(n)
+    if !isnull(typ) {
+      return make_var_val(n, typ)
+    }
+
+    // Check if it's a unit enum variant
+    // First try checker annotation for disambiguation
+    let mut check_enum = ""
+    if !isnull(orig) && !isnull(orig!.resolved_type) {
+      match orig!.resolved_type!.kind {
+        Named(rn, _) => { check_enum = rn.name }
+        _ => {}
+      }
+    }
+
+    if check_enum != "" {
+      let key = check_enum + "." + n
+      if self.unit_variants!.has(sym(key)) {
+        let tag = self.find_variant_tag(check_enum, n)
+        let vc = LExpr {
+          kind: ExVariantConstruct,
+          typ: LType { kind: TyTaggedUnion, name: check_enum, bits: 0, is_exported: false },
+          variant_construct: LVariantConstructData { enum_name: check_enum, variant: n, tag: tag, fields: [] }
+        }
+        return self.emit_temp(vc)
+      }
+    }
+
+    // Fallback: scan all registered enums for this variant name
+    let enum_keys = self.enums!.keys()
+    for ek in enum_keys {
+      let ekn = ek.get_name()
+      let key = ekn + "." + n
+      if self.unit_variants!.has(sym(key)) {
+        let tag = self.find_variant_tag(ekn, n)
+        let vc = LExpr {
+          kind: ExVariantConstruct,
+          typ: LType { kind: TyTaggedUnion, name: ekn, bits: 0, is_exported: false },
+          variant_construct: LVariantConstructData { enum_name: ekn, variant: n, tag: tag, fields: [] }
+        }
+        return self.emit_temp(vc)
+      }
+    }
+
+    // Might be a function reference or global
+    return make_var_val(n, self.expr_type(orig))
+  }
+
+  func Lowerer.lower_int_lit(self, value: string, type_hint: Sym?) -> LValue? {
+    let mut bits: i32 = 32
+    if !isnull(type_hint) {
+      let h = type_hint!.name
+      if h == "i8" || h == "u8" { bits = 8 }
+      if h == "i16" || h == "u16" { bits = 16 }
+      if h == "i64" || h == "u64" { bits = 64 }
+    }
+
+    let mut is_unsigned = false
+    if !isnull(type_hint) {
+      let h = type_hint!.name
+      is_unsigned = h == "u8" || h == "u16" || h == "u32" || h == "u64"
+    }
+
+    let int_val = parse_int(value)
+    if is_unsigned {
+      return LValue {
+        kind: ValLitUint, name: "", temp_id: 0, int_val: 0 as i64, uint_val: int_val as u64,
+        float_val: 0.0, str_val: "", bool_val: false,
+        typ: lir_uint_type(bits)
+      }
+    }
+    return make_int_val(int_val as i64, bits)
+  }
+
+  func Lowerer.lower_float_lit(self, value: string) -> LValue? {
+    let fval = str_to_float(value)
+    return LValue {
+      kind: ValLitFloat, name: "", temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64,
+      float_val: fval, str_val: "", bool_val: false,
+      typ: LType { kind: TyF64, name: "", bits: 64, is_exported: false }
+    }
+  }
+
+  func Lowerer.lower_string_interp(self, orig: Expr?, parts: [Expr]) -> LValue? {
+    let mut fparts: [LFormatPart] = []
+    for p in parts {
+      match p.kind {
+        StringLit(s) => {
+          append(fparts, LFormatPart { is_literal: true, text: s, format: "" })
+        }
+        _ => {
+          let v = self.lower_expr(p)
+          append(fparts, LFormatPart { is_literal: false, text: "", value: v, format: "" })
+        }
+      }
+    }
+    let fmt_expr = LExpr {
+      kind: ExFormat,
+      typ: LType { kind: TyString, name: "", bits: 0, is_exported: false },
+      format: LFormatData { parts: fparts }
+    }
+    return self.emit_temp(fmt_expr)
+  }
+
+  // ---------- Call ----------
+
+  func Lowerer.lower_call(self, orig: Expr?, func_expr: Expr?, type_args: [TypeExpr], args: [Expr], call_mut_args: [bool]) -> LValue? {
+    // Check if it's a variant constructor or class constructor
+    let func_name = match func_expr!.kind {
+      Ident(n) => { n.name }
+      _ => { "" }
+    }
+
+    // Check enum variant constructor
+    if func_name != "" {
+      // Use checker type for disambiguation
+      let mut target_enum = ""
+      if !isnull(orig) && !isnull(orig!.resolved_type) {
+        match orig!.resolved_type!.kind {
+          Named(rn, _) => { target_enum = rn.name }
+          _ => {}
+        }
+      }
+
+      // Try with resolved enum, then scan all enums
+      let enum_keys = self.enums!.keys()
+      for ek in enum_keys {
+        let ekn = ek.get_name()
+        let key = ekn + "." + func_name
+        if !self.enum_variant_tags!.has(sym(key)) { continue }
+        // Skip unit variants (they're handled in lower_ident, not calls)
+        if self.unit_variants!.has(sym(key)) { continue }
+        // Disambiguation: prefer target_enum if available
+        let enum_name = if target_enum != "" { target_enum } else { ekn }
+        let tag = self.find_variant_tag(enum_name, func_name)
+        let mut vargs: [LValue?] = []
+        for a in args {
+          append(vargs, self.lower_expr(a))
+        }
+        let vc = LExpr {
+          kind: ExVariantConstruct,
+          typ: LType { kind: TyTaggedUnion, name: enum_name, bits: 0, is_exported: false },
+          variant_construct: LVariantConstructData { enum_name: enum_name, variant: func_name, tag: tag, fields: vargs }
+        }
+        return self.emit_temp(vc)
+      }
+    }
+
+    // Check class constructor (struct literal syntax used for classes too)
+    if func_name != "" && self.classes!.has(sym(func_name)) {
+      // This is actually a class allocation — lower args as positional fields
+      let cd_entry2 = self.classes!.get(sym(func_name))
+      if isnull(cd_entry2) { return nil }
+      let cd = cd_entry2!.value
+      let mut finits: [LFieldInit] = []
+      let cf = cd.cf_children()
+      let mut i = 0
+      for a in args {
+        let av = self.lower_expr(a)
+        let fname = if i < len(cf) && !isnull(cf[i].name) { cf[i].name!.name } else { f"_{i}" }
+
+        append(finits, LFieldInit { name: fname, value: av })
+        i = i + 1
+      }
+      let mut lta: [LType?] = []
+      for ta in type_args {
+        append(lta, self.lower_type(ta))
+      }
+      let alloc = LExpr {
+        kind: ExClassAlloc,
+        typ: LType { kind: TyClassHandle, name: func_name, type_args: lta, bits: 0, is_exported: false },
+        class_alloc: LClassAllocData { class_name: func_name, fields: finits, type_args: lta }
+      }
+      return self.emit_temp(alloc)
+    }
+
+    // make_channel<T>(bufSize)
+    if func_name == "make_channel" {
+      let result_type = self.expr_type(orig)
+      let mut elem_type: LType? = nil
+      if !isnull(result_type) && result_type!.kind is TyChannel {
+        elem_type = result_type!.elem
+      }
+      if isnull(elem_type) && len(type_args) > 0 {
+        elem_type = self.lower_type(type_args[0])
+      }
+      if isnull(elem_type) {
+        elem_type = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+      }
+      let mut buf_size: LValue? = nil
+      if len(args) > 0 {
+        buf_size = self.lower_expr(args[0])
+      }
+      let mc = LExpr {
+        kind: ExMakeChannel,
+        typ: result_type,
+        make_channel: LMakeChannelData { elem_type: elem_type, buf_size: buf_size }
+      }
+      return self.emit_temp(mc)
+    }
+
+    // Check builtin functions
+    if is_builtin_func(func_name) {
+      // Special case: append with field access needs write-back
+      if func_name == "append" && len(args) >= 2 {
+        let first_arg = args[0]
+        match first_arg.kind {
+          FieldAccess(fa_recv, fa_field) => {
+            let recv_val = self.lower_expr(fa_recv)
+            let result_type = self.expr_type(first_arg)
+            let mut slice_val: LValue? = nil
+            let mut is_class_field = false
+            if !isnull(recv_val) && !isnull(recv_val!.typ) && recv_val!.typ!.kind is TyClassHandle {
+              is_class_field = true
+              let cget = LExpr {
+                kind: ExClassGet,
+                typ: result_type,
+                class_get: LClassGetData { handle: recv_val, class_name: recv_val!.typ!.name, field: fa_field.name }
+              }
+              slice_val = self.emit_temp(cget)
+            } else {
+              let sf = LExpr {
+                kind: ExStructField,
+                typ: result_type,
+                struct_field: LStructFieldData { receiver: recv_val, field: fa_field.name }
+              }
+              slice_val = self.emit_temp(sf)
+            }
+            // Lower remaining args
+            let mut bargs2: [LValue?] = [slice_val]
+            let mut bi = 1
+            while bi < len(args) {
+              append(bargs2, self.lower_expr(args[bi]))
+              bi = bi + 1
+            }
+            let builtin2 = LExpr {
+              kind: ExBuiltin,
+              typ: self.expr_type(orig),
+              builtin: LBuiltinData { name: "append", args: bargs2, file: "", line: 0 }
+            }
+            let result = self.emit_temp(builtin2)
+            // Write back
+            if is_class_field {
+              self.emit(LStmt { kind: StClassSet, class_set: LClassSetData { handle: recv_val, class_name: recv_val!.typ!.name, field: fa_field.name, value: slice_val } })
+            } else {
+              self.emit(LStmt { kind: StStructSet, struct_set: LStructSetData { receiver: recv_val, field: fa_field.name, value: slice_val } })
+            }
+            return result
+          }
+          _ => {}
+        }
+      }
+
+      let mut bargs: [LValue?] = []
+      for a in args {
+        append(bargs, self.lower_expr(a))
+      }
+      let mut rt = self.expr_type(orig)
+      if func_name == "assert" || func_name == "assert_eq" || func_name == "println" || func_name == "print" || func_name == "eprintln" || func_name == "eprint" || func_name == "panic" {
+        rt = LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
+      }
+      let mut bfile = ""
+      let mut bline: i32 = 0
+      if func_name == "assert" || func_name == "assert_eq" {
+        if !isnull(orig) {
+          if !isnull(orig!.span.start.file) {
+            bfile = orig!.span.start.file!.get_name()
+          }
+          bline = orig!.span.start.line
+        }
+      }
+      let builtin = LExpr {
+        kind: ExBuiltin,
+        typ: rt,
+        builtin: LBuiltinData { name: func_name, args: bargs, file: bfile, line: bline }
+      }
+      return self.emit_temp(builtin)
+    }
+
+    // Regular function call
+    let mut call_args: [LValue?] = []
+    let mut ai = 0
+    for a in args {
+      if ai < len(call_mut_args) && call_mut_args[ai] {
+        append(call_args, self.lower_mut_arg(a))
+      } else {
+        append(call_args, self.lower_expr(a))
+      }
+      ai = ai + 1
+    }
+    let mut lta: [LType?] = []
+    for ta in type_args {
+      append(lta, self.lower_type(ta))
+    }
+    // Use inferred type args from checker if no explicit ones
+    if len(lta) == 0 && !isnull(orig) && len(orig!.inferred_type_args) > 0 {
+      for ta in orig!.inferred_type_args {
+        append(lta, self.lower_type(ta))
+      }
+    }
+
+    // If func_expr is not a simple ident, lower it as a value
+    let actual_name = if func_name != "" { func_name } else { "__indirect_call" }
+
+    let rt = self.expr_type(orig)
+    let call = LExpr {
+      kind: ExCall,
+      typ: rt,
+      call: LCallData { func_name: actual_name, args: call_args, mut_args: call_mut_args, type_args: lta, is_exported: false }
+    }
+    return self.emit_temp(call)
+  }
+
+  // ---------- Method call ----------
+
+  func Lowerer.lower_method_call(
+    self, orig: Expr?, receiver: Expr?, method: Sym, type_args: [TypeExpr], args: [Expr], mc_mut_args: [bool]
+  ) -> LValue? {
+    // Check if receiver is an import package (e.g., fmt.Println, errors.New)
+    let method_name = method.name
+    if !isnull(receiver) && receiver!.kind is Ident {
+      match receiver!.kind {
+        Ident(id) => {
+          if self.import_aliases!.has(sym(id.name)) {
+            let func_name = id.name + "." + method_name
+            let mut call_args: [LValue?] = []
+            for a in args {
+              append(call_args, self.lower_expr(a))
+            }
+            let mut lta: [LType?] = []
+            for ta in type_args {
+              append(lta, self.lower_type(ta))
+            }
+            // Known void-returning functions get unit type
+            let mut rt = self.expr_type(orig)
+            if func_name == "fmt.Println" || func_name == "fmt.Print" || func_name == "fmt.Printf" {
+              rt = LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
+            }
+            let call = LExpr {
+              kind: ExCall,
+              typ: rt,
+              call: LCallData { func_name: func_name, args: call_args, mut_args: [], type_args: lta, is_exported: true }
+            }
+            return self.emit_temp(call)
+          }
+        }
+        _ => {}
+      }
+    }
+
+    let recv = self.lower_expr(receiver)
+    let recv_type = self.expr_type(receiver)
+
+    // String methods
+    if !isnull(recv_type) && recv_type!.kind is TyString {
+      let mut bargs: [LValue?] = [recv]
+      for a in args {
+        append(bargs, self.lower_expr(a))
+      }
+      let rt = self.expr_type(orig)
+      let builtin = LExpr {
+        kind: ExBuiltin,
+        typ: rt,
+        builtin: LBuiltinData { name: "str_" + method_name, args: bargs }
+      }
+      return self.emit_temp(builtin)
+    }
+
+    // Slice/list methods
+    if !isnull(recv_type) && recv_type!.kind is TySlice {
+      if method_name == "len" || method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "contains" || method_name == "reverse" || method_name == "join" || method_name == "extend" {
+        // For mutating methods on class field receivers, use a reference
+        // to avoid the copy-then-discard problem with value-type slice headers.
+        let is_mutating = method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "reverse" || method_name == "extend"
+        let mut slice_val = recv
+        if is_mutating && !isnull(receiver) && receiver!.kind is FieldAccess {
+          match receiver!.kind {
+            FieldAccess(field_recv, field_name) => {
+              let field_recv_type = self.expr_type(field_recv)
+              if !isnull(field_recv_type) && field_recv_type!.kind is TyClassHandle {
+                let field_recv_val = self.lower_expr(field_recv)
+                slice_val = LValue {
+                  kind: ValClassFieldRef,
+                  name: field_name.name,
+                  typ: recv_type,
+                  collection: field_recv_val
+                }
+              }
+            }
+            _ => {}
+          }
+        }
+        let mut bargs: [LValue?] = [slice_val]
+        for a in args {
+          append(bargs, self.lower_expr(a))
+        }
+        let rt = self.expr_type(orig)
+        let builtin = LExpr {
+          kind: ExBuiltin,
+          typ: rt,
+          builtin: LBuiltinData { name: "slice_" + method_name, args: bargs }
+        }
+        return self.emit_temp(builtin)
+      }
+    }
+
+    // Map methods
+    if !isnull(recv_type) && recv_type!.kind is TyMap {
+      if is_map_method(method_name) {
+        let mut bargs: [LValue?] = [recv]
+        for a in args {
+          append(bargs, self.lower_expr(a))
+        }
+        let rt = self.expr_type(orig)
+        let builtin = LExpr {
+          kind: ExBuiltin,
+          typ: rt,
+          builtin: LBuiltinData { name: "map_" + method_name, args: bargs }
+        }
+        return self.emit_temp(builtin)
+      }
+    }
+
+    // Channel methods
+    if !isnull(recv_type) && recv_type!.kind is TyChannel {
+      if method_name == "send" {
+        // ch.send(val) → LStmtSend
+        let val = self.lower_expr(args[0])
+        self.emit(LStmt { kind: StSend, send_data: LSendData { channel: recv, value: val } })
+        return LValue { kind: ValLitNull, name: "", int_val: 0, uint_val: 0, float_val: 0.0, str_val: "", temp_id: 0, bool_val: false,
+          typ: LType { kind: TyUnit, name: "", bits: 0, is_exported: false } }
+      }
+      if method_name == "receive" {
+        let rt = self.expr_type(orig)
+        let builtin = LExpr {
+          kind: ExBuiltin,
+          typ: rt,
+          builtin: LBuiltinData { name: "channel_receive", args: [recv] }
+        }
+        return self.emit_temp(builtin)
+      }
+      if method_name == "close" {
+        let rt = self.expr_type(orig)
+        let builtin = LExpr {
+          kind: ExBuiltin,
+          typ: rt,
+          builtin: LBuiltinData { name: "channel_close", args: [recv] }
+        }
+        return self.emit_temp(builtin)
+      }
+    }
+
+    // Regular method call
+    let mut call_args: [LValue?] = []
+    for a in args {
+      append(call_args, self.lower_expr(a))
+    }
+    let mut lta: [LType?] = []
+    for ta in type_args {
+      append(lta, self.lower_type(ta))
+    }
+    // Use inferred type args from checker if no explicit ones
+    if len(lta) == 0 && !isnull(orig) && len(orig!.inferred_type_args) > 0 {
+      for ta in orig!.inferred_type_args {
+        append(lta, self.lower_type(ta))
+      }
+    }
+
+    // Build param types for the method
+    let mut ptypes: [LType?] = []
+    let sig_key = if !isnull(recv_type) { recv_type!.name + "." + method_name } else { method_name }
+    let sig = self.func_sigs!.get(sym(sig_key))
+    if !isnull(sig) {
+      for p in sig!.value.param_children() {
+        if !isnull(p.name) && !p.is_self {
+          append(ptypes, self.lower_type(p.type_expr))
+        }
+      }
+    }
+
+    let rt = self.expr_type(orig)
+    let mc = LExpr {
+      kind: ExMethodCall,
+      typ: rt,
+      method_call: LMethodCallData {
+        receiver: recv,
+        method: method_name,
+        args: call_args,
+        mut_args: mc_mut_args,
+        type_args: lta,
+        is_exported: false,
+        param_types: ptypes
+      }
+    }
+    return self.emit_temp(mc)
+  }
+
+  // ---------- Field access ----------
+
+  func Lowerer.lower_field_access(self, orig: Expr?, receiver: Expr?, field_name: Sym) -> LValue? {
+    let recv = self.lower_expr(receiver)
+    let recv_type = self.expr_type(receiver)
+    let ft = self.expr_type(orig)
+
+    if !isnull(recv_type) && recv_type!.kind is TyClassHandle {
+      let fa = LExpr {
+        kind: ExClassGet,
+        typ: ft,
+        class_get: LClassGetData { handle: recv, class_name: recv_type!.name, field: field_name.name }
+      }
+      return self.emit_temp(fa)
+    }
+
+    // Struct field
+    let fa = LExpr {
+      kind: ExStructField,
+      typ: ft,
+      struct_field: LStructFieldData { receiver: recv, field: field_name.name }
+    }
+    return self.emit_temp(fa)
+  }
+
+  // ---------- Index ----------
+
+  // lower_mut_arg lowers an expression that will be passed as a mut argument.
+  // For index expressions, produces an LValIndexRef so the C backend can emit
+  // &collection.data[index]. For other expressions, falls back to lower_expr.
+  func Lowerer.lower_mut_arg(self, e: Expr?) -> LValue? {
+    if isnull(e) { return nil }
+    match e!.kind {
+      Index(receiver, index) => {
+        let recv = self.lower_expr(receiver)
+        let idx = self.lower_expr(index)
+        let rt = self.expr_type(e)
+        return LValue {
+          kind: ValIndexRef,
+          typ: rt,
+          collection: recv,
+          index: idx
+        }
+      }
+      _ => {
+        return self.lower_expr(e)
+      }
+    }
+  }
+
+  func Lowerer.lower_index(self, orig: Expr?, receiver: Expr?, index: Expr?) -> LValue? {
+    let recv = self.lower_expr(receiver)
+    let idx = self.lower_expr(index)
+    let rt = self.expr_type(orig)
+    let ie = LExpr {
+      kind: ExIndexGet,
+      typ: rt,
+      index_get: LIndexGetData { collection: recv, index: idx }
+    }
+    return self.emit_temp(ie)
+  }
+
+  // ---------- Slice ----------
+
+  func Lowerer.lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue? {
+    let recv = self.lower_expr(receiver)
+    let lv = if !isnull(low) { self.lower_expr(low) } else { nil }
+    let hv = if !isnull(high) { self.lower_expr(high) } else { nil }
+    let rt = self.expr_type(orig)
+    let se = LExpr {
+      kind: ExSlice,
+      typ: rt,
+      slice_data: LSliceData { collection: recv, low: lv, high: hv }
+    }
+    return self.emit_temp(se)
+  }
+
+  // ---------- Unary ----------
+
+  func Lowerer.lower_unary(self, orig: Expr?, op: UnaryOp, operand: Expr?) -> LValue? {
+    let v = self.lower_expr(operand)
+    let rt = self.expr_type(orig)
+    let lop = match op {
+      Neg => { UnNeg }
+      Not => { UnNot }
+    }
+    let ue = LExpr {
+      kind: ExUnOp,
+      typ: rt,
+      un_op: LUnOpData { op: lop, operand: v }
+    }
+    return self.emit_temp(ue)
+  }
+
+  // ---------- Binary ----------
+
+  func Lowerer.lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue? {
+    // Short-circuit && and || — right side must not be evaluated if left determines result.
+    // Lower: a && b → { let _sc = a; if _sc { _sc = b }; _sc }
+    // Lower: a || b → { let _sc = a; if !_sc { _sc = b }; _sc }
+    let is_and = match op { And => { true } _ => { false } }
+    let is_or = match op { Or => { true } _ => { false } }
+    if is_and || is_or {
+      let bool_type = LType { kind: TyBool, name: "", elem: nil, key: nil, fields: [], params: [], ret: nil, variants: [], type_args: [], bits: 0, is_exported: false }
+      let lv = self.lower_expr(left)
+
+      // Allocate result variable
+      let result_var = f"_sc{self.temp_id}"
+      self.temp_id = self.temp_id + 1
+      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: nil, mutable: false } })
+      self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: lv } })
+
+      // Condition: for &&, enter if-block when left is true; for ||, when left is false
+      let cond_val = LValue { kind: ValVar, name: result_var, typ: bool_type, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64, float_val: 0.0, str_val: "", bool_val: false }
+      let mut final_cond: LValue? = nil
+      if is_or {
+        let not_expr = LExpr { kind: ExUnOp, typ: bool_type, un_op: LUnOpData { op: UnNot, operand: cond_val } }
+        final_cond = self.emit_temp(not_expr)
+      } else {
+        final_cond = cond_val
+      }
+
+      // Save stmts, lower right side in new block
+      let saved = self.save_stmts()
+      let rv = self.lower_expr(right)
+      self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: rv } })
+      let then_body = self.stmts
+      self.restore_stmts(saved)
+
+      self.emit(LStmt { kind: StIf, if_data: LIfData { cond: final_cond, then_body: then_body, else_body: [] } })
+
+      return LValue { kind: ValVar, name: result_var, typ: bool_type, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64, float_val: 0.0, str_val: "", bool_val: false }
+    }
+
+    let lv = self.lower_expr(left)
+    let rv = self.lower_expr(right)
+    let rt = self.expr_type(orig)
+
+    let lop = match op {
+      Add => { BinAdd }
+      Sub => { BinSub }
+      Mul => { BinMul }
+      Div => { BinDiv }
+      Mod => { BinMod }
+      Eq => { BinEq }
+      Neq => { BinNe }
+      Lt => { BinLt }
+      Le => { BinLe }
+      Gt => { BinGt }
+      Ge => { BinGe }
+      And => { BinAnd }
+      Or => { BinOr }
+      BitAnd => { BinBitAnd }
+      BitOr => { BinBitOr }
+      BitXor => { BinBitXor }
+      Shl => { BinShl }
+      Shr => { BinShr }
+    }
+
+    // Numeric coercion
+    let mut final_lv = lv
+    let mut final_rv = rv
+    if !isnull(lv) && !isnull(rv) && !isnull(lv!.typ) && !isnull(rv!.typ) {
+      let lt = lv!.typ!
+      let rtt = rv!.typ!
+      if is_numeric_type(lt) && is_numeric_type(rtt) && lt.kind != rtt.kind {
+        let wider = wider_numeric_type(lt, rtt)
+        if lt.kind != wider!.kind {
+          let cast_expr = LExpr { kind: ExCast, typ: wider, cast: LCastData { target: wider, operand: lv } }
+          final_lv = self.emit_temp(cast_expr)
+        }
+        if rtt.kind != wider!.kind {
+          let cast_expr = LExpr { kind: ExCast, typ: wider, cast: LCastData { target: wider, operand: rv } }
+          final_rv = self.emit_temp(cast_expr)
+        }
+      }
+    }
+
+    let be = LExpr {
+      kind: ExBinOp,
+      typ: rt,
+      bin_op: LBinOpData { op: lop, left: final_lv, right: final_rv }
+    }
+    return self.emit_temp(be)
+  }
+
+  func is_map_method(name: string) -> bool {
+    if name == "get" { return true }
+    if name == "set" { return true }
+    if name == "has" { return true }
+    if name == "delete" { return true }
+    if name == "keys" { return true }
+    if name == "values" { return true }
+    if name == "len" { return true }
+    return false
+  }
+
+  func is_builtin_func(name: string) -> bool {
+    if name == "len" { return true }
+    if name == "append" { return true }
+    if name == "println" { return true }
+    if name == "print" { return true }
+    if name == "panic" { return true }
+    if name == "to_string" { return true }
+    if name == "parse_float" { return true }
+    if name == "isnull" { return true }
+    if name == "new_dict" { return true }
+    if name == "new_string_builder" { return true }
+    if name == "str_contains" { return true }
+    if name == "str_trim" { return true }
+    if name == "str_replace" { return true }
+    if name == "str_index_of" { return true }
+    if name == "str_to_lower" { return true }
+    if name == "str_to_upper" { return true }
+    if name == "str_substr" { return true }
+    if name == "str_char_at" { return true }
+    if name == "str_from_chars" { return true }
+    if name == "char_is_alpha" { return true }
+    if name == "char_is_digit" { return true }
+    if name == "char_is_alnum" { return true }
+    if name == "char_is_space" { return true }
+    if name == "assert" { return true }
+    if name == "assert_eq" { return true }
+    if name == "exit" { return true }
+    if name == "format" { return true }
+    if name == "read_file" { return true }
+    if name == "write_file" { return true }
+    if name == "list_dir" { return true }
+    if name == "file_exists" { return true }
+    if name == "mkdtemp" { return true }
+    if name == "os_args" { return true }
+    if name == "os_exit" { return true }
+    if name == "os_getwd" { return true }
+    if name == "itoa" { return true }
+    if name == "atoi" { return true }
+    if name == "char_to_string" { return true }
+    if name == "eprint" { return true }
+    if name == "eprintln" { return true }
+    if name == "hash_string" { return true }
+    if name == "exec_command" { return true }
+    if name == "path_join" { return true }
+    if name == "path_dir" { return true }
+    if name == "path_base" { return true }
+    if name == "path_ext" { return true }
+    return false
+  }
+
+  func is_numeric_type(t: LType) -> bool {
+    if t.kind is TyI8 { return true }
+    if t.kind is TyI16 { return true }
+    if t.kind is TyI32 { return true }
+    if t.kind is TyI64 { return true }
+    if t.kind is TyU8 { return true }
+    if t.kind is TyU16 { return true }
+    if t.kind is TyU32 { return true }
+    if t.kind is TyU64 { return true }
+    if t.kind is TyF32 { return true }
+    if t.kind is TyF64 { return true }
+    if t.kind is TyPlatformInt { return true }
+    if t.kind is TyPlatformUint { return true }
+    return false
+  }
+
+  func wider_numeric_type(a: LType, b: LType) -> LType? {
+    // Float wins over int
+    if a.kind is TyF64 || b.kind is TyF64 { return LType { kind: TyF64, name: "", bits: 64, is_exported: false } }
+    if a.kind is TyF32 || b.kind is TyF32 { return LType { kind: TyF32, name: "", bits: 32, is_exported: false } }
+    // Larger bits wins
+    if a.bits >= b.bits { return a }
+    return b
+  }
+
+  // ---------- Tuple literal ----------
+
+  func Lowerer.lower_tuple_lit(self, orig: Expr?, elems: [Expr]) -> LValue? {
+    let mut fields: [LFieldInit] = []
+    let mut lfields: [LField] = []
+    let mut i = 0
+    for e in elems {
+      let v = self.lower_expr(e)
+      let fname = f"_{i}"
+      let ft = if !isnull(v) && !isnull(v!.typ) { v!.typ } else { LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
+      append(fields, LFieldInit { name: fname, value: v })
+      append(lfields, LField { name: fname, typ: ft })
+      i = i + 1
+    }
+    let tt = LType { kind: TyTuple, name: "", fields: lfields, bits: 0, is_exported: false }
+    let sl = LExpr {
+      kind: ExStructLit,
+      typ: tt,
+      struct_lit: LStructLitData { fields: fields }
+    }
+    return self.emit_temp(sl)
+  }
+
+  // ---------- List literal ----------
+
+  func Lowerer.lower_list_lit(self, orig: Expr?, elems: [Expr]) -> LValue? {
+    let mut vals: [LValue?] = []
+    for e in elems {
+      append(vals, self.lower_expr(e))
+    }
+    let rt = self.expr_type(orig)
+    let ml = LExpr {
+      kind: ExMakeSlice,
+      typ: rt,
+      builtin: LBuiltinData { name: "make_slice", args: vals }
+    }
+    return self.emit_temp(ml)
+  }
+
+  // ---------- Map literal ----------
+
+  func Lowerer.lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue? {
+    let rt = self.expr_type(orig)
+    // Create empty map then insert
+    let make = LExpr {
+      kind: ExMakeMap,
+      typ: rt,
+      builtin: LBuiltinData { name: "make_map", args: [] }
+    }
+    let map_val = self.emit_temp(make)
+
+    let mut i = 0
+    while i < len(keys) {
+      let kv = self.lower_expr(keys[i])
+      let vv = self.lower_expr(values[i])
+      self.emit(LStmt {
+        kind: StIndexSet,
+        index_set: LIndexSetData { collection: map_val, index: kv, value: vv, field: "" }
+      })
+      i = i + 1
+    }
+
+    return map_val
+  }
+
+  // ---------- Struct/class literal ----------
+
+  func Lowerer.lower_struct_lit(
+    self, orig: Expr?, type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]
+  ) -> LValue? {
+    let tname = type_name.name
+
+    let mut finits: [LFieldInit] = []
+    // Resolve positional field names using class/struct field order
+    let mut field_order: [string] = []
+    if self.classes!.has(sym(tname)) {
+      let cd = self.classes!.get(sym(tname))
+      if !isnull(cd) {
+        for f in cd!.value.cf_children() {
+          if !isnull(f.name) {
+            append(field_order, f.name!.name)
+          }
+        }
+      }
+    }
+    if self.structs!.has(sym(tname)) {
+      let sd = self.structs!.get(sym(tname))
+      if !isnull(sd) {
+        for f in sd!.value.sf_children() {
+          if !isnull(f.name) {
+            append(field_order, f.name!.name)
+          }
+        }
+      }
+    }
+
+    // Collect explicitly provided fields
+    let mut provided: Dict<Sym, bool> = Dict<Sym, bool>()
+    let mut pos_idx = 0
+    for f in fields {
+      let mut fname = if !isnull(f.name) { f.name!.name } else { "" }
+      // Resolve positional (unnamed) fields
+      if fname == "" && pos_idx < len(field_order) {
+        fname = field_order[pos_idx]
+        pos_idx = pos_idx + 1
+      } else if fname != "" {
+        pos_idx = len(field_order) // stop positional tracking
+      }
+      let fv = self.lower_expr(f.value)
+      append(finits, LFieldInit { name: fname, value: fv })
+      if fname != "" {
+        provided.set(sym(fname), true)
+      }
+    }
+
+    // For classes, fill in default values for missing fields
+    if self.classes!.has(sym(tname)) {
+      let cd = self.classes!.get(sym(tname))
+      if !isnull(cd) {
+        for f in cd!.value.cf_children() {
+          if !isnull(f.name) && !provided.has(sym(f.name!.name)) && !isnull(f.default_value) {
+            let dv = self.lower_expr(f.default_value)
+            append(finits, LFieldInit { name: f.name!.name, value: dv })
+          }
+        }
+      }
+
+      let mut lta: [LType?] = []
+      for ta in type_args {
+        append(lta, self.lower_type(ta))
+      }
+
+      let alloc = LExpr {
+        kind: ExClassAlloc,
+        typ: LType { kind: TyClassHandle, name: tname, type_args: lta, bits: 0, is_exported: false },
+        class_alloc: LClassAllocData { class_name: tname, fields: finits, type_args: lta }
+      }
+      return self.emit_temp(alloc)
+    }
+
+    // Struct literal
+    let sl = LExpr {
+      kind: ExStructLit,
+      typ: LType { kind: TyStruct, name: tname, bits: 0, is_exported: false },
+      struct_lit: LStructLitData { fields: finits }
+    }
+    return self.emit_temp(sl)
+  }
+
+  // ---------- Lambda ----------
+
+  func Lowerer.lower_lambda(
+    self, orig: Expr?, params: [Param], return_type: TypeExpr?, body: Block?
+  ) -> LValue? {
+    let mut lparams: [LParam] = []
+    let old_scope = self.scope
+    self.scope = Dict<Sym, LType> {}
+
+    for p in params {
+      if !isnull(p.name) {
+        let pt = self.lower_type(p.type_expr)
+        append(lparams, LParam { name: p.name!.name, typ: pt, mutable: p.is_mut })
+        self.define_var(p.name!.name, pt)
+      }
+    }
+
+    let rt = self.lower_type(return_type)
+    let old_return = self.current_func_return
+    self.current_func_return = rt
+
+    // Lower lambda body with implicit return for last expression
+    let saved_stmts = self.save_stmts()
+    if !isnull(body) {
+      let stmts = body!.bs_children()
+      let mut i = 0
+      while i < len(stmts) {
+        if !isnull(rt) && i == len(stmts) - 1 && stmts[i].kind is ExprStmt {
+          // Last statement is an expression and we have a return type — emit as return
+          match stmts[i].kind {
+            ExprStmt(expr) => {
+              let val = self.lower_expr(expr)
+              self.emit(LStmt {
+                kind: StReturn,
+                ret: LReturnData { values: [val] }
+              })
+            }
+            _ => { self.lower_stmt(stmts[i]) }
+          }
+        } else {
+          self.lower_stmt(stmts[i])
+        }
+        i = i + 1
+      }
+    }
+    let body_stmts = self.stmts
+    self.restore_stmts(saved_stmts)
+
+    self.scope = old_scope
+    self.current_func_return = old_return
+
+    // Build func type
+    let mut ptypes: [LType?] = []
+    for p in lparams {
+      append(ptypes, p.typ)
+    }
+
+    let ft = LType { kind: TyFuncPtr, name: "", params: ptypes, ret: rt, bits: 0, is_exported: false }
+    let fl = LExpr {
+      kind: ExFuncLit,
+      typ: ft,
+      func_lit: LFuncLitData { params: lparams, return_type: rt, body: body_stmts }
+    }
+    return self.emit_temp(fl)
+  }
+
+  // ---------- Match arm body with result assignment ----------
+
+  // Lowers a match arm body. If result_name is non-empty, the last expression
+  // statement is assigned to it (match-as-expression pattern).
+  func Lowerer.lower_arm_body(self, body: Block?, result_name: string, rt: LType?) {
+    if isnull(body) { return }
+    let stmts = body!.bs_children()
+    if result_name == "" || len(stmts) == 0 {
+      self.lower_block(body)
+      return
+    }
+    // Lower all statements except the last
+    for i in range(0, len(stmts) - 1) {
+      self.lower_stmt(stmts[i])
+    }
+    // If last statement is an expression, assign to result
+    let last = stmts[len(stmts) - 1]
+    match last.kind {
+      ExprStmt(expr) => {
+        let val = self.lower_expr(expr)
+        self.emit(LStmt {
+          kind: StAssign,
+          assign: LAssignData { target: result_name, value: val }
+        })
+      }
+      _ => {
+        self.lower_stmt(last)
+      }
+    }
+  }
+
+  // ---------- Match expression ----------
+
+  func Lowerer.lower_match_expr(
+    self, orig: Expr?, value: Expr?, arms: [MatchArm]
+  ) -> LValue? {
+    let rt = self.expr_type(orig)
+    let result_name = f"__match_result_{self.next_temp()}"
+
+    self.emit(LStmt {
+      kind: StVarDecl,
+      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true }
+    })
+    self.define_var(result_name, rt)
+
+    let v = self.lower_expr(value)
+    let val_type = self.expr_type(value)
+
+    if !isnull(val_type) && val_type!.kind is TyTaggedUnion {
+      // Enum match expression — check for nested patterns first
+      if self.has_nested_variant_patterns(arms) {
+        self.emit_nested_enum_match(v, val_type!.name, arms, result_name, rt)
+      } else {
+        let tag_expr = LExpr {
+          kind: ExVariantTag,
+          typ: lir_int_type(32),
+          variant_tag: LVariantTagData { value: v }
+        }
+        let tag_val = self.emit_temp(tag_expr)
+
+        let mut cases: [LSwitchCase] = []
+        for arm in arms {
+          if isnull(arm.pattern) { continue }
+          let saved = self.save_stmts()
+          match arm.pattern!.kind {
+            Variant(vname, bindings) => {
+              let tag = self.find_variant_tag(val_type!.name, vname.name)
+              self.emit_variant_bindings(v, val_type!.name, vname.name, bindings)
+              self.lower_arm_body(arm.body, result_name, rt)
+              let body = self.stmts
+              self.restore_stmts(saved)
+              append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+            }
+            Ident(name) => {
+              let tag = self.find_variant_tag(val_type!.name, name.name)
+              if tag >= 0 {
+                self.lower_arm_body(arm.body, result_name, rt)
+                let body = self.stmts
+                self.restore_stmts(saved)
+                append(cases, LSwitchCase { tag: tag, binding: "", body: body })
+              } else {
+                self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: v!.typ, init: v, mutable: false } })
+                self.define_var(name.name, v!.typ)
+                self.lower_arm_body(arm.body, result_name, rt)
+                let body = self.stmts
+                self.restore_stmts(saved)
+                append(cases, LSwitchCase { tag: -1, binding: name.name, body: body })
+              }
+            }
+            Wildcard => {
+              self.lower_arm_body(arm.body, result_name, rt)
+              let body = self.stmts
+              self.restore_stmts(saved)
+              append(cases, LSwitchCase { tag: -1, binding: "", body: body })
+            }
+            _ => {
+              self.restore_stmts(saved)
+            }
+          }
+        }
+
+        self.emit(LStmt {
+          kind: StSwitch,
+          switch_data: LSwitchData { tag: tag_val, cases: cases, enum_name: val_type!.name }
+        })
+      }
+
+    } else if self.is_union_match(val_type, arms) {
+      self.emit_union_type_switch(v, val_type, arms, result_name, rt)
+    } else {
+      self.lower_match_as_if_else(v, val_type, arms, result_name, rt)
+    }
+
+    return make_var_val(result_name, rt)
+  }
+
+  // ---------- Cast ----------
+
+  func Lowerer.lower_cast(self, orig: Expr?, target_type: TypeExpr?, operand: Expr?) -> LValue? {
+    let v = self.lower_expr(operand)
+    let tt = self.lower_type(target_type)
+    let ce = LExpr {
+      kind: ExCast,
+      typ: tt,
+      cast: LCastData { target: tt, operand: v }
+    }
+    return self.emit_temp(ce)
+  }
+
+  // ---------- Unwrap (!) ----------
+
+  func Lowerer.lower_unwrap(self, orig: Expr?, operand: Expr?) -> LValue? {
+    let v = self.lower_expr(operand)
+    let inner_type = if !isnull(v) && !isnull(v!.typ) && v!.typ!.kind is TyOptional {
+      v!.typ!.elem
+    } else {
+      self.expr_type(orig)
+    }
+    let ue = LExpr {
+      kind: ExUnwrapOptional,
+      typ: inner_type,
+      unwrap_opt: LUnwrapOptionalData { value: v }
+    }
+    return self.emit_temp(ue)
+  }
+
+  // ---------- Try (?) ----------
+
+  func Lowerer.lower_try(self, orig: Expr?, operand: Expr?) -> LValue? {
+    let v = self.lower_expr(operand)
+    let rt = self.expr_type(orig)
+
+    // Extract error
+    let err_expr = LExpr {
+      kind: ExExtractError,
+      typ: LType { kind: TyError, name: "error", bits: 0, is_exported: false },
+      extract_error: LExtractErrorData { value: v }
+    }
+    let err_val = self.emit_temp(err_expr)
+
+    // Check if error is non-null → early return
+    let is_err = LExpr {
+      kind: ExIsNull,
+      typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+      is_null: LIsNullData { value: err_val }
+    }
+    let is_null_val = self.emit_temp(is_err)
+
+    let not_null = LExpr {
+      kind: ExUnOp,
+      typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+      un_op: LUnOpData { op: UnNot, operand: is_null_val }
+    }
+    let has_err = self.emit_temp(not_null)
+
+    // Build error return
+    let err_return: [LStmt?] = [
+      LStmt {
+        kind: StReturn,
+        ret: LReturnData { values: [make_null_val(rt), err_val] }
+      }
+    ]
+
+    self.emit(LStmt {
+      kind: StIf,
+      if_data: LIfData { cond: has_err, then_body: err_return, else_body: [] }
+    })
+
+    // Extract value
+    let val_expr = LExpr {
+      kind: ExExtractValue,
+      typ: rt,
+      extract_value: LExtractValueData { value: v }
+    }
+    return self.emit_temp(val_expr)
+  }
+
+  // ---------- Is ----------
+
+  func Lowerer.lower_is(self, orig: Expr?, operand: Expr?, variant: Sym) -> LValue? {
+    let v = self.lower_expr(operand)
+    let val_type = self.expr_type(operand)
+
+    // Check optional (is null check)
+    if !isnull(val_type) && val_type!.kind is TyOptional {
+      // `x is nil` → isnull(x)
+      let check = LExpr {
+        kind: ExIsNull,
+        typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+        is_null: LIsNullData { value: v }
+      }
+      if variant.name == "nil" || variant.name == "null" {
+        return self.emit_temp(check)
+      }
+      // Otherwise it's a non-null check
+      let is_null_val = self.emit_temp(check)
+      let not_null = LExpr {
+        kind: ExUnOp,
+        typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+        un_op: LUnOpData { op: UnNot, operand: is_null_val }
+      }
+      return self.emit_temp(not_null)
+    }
+
+    // Enum variant check
+    let enum_name = if !isnull(val_type) { val_type!.name } else { "" }
+    let tag = self.find_variant_tag(enum_name, variant.name)
+
+    let tag_expr = LExpr {
+      kind: ExVariantTag,
+      typ: lir_int_type(32),
+      variant_tag: LVariantTagData { value: v }
+    }
+    let tag_val = self.emit_temp(tag_expr)
+
+    let cmp = LExpr {
+      kind: ExBinOp,
+      typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
+      bin_op: LBinOpData { op: BinEq, left: tag_val, right: make_int_val(tag as i64, 32) }
+    }
+    return self.emit_temp(cmp)
+  }
+
+  // ---------- If-else expression ----------
+
+  func Lowerer.lower_if_else_expr(
+    self, orig: Expr?, cond: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?
+  ) -> LValue? {
+    let rt = self.expr_type(orig)
+    let result_name = f"__ifexpr_{self.next_temp()}"
+
+    self.emit(LStmt {
+      kind: StVarDecl,
+      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true }
+    })
+    self.define_var(result_name, rt)
+
+    // Lower as regular if but capture result from last stmt in each branch
+    let cv = self.lower_expr(cond)
+
+    let saved_then = self.save_stmts()
+    self.lower_arm_body(then_block, result_name, rt)
+    let then_body = self.stmts
+    self.restore_stmts(saved_then)
+
+    let saved_else = self.save_stmts()
+    if len(else_ifs) > 0 || !isnull(else_block) {
+      self.lower_else_ifs_with_result(else_ifs, else_block, result_name, rt)
+    }
+    let else_body = self.stmts
+    self.restore_stmts(saved_else)
+
+    self.emit(LStmt {
+      kind: StIf,
+      if_data: LIfData { cond: cv, then_body: then_body, else_body: else_body }
+    })
+
+    return make_var_val(result_name, rt)
+  }
+
+  // ---------- Enum helpers ----------
+
+  func Lowerer.find_variant_tag(self, enum_name: string, variant_name: string) -> i32 {
+    let key = enum_name + "." + variant_name
+    let tag = self.enum_variant_tags!.get(sym(key))
+    if !isnull(tag) {
+      return tag!.value
+    }
+    return -1
+  }
+
+  func Lowerer.find_variant_field_name(self, enum_name: string, variant_name: string, field_idx: i32) -> string {
+    let key = enum_name + "." + variant_name
+    let vfields = self.enum_variant_fields!.get(sym(key))
+    if !isnull(vfields) {
+      let fields = vfields!.value
+      if field_idx < len(fields) as i32 {
+        let tf = fields[field_idx as int]
+        if !isnull(tf.name) {
+          return tf.name!.name
+        }
+      }
+    }
+    return f"_{field_idx}"
+
+  }
+
+  func Lowerer.get_variant_field_type(self, enum_name: string, variant_name: string, field_idx: i32) -> LType? {
+    let key = enum_name + "." + variant_name
+    let vfields = self.enum_variant_fields!.get(sym(key))
+    if !isnull(vfields) {
+      let fields = vfields!.value
+      if field_idx < len(fields) as i32 {
+        let tf = fields[field_idx as int]
+        return self.lower_type(tf.type_expr)
+      }
+    }
+    return LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+  }
+
+  func Lowerer.find_variant_enum(self, variant_name: string) -> string {
+    let e = self.variant_to_enum!.get(sym(variant_name))
+    if !isnull(e) { return e!.value }
+    return ""
+  }
+
+}

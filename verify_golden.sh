@@ -3,21 +3,21 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-FORGE_BS="./forge"
+LYRIC_BS="./lyric"
 RUNTIME_DIR="runtime"
-TMPDIR=$(mktemp -d -t forge_verify_XXXXXX)
+TMPDIR=$(mktemp -d -t lyric_verify_XXXXXX)
 GOLDEN_DIR="testdata/golden"
 trap "rm -rf $TMPDIR" EXIT
 
-SKIP_FILES="guarded_by.fg"
+SKIP_FILES="guarded_by.ly"
 PASS=0
 FAIL=0
 SKIP=0
 FAILURES=""
 
-for fg in testdata/*.fg; do
+for fg in testdata/*.ly; do
   name=$(basename "$fg")
-  base="${name%.fg}"
+  base="${name%.ly}"
   
   skip=false
   for s in $SKIP_FILES; do
@@ -39,23 +39,23 @@ for fg in testdata/*.fg; do
 
   DEPS=""
   case "$name" in
-    test_lexer.fg) DEPS="src/lexer/lexer.fg src/ast/ast.fg src/parser/parser.fg src/parser/expr_parser.fg" ;;
-    test_parser.fg) DEPS="src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
-    test_desugar.fg) DEPS="src/desugar/desugar.fg src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
-    test_min.fg) DEPS="src/parser/parser.fg src/parser/expr_parser.fg src/lexer/lexer.fg src/ast/ast.fg" ;;
+    test_lexer.ly) DEPS="src/lexer/lexer.ly src/ast/ast.ly src/parser/parser.ly src/parser/expr_parser.ly" ;;
+    test_parser.ly) DEPS="src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
+    test_desugar.ly) DEPS="src/desugar/desugar.ly src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
+    test_min.ly) DEPS="src/parser/parser.ly src/parser/expr_parser.ly src/lexer/lexer.ly src/ast/ast.ly" ;;
   esac
 
   out_c="$TMPDIR/${base}.c"
   out_bin="$TMPDIR/${base}"
 
   if [ "$CMD" = "test" ]; then
-    if ! $FORGE_BS test "$fg" $DEPS -o "$out_c" 2>"$TMPDIR/${base}.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}.out"; then
+    if ! $LYRIC_BS test "$fg" $DEPS -o "$out_c" 2>"$TMPDIR/${base}.err" | grep -v '^wrote \|^phase: ' >"$TMPDIR/${base}.out"; then
       FAIL=$((FAIL + 1))
       FAILURES="$FAILURES\nFAIL  $name  (compile error)"
       continue
     fi
   else
-    if ! $FORGE_BS compile "$fg" -o "$out_c" 2>"$TMPDIR/${base}.err"; then
+    if ! $LYRIC_BS compile "$fg" -o "$out_c" 2>"$TMPDIR/${base}.err"; then
       FAIL=$((FAIL + 1))
       FAILURES="$FAILURES\nFAIL  $name  (compile error)"
       continue

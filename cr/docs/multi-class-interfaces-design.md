@@ -12,7 +12,7 @@ either:
 - A single concrete graph type (petgraph) — not generic
 - C++ concept maps (Boost BGL) — unusable ceremony
 
-Forge solves this with multi-class interfaces: an interface declares methods
+Lyric solves this with multi-class interfaces: an interface declares methods
 across multiple participant types, and `impl` blocks wire them to concrete
 classes via aliasing.
 
@@ -24,7 +24,7 @@ any data structure involving relationships between two or more types.
 The `func T.method(self)` syntax binds a method to a specific type parameter.
 `self` is always the type before the dot.
 
-```forge
+```lyric
 interface Graph<G, N, E> {
     func G.nodes(self) -> gen N
     func G.edges(self) -> gen E
@@ -39,7 +39,7 @@ interface Graph<G, N, E> {
 
 Functions without a type prefix have no receiver:
 
-```forge
+```lyric
 interface Graph<G, N, E> {
     // ...methods above...
     func distance(a: N, b: N) -> f64   // no receiver, neither N is privileged
@@ -53,7 +53,7 @@ Use free functions only when there's no natural receiver.
 Interfaces can provide default implementations — algorithms written once in
 terms of the required methods:
 
-```forge
+```lyric
 interface Graph<G, N, E> {
     // Required
     func G.nodes(self) -> gen N
@@ -77,7 +77,7 @@ Dijkstra, min-cut, topological sort can all live as default functions.
 
 Instead of `where G: Graph<G, N, E>` (redundant `G:`), use bare constraints:
 
-```forge
+```lyric
 func min_cut<G, N, E>(graph: G) -> (f64, ([N], [N]))
     where Graph<G, N, E>, E: Weighted
 {
@@ -102,7 +102,7 @@ three forms:
 
 ### `=` — Method alias
 
-```forge
+```lyric
 impl Graph<CircuitGraph, Component, Wire> {
     G.nodes    = CircuitGraph.components
     G.edges    = CircuitGraph.wires
@@ -115,7 +115,7 @@ impl Graph<CircuitGraph, Component, Wire> {
 
 ### `<->` — Field binding (generates getter + setter)
 
-```forge
+```lyric
 impl DoublyLinked<Folder, File> {
     P.first  <-> Folder.firstFile
     P.last   <-> Folder.lastFile
@@ -131,7 +131,7 @@ mapped to the `firstFile` field.
 
 ### `{ body }` — Inline implementation
 
-```forge
+```lyric
 impl Hashed<Graph, Edge, (Node, Node)> {
     // ...other aliases...
     C.key(self) -> (Node, Node) {
@@ -147,7 +147,7 @@ field access.
 
 `gen T` is a generator return type — lazy iteration via `yield`:
 
-```forge
+```lyric
 func G.nodes(self) -> gen N {
     let mut node = self.firstNode
     while !isnull(node) {
@@ -163,7 +163,7 @@ func G.nodes(self) -> gen N {
 
 Under the hood, generators compile to an `Iterator<T>` state machine:
 
-```forge
+```lyric
 interface Iterator<T> {
     func next(mut self) -> T?
 }
@@ -177,7 +177,7 @@ interface Iterator<T> {
 
 ### DoublyLinked
 
-```forge
+```lyric
 interface DoublyLinked<P, C> {
     // Getters
     func P.first(self) -> C?
@@ -249,7 +249,7 @@ interface DoublyLinked<P, C> {
 
 Usage with field bindings:
 
-```forge
+```lyric
 impl DoublyLinked<Folder, File> {
     P.first  <-> Folder.firstFile
     P.last   <-> Folder.lastFile
@@ -260,8 +260,8 @@ impl DoublyLinked<Folder, File> {
 
 // Now append, remove, insert_after, children all work on Folder/File
 let folder = Folder.new("src")
-let f1 = File.new("main.fg")
-let f2 = File.new("lib.fg")
+let f1 = File.new("main.ly")
+let f2 = File.new("lib.ly")
 append(folder, f1)
 append(folder, f2)
 
@@ -272,7 +272,7 @@ for file in children(folder) {
 
 ### Hashed Relations
 
-```forge
+```lyric
 interface Hashed<P, C, K> where K: Hashable {
     func P.lookup(self, key: K) -> C?
     func P.insert(mut self, child: C)
@@ -285,7 +285,7 @@ interface Hashed<P, C, K> where K: Hashable {
 
 Usage:
 
-```forge
+```lyric
 impl Hashed<Registry, Handler, string> {
     P.lookup   = Registry.findHandler
     P.insert   = Registry.addHandler
@@ -298,7 +298,7 @@ impl Hashed<Registry, Handler, string> {
 
 ### Graph with Generic Algorithms
 
-```forge
+```lyric
 interface Weighted {
     func weight(self) -> f64
 }
@@ -340,7 +340,7 @@ func topological_sort<G, N, E>(graph: G) -> [N]
 
 Concrete implementation:
 
-```forge
+```lyric
 impl Graph<CircuitGraph, Component, Wire> {
     G.nodes     = CircuitGraph.components
     G.edges     = CircuitGraph.wires
@@ -360,7 +360,7 @@ let (cut_val, (partA, partB)) = min_cut(circuit)
 When a type participates in multiple relations of the same interface with
 identical type signatures, `impl` blocks need labels to disambiguate:
 
-```forge
+```lyric
 impl Hashed<UserStore, User, string> as byEmail {
     P.lookup   = UserStore.findByEmail
     P.insert   = UserStore.addByEmail
@@ -382,7 +382,7 @@ impl Hashed<UserStore, User, string> as byUsername {
 
 At call sites, qualify with the label:
 
-```forge
+```lyric
 byEmail.insert(store, user)
 byUsername.insert(store, user)
 
@@ -470,7 +470,7 @@ structure pattern, and this class owns that class."
 
 ### Syntax
 
-```forge
+```lyric
 relation DoublyLinked Root owns [Func]
 relation DoublyLinked Root:out_edges owns [Edge:out]
 relation Hashed<string> Registry owns [Handler:by_name]
@@ -493,7 +493,7 @@ relation Interface Parent[:label] (owns|refs) [Child[:label]]
 
 Interfaces declare default fields using `field T.name: Type` syntax:
 
-```forge
+```lyric
 interface DoublyLinked<P, C> {
     field P.first: C?
     field P.last: C?
@@ -545,7 +545,7 @@ A class owned by at least one relation survives until its destructor is called
 
 A class can be owned by multiple relations. Example:
 
-```forge
+```lyric
 relation DoublyLinked Chip:pins owns [Pin:chip]
 relation DoublyLinked Net:connections owns [Pin:net]
 ```
@@ -608,7 +608,7 @@ Explicit `ref(x)` and `unref(x)` statements are available for when the
 programmer (or the interface's default implementation) intentionally wants to
 adjust counts:
 
-```forge
+```lyric
 // Inside DoublyLinked.append default implementation:
 func append(parent: mut P, child: mut C) {
     // ... link child into parent's list ...

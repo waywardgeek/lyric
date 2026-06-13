@@ -1,10 +1,10 @@
 # Pre-Bootstrap Sprint
 
-Everything needed before we can start porting the Forge compiler to Forge.
+Everything needed before we can start porting the Lyric compiler to Lyric.
 
 ## 1. Strings as `[u8]`
 
-**Current**: `string` is `char*` in C backend, `string` in Go backend. String indexing returns `string`. Strings are opaque — can't iterate bytes, can't write string algorithms in Forge.
+**Current**: `string` is `char*` in C backend, `string` in Go backend. String indexing returns `string`. Strings are opaque — can't iterate bytes, can't write string algorithms in Lyric.
 
 **Change**: `type string = [u8]`. String becomes a slice of bytes.
 
@@ -14,8 +14,8 @@ Everything needed before we can start porting the Forge compiler to Forge.
 - `len(s)` returns byte count
 - `append(s, byte)` works
 - `for c in s` iterates bytes
-- String library writable in pure Forge
-- Lexer can be pure Forge (character-by-character scanning)
+- String library writable in pure Lyric
+- Lexer can be pure Lyric (character-by-character scanning)
 
 ### Implementation
 
@@ -23,12 +23,12 @@ Everything needed before we can start porting the Forge compiler to Forge.
 
 **String literals**: The lowerer emits `[u8]` slice initialization instead of a string value. In LIR, a string literal becomes an `LExprBuiltin("str_from_lit", [LValLitStr])` or similar, since we need the C backend to call a runtime helper.
 
-**C backend**: `string` → `forge_slice_u8`. String literals emit `forge_str_lit("hello")` which copies bytes into a heap-allocated slice. Add to `forge_runtime.h`:
+**C backend**: `string` → `lyric_slice_u8`. String literals emit `lyric_str_lit("hello")` which copies bytes into a heap-allocated slice. Add to `lyric_runtime.h`:
 
 ```c
-static inline forge_slice_u8 forge_str_lit(const char* s) {
+static inline lyric_slice_u8 lyric_str_lit(const char* s) {
     size_t n = strlen(s);
-    forge_slice_u8 r;
+    lyric_slice_u8 r;
     r.data = (uint8_t*)malloc(n);
     r.len = (int32_t)n;
     r.cap = (int32_t)n;
@@ -38,7 +38,7 @@ static inline forge_slice_u8 forge_str_lit(const char* s) {
 
 // Null-terminate for C interop (printf, fopen, etc.)
 // Caller must free the result.
-static inline char* forge_str_to_cstr(forge_slice_u8 s) {
+static inline char* lyric_str_to_cstr(lyric_slice_u8 s) {
     char* r = (char*)malloc(s.len + 1);
     memcpy(r, s.data, s.len);
     r[s.len] = '\0';
@@ -48,12 +48,12 @@ static inline char* forge_str_to_cstr(forge_slice_u8 s) {
 
 **Go backend**: Strings stay as Go `string`. Add conversion helpers: `[]byte(s)` / `string(b)` at boundaries. Since Go strings are already UTF-8 byte sequences, this is mostly transparent.
 
-**F-strings**: `f"hello {name}"` — each literal part becomes a `[u8]`, interpolated values get `to_string()` or format builtin, then all parts are concatenated. The lowerer already emits `LExprFormat` with parts — the C backend needs to build a `forge_slice_u8` instead of `char*`.
+**F-strings**: `f"hello {name}"` — each literal part becomes a `[u8]`, interpolated values get `to_string()` or format builtin, then all parts are concatenated. The lowerer already emits `LExprFormat` with parts — the C backend needs to build a `lyric_slice_u8` instead of `char*`.
 
-**Null terminator**: NOT stored in the slice. Pure byte count. The `forge_str_to_cstr()` bridge adds `\0` when passing to C functions (file I/O, printf, exec).
+**Null terminator**: NOT stored in the slice. Pure byte count. The `lyric_str_to_cstr()` bridge adds `\0` when passing to C functions (file I/O, printf, exec).
 
 ### Migration
-- Existing `.fg` test files using `string` keep working — it's the same type, just now a slice alias.
+- Existing `.ly` test files using `string` keep working — it's the same type, just now a slice alias.
 - `hash_string` builtin stays (operates on `[u8]` now — same bytes).
 - `print`/`println` need to accept `[u8]` — C backend uses `fwrite(s.data, 1, s.len, stdout)` instead of `printf("%s", s)`.
 
@@ -77,7 +77,7 @@ Character literals are NOT a new type — they're `u8` constants. `'A'` is `65u8
 
 **Lexer**: When `peek() == '\''`, scan a character literal. Handle escape sequences. Emit a new token `TCharLit` with the byte value stored as the token text (or as an integer).
 
-**Parser**: `TCharLit` → `ExprKind.IntLit` with value set to the ASCII byte value, type annotated as `u8`. Alternatively, add `ExprKind.CharLit` if we want to preserve source fidelity for `forge fmt`.
+**Parser**: `TCharLit` → `ExprKind.IntLit` with value set to the ASCII byte value, type annotated as `u8`. Alternatively, add `ExprKind.CharLit` if we want to preserve source fidelity for `lyric fmt`.
 
 **Checker**: If we use `IntLit`, no changes needed (already typed). If `CharLit`, resolve to `u8`.
 
@@ -89,12 +89,12 @@ Character literals are NOT a new type — they're `u8` constants. `'A'` is `65u8
 
 **String literals contain arbitrary UTF-8**: Since strings are `[u8]`, a string literal `"café"` stores the raw UTF-8 bytes (`[99, 97, 102, 195, 169]`). No special handling needed — the lexer already reads UTF-8 source, we just preserve the bytes.
 
-## 3. String Standard Library (`stdlib/string.fg`)
+## 3. String Standard Library (`stdlib/string.ly`)
 
-Written in pure Forge once strings are `[u8]`. All functions operate on byte slices.
+Written in pure Lyric once strings are `[u8]`. All functions operate on byte slices.
 
 ```
-forge string_lib {
+lyric string_lib {
   // Comparison
   pub func str_eq(a: string, b: string) -> bool
   pub func str_cmp(a: string, b: string) -> i32    // -1, 0, 1
@@ -134,7 +134,7 @@ These replace the Go `strings`, `strconv`, and `unicode` packages the compiler c
 
 ## 4. File I/O and OS Builtins
 
-The compiler needs to read source files, write output, invoke `cc`, and parse CLI args. These can't be written in Forge — they need C syscall bridges.
+The compiler needs to read source files, write output, invoke `cc`, and parse CLI args. These can't be written in Lyric — they need C syscall bridges.
 
 ### Approach: Builtins (not `extern`)
 
@@ -168,22 +168,22 @@ pub func path_ext(path: string) -> string
 
 ### C Backend Implementation
 
-Each builtin maps to a C function in `forge_runtime.h`. Examples:
+Each builtin maps to a C function in `lyric_runtime.h`. Examples:
 
 ```c
-static inline forge_result_slice_u8_bool forge_read_file(forge_slice_u8 path) {
-    char* cpath = forge_str_to_cstr(path);
+static inline lyric_result_slice_u8_bool lyric_read_file(lyric_slice_u8 path) {
+    char* cpath = lyric_str_to_cstr(path);
     FILE* f = fopen(cpath, "rb");
     free(cpath);
-    if (!f) return (forge_result_slice_u8_bool){ .val = {0}, .err = false };
+    if (!f) return (lyric_result_slice_u8_bool){ .val = {0}, .err = false };
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
     fseek(f, 0, SEEK_SET);
     uint8_t* buf = malloc(n);
     fread(buf, 1, n, f);
     fclose(f);
-    forge_slice_u8 s = { buf, (int32_t)n, (int32_t)n };
-    return (forge_result_slice_u8_bool){ .val = s, .err = true };
+    lyric_slice_u8 s = { buf, (int32_t)n, (int32_t)n };
+    return (lyric_result_slice_u8_bool){ .val = s, .err = true };
 }
 ```
 
@@ -199,17 +199,17 @@ This means `s1 == s2` for strings just works — element-wise byte comparison. N
 
 ### 5b. Tagged Union / `any` Type
 
-The AST and LIR use `Data any` with type assertions everywhere. The Go compiler has `dataAs[T](data any) *T`. For Forge:
+The AST and LIR use `Data any` with type assertions everywhere. The Go compiler has `dataAs[T](data any) *T`. For Lyric:
 
-**`any` is just an empty interface** — same as Go. Forge already has interfaces and the C backend has vtable dispatch. In C, `any` = `void*`. Type assertions via match on concrete types (the C backend already handles `ForgeUnion` with type tags for union types).
+**`any` is just an empty interface** — same as Go. Lyric already has interfaces and the C backend has vtable dispatch. In C, `any` = `void*`. Type assertions via match on concrete types (the C backend already handles `LyricUnion` with type tags for union types).
 
 No new language machinery needed — just register `any` as a built-in empty interface in the checker.
 
 ### 5c. Error Model
 
-Forge already has `(T, error)` tuple returns and `?` operator. For the bootstrap, add a concrete `Error` class to stdlib:
+Lyric already has `(T, error)` tuple returns and `?` operator. For the bootstrap, add a concrete `Error` class to stdlib:
 
-```forge
+```lyric
 class Error(msg: string) {
     pub func message(self) -> string { return self.msg }
 }
@@ -221,7 +221,7 @@ Compiler code uses `Error(f"unexpected token {tok}")` to create errors, and `?` 
 
 The compiler builds strings extensively (C backend output). Current Go code uses `fmt.Sprintf` and `strings.Builder`. Options:
 
-- **StringBuilder class**: `class StringBuilder()` with `write(s: string)`, `write_byte(b: u8)`, `to_string() -> string`. Backed by `[u8]` with amortized growth. Can be written in pure Forge.
+- **StringBuilder class**: `class StringBuilder()` with `write(s: string)`, `write_byte(b: u8)`, `to_string() -> string`. Backed by `[u8]` with amortized growth. Can be written in pure Lyric.
 - **F-strings**: Already have `f"..."` — covers most formatting cases.
 
 **Decision**: Add `StringBuilder` to stdlib. F-strings for simple cases, StringBuilder for the C backend's heavy string building.
@@ -232,10 +232,10 @@ The compiler builds strings extensively (C backend output). Current Go code uses
 2. **Character literals** (`'c'` → `u8`) in lexer/parser/checker — ~100 LOC
 3. **String as `[u8]`** — type alias, C backend changes, runtime helpers — ~300 LOC
 4. **Deep `==` for composite types** — C backend emits memcmp/field-wise comparison — ~150 LOC
-5. **String stdlib** (`stdlib/string.fg`) — pure Forge — ~200 LOC
+5. **String stdlib** (`stdlib/string.ly`) — pure Lyric — ~200 LOC
 6. **OS/IO builtins** — checker + lowerer + C backend + runtime — ~400 LOC
 7. **`any` type** — checker + lowerer + C backend (boxing/unboxing) — ~300 LOC
-8. **StringBuilder** in stdlib — pure Forge — ~50 LOC
+8. **StringBuilder** in stdlib — pure Lyric — ~50 LOC
 
 **Total: ~1,550 lines of changes**, then we're ready to start porting.
 

@@ -1,0 +1,1535 @@
+// optimizer.ly — Post-lowering LIR→LIR optimization pass
+// Ported from pkg/lir/optimize.go
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+pub func optimize(prog: LProgram) {
+  let mut i = 0
+  while i < len(prog.functions) {
+    optimize_func(mut prog.functions[i])
+    i = i + 1
+  }
+}
+
+func optimize_func(mut fn: LFuncDecl) {
+  // Run structural transforms first
+  let stmts = optimize_stmts_structural(fn.body, fn.return_type)
+  fn.body = stmts
+
+  // Collect used temps and vars on the TRANSFORMED stmts
+  let used_temps = Dict<Sym, bool>()
+  collect_used_temps(fn.body, used_temps)
+  let used_vars = Dict<Sym, bool>()
+  collect_used_var_names(fn.body, used_vars)
+
+  fn.body = eliminate_unused_temps_recursive(fn.body, used_temps, used_vars)
+
+  // Re-collect AFTER elimination — some VarDecls referencing MultiAssign names
+  // may have been eliminated, making those names now unused
+  let used_vars2 = Dict<Sym, bool>()
+  collect_used_var_names(fn.body, used_vars2)
+  let used_temps2 = Dict<Sym, bool>()
+  collect_used_temps(fn.body, used_temps2)
+  blank_unused_multi_assign_names(fn.body, used_temps2, used_vars2)
+}
+
+func optimize_stmts_structural(
+    stmts: [LStmt?],
+    return_type: LType?
+) -> [LStmt?] {
+  let mut result = fuse_side_effect_temps(stmts)
+  result = destructure_multi_return(result)
+  result = destructure_extract_pairs(result)
+  result = fix_nil_zero_values(result)
+  // coerceForRangeIndex — stub (requires data-flow analysis)
+  // wrapOptionalReturns — stub (lowerer handles this)
+  // rewriteAppendReassign — stub (handled in C backend)
+
+  // Recurse into nested blocks
+  let mut i = 0
+  while i < len(result) {
+    if !isnull(result[i]) {
+      optimize_nested_stmts_structural(result[i]!, return_type)
+    }
+    i = i + 1
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Pass 1: Side-effect temp elimination
+// ---------------------------------------------------------------------------
+// Pattern: _tN := call(...)  followed by  _ = _tN
+// Fuse into: a single side-effect statement (bare call, no assignment)
+
+func fuse_side_effect_temps(stmts: [LStmt?]) -> [LStmt?] {
+  // Build set of temp IDs that are only used in LStmtExpr discards
+  let discarded = Dict<Sym, bool>()
+  for s in stmts {
+    if !isnull(s) && s!.kind == StExpr {
+      let es = s!.expr_stmt
+      if !isnull(es) {
+        discarded.set(sym(f"{es!.temp_id}"), true)
+      }
+    }
+  }
+
+  let mut out: [LStmt?] = []
+  for s in stmts {
+    if isnull(s) {
+      append(out, s)
+    } else {
+      let stmt = s!
+      if stmt.kind == StTempDef {
+        let td = stmt.temp_def
+        if !isnull(td) {
+          let key = f"{td!.id}"
+          let entry = discarded.get(sym(key))
+          if !isnull(entry) && entry!.value {
+            if !isnull(td!.expr) && is_side_effect_expr(td!.expr!) {
+              // Emit as bare side-effect statement
+              let se = LStmt {
+                kind: StSideEffect,
+                side_effect: LSideEffectData { expr: td!.expr }
+              }
+              append(out, se)
+            } else {
+              append(out, s)
+            }
+          } else {
+            append(out, s)
+          }
+        } else {
+          append(out, s)
+        }
+      } else if stmt.kind == StExpr {
+        let es = stmt.expr_stmt
+        if !isnull(es) {
+          let key = f"{es!.temp_id}"
+          let entry = discarded.get(sym(key))
+          if !isnull(entry) && entry!.value {
+            // Skip the discard — already fused above
+          } else {
+            append(out, s)
+          }
+        } else {
+          append(out, s)
+        }
+      } else {
+        append(out, s)
+      }
+    }
+  }
+  return out
+}
+
+func is_side_effect_expr(e: LExpr) -> bool {
+  if e.kind == ExCall || e.kind == ExMethodCall {
+    return true
+  }
+  if e.kind == ExBuiltin {
+    let b = e.builtin
+    if !isnull(b) {
+      if (b!.name == "println" ||
+          b!.name == "print" ||
+          b!.name == "eprintln" ||
+          b!.name == "eprint" ||
+          b!.name == "append" ||
+          b!.name == "slice_push" ||
+          b!.name == "push_bytes" ||
+          b!.name == "slice_pop" ||
+          b!.name == "slice_clear" ||
+          b!.name == "slice_reverse" ||
+          b!.name == "channel_close" ||
+          b!.name == "channel_receive") {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2: Multi-return destructuring
+// ---------------------------------------------------------------------------
+// Pattern:
+//   _tN := someFunc(args...)    // returns (T, error)
+//   val := _tN
+//   err := _tN
+// Replace with:
+//   MultiAssign{names: ["val", "err"], expr: call-expr}
+
+func destructure_multi_return(stmts: [LStmt?]) -> [LStmt?] {
+  let mut out: [LStmt?] = []
+  let mut i = 0
+  while i < len(stmts) {
+    let can_destructure = (
+      i + 2 < len(stmts) &&
+      !isnull(stmts[i]) &&
+      stmts[i]!.kind == StTempDef
+    )
+    if can_destructure {
+      let td = stmts[i]!.temp_def
+      if !isnull(td) {
+        let temp_id = td!.id
+        let mut j = i + 1
+        let mut names: [string] = []
+        let mut types: [LType?] = []
+        while j < len(stmts) && !isnull(stmts[j]) && stmts[j]!.kind == StVarDecl {
+          let vd = stmts[j]!.var_decl
+          let vd_matches = (
+            !isnull(vd) && !isnull(vd!.init) &&
+            vd!.init!.kind == ValTemp &&
+            vd!.init!.temp_id == temp_id
+          )
+          if vd_matches {
+            append(names, vd!.name)
+            append(types, vd!.typ)
+            j = j + 1
+          } else {
+            break
+          }
+        }
+        if len(names) >= 2 {
+          let ma = LStmt {
+            kind: StMultiAssign,
+            multi_assign: LMultiAssignData {
+              names: names,
+              types: types,
+              expr: td!.expr
+            }
+          }
+          append(out, ma)
+          i = j
+        } else {
+          append(out, stmts[i])
+          i = i + 1
+        }
+      } else {
+        append(out, stmts[i])
+        i = i + 1
+      }
+    } else {
+      append(out, stmts[i])
+      i = i + 1
+    }
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2b: Destructure Extract pairs (try operator)
+// ---------------------------------------------------------------------------
+
+func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?] {
+  // First pass: find temps that are sources of Extract operations
+  let has_value = Dict<Sym, bool>()
+  let has_error = Dict<Sym, bool>()
+
+  for s in stmts {
+    if isnull(s) { continue }
+    let stmt = s!
+    if stmt.kind != StTempDef { continue }
+    let td = stmt.temp_def
+    if isnull(td) || isnull(td!.expr) { continue }
+    let expr = td!.expr!
+
+    if expr.kind == ExExtractValue && !isnull(expr.extract_value) {
+      let d = expr.extract_value!
+      if !isnull(d.value) && d.value!.kind == ValTemp {
+        has_value.set(sym(f"{d.value!.temp_id}"), true)
+      }
+    }
+    if expr.kind == ExExtractError && !isnull(expr.extract_error) {
+      let d = expr.extract_error!
+      if !isnull(d.value) && d.value!.kind == ValTemp {
+        has_error.set(sym(f"{d.value!.temp_id}"), true)
+      }
+    }
+  }
+
+  // Check if any sources found
+  if len(has_value.keys()) == 0 && len(has_error.keys()) == 0 {
+    return stmts
+  }
+
+  // Merge: a source must have BOTH value and error extracts
+  let sources = Dict<Sym, bool>()
+  let val_keys = has_value.keys()
+  for k in val_keys {
+    let entry = has_error.get(k)
+    if !isnull(entry) {
+      sources.set(k, true)
+    }
+  }
+
+  if len(sources.keys()) == 0 {
+    return stmts
+  }
+
+  // Second pass: rewrite
+  let mut out: [LStmt?] = []
+  for s in stmts {
+    if isnull(s) {
+      append(out, s)
+      continue
+    }
+    let stmt = s!
+    if stmt.kind != StTempDef {
+      append(out, s)
+      continue
+    }
+    let td = stmt.temp_def
+    if isnull(td) {
+      append(out, s)
+      continue
+    }
+
+    // Is this a source temp being extracted?
+    let src_key = f"{td!.id}"
+    let src_entry = sources.get(sym(src_key))
+    if !isnull(src_entry) {
+      let val_name = f"_t{td!.id}_val"
+      let err_name = f"_t{td!.id}_err"
+      let ma = LStmt {
+        kind: StMultiAssign,
+        multi_assign: LMultiAssignData {
+          names: [val_name, err_name],
+          types: [],
+          expr: td!.expr
+        }
+      }
+      append(out, ma)
+      continue
+    }
+
+    // Is this an extract of a source?
+    if !isnull(td!.expr) {
+      let expr = td!.expr!
+
+      if expr.kind == ExExtractValue && !isnull(expr.extract_value) {
+        let d = expr.extract_value!
+        if !isnull(d.value) && d.value!.kind == ValTemp {
+          let ek = f"{d.value!.temp_id}"
+          let ee = sources.get(sym(ek))
+          if !isnull(ee) {
+            let val_name = f"_t{d.value!.temp_id}_val"
+            let vd = LStmt {
+              kind: StVarDecl,
+              var_decl: LVarDeclData {
+                name: f"_t{td!.id}",
+                typ: expr.typ,
+                init: LValue {
+                  kind: ValVar,
+                  name: val_name,
+                  typ: expr.typ
+                },
+                mutable: false
+              }
+            }
+            append(out, vd)
+            continue
+          }
+        }
+      }
+
+      if expr.kind == ExExtractError && !isnull(expr.extract_error) {
+        let d = expr.extract_error!
+        if !isnull(d.value) && d.value!.kind == ValTemp {
+          let ek = f"{d.value!.temp_id}"
+          let ee = sources.get(sym(ek))
+          if !isnull(ee) {
+            let err_name = f"_t{d.value!.temp_id}_err"
+            let vd = LStmt {
+              kind: StVarDecl,
+              var_decl: LVarDeclData {
+                name: f"_t{td!.id}",
+                typ: expr.typ,
+                init: LValue {
+                  kind: ValVar,
+                  name: err_name,
+                  typ: expr.typ
+                },
+                mutable: false
+              }
+            }
+            append(out, vd)
+            continue
+          }
+        }
+      }
+    }
+
+    append(out, s)
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2c: Fix nil zero values
+// ---------------------------------------------------------------------------
+
+func fix_nil_zero_values(stmts: [LStmt?]) -> [LStmt?] {
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) && stmts[i]!.kind == StReturn {
+      let r = stmts[i]!.ret
+      if !isnull(r) {
+        let mut j = 0
+        while j < len(r!.values) {
+          let v = r!.values[j]
+          if !isnull(v) && v!.kind == ValLitNull && !isnull(v!.typ) {
+            r!.values[j] = zero_value_for_type(v!.typ!)
+          }
+          j = j + 1
+        }
+      }
+    }
+    i = i + 1
+  }
+  return stmts
+}
+
+func zero_value_for_type(t: LType) -> LValue? {
+  match t.kind {
+    TyI8 | TyI16 | TyI32 | TyI64 | TyPlatformInt => {
+      return LValue { kind: ValLitInt, int_val: 0, typ: t }
+    }
+    TyU8 | TyU16 | TyU32 | TyU64 | TyPlatformUint => {
+      return LValue { kind: ValLitUint, uint_val: 0 as u64, typ: t }
+    }
+    TyF32 | TyF64 => {
+      return LValue { kind: ValLitFloat, float_val: 0.0, typ: t }
+    }
+    TyBool => {
+      return LValue { kind: ValLitBool, bool_val: false, typ: t }
+    }
+    TyString => {
+      return LValue { kind: ValLitString, str_val: "", typ: t }
+    }
+    _ => {
+      return LValue { kind: ValLitNull, typ: t }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recurse into nested blocks
+// ---------------------------------------------------------------------------
+
+func optimize_nested_stmts_structural(s: LStmt, return_type: LType?) {
+  match s.kind {
+    StIf => {
+      let d = s.if_data
+      if !isnull(d) {
+        d!.then_body = optimize_stmts_structural(d!.then_body, return_type)
+        d!.else_body = optimize_stmts_structural(d!.else_body, return_type)
+      }
+    }
+    StWhile => {
+      let d = s.while_data
+      if !isnull(d) {
+        d!.cond_block = optimize_stmts_structural(d!.cond_block, return_type)
+        d!.body = optimize_stmts_structural(d!.body, return_type)
+      }
+    }
+    StFor => {
+      let d = s.for_data
+      if !isnull(d) {
+        d!.body = optimize_stmts_structural(d!.body, return_type)
+      }
+    }
+    StSwitch => {
+      let d = s.switch_data
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          d!.cases[i].body = optimize_stmts_structural(
+            d!.cases[i].body, return_type
+          )
+          i = i + 1
+        }
+      }
+    }
+    StTypeSwitch => {
+      let d = s.type_switch
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          d!.cases[i].body = optimize_stmts_structural(
+            d!.cases[i].body, return_type
+          )
+          i = i + 1
+        }
+      }
+    }
+    StBlock => {
+      let d = s.block
+      if !isnull(d) {
+        d!.stmts = optimize_stmts_structural(d!.stmts, return_type)
+      }
+    }
+    StDefer => {
+      let d = s.defer_data
+      if !isnull(d) {
+        d!.body = optimize_stmts_structural(d!.body, return_type)
+      }
+    }
+    StSpawn => {
+      let d = s.spawn_data
+      if !isnull(d) {
+        d!.body = optimize_stmts_structural(d!.body, return_type)
+      }
+    }
+    StLock => {
+      let d = s.lock_data
+      if !isnull(d) {
+        d!.body = optimize_stmts_structural(d!.body, return_type)
+      }
+    }
+    StSelect => {
+      let d = s.select_data
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          d!.cases[i].body = optimize_stmts_structural(
+            d!.cases[i].body, return_type
+          )
+          i = i + 1
+        }
+      }
+    }
+    _ => {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 5: Eliminate unused temps
+// ---------------------------------------------------------------------------
+
+func eliminate_unused_temps(
+    stmts: [LStmt?],
+    used_temps: Dict<Sym, bool>
+) -> [LStmt?] {
+  let used_vars = Dict<Sym, bool>()
+  collect_used_var_names(stmts, used_vars)
+
+  let mut out: [LStmt?] = []
+  for s in stmts {
+    if isnull(s) { continue }
+    let stmt = s!
+
+    if stmt.kind == StTempDef {
+      let td = stmt.temp_def
+      if !isnull(td) {
+        let key = f"{td!.id}"
+        let entry = used_temps.get(sym(key))
+        if isnull(entry) {
+          // Temp is unused — emit as side effect if it has side effects
+          if !isnull(td!.expr) && is_side_effect_expr(td!.expr!) {
+            let se = LStmt {
+              kind: StSideEffect,
+              side_effect: LSideEffectData { expr: td!.expr }
+            }
+            append(out, se)
+          }
+          // Otherwise drop entirely
+          continue
+        }
+      }
+    }
+
+    // Eliminate unused VarDecls with temp-like names (_tN)
+    if stmt.kind == StVarDecl {
+      let vd = stmt.var_decl
+      if !isnull(vd) && len(vd!.name) > 2 {
+        if vd!.name[0] == 95 as u8 && vd!.name[1] == 116 as u8 {
+          // '_' = 95, 't' = 116
+          let num_str = vd!.name[2:len(vd!.name)]
+          if is_numeric_str(num_str) {
+            let var_entry = used_vars.get(sym(vd!.name))
+            let tid = parse_temp_id(vd!.name)
+            let temp_entry = used_temps.get(sym(f"{tid}"))
+            if isnull(var_entry) && isnull(temp_entry) {
+              continue
+            }
+          }
+        }
+      }
+    }
+
+    append(out, s)
+  }
+  return out
+}
+
+func is_numeric_str(s: string) -> bool {
+  if len(s) == 0 { return false }
+  let mut i = 0
+  while i < len(s) {
+    let c = s[i]
+    if c < 48 as u8 || c > 57 as u8 {
+      return false
+    }
+    i = i + 1
+  }
+  return true
+}
+
+func parse_temp_id(name: string) -> i32 {
+  if len(name) > 2 && name[0] == 95 as u8 && name[1] == 116 as u8 {
+    let mut num_str = name[2:len(name)]
+    // Strip _val/_err suffix if present
+    if len(num_str) > 4 {
+      let suffix = num_str[len(num_str) - 4:len(num_str)]
+      if suffix == "_val" || suffix == "_err" {
+        num_str = num_str[0:len(num_str) - 4]
+      }
+    }
+    return parse_int(num_str) as i32
+  }
+  return -1
+}
+
+func eliminate_unused_temps_recursive(
+    stmts: [LStmt?],
+    used_temps: Dict<Sym, bool>,
+    used_vars: Dict<Sym, bool>
+) -> [LStmt?] {
+  let mut result = eliminate_unused_temps(stmts, used_temps)
+  let mut i = 0
+  while i < len(result) {
+    if isnull(result[i]) {
+      i = i + 1
+      continue
+    }
+    let stmt = result[i]!
+    match stmt.kind {
+      StIf => {
+        let d = stmt.if_data
+        if !isnull(d) {
+          d!.then_body = eliminate_unused_temps_recursive(d!.then_body, used_temps, used_vars)
+          d!.else_body = eliminate_unused_temps_recursive(d!.else_body, used_temps, used_vars)
+        }
+      }
+      StWhile => {
+        let d = stmt.while_data
+        if !isnull(d) {
+          d!.cond_block = eliminate_unused_temps_recursive(d!.cond_block, used_temps, used_vars)
+          d!.body = eliminate_unused_temps_recursive(d!.body, used_temps, used_vars)
+        }
+      }
+      StFor => {
+        let d = stmt.for_data
+        if !isnull(d) {
+          d!.body = eliminate_unused_temps_recursive(d!.body, used_temps, used_vars)
+        }
+      }
+      StSwitch => {
+        let d = stmt.switch_data
+        if !isnull(d) {
+          let mut j = 0
+          while j < len(d!.cases) {
+            d!.cases[j].body = eliminate_unused_temps_recursive(
+              d!.cases[j].body, used_temps, used_vars
+            )
+            j = j + 1
+          }
+        }
+      }
+      StTypeSwitch => {
+        let d = stmt.type_switch
+        if !isnull(d) {
+          let mut j = 0
+          while j < len(d!.cases) {
+            d!.cases[j].body = eliminate_unused_temps_recursive(
+              d!.cases[j].body, used_temps, used_vars
+            )
+            j = j + 1
+          }
+        }
+      }
+      StBlock => {
+        let d = stmt.block
+        if !isnull(d) {
+          d!.stmts = eliminate_unused_temps_recursive(d!.stmts, used_temps, used_vars)
+        }
+      }
+      StDefer => {
+        let d = stmt.defer_data
+        if !isnull(d) {
+          d!.body = eliminate_unused_temps_recursive(d!.body, used_temps, used_vars)
+        }
+      }
+      StSpawn => {
+        let d = stmt.spawn_data
+        if !isnull(d) {
+          d!.body = eliminate_unused_temps_recursive(d!.body, used_temps, used_vars)
+        }
+      }
+      StLock => {
+        let d = stmt.lock_data
+        if !isnull(d) {
+          d!.body = eliminate_unused_temps_recursive(d!.body, used_temps, used_vars)
+        }
+      }
+      StSelect => {
+        let d = stmt.select_data
+        if !isnull(d) {
+          let mut j = 0
+          while j < len(d!.cases) {
+            d!.cases[j].body = eliminate_unused_temps_recursive(
+              d!.cases[j].body, used_temps, used_vars
+            )
+            j = j + 1
+          }
+        }
+      }
+      _ => {}
+    }
+    i = i + 1
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Blank unused multi-assign names
+// ---------------------------------------------------------------------------
+
+func blank_unused_multi_assign_names(
+    stmts: [LStmt?],
+    used_temps: Dict<Sym, bool>,
+    used_vars: Dict<Sym, bool>
+) {
+  for s in stmts {
+    if isnull(s) { continue }
+    let stmt = s!
+
+    if stmt.kind == StMultiAssign {
+      let ma = stmt.multi_assign
+      if !isnull(ma) {
+        let mut j = 0
+        while j < len(ma!.names) {
+          let name = ma!.names[j]
+          if name != "_" {
+            let var_entry = used_vars.get(sym(name))
+            let tid = parse_temp_id(name)
+            let temp_entry = used_temps.get(sym(f"{tid}"))
+            if isnull(var_entry) && isnull(temp_entry) {
+              ma!.names[j] = "_"
+            }
+          }
+          j = j + 1
+        }
+      }
+    }
+
+    // Recurse into nested blocks
+    recurse_blank_unused(stmt, used_temps, used_vars)
+  }
+}
+
+func recurse_blank_unused(
+    stmt: LStmt,
+    used_temps: Dict<Sym, bool>,
+    used_vars: Dict<Sym, bool>
+) {
+  match stmt.kind {
+    StIf => {
+      let d = stmt.if_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.then_body, used_temps, used_vars)
+        blank_unused_multi_assign_names(d!.else_body, used_temps, used_vars)
+      }
+    }
+    StWhile => {
+      let d = stmt.while_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.cond_block, used_temps, used_vars)
+        blank_unused_multi_assign_names(d!.body, used_temps, used_vars)
+      }
+    }
+    StFor => {
+      let d = stmt.for_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.body, used_temps, used_vars)
+      }
+    }
+    StSwitch => {
+      let d = stmt.switch_data
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          blank_unused_multi_assign_names(d!.cases[i].body, used_temps, used_vars)
+          i = i + 1
+        }
+      }
+    }
+    StTypeSwitch => {
+      let d = stmt.type_switch
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          blank_unused_multi_assign_names(d!.cases[i].body, used_temps, used_vars)
+          i = i + 1
+        }
+      }
+    }
+    StBlock => {
+      let d = stmt.block
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.stmts, used_temps, used_vars)
+      }
+    }
+    StDefer => {
+      let d = stmt.defer_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.body, used_temps, used_vars)
+      }
+    }
+    StSpawn => {
+      let d = stmt.spawn_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.body, used_temps, used_vars)
+      }
+    }
+    StLock => {
+      let d = stmt.lock_data
+      if !isnull(d) {
+        blank_unused_multi_assign_names(d!.body, used_temps, used_vars)
+      }
+    }
+    StSelect => {
+      let d = stmt.select_data
+      if !isnull(d) {
+        let mut i = 0
+        while i < len(d!.cases) {
+          blank_unused_multi_assign_names(d!.cases[i].body, used_temps, used_vars)
+          i = i + 1
+        }
+      }
+    }
+    _ => {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Collect used temps
+// ---------------------------------------------------------------------------
+
+func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>) {
+  for s in stmts {
+    if !isnull(s) {
+      collect_used_temps_in_stmt(s!, used)
+    }
+  }
+}
+
+func collect_used_temps_in_stmt(s: LStmt, used: Dict<Sym, bool>) {
+  match s.kind {
+    StTempDef => {
+      let td = s.temp_def
+      if !isnull(td) && !isnull(td!.expr) {
+        collect_used_temps_in_expr(td!.expr!, used)
+      }
+    }
+    StVarDecl => {
+      let vd = s.var_decl
+      if !isnull(vd) && !isnull(vd!.init) {
+        collect_used_temps_in_value(vd!.init!, used)
+      }
+    }
+    StAssign => {
+      let a = s.assign
+      if !isnull(a) && !isnull(a!.value) {
+        collect_used_temps_in_value(a!.value!, used)
+      }
+    }
+    StStructSet => {
+      let ss = s.struct_set
+      if !isnull(ss) {
+        if !isnull(ss!.receiver) { collect_used_temps_in_value(ss!.receiver!, used) }
+        if !isnull(ss!.value) { collect_used_temps_in_value(ss!.value!, used) }
+      }
+    }
+    StClassSet => {
+      let cs = s.class_set
+      if !isnull(cs) {
+        if !isnull(cs!.handle) { collect_used_temps_in_value(cs!.handle!, used) }
+        if !isnull(cs!.value) { collect_used_temps_in_value(cs!.value!, used) }
+      }
+    }
+    StIndexSet => {
+      let is_ = s.index_set
+      if !isnull(is_) {
+        if !isnull(is_!.collection) { collect_used_temps_in_value(is_!.collection!, used) }
+        if !isnull(is_!.index) { collect_used_temps_in_value(is_!.index!, used) }
+        if !isnull(is_!.value) { collect_used_temps_in_value(is_!.value!, used) }
+      }
+    }
+    StIf => {
+      let d = s.if_data
+      if !isnull(d) {
+        if !isnull(d!.cond) { collect_used_temps_in_value(d!.cond!, used) }
+        collect_used_temps(d!.then_body, used)
+        collect_used_temps(d!.else_body, used)
+      }
+    }
+    StWhile => {
+      let d = s.while_data
+      if !isnull(d) {
+        collect_used_temps(d!.cond_block, used)
+        if !isnull(d!.cond_var) { collect_used_temps_in_value(d!.cond_var!, used) }
+        collect_used_temps(d!.body, used)
+      }
+    }
+    StFor => {
+      let d = s.for_data
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_temps_in_value(d!.collection!, used) }
+        collect_used_temps(d!.body, used)
+      }
+    }
+    StSwitch => {
+      let d = s.switch_data
+      if !isnull(d) {
+        if !isnull(d!.tag) { collect_used_temps_in_value(d!.tag!, used) }
+        let mut i = 0
+        while i < len(d!.cases) {
+          collect_used_temps(d!.cases[i].body, used)
+          i = i + 1
+        }
+      }
+    }
+    StTypeSwitch => {
+      let d = s.type_switch
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+        let mut i = 0
+        while i < len(d!.cases) {
+          collect_used_temps(d!.cases[i].body, used)
+          i = i + 1
+        }
+      }
+    }
+    StReturn => {
+      let r = s.ret
+      if !isnull(r) {
+        for v in r!.values {
+          if !isnull(v) { collect_used_temps_in_value(v!, used) }
+        }
+      }
+    }
+    StSend => {
+      let snd = s.send_data
+      if !isnull(snd) {
+        if !isnull(snd!.channel) { collect_used_temps_in_value(snd!.channel!, used) }
+        if !isnull(snd!.value) { collect_used_temps_in_value(snd!.value!, used) }
+      }
+    }
+    StSelect => {
+      let sel = s.select_data
+      if !isnull(sel) {
+        let mut i = 0
+        while i < len(sel!.cases) {
+          let c = sel!.cases[i]
+          if !isnull(c.channel) { collect_used_temps_in_value(c.channel!, used) }
+          if !isnull(c.value) { collect_used_temps_in_value(c.value!, used) }
+          collect_used_temps(c.body, used)
+          i = i + 1
+        }
+      }
+    }
+    StExpr => {
+      let es = s.expr_stmt
+      if !isnull(es) {
+        used.set(sym(f"{es!.temp_id}"), true)
+      }
+    }
+    StSideEffect => {
+      let se = s.side_effect
+      if !isnull(se) && !isnull(se!.expr) {
+        collect_used_temps_in_expr(se!.expr!, used)
+      }
+    }
+    StMultiAssign => {
+      let ma = s.multi_assign
+      if !isnull(ma) && !isnull(ma!.expr) {
+        collect_used_temps_in_expr(ma!.expr!, used)
+      }
+    }
+    StBlock => {
+      let d = s.block
+      if !isnull(d) { collect_used_temps(d!.stmts, used) }
+    }
+    StDefer => {
+      let d = s.defer_data
+      if !isnull(d) { collect_used_temps(d!.body, used) }
+    }
+    StSpawn => {
+      let d = s.spawn_data
+      if !isnull(d) { collect_used_temps(d!.body, used) }
+    }
+    StLock => {
+      let d = s.lock_data
+      if !isnull(d) {
+        if !isnull(d!.mutex) { collect_used_temps_in_value(d!.mutex!, used) }
+        collect_used_temps(d!.body, used)
+      }
+    }
+    _ => {}
+  }
+}
+
+func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>) {
+  match e.kind {
+    ExBinOp => {
+      let d = e.bin_op
+      if !isnull(d) {
+        if !isnull(d!.left) { collect_used_temps_in_value(d!.left!, used) }
+        if !isnull(d!.right) { collect_used_temps_in_value(d!.right!, used) }
+      }
+    }
+    ExUnOp => {
+      let d = e.un_op
+      if !isnull(d) {
+        if !isnull(d!.operand) { collect_used_temps_in_value(d!.operand!, used) }
+      }
+    }
+    ExCast => {
+      let d = e.cast
+      if !isnull(d) {
+        if !isnull(d!.operand) { collect_used_temps_in_value(d!.operand!, used) }
+      }
+    }
+    ExStructField => {
+      let d = e.struct_field
+      if !isnull(d) {
+        if !isnull(d!.receiver) { collect_used_temps_in_value(d!.receiver!, used) }
+      }
+    }
+    ExClassGet => {
+      let d = e.class_get
+      if !isnull(d) {
+        if !isnull(d!.handle) { collect_used_temps_in_value(d!.handle!, used) }
+      }
+    }
+    ExIndexGet => {
+      let d = e.index_get
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_temps_in_value(d!.collection!, used) }
+        if !isnull(d!.index) { collect_used_temps_in_value(d!.index!, used) }
+      }
+    }
+    ExCall => {
+      let d = e.call
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
+    ExMethodCall => {
+      let d = e.method_call
+      if !isnull(d) {
+        if !isnull(d!.receiver) { collect_used_temps_in_value(d!.receiver!, used) }
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
+    ExBuiltin => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
+    ExStructLit => {
+      let d = e.struct_lit
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f.value) { collect_used_temps_in_value(f.value!, used) }
+        }
+      }
+    }
+    ExClassAlloc => {
+      let d = e.class_alloc
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f.value) { collect_used_temps_in_value(f.value!, used) }
+        }
+      }
+    }
+    ExWrapOptional => {
+      let d = e.wrap_opt
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExUnwrapOptional => {
+      let d = e.unwrap_opt
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExIsNull => {
+      let d = e.is_null
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExVariantConstruct => {
+      let d = e.variant_construct
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f) { collect_used_temps_in_value(f!, used) }
+        }
+      }
+    }
+    ExVariantTag => {
+      let d = e.variant_tag
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExVariantData => {
+      let d = e.variant_data
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExExtractValue => {
+      let d = e.extract_value
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExExtractError => {
+      let d = e.extract_error
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+      }
+    }
+    ExMakeResult => {
+      let d = e.make_result
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_temps_in_value(d!.value!, used) }
+        if !isnull(d!.err) { collect_used_temps_in_value(d!.err!, used) }
+      }
+    }
+    ExFormat => {
+      let d = e.format
+      if !isnull(d) {
+        for p in d!.parts {
+          if !p.is_literal && !isnull(p.value) {
+            collect_used_temps_in_value(p.value!, used)
+          }
+        }
+      }
+    }
+    ExFuncLit => {
+      let d = e.func_lit
+      if !isnull(d) {
+        collect_used_temps(d!.body, used)
+      }
+    }
+    ExSlice => {
+      let d = e.slice_data
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_temps_in_value(d!.collection!, used) }
+        if !isnull(d!.low) { collect_used_temps_in_value(d!.low!, used) }
+        if !isnull(d!.high) { collect_used_temps_in_value(d!.high!, used) }
+      }
+    }
+    ExMakeSlice => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
+    ExMakeChannel => {
+      let d = e.make_channel
+      if !isnull(d) {
+        if !isnull(d!.buf_size) { collect_used_temps_in_value(d!.buf_size!, used) }
+      }
+    }
+    _ => {}
+  }
+}
+
+func collect_used_temps_in_value(v: LValue, used: Dict<Sym, bool>) {
+  if v.kind == ValTemp {
+    used.set(sym(f"{v.temp_id}"), true)
+  }
+  if v.kind == ValIndexRef || v.kind == ValClassFieldRef {
+    if !isnull(v.collection) {
+      collect_used_temps_in_value(v.collection!, used)
+    }
+    if !isnull(v.index) {
+      collect_used_temps_in_value(v.index!, used)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Collect used variable names
+// ---------------------------------------------------------------------------
+
+func collect_used_var_names(stmts: [LStmt?], used: Dict<Sym, bool>) {
+  for s in stmts {
+    if !isnull(s) {
+      collect_used_var_names_in_stmt(s!, used)
+    }
+  }
+}
+
+func collect_used_var_names_in_stmt(s: LStmt, used: Dict<Sym, bool>) {
+  match s.kind {
+    StTempDef => {
+      let td = s.temp_def
+      if !isnull(td) && !isnull(td!.expr) {
+        collect_used_var_names_in_expr(td!.expr!, used)
+      }
+    }
+    StVarDecl => {
+      let vd = s.var_decl
+      if !isnull(vd) && !isnull(vd!.init) {
+        collect_used_var_names_in_value(vd!.init!, used)
+      }
+    }
+    StAssign => {
+      let a = s.assign
+      if !isnull(a) && !isnull(a!.value) {
+        collect_used_var_names_in_value(a!.value!, used)
+      }
+    }
+    StStructSet => {
+      let ss = s.struct_set
+      if !isnull(ss) {
+        if !isnull(ss!.receiver) { collect_used_var_names_in_value(ss!.receiver!, used) }
+        if !isnull(ss!.value) { collect_used_var_names_in_value(ss!.value!, used) }
+      }
+    }
+    StClassSet => {
+      let cs = s.class_set
+      if !isnull(cs) {
+        if !isnull(cs!.handle) { collect_used_var_names_in_value(cs!.handle!, used) }
+        if !isnull(cs!.value) { collect_used_var_names_in_value(cs!.value!, used) }
+      }
+    }
+    StIndexSet => {
+      let is_ = s.index_set
+      if !isnull(is_) {
+        if !isnull(is_!.collection) { collect_used_var_names_in_value(is_!.collection!, used) }
+        if !isnull(is_!.index) { collect_used_var_names_in_value(is_!.index!, used) }
+        if !isnull(is_!.value) { collect_used_var_names_in_value(is_!.value!, used) }
+      }
+    }
+    StIf => {
+      let d = s.if_data
+      if !isnull(d) {
+        if !isnull(d!.cond) { collect_used_var_names_in_value(d!.cond!, used) }
+        collect_used_var_names(d!.then_body, used)
+        collect_used_var_names(d!.else_body, used)
+      }
+    }
+    StWhile => {
+      let d = s.while_data
+      if !isnull(d) {
+        collect_used_var_names(d!.cond_block, used)
+        if !isnull(d!.cond_var) { collect_used_var_names_in_value(d!.cond_var!, used) }
+        collect_used_var_names(d!.body, used)
+      }
+    }
+    StFor => {
+      let d = s.for_data
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_var_names_in_value(d!.collection!, used) }
+        collect_used_var_names(d!.body, used)
+      }
+    }
+    StSwitch => {
+      let d = s.switch_data
+      if !isnull(d) {
+        if !isnull(d!.tag) { collect_used_var_names_in_value(d!.tag!, used) }
+        let mut i = 0
+        while i < len(d!.cases) {
+          collect_used_var_names(d!.cases[i].body, used)
+          i = i + 1
+        }
+      }
+    }
+    StTypeSwitch => {
+      let d = s.type_switch
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+        let mut i = 0
+        while i < len(d!.cases) {
+          collect_used_var_names(d!.cases[i].body, used)
+          i = i + 1
+        }
+      }
+    }
+    StReturn => {
+      let r = s.ret
+      if !isnull(r) {
+        for v in r!.values {
+          if !isnull(v) { collect_used_var_names_in_value(v!, used) }
+        }
+      }
+    }
+    StSend => {
+      let snd = s.send_data
+      if !isnull(snd) {
+        if !isnull(snd!.channel) { collect_used_var_names_in_value(snd!.channel!, used) }
+        if !isnull(snd!.value) { collect_used_var_names_in_value(snd!.value!, used) }
+      }
+    }
+    StSelect => {
+      let sel = s.select_data
+      if !isnull(sel) {
+        let mut i = 0
+        while i < len(sel!.cases) {
+          let c = sel!.cases[i]
+          if !isnull(c.channel) { collect_used_var_names_in_value(c.channel!, used) }
+          if !isnull(c.value) { collect_used_var_names_in_value(c.value!, used) }
+          collect_used_var_names(c.body, used)
+          i = i + 1
+        }
+      }
+    }
+    StSideEffect => {
+      let se = s.side_effect
+      if !isnull(se) && !isnull(se!.expr) {
+        collect_used_var_names_in_expr(se!.expr!, used)
+      }
+    }
+    StMultiAssign => {
+      let ma = s.multi_assign
+      if !isnull(ma) && !isnull(ma!.expr) {
+        collect_used_var_names_in_expr(ma!.expr!, used)
+      }
+    }
+    StBlock => {
+      let d = s.block
+      if !isnull(d) { collect_used_var_names(d!.stmts, used) }
+    }
+    StDefer => {
+      let d = s.defer_data
+      if !isnull(d) { collect_used_var_names(d!.body, used) }
+    }
+    StSpawn => {
+      let d = s.spawn_data
+      if !isnull(d) { collect_used_var_names(d!.body, used) }
+    }
+    StLock => {
+      let d = s.lock_data
+      if !isnull(d) {
+        if !isnull(d!.mutex) { collect_used_var_names_in_value(d!.mutex!, used) }
+        collect_used_var_names(d!.body, used)
+      }
+    }
+    _ => {}
+  }
+}
+
+func collect_used_var_names_in_expr(e: LExpr, used: Dict<Sym, bool>) {
+  match e.kind {
+    ExBinOp => {
+      let d = e.bin_op
+      if !isnull(d) {
+        if !isnull(d!.left) { collect_used_var_names_in_value(d!.left!, used) }
+        if !isnull(d!.right) { collect_used_var_names_in_value(d!.right!, used) }
+      }
+    }
+    ExUnOp => {
+      let d = e.un_op
+      if !isnull(d) {
+        if !isnull(d!.operand) { collect_used_var_names_in_value(d!.operand!, used) }
+      }
+    }
+    ExCast => {
+      let d = e.cast
+      if !isnull(d) {
+        if !isnull(d!.operand) { collect_used_var_names_in_value(d!.operand!, used) }
+      }
+    }
+    ExStructField => {
+      let d = e.struct_field
+      if !isnull(d) {
+        if !isnull(d!.receiver) { collect_used_var_names_in_value(d!.receiver!, used) }
+      }
+    }
+    ExClassGet => {
+      let d = e.class_get
+      if !isnull(d) {
+        if !isnull(d!.handle) { collect_used_var_names_in_value(d!.handle!, used) }
+      }
+    }
+    ExIndexGet => {
+      let d = e.index_get
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_var_names_in_value(d!.collection!, used) }
+        if !isnull(d!.index) { collect_used_var_names_in_value(d!.index!, used) }
+      }
+    }
+    ExCall => {
+      let d = e.call
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
+      }
+    }
+    ExMethodCall => {
+      let d = e.method_call
+      if !isnull(d) {
+        if !isnull(d!.receiver) { collect_used_var_names_in_value(d!.receiver!, used) }
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
+      }
+    }
+    ExBuiltin => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
+      }
+    }
+    ExStructLit => {
+      let d = e.struct_lit
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f.value) { collect_used_var_names_in_value(f.value!, used) }
+        }
+      }
+    }
+    ExClassAlloc => {
+      let d = e.class_alloc
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f.value) { collect_used_var_names_in_value(f.value!, used) }
+        }
+      }
+    }
+    ExWrapOptional => {
+      let d = e.wrap_opt
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExUnwrapOptional => {
+      let d = e.unwrap_opt
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExIsNull => {
+      let d = e.is_null
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExVariantConstruct => {
+      let d = e.variant_construct
+      if !isnull(d) {
+        for f in d!.fields {
+          if !isnull(f) { collect_used_var_names_in_value(f!, used) }
+        }
+      }
+    }
+    ExVariantTag => {
+      let d = e.variant_tag
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExVariantData => {
+      let d = e.variant_data
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExExtractValue => {
+      let d = e.extract_value
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExExtractError => {
+      let d = e.extract_error
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+      }
+    }
+    ExMakeResult => {
+      let d = e.make_result
+      if !isnull(d) {
+        if !isnull(d!.value) { collect_used_var_names_in_value(d!.value!, used) }
+        if !isnull(d!.err) { collect_used_var_names_in_value(d!.err!, used) }
+      }
+    }
+    ExFormat => {
+      let d = e.format
+      if !isnull(d) {
+        for p in d!.parts {
+          if !p.is_literal && !isnull(p.value) {
+            collect_used_var_names_in_value(p.value!, used)
+          }
+        }
+      }
+    }
+    ExFuncLit => {
+      let d = e.func_lit
+      if !isnull(d) {
+        collect_used_var_names(d!.body, used)
+      }
+    }
+    ExSlice => {
+      let d = e.slice_data
+      if !isnull(d) {
+        if !isnull(d!.collection) { collect_used_var_names_in_value(d!.collection!, used) }
+        if !isnull(d!.low) { collect_used_var_names_in_value(d!.low!, used) }
+        if !isnull(d!.high) { collect_used_var_names_in_value(d!.high!, used) }
+      }
+    }
+    ExMakeSlice => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
+      }
+    }
+    ExMakeChannel => {
+      let d = e.make_channel
+      if !isnull(d) {
+        if !isnull(d!.buf_size) { collect_used_var_names_in_value(d!.buf_size!, used) }
+      }
+    }
+    _ => {}
+  }
+}
+
+func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>) {
+  if v.kind == ValVar {
+    used.set(sym(v.name), true)
+  }
+  if v.kind == ValIndexRef || v.kind == ValClassFieldRef {
+    if !isnull(v.collection) {
+      collect_used_var_names_in_value(v.collection!, used)
+    }
+    if !isnull(v.index) {
+      collect_used_var_names_in_value(v.index!, used)
+    }
+  }
+}
+

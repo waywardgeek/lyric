@@ -1,0 +1,131 @@
+// demo.ly — A real Lyric program demonstrating the language
+// Implements a simple task manager with interfaces, classes, and stdlib usage
+
+lyric demo {
+  import fmt from "fmt"
+  import strings from "strings"
+
+  // --- Interfaces ---
+
+  interface Displayable {
+    func display(self) -> string
+  }
+
+  interface Prioritizable {
+    func priority(self) -> i32
+  }
+
+  // --- Task class implementing both interfaces ---
+
+  class Task implements Displayable, Prioritizable {
+    title: string
+    desc: string
+    prio: i32
+    done: bool
+
+    pub func display(self) -> string {
+      return f"[{self.prio}] {self.title}: {self.desc}"
+    }
+
+    pub func priority(self) -> i32 {
+      return self.prio
+    }
+
+    func is_done(self) -> bool {
+      return self.done
+    }
+  }
+
+  // --- TaskList using generic-ish patterns ---
+
+  class TaskList {
+    name: string
+    tasks: [Task]
+
+    func add(mut self, task: Task) {
+      // (in a real implementation, would append to self.tasks)
+    }
+
+    func summary(self) -> string {
+      return f"Task list '{self.name}'"
+    }
+  }
+
+  // --- Functions working with interfaces ---
+
+  func show(item: Displayable) -> string {
+    return item.display()
+  }
+
+  func highest_priority(a: i32, b: i32) -> i32 {
+    if a > b {
+      return a
+    }
+    return b
+  }
+
+  // --- Utility functions ---
+
+  func repeat_string(s: string, n: i32) -> string {
+    let mut result = ""
+    let mut i: i32 = 0
+    while i < n {
+      result = result + s
+      i = i + 1
+    }
+    return result
+  }
+
+  func fizzbuzz(n: i32) -> string {
+    if n % 15 == 0 {
+      return "FizzBuzz"
+    } else if n % 3 == 0 {
+      return "Fizz"
+    } else if n % 5 == 0 {
+      return "Buzz"
+    }
+    return f"{n}"
+  }
+
+  // --- Main ---
+
+  func main() {
+    // Create tasks
+    let t1 = Task{Title: "Design Lyric", Desc: "Language spec", Prio: 3, Done: false}
+    let t2 = Task{Title: "Build parser", Desc: "Recursive descent", Prio: 5, Done: false}
+    let t3 = Task{Title: "Write tests", Desc: "Full coverage", Prio: 4, Done: true}
+
+    // Use Displayable interface
+    println(show(t1))
+    println(show(t2))
+    println(show(t3))
+
+    // Use Prioritizable interface
+    let max_p = highest_priority(t1.priority(), t2.priority())
+    println(f"Highest priority: {max_p}")
+
+    // String operations
+    let separator = repeat_string("-", 30)
+    println(separator)
+
+    // FizzBuzz with f-strings
+    let mut i: i32 = 1
+    let mut results = ""
+    while i <= 15 {
+      if i > 1 {
+        results = results + ", "
+      }
+      results = results + fizzbuzz(i)
+      i = i + 1
+    }
+    println(f"FizzBuzz: {results}")
+
+    // Check task status
+    if t3.is_done() {
+      println("Tests are done!")
+    }
+
+    // String stdlib
+    println(strings.ToUpper("lyric is working!"))
+  }
+}

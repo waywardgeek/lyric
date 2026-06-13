@@ -1,20 +1,20 @@
-# Forge Bootstrap Design
+# Lyric Bootstrap Design
 
 ## Goals
 
-1. **Prove Forge is at least as good as Go for writing compilers.** The Go compiler
+1. **Prove Lyric is at least as good as Go for writing compilers.** The Go compiler
    is the gold standard for compiler ergonomics — fast builds, clean code, readable
-   error messages. The bootstrap compiler must demonstrate that Forge matches or
+   error messages. The bootstrap compiler must demonstrate that Lyric matches or
    exceeds that bar. Relations, Sym, match expressions, and the error model should
    make compiler code *cleaner* than the Go equivalent, not just equivalent.
 
 2. **Jank-free language, jank-free compiler.** Every rough edge discovered while
    writing the bootstrap compiler is a language design bug that must be fixed.
    The bootstrap is the ultimate dogfooding exercise — if something is awkward to
-   express in Forge, it's awkward for every Forge user. No workarounds, no "good
+   express in Lyric, it's awkward for every Lyric user. No workarounds, no "good
    enough for now." Fix the language.
 
-3. **Self-hosting.** Compile the Forge compiler with itself via C backend. This is
+3. **Self-hosting.** Compile the Lyric compiler with itself via C backend. This is
    the mechanical proof that goals 1 and 2 were achieved.
 
 ## Architecture
@@ -25,13 +25,13 @@ A single `Root` class owns all top-level allocations. Destroying Root cascades t
 ```
 class Root() {}
 class File() {}
-class ForgeBlock() {}
+class LyricBlock() {}
 class InterfaceDecl() {}
 // ... etc
 
 relation OwningList Root:root owns [File:file]
-relation OwningList File:file owns [ForgeBlock:block]
-relation OwningList ForgeBlock:block owns [InterfaceDecl:iface]
+relation OwningList File:file owns [LyricBlock:block]
+relation OwningList LyricBlock:block owns [InterfaceDecl:iface]
 // ... etc
 ```
 
@@ -58,18 +58,18 @@ The compiler uses these Go stdlib packages (non-test):
 - `sort` — Strings (can use stdlib sort with comparator)
 - `regexp` — only used in verifier/update, can defer or rewrite
 
-These can be provided as `.fg` wrappers around Go functions via `extern` or `forge gen`.
+These can be provided as `.ly` wrappers around Go functions via `extern` or `lyric gen`.
 
 ### What We Skip
-- `forge gen` command (uses go/ast, go/parser — not needed for bootstrap)
+- `lyric gen` command (uses go/ast, go/parser — not needed for bootstrap)
 - Go backend (C backend is the bootstrap target; monomorphization eliminates generics issues)
 - Verifier (nice-to-have, not essential)
 - Tests (port later)
 
 ### Port Order (bottom-up)
-1. ~~**AST types**~~ ✅ — structs, enums, type definitions (bootstrap/ast.fg)
-2. ~~**Lexer**~~ ✅ — character-by-character scanner, Dict keyword tables (bootstrap/lexer.fg)
-3. ~~**Parser**~~ ✅ — recursive descent + Pratt expr parser (bootstrap/parser.fg, expr_parser.fg)
+1. ~~**AST types**~~ ✅ — structs, enums, type definitions (bootstrap/ast.ly)
+2. ~~**Lexer**~~ ✅ — character-by-character scanner, Dict keyword tables (bootstrap/lexer.ly)
+3. ~~**Parser**~~ ✅ — recursive descent + Pratt expr parser (bootstrap/parser.ly, expr_parser.ly)
 4. **Desugar passes** — interface embeds, fields, relations, destructors, default impls
 5. **Checker** — type checking, inference, constraint satisfaction
 6. **LIR** — lowering AST → LIR
@@ -79,6 +79,6 @@ These can be provided as `.fg` wrappers around Go functions via `extern` or `for
 10. **CLI** — main entry point, file I/O
 
 ### Open Questions
-- HashedList: swiss hash table in Forge stdlib, or simpler open-addressing? Swiss is optimal but complex. A basic open-addressing table with string keys may be sufficient for bootstrap.
+- HashedList: swiss hash table in Lyric stdlib, or simpler open-addressing? Swiss is optimal but complex. A basic open-addressing table with string keys may be sufficient for bootstrap.
 - String interning: the compiler creates many duplicate strings. Worth adding an intern table to Root?
 - Error reporting: currently uses fmt.Errorf / string formatting. F-strings + a DiagnosticList class?

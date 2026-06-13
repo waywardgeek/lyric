@@ -1,0 +1,40 @@
+// lambdas.ly — end-to-end test for lambda expressions
+
+lyric lambdas {
+
+func apply(x: i32, f: func(i32) -> i32) -> i32 {
+    return f(x)
+}
+
+func transform<T, U>(items: [T], f: (T) -> U) -> [U] {
+    let mut result: [U] = []
+    for item in items {
+        result = append(result, f(item))
+    }
+    return result
+}
+
+func main() {
+    // Basic lambda
+    let double = |x: i32| -> i32 { x * 2 }
+    println(double(5))
+
+    // Lambda passed to higher-order function
+    let result = apply(7, |x: i32| -> i32 { x + 3 })
+    println(result)
+
+    // Lambda with generic function (type inference)
+    let nums: [i32] = [1, 2, 3, 4, 5]
+    let doubled = transform(nums, |x: i32| -> i32 { x * 2 })
+    for v in doubled {
+        println(v)
+    }
+
+    // Lambda producing strings
+    let strs = transform(nums, |x: i32| -> string { f"n={x}" })
+    for s in strs {
+        println(s)
+    }
+}
+
+}

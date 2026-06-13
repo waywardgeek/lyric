@@ -1,0 +1,32 @@
+// nested_match.ly — test nested pattern matching
+
+lyric nested_match {
+
+enum Shape {
+    Circle(radius: f64)
+    Rect(w: f64, h: f64)
+}
+
+enum Option {
+    Some(value: Shape)
+    None
+}
+
+func describe(opt: Option) -> string {
+    return match opt {
+        Some(Circle(r)) => { f"circle with radius {r}" }
+        Some(Rect(w, h)) => { f"rect {w}x{h}" }
+        None => { "nothing" }
+    }
+}
+
+func main() {
+    let c = Some(Circle(3.14))
+    let r = Some(Rect(10.0, 20.0))
+    let n = None
+    println(describe(c))
+    println(describe(r))
+    println(describe(n))
+}
+
+}

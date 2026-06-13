@@ -1,0 +1,22 @@
+// Test guard clauses in match expressions
+
+lyric guards {
+
+func classify(n: i32) -> string {
+    return match n {
+        x if x < 0 => { "negative" }
+        0 => { "zero" }
+        x if x > 100 => { "large" }
+        _ => { "positive" }
+    }
+}
+
+func main() {
+    let result = classify(-5)
+    println(result)
+    println(classify(0))
+    println(classify(200))
+    println(classify(42))
+}
+
+}

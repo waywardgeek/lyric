@@ -1,4 +1,4 @@
-# Forge Memory Management Design
+# Lyric Memory Management Design
 
 **Date**: 2026-06-12
 **Status**: Draft — approved for implementation
@@ -6,7 +6,7 @@
 
 ## Overview
 
-Forge currently leaks all heap memory (classes, strings, dynamic arrays). This design introduces:
+Lyric currently leaks all heap memory (classes, strings, dynamic arrays). This design introduces:
 
 1. **Slab allocator** for classes (replaces malloc)
 2. **Ownership-based destruction** for owned classes (extends existing relation destructors)
@@ -29,7 +29,7 @@ All memory management structures and operations are represented in the **LIR**, 
 
 All value types (primitives, structs, tuples, slices) use **copy-on-assign** semantics. Assignment always produces an independent copy.
 
-```forge
+```lyric
 let mut x = Point { x: 0.0, y: 0.0 }
 let mut y = x        // copy — y is independent
 y.x = 1.0            // x.x still 0.0
@@ -55,8 +55,8 @@ This applies uniformly:
 
 For cases where you want a reference view without copying (e.g., parsing, serialization, cryptography), use `ref` as a binding qualifier:
 
-```forge
-let src = read_file("input.fg")
+```lyric
+let src = read_file("input.ly")
 let ref token = src[start:end]        // zero-copy immutable view
 
 // Parser example: parse fixed-width record
@@ -95,7 +95,7 @@ let [mut] [ref] name = expr
 
 Class references are u32 handles (indices into slab arrays). Assignment copies the handle and increments the ref count on the referenced instance:
 
-```forge
+```lyric
 let x = Widget {}    // ref count = 1
 let y = x            // copies u32 handle; ref count = 2
 ```
@@ -106,7 +106,7 @@ let y = x            // copies u32 handle; ref count = 2
 
 When a struct is copied (by assignment or pass-by-value), the compiler auto-inserts ref increments for all transitively contained class reference fields:
 
-```forge
+```lyric
 struct Pair {
     left: Widget
     right: Widget
@@ -118,7 +118,7 @@ let y = x       // copies struct; compiler inserts ref(y.left), ref(y.right)
 
 On scope exit, the compiler inserts decrements:
 
-```forge
+```lyric
 func example() {
     let p = Pair { left: Widget {}, right: Widget {} }
 }  // compiler inserts: unref(p.left); unref(p.right)
@@ -126,7 +126,7 @@ func example() {
 
 On reassignment, decrement old refs and increment new:
 
-```forge
+```lyric
 let mut x = Pair { left: w1, right: w2 }
 x = Pair { left: w3, right: w4 }  // unref(w1), unref(w2), ref(w3), ref(w4)
 ```
@@ -140,7 +140,7 @@ The compiler generates these copy/cleanup sequences based on type analysis — a
 
 `let y = x` where `x` is `let mut` produces a **snapshot copy** — `y` is independent of future changes to `x`. The optimizer cannot use a reference here because `x` might change, violating `y`'s immutability.
 
-```forge
+```lyric
 let mut x = Point { x: 0.0, y: 0.0 }
 let y = x         // snapshot copy
 x.x = 1.0         // y.x still 0.0
@@ -154,7 +154,7 @@ x.x = 1.0         // y.x still 0.0
 
 All class references become `u32` indices into per-class slab arrays, replacing raw pointers.
 
-- `null` (Forge keyword) = `0`
+- `null` (Lyric keyword) = `0`
 - Valid references = `>= 1`
 - Array index = `reference - 1` (so index 0 holds reference 1)
 
@@ -201,9 +201,9 @@ typedef struct {
     Counter_Slab counter_slab;
     Widget_Slab  widget_slab;
     // ... one per class
-} ForgeRoot;
+} LyricRoot;
 
-static ForgeRoot _forge_root = {0};
+static LyricRoot _lyric_root = {0};
 ```
 
 ### 2.4 Alloc / Free Functions
@@ -252,10 +252,10 @@ Field access rewrites in the LIR:
 obj->count
 
 // After AoS:
-_forge_root.counter_slab.data[ref - 1].count
+_lyric_root.counter_slab.data[ref - 1].count
 
 // After SoA:
-_forge_root.counter_slab.count[ref - 1]
+_lyric_root.counter_slab.count[ref - 1]
 ```
 
 The LIR represents this as `LExprSlabGet(class_name, field_name, ref_expr)` and `LStmtSlabSet(class_name, field_name, ref_expr, value_expr)`. The C backend emits the appropriate AoS or SoA access pattern.
@@ -266,7 +266,7 @@ The LIR represents this as `LExprSlabGet(class_name, field_name, ref_expr)` and 
 
 ### 3.1 Owned Classes (via `owns` relations)
 
-Forge already generates `destroy()` methods for classes with `owns` relations. The memory management pass extends these:
+Lyric already generates `destroy()` methods for classes with `owns` relations. The memory management pass extends these:
 
 1. `final` function runs (user hook — see §3.4)
 2. Existing destructor body runs (cascade destroy of owned children, unlink from all relations)
@@ -295,7 +295,7 @@ The same pattern as `mut resize` for arrays: annotate functions with what they m
 
 **Two levels of specificity:**
 
-```forge
+```lyric
 // Level 1: destroys arbitrary instances of a class
 destroys(Widget) func cleanup_all_widgets()
 
@@ -305,7 +305,7 @@ destroys(w) func remove_widget(w: Widget)
 
 **After a call to a `destroys(Widget)` function**, all Widget references in scope are dead:
 
-```forge
+```lyric
 let a = Widget {}
 let b = Widget {}
 cleanup_all_widgets()     // destroys(Widget)
@@ -314,7 +314,7 @@ println(a.name)           // ERROR: a may be invalid after destroys(Widget) call
 
 **After a call to a `destroys(w)` function**, only the specific binding is dead:
 
-```forge
+```lyric
 let a = Widget {}
 let b = Widget {}
 remove_widget(a)          // destroys(a) — only a is dead
@@ -332,7 +332,7 @@ println(a.name)           // ERROR: a was destroyed
 
 Classes may declare a `final` function, called immediately before the auto-generated destructor runs:
 
-```forge
+```lyric
 class Connection {
     fd: i32
 
@@ -351,7 +351,7 @@ The execution order on `destroy()` is:
 
 It is extremely common to iterate through children and destroy some of them. Normal iterators must prohibit this (the underlying collection is being mutated). Safe iterators explicitly allow destroying the **current element only**.
 
-```forge
+```lyric
 // Normal iterator — destroy during iteration is an error
 for child in parent.children() {
     child.destroy()        // ERROR: children() doesn't allow destruction
@@ -370,7 +370,7 @@ for child in parent.children_safe() {
 
 **Implementation**: Safe iterators are declared with a `safe` keyword on the generator:
 
-```forge
+```lyric
 safe gen func DoublyLinked.iter_safe(self) -> gen T {
     let mut cur = self.head
     while cur != null {
@@ -383,13 +383,13 @@ safe gen func DoublyLinked.iter_safe(self) -> gen T {
 
 Inside the `for` body of a safe iterator, the loop variable is annotated as the one destroyable reference. Any function called with that variable can `destroys(param)` it. Any call to `destroys(Widget)` (class-level) is still an error — only the specific yielded instance may be destroyed.
 
-**Java parallel**: Java had exactly this problem — `ConcurrentModificationException` during iteration. Java's `Iterator.remove()` was the eventual solution. Forge's safe iterators are the same idea, but statically checked at compile time instead of throwing at runtime.
+**Java parallel**: Java had exactly this problem — `ConcurrentModificationException` during iteration. Java's `Iterator.remove()` was the eventual solution. Lyric's safe iterators are the same idea, but statically checked at compile time instead of throwing at runtime.
 
 ### 3.6 The `trusted` Keyword
 
 Data structures (ArrayList, Dict, HashedList, DoublyLinkedList) manage their own element lifetimes. The compiler's automatic ref counting would double-count or interfere.
 
-```forge
+```lyric
 trusted func ArrayList.push(mut self, item: T) {
     ref(item)           // manual increment
     // ... store item in backing array ...
@@ -411,7 +411,7 @@ trusted func ArrayList.remove(mut self, idx: i32) -> T {
 
 **Syntax:**
 
-```forge
+```lyric
 trusted func ArrayList.push(mut self, item: T) { ... }
 
 // Or block-level:
@@ -426,7 +426,7 @@ trusted {
 
 ### 3.7 `ref` and `unref` Semantics
 
-```forge
+```lyric
 ref(x)     // increment _ref_count by 1 (no-op if owned class)
 unref(x)   // decrement _ref_count by 1; if 0, destroy + free (no-op if owned class)
 ```
@@ -468,7 +468,7 @@ Dynamic arrays can reallocate their backing data on push/grow. If a `mut` refere
 
 Functions that may grow or shrink a dynamic array parameter annotate it:
 
-```forge
+```lyric
 func sort(mut arr: [i32])                    // element mutation only — safe
 func append_all(mut resize dst: [i32], src: [i32])  // may resize — invalidates element refs
 ```
@@ -500,7 +500,7 @@ for each pair of mut arguments (a, b) at a call site:
 
 **Within-scope tracking:**
 
-```forge
+```lyric
 let mut arr = [1, 2, 3]
 let mut x = mut arr[0]   // x derives from arr
 push(mut resize arr, 4)  // ERROR: arr is borrowed by x
@@ -525,7 +525,7 @@ Subslice passing (`foo(arr[2:5])`) passes a **view** — no copy, shared backing
 
 For zero-copy local bindings, use `ref`:
 
-```forge
+```lyric
 let ref view = arr[2:5]   // shared view, no copy
 ```
 
@@ -533,7 +533,7 @@ let ref view = arr[2:5]   // shared view, no copy
 
 When a dynamic array goes out of scope, the backing array's ref count is decremented. If it hits 0, the backing data is freed:
 
-```forge
+```lyric
 func example() {
     let mut arr = [1, 2, 3]
     // ... use arr ...
@@ -548,7 +548,7 @@ For arrays of class references (`[Widget]`), each element is unref'd before the 
 
 When a slice is passed to a function (non-`mut`), the backing data is shared — no copy. The function receives a view into the caller's data. This is the performance-critical path (parsers, string processing).
 
-```forge
+```lyric
 func count_zeros(data: [i32]) -> i32 {   // data is a view, not a copy
     let mut n = 0
     for x in data { if x == 0 { n = n + 1 } }
