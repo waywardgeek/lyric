@@ -639,7 +639,7 @@ func slab_rewrite(prog: LProgram) {
 }
 
 // Rewrite a list of statements, returning potentially expanded list.
-// Also injects StSliceFree at scope exits for locally-declared slice variables
+// Also injects StSliceFree at scope exits for locally-declared slice/string variables
 // that own their backing data and don't escape.
 // `all_stmts` is the full function body (for escape-via-call checking).
 func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>) -> [LStmt?] {
@@ -657,19 +657,24 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
       let s = stmts[i]!
 
       // Track ExMakeSlice temp defs — these produce fresh backing arrays
+      // Track fresh string temps — ExFormat, ExBinOp(string+string), ExCall/ExMethodCall returning string
       if s.kind is StTempDef {
         if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
           if s.temp_def!.expr!.kind is ExMakeSlice {
             fresh_temps.push(s.temp_def!.id)
           }
+          if is_fresh_string_expr(s.temp_def!.expr!) {
+            fresh_temps.push(s.temp_def!.id)
+          }
         }
       }
 
-      // Track slice-typed variable declarations, but only if they own data
+      // Track slice/string-typed variable declarations, but only if they own data
       if s.kind is StVarDecl {
         if !isnull(s.var_decl) && !isnull(s.var_decl!.typ) {
-          if s.var_decl!.typ!.kind is TySlice {
-            // Only free if initialized from a fresh allocation (ExMakeSlice)
+          let typ_kind = s.var_decl!.typ!.kind
+          if typ_kind is TySlice || typ_kind is TyString {
+            // Only free if initialized from a fresh allocation
             if is_fresh_slice_init(s.var_decl!.init, fresh_temps) {
               // Check it doesn't escape via function calls or field stores
               if !var_escapes_via_call(s.var_decl!.name, all_stmts, escape_map) {
@@ -1220,6 +1225,23 @@ func slab_rewrite_value(v: LValue) {
 // ==========================================================================
 // Helpers
 // ==========================================================================
+
+// Check if an expression produces a freshly-allocated string.
+// Only expressions that ALWAYS allocate are considered fresh.
+// ExCall/ExMethodCall are NOT included because they might return string literals.
+func is_fresh_string_expr(e: LExpr) -> bool {
+  // f-strings produce freshly allocated strings via sprintf
+  if e.kind is ExFormat {
+    return true
+  }
+  // String concatenation (string + string) always allocates new backing
+  if e.kind is ExBinOp {
+    if !isnull(e.typ) && e.typ!.kind is TyString {
+      return true
+    }
+  }
+  return false
+}
 
 // Check if a VarDecl's init value points to a fresh allocation (ExMakeSlice temp).
 func is_fresh_slice_init(init: LValue?, fresh_temps: [i32]) -> bool {
