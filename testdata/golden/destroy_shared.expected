@@ -1,0 +1,5 @@
+a has player: true
+b has player: true
+b has player after destroy: false
+slab reuse: true
+p2 name: Bob

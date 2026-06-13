@@ -15222,12 +15222,14 @@ void TypeExpr_destroy(TypeExpr* self) {
     {
         array_remove_CImplBlock_CTypeExpr(self);
     }
+    _forge_slab_free_TypeExpr(self);
 }
 
 void TupleField_destroy(TupleField* self) {
     {
         array_remove_CEnumVariant_CTupleField(self);
     }
+    _forge_slab_free_TupleField(self);
 }
 
 void TypeParam_destroy(TypeParam* self) {
@@ -15246,6 +15248,7 @@ void TypeParam_destroy(TypeParam* self) {
     {
         array_remove_CInterfaceDecl_CTypeParam(self);
     }
+    _forge_slab_free_TypeParam(self);
 }
 
 void WhereClause_destroy(WhereClause* self) {
@@ -15272,12 +15275,14 @@ void WhereClause_destroy(WhereClause* self) {
     {
         array_remove_CClassDecl_CWhereClause(self);
     }
+    _forge_slab_free_WhereClause(self);
 }
 
 void Param_destroy(Param* self) {
     {
         array_remove_CFuncDecl_CParam(self);
     }
+    _forge_slab_free_Param(self);
 }
 
 void FuncDecl_destroy(FuncDecl* self) {
@@ -15341,6 +15346,7 @@ void FuncDecl_destroy(FuncDecl* self) {
     {
         array_remove_CForgeBlock_CFuncDecl(self);
     }
+    _forge_slab_free_FuncDecl(self);
 }
 
 void Field_destroy(Field* self) {
@@ -15350,6 +15356,7 @@ void Field_destroy(Field* self) {
     {
         array_remove_CStructDecl_CField(self);
     }
+    _forge_slab_free_Field(self);
 }
 
 void ClassDecl_destroy(ClassDecl* self) {
@@ -15424,6 +15431,7 @@ void ClassDecl_destroy(ClassDecl* self) {
     {
         array_remove_CForgeBlock_CClassDecl(self);
     }
+    _forge_slab_free_ClassDecl(self);
 }
 
 void StructDecl_destroy(StructDecl* self) {
@@ -15464,6 +15472,7 @@ void StructDecl_destroy(StructDecl* self) {
     {
         array_remove_CForgeBlock_CStructDecl(self);
     }
+    _forge_slab_free_StructDecl(self);
 }
 
 void EnumVariant_destroy(EnumVariant* self) {
@@ -15487,6 +15496,7 @@ void EnumVariant_destroy(EnumVariant* self) {
     {
         array_remove_CEnumDecl_CEnumVariant(self);
     }
+    _forge_slab_free_EnumVariant(self);
 }
 
 void EnumDecl_destroy(EnumDecl* self) {
@@ -15527,12 +15537,14 @@ void EnumDecl_destroy(EnumDecl* self) {
     {
         array_remove_CForgeBlock_CEnumDecl(self);
     }
+    _forge_slab_free_EnumDecl(self);
 }
 
 void InterfaceFieldDecl_destroy(InterfaceFieldDecl* self) {
     {
         array_remove_CInterfaceDecl_CInterfaceFieldDecl(self);
     }
+    _forge_slab_free_InterfaceFieldDecl(self);
 }
 
 void InterfaceEmbed_destroy(InterfaceEmbed* self) {
@@ -15556,12 +15568,14 @@ void InterfaceEmbed_destroy(InterfaceEmbed* self) {
     {
         array_remove_CInterfaceDecl_CInterfaceEmbed(self);
     }
+    _forge_slab_free_InterfaceEmbed(self);
 }
 
 void DestructorBlock_destroy(DestructorBlock* self) {
     {
         array_remove_CInterfaceDecl_CDestructorBlock(self);
     }
+    _forge_slab_free_DestructorBlock(self);
 }
 
 void InterfaceDecl_destroy(InterfaceDecl* self) {
@@ -15653,12 +15667,14 @@ void InterfaceDecl_destroy(InterfaceDecl* self) {
     {
         array_remove_CForgeBlock_CInterfaceDecl(self);
     }
+    _forge_slab_free_InterfaceDecl(self);
 }
 
 void ImplMapping_destroy(ImplMapping* self) {
     {
         array_remove_CImplBlock_CImplMapping(self);
     }
+    _forge_slab_free_ImplMapping(self);
 }
 
 void ImplBlock_destroy(ImplBlock* self) {
@@ -15699,54 +15715,63 @@ void ImplBlock_destroy(ImplBlock* self) {
     {
         array_remove_CForgeBlock_CImplBlock(self);
     }
+    _forge_slab_free_ImplBlock(self);
 }
 
 void RelationDecl_destroy(RelationDecl* self) {
     {
         array_remove_CForgeBlock_CRelationDecl(self);
     }
+    _forge_slab_free_RelationDecl(self);
 }
 
 void DocBlock_destroy(DocBlock* self) {
     {
         array_remove_CForgeBlock_CDocBlock(self);
     }
+    _forge_slab_free_DocBlock(self);
 }
 
 void InvariantDecl_destroy(InvariantDecl* self) {
     {
         array_remove_CForgeBlock_CInvariantDecl(self);
     }
+    _forge_slab_free_InvariantDecl(self);
 }
 
 void ImportDecl_destroy(ImportDecl* self) {
     {
         array_remove_CForgeBlock_CImportDecl(self);
     }
+    _forge_slab_free_ImportDecl(self);
 }
 
 void TypeAliasDecl_destroy(TypeAliasDecl* self) {
     {
         array_remove_CForgeBlock_CTypeAliasDecl(self);
     }
+    _forge_slab_free_TypeAliasDecl(self);
 }
 
 void ConstDecl_destroy(ConstDecl* self) {
     {
         array_remove_CForgeBlock_CConstDecl(self);
     }
+    _forge_slab_free_ConstDecl(self);
 }
 
 void Comment_destroy(Comment* self) {
     {
         array_remove_CFile_CComment(self);
     }
+    _forge_slab_free_Comment(self);
 }
 
 void Stmt_destroy(Stmt* self) {
     {
         array_remove_CBlock_CStmt(self);
     }
+    _forge_slab_free_Stmt(self);
 }
 
 void Block_destroy(Block* self) {
@@ -15767,6 +15792,7 @@ void Block_destroy(Block* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Block(self);
 }
 
 void ForgeBlock_destroy(ForgeBlock* self) {
@@ -15977,6 +16003,7 @@ void ForgeBlock_destroy(ForgeBlock* self) {
     {
         array_remove_CFile_CForgeBlock(self);
     }
+    _forge_slab_free_ForgeBlock(self);
 }
 
 void File_destroy(File* self) {
@@ -16014,6 +16041,7 @@ void File_destroy(File* self) {
             i = _t17;
         }
     }
+    _forge_slab_free_File(self);
 }
 
 forge_string Sym_get_name(Sym* self) {
@@ -16044,6 +16072,7 @@ void Sym_destroy(Sym* self) {
             _t5;
         }
     }
+    _forge_slab_free_Sym(self);
 }
 
 void StringBuilder_write(StringBuilder* self, forge_string s) {
@@ -16103,6 +16132,7 @@ void SymTable_destroy(SymTable* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_SymTable(self);
 }
 
 ForgeSlice_TypeExprptr WhereClause_wc_arg_children(WhereClause* self) {
@@ -20885,6 +20915,7 @@ void Lexer_destroy(Lexer* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Lexer(self);
 }
 
 ForgeSlice_Commentptr Lexer_lc_children(Lexer* self) {
@@ -67285,8 +67316,63 @@ void slab_rewrite(LProgram* prog) {
         ForgeSlice_LStmtptr new_body = _t6;
         ForgeSlice_LFuncDecl _t7 = prog->functions;
         _t7.data[fi].body = new_body;
-        int32_t _t8 = (fi + 1);
-        fi = _t8;
+        ForgeSlice_LFuncDecl _t8 = prog->functions;
+        LFuncDecl _t9 = _t8.data[fi];
+        forge_string _t10 = _t9.name;
+        forge_string fname = _t10;
+        bool _t11 = forge_str_eq(fname, FORGE_STR("destroy"));
+        if (_t11) {
+            ForgeSlice_LFuncDecl _t12 = prog->functions;
+            LFuncDecl _t13 = _t12.data[fi];
+            ForgeSlice_LParam _t14 = _t13.params;
+            int32_t _t15 = _t14.len;
+            bool _t16 = (_t15 > 0);
+            if (_t16) {
+                ForgeSlice_LFuncDecl _t17 = prog->functions;
+                LFuncDecl _t18 = _t17.data[fi];
+                ForgeSlice_LParam _t19 = _t18.params;
+                LParam _t20 = _t19.data[0];
+                LParam p = _t20;
+                LType* _t21 = p.typ;
+                bool _t22 = (_t21 == NULL);
+                bool _t23 = (!_t22);
+                if (_t23) {
+                    LType* _t24 = p.typ;
+                    LType* _t25 = _t24;
+                    LTypeKind _t26 = _t25->kind;
+                    int32_t _t27 = _t26;
+                    bool _t28 = (_t27 == 17);
+                    if (_t28) {
+                        LStmtKind _t29 = LStmtKind_StSlabFree;
+                        LType* _t30 = p.typ;
+                        LType* _t31 = _t30;
+                        forge_string _t32 = _t31->name;
+                        LValueKind _t33 = LValueKind_ValVar;
+                        forge_string _t34 = p.name;
+                        LType* _t35 = p.typ;
+                        LValue* _t36 = _forge_slab_alloc_LValue();
+                        _t36->kind = _t33;
+                        _t36->name = _t34;
+                        _t36->temp_id = 0;
+                        _t36->typ = _t35;
+                        LSlabFreeData _t37 = (LSlabFreeData){.class_name = _t32, .handle = _t36};
+                        LStmt* _t38 = _forge_slab_alloc_LStmt();
+                        _t38->kind = _t29;
+                        _t38->slab_free = forge_some(_t37, ForgeOpt_LSlabFreeData);
+                        LStmt* free_stmt = _t38;
+                        ForgeSlice_LFuncDecl _t39 = prog->functions;
+                        LFuncDecl _t40 = _t39.data[fi];
+                        ForgeSlice_LStmtptr _t41 = _t40.body;
+                        ForgeSlice_LStmtptr fn_body = _t41;
+                        ({ forge_push(&fn_body, free_stmt, ForgeSlice_LStmtptr); fn_body; });
+                        ForgeSlice_LFuncDecl _t43 = prog->functions;
+                        _t43.data[fi].body = fn_body;
+                    }
+                }
+            }
+        }
+        int32_t _t44 = (fi + 1);
+        fi = _t44;
     }
 }
 
@@ -88889,6 +88975,7 @@ void Dict_CSym_ETokenKind_destroy(Dict_CSym_ETokenKind* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_ETokenKind(self);
 }
 
 ForgeSlice_DictEntry_CSym_ETokenKindptr Dict_CSym_ETokenKind_d_children(Dict_CSym_ETokenKind* self) {
@@ -88987,6 +89074,7 @@ void Dict_CSym_CType_destroy(Dict_CSym_CType* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CType(self);
 }
 
 ForgeSlice_DictEntry_CSym_CTypeptr Dict_CSym_CType_d_children(Dict_CSym_CType* self) {
@@ -89085,6 +89173,7 @@ void Dict_CSym_CVariantInfo_destroy(Dict_CSym_CVariantInfo* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CVariantInfo(self);
 }
 
 ForgeSlice_DictEntry_CSym_CVariantInfoptr Dict_CSym_CVariantInfo_d_children(Dict_CSym_CVariantInfo* self) {
@@ -89183,6 +89272,7 @@ void Dict_CSym_CTypeInfo_destroy(Dict_CSym_CTypeInfo* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CTypeInfo(self);
 }
 
 ForgeSlice_DictEntry_CSym_CTypeInfoptr Dict_CSym_CTypeInfo_d_children(Dict_CSym_CTypeInfo* self) {
@@ -89281,6 +89371,7 @@ void Dict_CSym_CInterfaceDecl_destroy(Dict_CSym_CInterfaceDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CInterfaceDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CInterfaceDeclptr Dict_CSym_CInterfaceDecl_d_children(Dict_CSym_CInterfaceDecl* self) {
@@ -89379,6 +89470,7 @@ void Dict_CSym_CDict_CSym_CType_destroy(Dict_CSym_CDict_CSym_CType* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CDict_CSym_CType(self);
 }
 
 ForgeSlice_DictEntry_CSym_CDict_CSym_CTypeptr Dict_CSym_CDict_CSym_CType_d_children(Dict_CSym_CDict_CSym_CType* self) {
@@ -89477,6 +89569,7 @@ void Dict_CSym_string_destroy(Dict_CSym_string* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_string(self);
 }
 
 ForgeSlice_DictEntry_CSym_stringptr Dict_CSym_string_d_children(Dict_CSym_string* self) {
@@ -89575,6 +89668,7 @@ void Dict_CSym_CStructDecl_destroy(Dict_CSym_CStructDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CStructDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CStructDeclptr Dict_CSym_CStructDecl_d_children(Dict_CSym_CStructDecl* self) {
@@ -89673,6 +89767,7 @@ void Dict_CSym_CClassDecl_destroy(Dict_CSym_CClassDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CClassDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CClassDeclptr Dict_CSym_CClassDecl_d_children(Dict_CSym_CClassDecl* self) {
@@ -89771,6 +89866,7 @@ void Dict_CSym_CEnumDecl_destroy(Dict_CSym_CEnumDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CEnumDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CEnumDeclptr Dict_CSym_CEnumDecl_d_children(Dict_CSym_CEnumDecl* self) {
@@ -89869,6 +89965,7 @@ void Dict_CSym_CTypeExpr_destroy(Dict_CSym_CTypeExpr* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CTypeExpr(self);
 }
 
 ForgeSlice_DictEntry_CSym_CTypeExprptr Dict_CSym_CTypeExpr_d_children(Dict_CSym_CTypeExpr* self) {
@@ -89967,6 +90064,7 @@ void Dict_CSym_CFuncDecl_destroy(Dict_CSym_CFuncDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CFuncDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CFuncDeclptr Dict_CSym_CFuncDecl_d_children(Dict_CSym_CFuncDecl* self) {
@@ -90065,6 +90163,7 @@ void Dict_CSym_CLType_destroy(Dict_CSym_CLType* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CLType(self);
 }
 
 ForgeSlice_DictEntry_CSym_CLTypeptr Dict_CSym_CLType_d_children(Dict_CSym_CLType* self) {
@@ -90163,6 +90262,7 @@ void Dict_CSym_CDict_CSym_CLType_destroy(Dict_CSym_CDict_CSym_CLType* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CDict_CSym_CLType(self);
 }
 
 ForgeSlice_DictEntry_CSym_CDict_CSym_CLTypeptr Dict_CSym_CDict_CSym_CLType_d_children(Dict_CSym_CDict_CSym_CLType* self) {
@@ -90261,6 +90361,7 @@ void Dict_CSym_CExpr_destroy(Dict_CSym_CExpr* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CExpr(self);
 }
 
 ForgeSlice_DictEntry_CSym_CExprptr Dict_CSym_CExpr_d_children(Dict_CSym_CExpr* self) {
@@ -90359,6 +90460,7 @@ void Dict_CSym_bool_destroy(Dict_CSym_bool* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_bool(self);
 }
 
 ForgeSlice_DictEntry_CSym_boolptr Dict_CSym_bool_d_children(Dict_CSym_bool* self) {
@@ -90457,6 +90559,7 @@ void Dict_CSym_i32_destroy(Dict_CSym_i32* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_i32(self);
 }
 
 ForgeSlice_DictEntry_CSym_i32ptr Dict_CSym_i32_d_children(Dict_CSym_i32* self) {
@@ -90555,6 +90658,7 @@ void Dict_CSym_slice_CTupleField_destroy(Dict_CSym_slice_CTupleField* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_slice_CTupleField(self);
 }
 
 ForgeSlice_DictEntry_CSym_slice_CTupleFieldptr Dict_CSym_slice_CTupleField_d_children(Dict_CSym_slice_CTupleField* self) {
@@ -90653,6 +90757,7 @@ void Dict_CSym_SLInterfaceDecl_destroy(Dict_CSym_SLInterfaceDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_SLInterfaceDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_SLInterfaceDeclptr Dict_CSym_SLInterfaceDecl_d_children(Dict_CSym_SLInterfaceDecl* self) {
@@ -90751,6 +90856,7 @@ void Dict_CSym_opt_CLType_destroy(Dict_CSym_opt_CLType* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_opt_CLType(self);
 }
 
 ForgeSlice_DictEntry_CSym_opt_CLTypeptr Dict_CSym_opt_CLType_d_children(Dict_CSym_opt_CLType* self) {
@@ -90849,6 +90955,7 @@ void Dict_CSym_SLFuncDecl_destroy(Dict_CSym_SLFuncDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_SLFuncDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_SLFuncDeclptr Dict_CSym_SLFuncDecl_d_children(Dict_CSym_SLFuncDecl* self) {
@@ -90947,6 +91054,7 @@ void Dict_CSym_SLClassDecl_destroy(Dict_CSym_SLClassDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_SLClassDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_SLClassDeclptr Dict_CSym_SLClassDecl_d_children(Dict_CSym_SLClassDecl* self) {
@@ -91045,6 +91153,7 @@ void Dict_CSym_SLStructDecl_destroy(Dict_CSym_SLStructDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_SLStructDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_SLStructDeclptr Dict_CSym_SLStructDecl_d_children(Dict_CSym_SLStructDecl* self) {
@@ -91143,6 +91252,7 @@ void Dict_CSym_slice_SLFuncDecl_destroy(Dict_CSym_slice_SLFuncDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_slice_SLFuncDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_slice_SLFuncDeclptr Dict_CSym_slice_SLFuncDecl_d_children(Dict_CSym_slice_SLFuncDecl* self) {
@@ -91241,6 +91351,7 @@ void Dict_CSym_slice_string_destroy(Dict_CSym_slice_string* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_slice_string(self);
 }
 
 ForgeSlice_DictEntry_CSym_slice_stringptr Dict_CSym_slice_string_d_children(Dict_CSym_slice_string* self) {
@@ -91339,6 +91450,7 @@ void Dict_CSym_CConstDecl_destroy(Dict_CSym_CConstDecl* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_CConstDecl(self);
 }
 
 ForgeSlice_DictEntry_CSym_CConstDeclptr Dict_CSym_CConstDecl_d_children(Dict_CSym_CConstDecl* self) {
@@ -91437,6 +91549,7 @@ void Dict_CSym_slice_CMatchArm_destroy(Dict_CSym_slice_CMatchArm* self) {
             i = _t8;
         }
     }
+    _forge_slab_free_Dict_CSym_slice_CMatchArm(self);
 }
 
 ForgeSlice_DictEntry_CSym_slice_CMatchArmptr Dict_CSym_slice_CMatchArm_d_children(Dict_CSym_slice_CMatchArm* self) {
@@ -96739,6 +96852,7 @@ void DictEntry_CSym_ETokenKind_destroy(DictEntry_CSym_ETokenKind* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_ETokenKind(self);
 }
 
 Dict_CSym_ETokenKind* DictEntry_CSym_ETokenKind_d_parent(DictEntry_CSym_ETokenKind* self) {
@@ -96778,6 +96892,7 @@ void DictEntry_CSym_CType_destroy(DictEntry_CSym_CType* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CType(self);
 }
 
 Dict_CSym_CType* DictEntry_CSym_CType_d_parent(DictEntry_CSym_CType* self) {
@@ -96817,6 +96932,7 @@ void DictEntry_CSym_CVariantInfo_destroy(DictEntry_CSym_CVariantInfo* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CVariantInfo(self);
 }
 
 Dict_CSym_CVariantInfo* DictEntry_CSym_CVariantInfo_d_parent(DictEntry_CSym_CVariantInfo* self) {
@@ -96856,6 +96972,7 @@ void DictEntry_CSym_CTypeInfo_destroy(DictEntry_CSym_CTypeInfo* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CTypeInfo(self);
 }
 
 Dict_CSym_CTypeInfo* DictEntry_CSym_CTypeInfo_d_parent(DictEntry_CSym_CTypeInfo* self) {
@@ -96895,6 +97012,7 @@ void DictEntry_CSym_CInterfaceDecl_destroy(DictEntry_CSym_CInterfaceDecl* self) 
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CInterfaceDecl(self);
 }
 
 Dict_CSym_CInterfaceDecl* DictEntry_CSym_CInterfaceDecl_d_parent(DictEntry_CSym_CInterfaceDecl* self) {
@@ -96934,6 +97052,7 @@ void DictEntry_CSym_CDict_CSym_CType_destroy(DictEntry_CSym_CDict_CSym_CType* se
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CDict_CSym_CType(self);
 }
 
 Dict_CSym_CDict_CSym_CType* DictEntry_CSym_CDict_CSym_CType_d_parent(DictEntry_CSym_CDict_CSym_CType* self) {
@@ -96973,6 +97092,7 @@ void DictEntry_CSym_string_destroy(DictEntry_CSym_string* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_string(self);
 }
 
 Dict_CSym_string* DictEntry_CSym_string_d_parent(DictEntry_CSym_string* self) {
@@ -97012,6 +97132,7 @@ void DictEntry_CSym_CStructDecl_destroy(DictEntry_CSym_CStructDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CStructDecl(self);
 }
 
 Dict_CSym_CStructDecl* DictEntry_CSym_CStructDecl_d_parent(DictEntry_CSym_CStructDecl* self) {
@@ -97051,6 +97172,7 @@ void DictEntry_CSym_CClassDecl_destroy(DictEntry_CSym_CClassDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CClassDecl(self);
 }
 
 Dict_CSym_CClassDecl* DictEntry_CSym_CClassDecl_d_parent(DictEntry_CSym_CClassDecl* self) {
@@ -97090,6 +97212,7 @@ void DictEntry_CSym_CEnumDecl_destroy(DictEntry_CSym_CEnumDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CEnumDecl(self);
 }
 
 Dict_CSym_CEnumDecl* DictEntry_CSym_CEnumDecl_d_parent(DictEntry_CSym_CEnumDecl* self) {
@@ -97129,6 +97252,7 @@ void DictEntry_CSym_CTypeExpr_destroy(DictEntry_CSym_CTypeExpr* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CTypeExpr(self);
 }
 
 Dict_CSym_CTypeExpr* DictEntry_CSym_CTypeExpr_d_parent(DictEntry_CSym_CTypeExpr* self) {
@@ -97168,6 +97292,7 @@ void DictEntry_CSym_CFuncDecl_destroy(DictEntry_CSym_CFuncDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CFuncDecl(self);
 }
 
 Dict_CSym_CFuncDecl* DictEntry_CSym_CFuncDecl_d_parent(DictEntry_CSym_CFuncDecl* self) {
@@ -97207,6 +97332,7 @@ void DictEntry_CSym_CLType_destroy(DictEntry_CSym_CLType* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CLType(self);
 }
 
 Dict_CSym_CLType* DictEntry_CSym_CLType_d_parent(DictEntry_CSym_CLType* self) {
@@ -97246,6 +97372,7 @@ void DictEntry_CSym_CDict_CSym_CLType_destroy(DictEntry_CSym_CDict_CSym_CLType* 
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CDict_CSym_CLType(self);
 }
 
 Dict_CSym_CDict_CSym_CLType* DictEntry_CSym_CDict_CSym_CLType_d_parent(DictEntry_CSym_CDict_CSym_CLType* self) {
@@ -97285,6 +97412,7 @@ void DictEntry_CSym_CExpr_destroy(DictEntry_CSym_CExpr* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CExpr(self);
 }
 
 Dict_CSym_CExpr* DictEntry_CSym_CExpr_d_parent(DictEntry_CSym_CExpr* self) {
@@ -97324,6 +97452,7 @@ void DictEntry_CSym_bool_destroy(DictEntry_CSym_bool* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_bool(self);
 }
 
 Dict_CSym_bool* DictEntry_CSym_bool_d_parent(DictEntry_CSym_bool* self) {
@@ -97363,6 +97492,7 @@ void DictEntry_CSym_i32_destroy(DictEntry_CSym_i32* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_i32(self);
 }
 
 Dict_CSym_i32* DictEntry_CSym_i32_d_parent(DictEntry_CSym_i32* self) {
@@ -97402,6 +97532,7 @@ void DictEntry_CSym_slice_CTupleField_destroy(DictEntry_CSym_slice_CTupleField* 
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_slice_CTupleField(self);
 }
 
 Dict_CSym_slice_CTupleField* DictEntry_CSym_slice_CTupleField_d_parent(DictEntry_CSym_slice_CTupleField* self) {
@@ -97441,6 +97572,7 @@ void DictEntry_CSym_SLInterfaceDecl_destroy(DictEntry_CSym_SLInterfaceDecl* self
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_SLInterfaceDecl(self);
 }
 
 Dict_CSym_SLInterfaceDecl* DictEntry_CSym_SLInterfaceDecl_d_parent(DictEntry_CSym_SLInterfaceDecl* self) {
@@ -97480,6 +97612,7 @@ void DictEntry_CSym_opt_CLType_destroy(DictEntry_CSym_opt_CLType* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_opt_CLType(self);
 }
 
 Dict_CSym_opt_CLType* DictEntry_CSym_opt_CLType_d_parent(DictEntry_CSym_opt_CLType* self) {
@@ -97519,6 +97652,7 @@ void DictEntry_CSym_SLFuncDecl_destroy(DictEntry_CSym_SLFuncDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_SLFuncDecl(self);
 }
 
 Dict_CSym_SLFuncDecl* DictEntry_CSym_SLFuncDecl_d_parent(DictEntry_CSym_SLFuncDecl* self) {
@@ -97558,6 +97692,7 @@ void DictEntry_CSym_SLClassDecl_destroy(DictEntry_CSym_SLClassDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_SLClassDecl(self);
 }
 
 Dict_CSym_SLClassDecl* DictEntry_CSym_SLClassDecl_d_parent(DictEntry_CSym_SLClassDecl* self) {
@@ -97597,6 +97732,7 @@ void DictEntry_CSym_SLStructDecl_destroy(DictEntry_CSym_SLStructDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_SLStructDecl(self);
 }
 
 Dict_CSym_SLStructDecl* DictEntry_CSym_SLStructDecl_d_parent(DictEntry_CSym_SLStructDecl* self) {
@@ -97636,6 +97772,7 @@ void DictEntry_CSym_slice_SLFuncDecl_destroy(DictEntry_CSym_slice_SLFuncDecl* se
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_slice_SLFuncDecl(self);
 }
 
 Dict_CSym_slice_SLFuncDecl* DictEntry_CSym_slice_SLFuncDecl_d_parent(DictEntry_CSym_slice_SLFuncDecl* self) {
@@ -97675,6 +97812,7 @@ void DictEntry_CSym_slice_string_destroy(DictEntry_CSym_slice_string* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_slice_string(self);
 }
 
 Dict_CSym_slice_string* DictEntry_CSym_slice_string_d_parent(DictEntry_CSym_slice_string* self) {
@@ -97714,6 +97852,7 @@ void DictEntry_CSym_CConstDecl_destroy(DictEntry_CSym_CConstDecl* self) {
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_CConstDecl(self);
 }
 
 Dict_CSym_CConstDecl* DictEntry_CSym_CConstDecl_d_parent(DictEntry_CSym_CConstDecl* self) {
@@ -97753,6 +97892,7 @@ void DictEntry_CSym_slice_CMatchArm_destroy(DictEntry_CSym_slice_CMatchArm* self
             _t5;
         }
     }
+    _forge_slab_free_DictEntry_CSym_slice_CMatchArm(self);
 }
 
 Dict_CSym_slice_CMatchArm* DictEntry_CSym_slice_CMatchArm_d_parent(DictEntry_CSym_slice_CMatchArm* self) {

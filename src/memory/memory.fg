@@ -18,6 +18,33 @@ func slab_rewrite(prog: LProgram) {
     let body = prog.functions[fi].body
     let new_body = slab_rewrite_stmts(body)
     prog.functions[fi].body = new_body
+
+    // Inject slab_free(self) at end of destroy methods
+    let fname = prog.functions[fi].name
+    if fname == "destroy" {
+      if len(prog.functions[fi].params) > 0 {
+        let p = prog.functions[fi].params[0]
+        if !isnull(p.typ) {
+          if p.typ!.kind is TyClassHandle {
+            let free_stmt = LStmt {
+              kind: StSlabFree,
+              slab_free: LSlabFreeData {
+                class_name: p.typ!.name,
+                handle: LValue {
+                  kind: ValVar,
+                  name: p.name,
+                  temp_id: 0,
+                  typ: p.typ,
+                },
+              },
+            }
+            let mut fn_body = prog.functions[fi].body
+            fn_body.push(free_stmt)
+            prog.functions[fi].body = fn_body
+          }
+        }
+      }
+    }
     fi = fi + 1
   }
 }
