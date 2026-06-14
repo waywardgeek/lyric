@@ -1391,6 +1391,88 @@ lyric checker {
     for f in funcs {
       self.register_func(f)
     }
+
+    // Register interface methods on concrete types via impl blocks.
+    // After desugar_default_impls, interface methods with bodies become top-level
+    // generic functions like `func P.add<P,C>(self, child: C) where P: MyList<P,C>`.
+    // The receiver "P" is a type param, not a concrete type. For each such function,
+    // find all impl blocks for the interface, substitute concrete types, and register
+    // the method on the concrete class so `panel.add(w1)` resolves.
+    for f in funcs {
+      if f.name == nil { continue }
+      if f.receiver_type == nil { continue }
+      let rname = sym_to_string(f.receiver_type!)
+
+      // Skip if receiver is an actual type (already handled by register_func)
+      let type_info = self.registry.lookup(rname)
+      if type_info != nil { continue }
+
+      // Check where-clauses for interface constraints
+      let where_clauses = f.where_children()
+      for wc in where_clauses {
+        if wc.constraint == nil { continue }
+        let iface_name = sym_to_string(wc.constraint!)
+        let iface_entry = self.iface_decls.get(sym(iface_name))
+        if iface_entry == nil { continue }
+        let iface_decl = iface_entry!.value
+        let itp = iface_decl.itp_children()
+
+        // Find which type param position the receiver occupies in the where-clause
+        let wc_args = wc.wc_arg_children()
+        let mut recv_param_idx: i32 = -1
+        let mut j: i32 = 0
+        while j < len(wc_args) {
+          match wc_args[j].kind {
+            Named(arg_name, _) => {
+              if sym_to_string(arg_name) == rname {
+                recv_param_idx = j
+              }
+            }
+            _ => {}
+          }
+          j = j + 1
+        }
+        if recv_param_idx < 0 { continue }
+
+        // Find all impl blocks in this block for this interface
+        for ib in impls {
+          if ib.interface_name == nil { continue }
+          if sym_to_string(ib.interface_name!) != iface_name { continue }
+
+          let impl_args = ib.ib_arg_children()
+          if recv_param_idx >= len(impl_args) as i32 { continue }
+
+          // Build substitution: interface type params → concrete types
+          let subst = Dict<Sym, Type>()
+          let mut k: i32 = 0
+          let mut limit = len(itp)
+          if len(impl_args) < limit { limit = len(impl_args) }
+          while k < limit as i32 {
+            if itp[k].name != nil {
+              subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k]))
+            }
+            k = k + 1
+          }
+
+          let concrete_type = self.resolve_type_expr(impl_args[recv_param_idx])
+          let concrete_name = type_name(concrete_type)
+          if concrete_name == "" { continue }
+
+          let cinfo = self.registry.lookup(concrete_name)
+          if cinfo == nil { continue }
+
+          let fname = sym_to_string(f.name!)
+          // Don't override existing methods
+          let existing = cinfo!.methods.get(sym(fname))
+          if existing != nil { continue }
+
+          let ft = self.func_decl_to_type(f)
+          let substituted = substitute_type(ft, subst)
+          cinfo!.methods.set(sym(fname), substituted)
+          self.scope.define(concrete_name + "." + fname, substituted)
+        }
+      }
+    }
   }
 
   func Checker.register_interface(self, iface: InterfaceDecl) {
@@ -1836,6 +1918,8 @@ lyric checker {
       }
       // Also define as "T.method" in scope for lookup
       self.scope.define(key, ft)
+      // Also define by bare name for free-function call syntax (backward compat)
+      self.scope.define(fname, ft)
     } else {
       self.scope.define(fname, ft)
     }
@@ -1966,6 +2050,18 @@ lyric checker {
             self_type = Type { kind: self_type.kind, bits: self_type.bits, type_args: ta }
           }
           self.scope.define("self", self_type)
+        } else {
+          // Receiver is a type param (e.g., "P" from an interface method).
+          // Define self as TypeVar and grant relational methods from where-clauses.
+          self.scope.define("self", make_typevar_type(rname))
+          let where_clauses = f.where_children()
+          for wc in where_clauses {
+            if wc.constraint != nil {
+              let iface_name = sym_to_string(wc.constraint!)
+              let wc_args = wc.wc_arg_children()
+              self.grant_relational_methods(iface_name, wc_args)
+            }
+          }
         }
         self.check_func_body(f)
         self.pop_scope()

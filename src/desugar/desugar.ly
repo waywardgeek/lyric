@@ -520,7 +520,8 @@ lyric desugar {
           if !isnull(m.body) {
             // Extract as top-level function
             let fn = m
-            fn.receiver_type = null
+            // Preserve receiver_type — the checker uses it to register methods
+            // on concrete types that implement this interface via impl blocks.
 
             // Add interface type params
             let iface_tps = iface.itp_children()
