@@ -1394,112 +1394,118 @@ lyric checker {
       self.register_func(f)
     }
 
-    // Register interface methods on concrete types via impl blocks.
-    // After desugar_default_impls, interface methods with bodies become top-level
-    // generic functions like `func P.add<P,C>(self, child: C) where P: MyList<P,C>`.
-    // The receiver "P" is a type param, not a concrete type. For each such function,
-    // find all impl blocks for the interface, substitute concrete types, and register
-    // the method on the concrete class so `panel.add(w1)` resolves.
-    for f in funcs {
-      if f.name == nil { continue }
-      if f.receiver_type == nil { continue }
-      let rname = sym_to_string(f.receiver_type!)
+  }
 
-      // Skip if receiver is an actual type (already handled by register_func)
-      let type_info = self.registry.lookup(rname)
-      if type_info != nil { continue }
+  // Phase 1.5: Register interface methods on concrete types.
+  // Collects ALL impl blocks from ALL blocks to enable cross-block resolution
+  // (e.g. P.push defined in stdlib, impl block for Lexer in lexer.ly).
+  func Checker.register_interface_methods(self, file: File) {
+    // Collect ALL impl blocks from ALL blocks
+    let mut all_impls: [ImplBlock] = []
+    let all_blocks = file.fb_children()
+    for blk in all_blocks {
+      let blk_impls = blk.ib_children()
+      for ib in blk_impls {
+        all_impls = append(all_impls, ib)
+      }
+    }
 
-      // Check where-clauses for interface constraints
-      let where_clauses = f.where_children()
-      for wc in where_clauses {
-        if wc.constraint == nil { continue }
-        let iface_name = sym_to_string(wc.constraint!)
-        let iface_entry = self.iface_decls.get(sym(iface_name))
-        if iface_entry == nil { continue }
-        let iface_decl = iface_entry!.value
-        let itp = iface_decl.itp_children()
+    // Find all functions with type-param receivers and match against all impl blocks
+    for blk in all_blocks {
+      let funcs = blk.fd_children()
+      for f in funcs {
+        if f.name == nil { continue }
+        if f.receiver_type == nil { continue }
+        let rname = sym_to_string(f.receiver_type!)
 
-        // Find which type param position the receiver occupies in the where-clause
-        let wc_args = wc.wc_arg_children()
-        let mut recv_param_idx: i32 = -1
-        let mut j: i32 = 0
-        while j < len(wc_args) {
-          match wc_args[j].kind {
-            Named(arg_name, _) => {
-              if sym_to_string(arg_name) == rname {
-                recv_param_idx = j
-              }
-            }
-            _ => {}
-          }
-          j = j + 1
-        }
-        if recv_param_idx < 0 { continue }
+        let type_info = self.registry.lookup(rname)
+        if type_info != nil { continue }
 
-        // Find all impl blocks in this block for this interface
-        for ib in impls {
-          if ib.interface_name == nil { continue }
-          if sym_to_string(ib.interface_name!) != iface_name { continue }
+        let where_clauses = f.where_children()
+        for wc in where_clauses {
+          if wc.constraint == nil { continue }
+          let iface_name = sym_to_string(wc.constraint!)
+          let iface_entry = self.iface_decls.get(sym(iface_name))
+          if iface_entry == nil { continue }
+          let iface_decl = iface_entry!.value
+          let itp = iface_decl.itp_children()
 
-          let impl_args = ib.ib_arg_children()
-          if recv_param_idx >= len(impl_args) as i32 { continue }
-
-          // Build substitution: interface type params → concrete types
-          let subst = Dict<Sym, Type>()
-          let mut k: i32 = 0
-          let mut limit = len(itp)
-          if len(impl_args) < limit { limit = len(impl_args) }
-          while k < limit as i32 {
-            if itp[k].name != nil {
-              subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k]))
-            }
-            k = k + 1
-          }
-
-          let concrete_type = self.resolve_type_expr(impl_args[recv_param_idx])
-          let concrete_name = type_name(concrete_type)
-          if concrete_name == "" { continue }
-
-          let cinfo = self.registry.lookup(concrete_name)
-          if cinfo == nil { continue }
-
-          let fname = sym_to_string(f.name!)
-          // Don't override existing methods
-          let existing = cinfo!.methods.get(sym(fname))
-          if existing != nil { continue }
-
-          let ft = self.func_decl_to_type(f)
-          let substituted = substitute_type(ft, subst)
-          // Strip resolved type params and store concrete type args for the call site
-          let mut final_type = substituted
-          match substituted.kind {
-            Func(sp, sr, stpn) => {
-              let mut remaining: [string] = []
-              for tpn in stpn {
-                if subst.get(sym(tpn)) == nil {
-                  append(remaining, tpn)
+          let wc_args = wc.wc_arg_children()
+          let mut recv_param_idx: i32 = -1
+          let mut j: i32 = 0
+          while j < len(wc_args) {
+            match wc_args[j].kind {
+              Named(arg_name, _) => {
+                if sym_to_string(arg_name) == rname {
+                  recv_param_idx = j
                 }
               }
-              final_type = make_func_type(sp, sr, remaining)
+              _ => {}
             }
-            _ => {}
+            j = j + 1
           }
-          // Build inferred_type_args from the original function's type params
-          let mut ta: [TypeExpr] = []
-          let orig_tps = f.fp_children()
-          for tp in orig_tps {
-            if tp.name != nil {
-              let tpname = sym_to_string(tp.name!)
-              let bound = subst.get(sym(tpname))
-              if bound != nil {
-                append(ta, type_to_type_expr(bound!.value))
+          if recv_param_idx < 0 { continue }
+
+          for ib in all_impls {
+            if ib.interface_name == nil { continue }
+            if sym_to_string(ib.interface_name!) != iface_name { continue }
+
+            let impl_args = ib.ib_arg_children()
+            if recv_param_idx >= len(impl_args) as i32 { continue }
+
+            let subst = Dict<Sym, Type>()
+            let mut k: i32 = 0
+            let mut limit = len(itp)
+            if len(impl_args) < limit { limit = len(impl_args) }
+            while k < limit as i32 {
+              if itp[k].name != nil {
+                subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k]))
+              }
+              k = k + 1
+            }
+
+            let concrete_type = self.resolve_type_expr(impl_args[recv_param_idx])
+            let concrete_name = type_name(concrete_type)
+            if concrete_name == "" { continue }
+
+            let cinfo = self.registry.lookup(concrete_name)
+            if cinfo == nil { continue }
+
+            let fname = sym_to_string(f.name!)
+            let existing = cinfo!.methods.get(sym(fname))
+            if existing != nil { continue }
+
+            let ft = self.func_decl_to_type(f)
+            let substituted = substitute_type(ft, subst)
+            let mut final_type = substituted
+            match substituted.kind {
+              Func(sp, sr, stpn) => {
+                let mut remaining: [string] = []
+                for tpn in stpn {
+                  if subst.get(sym(tpn)) == nil {
+                    append(remaining, tpn)
+                  }
+                }
+                final_type = make_func_type(sp, sr, remaining)
+              }
+              _ => {}
+            }
+            let mut ta: [TypeExpr] = []
+            let orig_tps = f.fp_children()
+            for tp in orig_tps {
+              if tp.name != nil {
+                let tpname = sym_to_string(tp.name!)
+                let bound = subst.get(sym(tpname))
+                if bound != nil {
+                  append(ta, type_to_type_expr(bound!.value))
+                }
               }
             }
+            let method_key = concrete_name + "." + fname
+            self.method_type_args.set(sym(method_key), ta)
+            cinfo!.methods.set(sym(fname), final_type)
+            self.scope.define(method_key, final_type)
           }
-          let method_key = concrete_name + "." + fname
-          self.method_type_args.set(sym(method_key), ta)
-          cinfo!.methods.set(sym(fname), final_type)
-          self.scope.define(method_key, final_type)
         }
       }
     }
@@ -4664,6 +4670,9 @@ lyric checker {
     for b in blocks {
       c.register_lyric_block(b)
     }
+
+    // Phase 1.5: register interface methods using ALL impl blocks
+    c.register_interface_methods(file)
 
     // Phase 2: check all function bodies
     for b in blocks {

@@ -11267,6 +11267,7 @@ Type* Checker_resolve_named_type(Checker* self, lyric_string name, LyricSlice_Ty
 Type* Checker_func_decl_to_type(Checker* self, FuncDecl* f);
 void Checker_preregister_type_names(Checker* self, LyricBlock* block);
 void Checker_register_lyric_block(Checker* self, LyricBlock* block);
+void Checker_register_interface_methods(Checker* self, File* file);
 void Checker_register_interface(Checker* self, InterfaceDecl* iface);
 void Checker_register_struct(Checker* self, StructDecl* s);
 void Checker_register_class(Checker* self, ClassDecl* cls);
@@ -36878,247 +36879,270 @@ void Checker_register_lyric_block(Checker* self, LyricBlock* block) {
         FuncDecl* f = funcs.data[_idx];
         Checker_register_func(self, f);
     }
-    for (int32_t _idx = 0; _idx < funcs.len; _idx++) {
-        FuncDecl* f = funcs.data[_idx];
-        Sym* _t67 = f->name;
-        bool _t68 = (_t67 == 0);
-        if (_t68) {
-            continue;
+}
+
+void Checker_register_interface_methods(Checker* self, File* file) {
+    LyricSlice_ImplBlockptr _t0 = lyric_slice_empty(LyricSlice_ImplBlockptr);
+    LyricSlice_ImplBlockptr all_impls = _t0;
+    LyricSlice_LyricBlockptr _t1 = File_fb_children(file);
+    LyricSlice_LyricBlockptr all_blocks = _t1;
+    for (int32_t _idx = 0; _idx < all_blocks.len; _idx++) {
+        LyricBlock* blk = all_blocks.data[_idx];
+        LyricSlice_ImplBlockptr _t2 = LyricBlock_ib_children(blk);
+        LyricSlice_ImplBlockptr blk_impls = _t2;
+        for (int32_t _idx = 0; _idx < blk_impls.len; _idx++) {
+            ImplBlock* ib = blk_impls.data[_idx];
+            LyricSlice_ImplBlockptr _t3 = ({ lyric_push(&all_impls, ib, LyricSlice_ImplBlockptr); all_impls; });
+            all_impls = _t3;
         }
-        Sym* _t69 = f->receiver_type;
-        bool _t70 = (_t69 == 0);
-        if (_t70) {
-            continue;
-        }
-        Sym* _t71 = f->receiver_type;
-        Sym* _t72 = _t71;
-        lyric_string _t73 = sym_to_string(_t72);
-        lyric_string rname = _t73;
-        Registry* _t74 = self->registry;
-        TypeInfo* _t75 = Registry_lookup(_t74, rname);
-        TypeInfo* type_info = _t75;
-        bool _t76 = (type_info != 0);
-        if (_t76) {
-            continue;
-        }
-        LyricSlice_WhereClauseptr _t77 = FuncDecl_where_children(f);
-        LyricSlice_WhereClauseptr where_clauses = _t77;
-        for (int32_t _idx = 0; _idx < where_clauses.len; _idx++) {
-            WhereClause* wc = where_clauses.data[_idx];
-            Sym* _t78 = wc->constraint;
-            bool _t79 = (_t78 == 0);
-            if (_t79) {
+    }
+    for (int32_t _idx = 0; _idx < all_blocks.len; _idx++) {
+        LyricBlock* blk = all_blocks.data[_idx];
+        LyricSlice_FuncDeclptr _t4 = LyricBlock_fd_children(blk);
+        LyricSlice_FuncDeclptr funcs = _t4;
+        for (int32_t _idx = 0; _idx < funcs.len; _idx++) {
+            FuncDecl* f = funcs.data[_idx];
+            Sym* _t5 = f->name;
+            bool _t6 = (_t5 == 0);
+            if (_t6) {
                 continue;
             }
-            Sym* _t80 = wc->constraint;
-            Sym* _t81 = _t80;
-            lyric_string _t82 = sym_to_string(_t81);
-            lyric_string iface_name = _t82;
-            Dict_CSym_CInterfaceDecl* _t83 = self->iface_decls;
-            Sym* _t84 = sym(iface_name);
-            DictEntry_CSym_CInterfaceDecl* _t85 = Dict_CSym_CInterfaceDecl_get(_t83, _t84);
-            DictEntry_CSym_CInterfaceDecl* iface_entry = _t85;
-            bool _t86 = (iface_entry == 0);
-            if (_t86) {
+            Sym* _t7 = f->receiver_type;
+            bool _t8 = (_t7 == 0);
+            if (_t8) {
                 continue;
             }
-            DictEntry_CSym_CInterfaceDecl* _t87 = iface_entry;
-            InterfaceDecl* _t88 = _t87->value;
-            InterfaceDecl* iface_decl = _t88;
-            LyricSlice_TypeParamptr _t89 = InterfaceDecl_itp_children(iface_decl);
-            LyricSlice_TypeParamptr itp = _t89;
-            LyricSlice_TypeExprptr _t90 = WhereClause_wc_arg_children(wc);
-            LyricSlice_TypeExprptr wc_args = _t90;
-            int32_t _t91 = (-1);
-            int32_t recv_param_idx = _t91;
-            int32_t j = 0;
-            while (1) {
-                int32_t _t92 = wc_args.len;
-                bool _t93 = (j < _t92);
-                if (!(_t93)) break;
-                TypeExpr* _t94 = wc_args.data[j];
-                TypeExprKind _t95 = _t94->kind;
-                int32_t _t96 = _t95.tag;
-                switch (_t96) {
-                case 0: {
-                    Sym* _t97 = _t95.data.named.name;
-                    Sym* arg_name = _t97;
-                    lyric_string _t98 = sym_to_string(arg_name);
-                    bool _t99 = lyric_str_eq(_t98, rname);
-                    if (_t99) {
-                        recv_param_idx = j;
-                    }
-                    break;
-                }
-                default: {
-                    break;
-                }
-                }
-                int32_t _t100 = (j + 1);
-                j = _t100;
-            }
-            bool _t101 = (recv_param_idx < 0);
-            if (_t101) {
+            Sym* _t9 = f->receiver_type;
+            Sym* _t10 = _t9;
+            lyric_string _t11 = sym_to_string(_t10);
+            lyric_string rname = _t11;
+            Registry* _t12 = self->registry;
+            TypeInfo* _t13 = Registry_lookup(_t12, rname);
+            TypeInfo* type_info = _t13;
+            bool _t14 = (type_info != 0);
+            if (_t14) {
                 continue;
             }
-            for (int32_t _idx = 0; _idx < impls.len; _idx++) {
-                ImplBlock* ib = impls.data[_idx];
-                Sym* _t102 = ib->interface_name;
-                bool _t103 = (_t102 == 0);
-                if (_t103) {
+            LyricSlice_WhereClauseptr _t15 = FuncDecl_where_children(f);
+            LyricSlice_WhereClauseptr where_clauses = _t15;
+            for (int32_t _idx = 0; _idx < where_clauses.len; _idx++) {
+                WhereClause* wc = where_clauses.data[_idx];
+                Sym* _t16 = wc->constraint;
+                bool _t17 = (_t16 == 0);
+                if (_t17) {
                     continue;
                 }
-                Sym* _t104 = ib->interface_name;
-                Sym* _t105 = _t104;
-                lyric_string _t106 = sym_to_string(_t105);
-                bool _t107 = (!lyric_str_eq(_t106, iface_name));
-                if (_t107) {
+                Sym* _t18 = wc->constraint;
+                Sym* _t19 = _t18;
+                lyric_string _t20 = sym_to_string(_t19);
+                lyric_string iface_name = _t20;
+                Dict_CSym_CInterfaceDecl* _t21 = self->iface_decls;
+                Sym* _t22 = sym(iface_name);
+                DictEntry_CSym_CInterfaceDecl* _t23 = Dict_CSym_CInterfaceDecl_get(_t21, _t22);
+                DictEntry_CSym_CInterfaceDecl* iface_entry = _t23;
+                bool _t24 = (iface_entry == 0);
+                if (_t24) {
                     continue;
                 }
-                LyricSlice_TypeExprptr _t108 = ImplBlock_ib_arg_children(ib);
-                LyricSlice_TypeExprptr impl_args = _t108;
-                int32_t _t109 = impl_args.len;
-                int32_t _t110 = ((int32_t)_t109);
-                bool _t111 = (recv_param_idx >= _t110);
-                if (_t111) {
-                    continue;
-                }
-                Dict_CSym_CType* _t112 = _lyric_slab_alloc_Dict_CSym_CType();
-                Dict_CSym_CType* subst = _t112;
-                int32_t k = 0;
-                int32_t _t113 = itp.len;
-                int32_t limit = _t113;
-                int32_t _t114 = impl_args.len;
-                bool _t115 = (_t114 < limit);
-                if (_t115) {
-                    int32_t _t116 = impl_args.len;
-                    limit = _t116;
-                }
+                DictEntry_CSym_CInterfaceDecl* _t25 = iface_entry;
+                InterfaceDecl* _t26 = _t25->value;
+                InterfaceDecl* iface_decl = _t26;
+                LyricSlice_TypeParamptr _t27 = InterfaceDecl_itp_children(iface_decl);
+                LyricSlice_TypeParamptr itp = _t27;
+                LyricSlice_TypeExprptr _t28 = WhereClause_wc_arg_children(wc);
+                LyricSlice_TypeExprptr wc_args = _t28;
+                int32_t _t29 = (-1);
+                int32_t recv_param_idx = _t29;
+                int32_t j = 0;
                 while (1) {
-                    int32_t _t117 = ((int32_t)limit);
-                    bool _t118 = (k < _t117);
-                    if (!(_t118)) break;
-                    TypeParam* _t119 = itp.data[k];
-                    Sym* _t120 = _t119->name;
-                    bool _t121 = (_t120 != 0);
-                    if (_t121) {
-                        TypeParam* _t122 = itp.data[k];
-                        Sym* _t123 = _t122->name;
-                        Sym* _t124 = _t123;
-                        lyric_string _t125 = sym_to_string(_t124);
-                        Sym* _t126 = sym(_t125);
-                        TypeExpr* _t127 = impl_args.data[k];
-                        Type* _t128 = Checker_resolve_type_expr(self, _t127);
-                        Dict_CSym_CType_set(subst, _t126, _t128);
+                    int32_t _t30 = wc_args.len;
+                    bool _t31 = (j < _t30);
+                    if (!(_t31)) break;
+                    TypeExpr* _t32 = wc_args.data[j];
+                    TypeExprKind _t33 = _t32->kind;
+                    int32_t _t34 = _t33.tag;
+                    switch (_t34) {
+                    case 0: {
+                        Sym* _t35 = _t33.data.named.name;
+                        Sym* arg_name = _t35;
+                        lyric_string _t36 = sym_to_string(arg_name);
+                        bool _t37 = lyric_str_eq(_t36, rname);
+                        if (_t37) {
+                            recv_param_idx = j;
+                        }
+                        break;
                     }
-                    int32_t _t130 = (k + 1);
-                    k = _t130;
+                    default: {
+                        break;
+                    }
+                    }
+                    int32_t _t38 = (j + 1);
+                    j = _t38;
                 }
-                TypeExpr* _t131 = impl_args.data[recv_param_idx];
-                Type* _t132 = Checker_resolve_type_expr(self, _t131);
-                Type* concrete_type = _t132;
-                lyric_string _t133 = type_name(concrete_type);
-                lyric_string concrete_name = _t133;
-                bool _t134 = lyric_str_eq(concrete_name, LYRIC_STR(""));
-                if (_t134) {
+                bool _t39 = (recv_param_idx < 0);
+                if (_t39) {
                     continue;
                 }
-                Registry* _t135 = self->registry;
-                TypeInfo* _t136 = Registry_lookup(_t135, concrete_name);
-                TypeInfo* cinfo = _t136;
-                bool _t137 = (cinfo == 0);
-                if (_t137) {
-                    continue;
-                }
-                Sym* _t138 = f->name;
-                Sym* _t139 = _t138;
-                lyric_string _t140 = sym_to_string(_t139);
-                lyric_string fname = _t140;
-                TypeInfo* _t141 = cinfo;
-                Dict_CSym_CType* _t142 = _t141->methods;
-                Sym* _t143 = sym(fname);
-                DictEntry_CSym_CType* _t144 = Dict_CSym_CType_get(_t142, _t143);
-                DictEntry_CSym_CType* existing = _t144;
-                bool _t145 = (existing != 0);
-                if (_t145) {
-                    continue;
-                }
-                Type* _t146 = Checker_func_decl_to_type(self, f);
-                Type* ft = _t146;
-                Type* _t147 = substitute_type(ft, subst);
-                Type* substituted = _t147;
-                Type* final_type = substituted;
-                TypeKind _t148 = substituted->kind;
-                int32_t _t149 = _t148.tag;
-                switch (_t149) {
-                case 14: {
-                    LyricSlice_Typeptr _t150 = _t148.data.func.params;
-                    LyricSlice_Typeptr sp = _t150;
-                    Type* _t151 = _t148.data.func.ret;
-                    Type* sr = _t151;
-                    LyricSlice_lyric_string _t152 = _t148.data.func.type_param_names;
-                    LyricSlice_lyric_string stpn = _t152;
-                    LyricSlice_lyric_string _t153 = lyric_slice_empty(LyricSlice_lyric_string);
-                    LyricSlice_lyric_string remaining = _t153;
-                    for (int32_t _idx = 0; _idx < stpn.len; _idx++) {
-                        lyric_string tpn = stpn.data[_idx];
-                        Sym* _t154 = sym(tpn);
-                        DictEntry_CSym_CType* _t155 = Dict_CSym_CType_get(subst, _t154);
-                        bool _t156 = (_t155 == 0);
-                        if (_t156) {
-                            LyricSlice_lyric_string _t157 = ({ lyric_push(&remaining, tpn, LyricSlice_lyric_string); remaining; });
-                            _t157;
+                for (int32_t _idx = 0; _idx < all_impls.len; _idx++) {
+                    ImplBlock* ib = all_impls.data[_idx];
+                    Sym* _t40 = ib->interface_name;
+                    bool _t41 = (_t40 == 0);
+                    if (_t41) {
+                        continue;
+                    }
+                    Sym* _t42 = ib->interface_name;
+                    Sym* _t43 = _t42;
+                    lyric_string _t44 = sym_to_string(_t43);
+                    bool _t45 = (!lyric_str_eq(_t44, iface_name));
+                    if (_t45) {
+                        continue;
+                    }
+                    LyricSlice_TypeExprptr _t46 = ImplBlock_ib_arg_children(ib);
+                    LyricSlice_TypeExprptr impl_args = _t46;
+                    int32_t _t47 = impl_args.len;
+                    int32_t _t48 = ((int32_t)_t47);
+                    bool _t49 = (recv_param_idx >= _t48);
+                    if (_t49) {
+                        continue;
+                    }
+                    Dict_CSym_CType* _t50 = _lyric_slab_alloc_Dict_CSym_CType();
+                    Dict_CSym_CType* subst = _t50;
+                    int32_t k = 0;
+                    int32_t _t51 = itp.len;
+                    int32_t limit = _t51;
+                    int32_t _t52 = impl_args.len;
+                    bool _t53 = (_t52 < limit);
+                    if (_t53) {
+                        int32_t _t54 = impl_args.len;
+                        limit = _t54;
+                    }
+                    while (1) {
+                        int32_t _t55 = ((int32_t)limit);
+                        bool _t56 = (k < _t55);
+                        if (!(_t56)) break;
+                        TypeParam* _t57 = itp.data[k];
+                        Sym* _t58 = _t57->name;
+                        bool _t59 = (_t58 != 0);
+                        if (_t59) {
+                            TypeParam* _t60 = itp.data[k];
+                            Sym* _t61 = _t60->name;
+                            Sym* _t62 = _t61;
+                            lyric_string _t63 = sym_to_string(_t62);
+                            Sym* _t64 = sym(_t63);
+                            TypeExpr* _t65 = impl_args.data[k];
+                            Type* _t66 = Checker_resolve_type_expr(self, _t65);
+                            Dict_CSym_CType_set(subst, _t64, _t66);
+                        }
+                        int32_t _t68 = (k + 1);
+                        k = _t68;
+                    }
+                    TypeExpr* _t69 = impl_args.data[recv_param_idx];
+                    Type* _t70 = Checker_resolve_type_expr(self, _t69);
+                    Type* concrete_type = _t70;
+                    lyric_string _t71 = type_name(concrete_type);
+                    lyric_string concrete_name = _t71;
+                    bool _t72 = lyric_str_eq(concrete_name, LYRIC_STR(""));
+                    if (_t72) {
+                        continue;
+                    }
+                    Registry* _t73 = self->registry;
+                    TypeInfo* _t74 = Registry_lookup(_t73, concrete_name);
+                    TypeInfo* cinfo = _t74;
+                    bool _t75 = (cinfo == 0);
+                    if (_t75) {
+                        continue;
+                    }
+                    Sym* _t76 = f->name;
+                    Sym* _t77 = _t76;
+                    lyric_string _t78 = sym_to_string(_t77);
+                    lyric_string fname = _t78;
+                    TypeInfo* _t79 = cinfo;
+                    Dict_CSym_CType* _t80 = _t79->methods;
+                    Sym* _t81 = sym(fname);
+                    DictEntry_CSym_CType* _t82 = Dict_CSym_CType_get(_t80, _t81);
+                    DictEntry_CSym_CType* existing = _t82;
+                    bool _t83 = (existing != 0);
+                    if (_t83) {
+                        continue;
+                    }
+                    Type* _t84 = Checker_func_decl_to_type(self, f);
+                    Type* ft = _t84;
+                    Type* _t85 = substitute_type(ft, subst);
+                    Type* substituted = _t85;
+                    Type* final_type = substituted;
+                    TypeKind _t86 = substituted->kind;
+                    int32_t _t87 = _t86.tag;
+                    switch (_t87) {
+                    case 14: {
+                        LyricSlice_Typeptr _t88 = _t86.data.func.params;
+                        LyricSlice_Typeptr sp = _t88;
+                        Type* _t89 = _t86.data.func.ret;
+                        Type* sr = _t89;
+                        LyricSlice_lyric_string _t90 = _t86.data.func.type_param_names;
+                        LyricSlice_lyric_string stpn = _t90;
+                        LyricSlice_lyric_string _t91 = lyric_slice_empty(LyricSlice_lyric_string);
+                        LyricSlice_lyric_string remaining = _t91;
+                        for (int32_t _idx = 0; _idx < stpn.len; _idx++) {
+                            lyric_string tpn = stpn.data[_idx];
+                            Sym* _t92 = sym(tpn);
+                            DictEntry_CSym_CType* _t93 = Dict_CSym_CType_get(subst, _t92);
+                            bool _t94 = (_t93 == 0);
+                            if (_t94) {
+                                LyricSlice_lyric_string _t95 = ({ lyric_push(&remaining, tpn, LyricSlice_lyric_string); remaining; });
+                                _t95;
+                            }
+                        }
+                        Type* _t96 = make_func_type(sp, sr, remaining);
+                        final_type = _t96;
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                    }
+                    LyricSlice_TypeExprptr _t97 = lyric_slice_empty(LyricSlice_TypeExprptr);
+                    LyricSlice_TypeExprptr ta = _t97;
+                    LyricSlice_TypeParamptr _t98 = FuncDecl_fp_children(f);
+                    LyricSlice_TypeParamptr orig_tps = _t98;
+                    for (int32_t _idx = 0; _idx < orig_tps.len; _idx++) {
+                        TypeParam* tp = orig_tps.data[_idx];
+                        Sym* _t99 = tp->name;
+                        bool _t100 = (_t99 != 0);
+                        if (_t100) {
+                            Sym* _t101 = tp->name;
+                            Sym* _t102 = _t101;
+                            lyric_string _t103 = sym_to_string(_t102);
+                            lyric_string tpname = _t103;
+                            Sym* _t104 = sym(tpname);
+                            DictEntry_CSym_CType* _t105 = Dict_CSym_CType_get(subst, _t104);
+                            DictEntry_CSym_CType* bound = _t105;
+                            bool _t106 = (bound != 0);
+                            if (_t106) {
+                                DictEntry_CSym_CType* _t107 = bound;
+                                Type* _t108 = _t107->value;
+                                TypeExpr* _t109 = type_to_type_expr(_t108);
+                                LyricSlice_TypeExprptr _t110 = ({ lyric_push(&ta, _t109, LyricSlice_TypeExprptr); ta; });
+                                _t110;
+                            }
                         }
                     }
-                    Type* _t158 = make_func_type(sp, sr, remaining);
-                    final_type = _t158;
-                    break;
+                    lyric_string _t111 = lyric_str_concat(concrete_name, LYRIC_STR("."));
+                    lyric_string _t112 = lyric_str_concat(_t111, fname);
+                    lyric_string method_key = _t112;
+                    Dict_CSym_slice_CTypeExpr* _t113 = self->method_type_args;
+                    Sym* _t114 = sym(method_key);
+                    Dict_CSym_slice_CTypeExpr_set(_t113, _t114, ta);
+                    TypeInfo* _t116 = cinfo;
+                    Dict_CSym_CType* _t117 = _t116->methods;
+                    Sym* _t118 = sym(fname);
+                    Dict_CSym_CType_set(_t117, _t118, final_type);
+                    Scope* _t120 = self->scope;
+                    Scope_define(_t120, method_key, final_type);
                 }
-                default: {
-                    break;
-                }
-                }
-                LyricSlice_TypeExprptr _t159 = lyric_slice_empty(LyricSlice_TypeExprptr);
-                LyricSlice_TypeExprptr ta = _t159;
-                LyricSlice_TypeParamptr _t160 = FuncDecl_fp_children(f);
-                LyricSlice_TypeParamptr orig_tps = _t160;
-                for (int32_t _idx = 0; _idx < orig_tps.len; _idx++) {
-                    TypeParam* tp = orig_tps.data[_idx];
-                    Sym* _t161 = tp->name;
-                    bool _t162 = (_t161 != 0);
-                    if (_t162) {
-                        Sym* _t163 = tp->name;
-                        Sym* _t164 = _t163;
-                        lyric_string _t165 = sym_to_string(_t164);
-                        lyric_string tpname = _t165;
-                        Sym* _t166 = sym(tpname);
-                        DictEntry_CSym_CType* _t167 = Dict_CSym_CType_get(subst, _t166);
-                        DictEntry_CSym_CType* bound = _t167;
-                        bool _t168 = (bound != 0);
-                        if (_t168) {
-                            DictEntry_CSym_CType* _t169 = bound;
-                            Type* _t170 = _t169->value;
-                            TypeExpr* _t171 = type_to_type_expr(_t170);
-                            LyricSlice_TypeExprptr _t172 = ({ lyric_push(&ta, _t171, LyricSlice_TypeExprptr); ta; });
-                            _t172;
-                        }
-                    }
-                }
-                lyric_string _t173 = lyric_str_concat(concrete_name, LYRIC_STR("."));
-                lyric_string _t174 = lyric_str_concat(_t173, fname);
-                lyric_string method_key = _t174;
-                Dict_CSym_slice_CTypeExpr* _t175 = self->method_type_args;
-                Sym* _t176 = sym(method_key);
-                Dict_CSym_slice_CTypeExpr_set(_t175, _t176, ta);
-                TypeInfo* _t178 = cinfo;
-                Dict_CSym_CType* _t179 = _t178->methods;
-                Sym* _t180 = sym(fname);
-                Dict_CSym_CType_set(_t179, _t180, final_type);
-                Scope* _t182 = self->scope;
-                Scope_define(_t182, method_key, final_type);
             }
         }
     }
+    if (all_impls.cap > 0 && all_impls.data) free(all_impls.data);
 }
 
 void Checker_register_interface(Checker* self, InterfaceDecl* iface) {
@@ -44935,6 +44959,7 @@ Checker* check_file(File* file) {
         LyricBlock* b = blocks.data[_idx];
         Checker_register_lyric_block(c, b);
     }
+    Checker_register_interface_methods(c, file);
     for (int32_t _idx = 0; _idx < blocks.len; _idx++) {
         LyricBlock* b = blocks.data[_idx];
         Checker_check_lyric_block_bodies(c, b);
