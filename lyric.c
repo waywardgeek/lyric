@@ -174,6 +174,7 @@ typedef struct Dict_CSym_CVariantInfo Dict_CSym_CVariantInfo;
 typedef struct Dict_CSym_CTypeInfo Dict_CSym_CTypeInfo;
 typedef struct Dict_CSym_CInterfaceDecl Dict_CSym_CInterfaceDecl;
 typedef struct Dict_CSym_CDict_CSym_CType Dict_CSym_CDict_CSym_CType;
+typedef struct Dict_CSym_slice_CTypeExpr Dict_CSym_slice_CTypeExpr;
 typedef struct Dict_CSym_string Dict_CSym_string;
 typedef struct Dict_CSym_CStructDecl Dict_CSym_CStructDecl;
 typedef struct Dict_CSym_CClassDecl Dict_CSym_CClassDecl;
@@ -195,33 +196,34 @@ typedef struct Dict_CSym_slice_CLFuncDecl Dict_CSym_slice_CLFuncDecl;
 typedef struct Dict_CSym_slice_string Dict_CSym_slice_string;
 typedef struct Dict_CSym_CConstDecl Dict_CSym_CConstDecl;
 typedef struct Dict_CSym_slice_CMatchArm Dict_CSym_slice_CMatchArm;
-typedef struct DictEntry_CSym_ETokenKind DictEntry_CSym_ETokenKind;
-typedef struct DictEntry_CSym_CType DictEntry_CSym_CType;
-typedef struct DictEntry_CSym_CVariantInfo DictEntry_CSym_CVariantInfo;
-typedef struct DictEntry_CSym_CTypeInfo DictEntry_CSym_CTypeInfo;
+typedef struct DictEntry_CSym_bool DictEntry_CSym_bool;
 typedef struct DictEntry_CSym_CInterfaceDecl DictEntry_CSym_CInterfaceDecl;
-typedef struct DictEntry_CSym_CDict_CSym_CType DictEntry_CSym_CDict_CSym_CType;
-typedef struct DictEntry_CSym_string DictEntry_CSym_string;
-typedef struct DictEntry_CSym_CStructDecl DictEntry_CSym_CStructDecl;
 typedef struct DictEntry_CSym_CClassDecl DictEntry_CSym_CClassDecl;
-typedef struct DictEntry_CSym_CEnumDecl DictEntry_CSym_CEnumDecl;
-typedef struct DictEntry_CSym_CTypeExpr DictEntry_CSym_CTypeExpr;
 typedef struct DictEntry_CSym_CFuncDecl DictEntry_CSym_CFuncDecl;
+typedef struct DictEntry_CSym_CConstDecl DictEntry_CSym_CConstDecl;
+typedef struct DictEntry_CSym_ETokenKind DictEntry_CSym_ETokenKind;
+typedef struct DictEntry_CSym_string DictEntry_CSym_string;
+typedef struct DictEntry_CSym_CTypeExpr DictEntry_CSym_CTypeExpr;
+typedef struct DictEntry_CSym_CType DictEntry_CSym_CType;
+typedef struct DictEntry_CSym_CTypeInfo DictEntry_CSym_CTypeInfo;
+typedef struct DictEntry_CSym_slice_CTypeExpr DictEntry_CSym_slice_CTypeExpr;
+typedef struct DictEntry_CSym_CVariantInfo DictEntry_CSym_CVariantInfo;
+typedef struct DictEntry_CSym_CDict_CSym_CType DictEntry_CSym_CDict_CSym_CType;
 typedef struct DictEntry_CSym_CLType DictEntry_CSym_CLType;
+typedef struct DictEntry_CSym_CStructDecl DictEntry_CSym_CStructDecl;
 typedef struct DictEntry_CSym_CDict_CSym_CLType DictEntry_CSym_CDict_CSym_CLType;
 typedef struct DictEntry_CSym_CExpr DictEntry_CSym_CExpr;
-typedef struct DictEntry_CSym_bool DictEntry_CSym_bool;
+typedef struct DictEntry_CSym_CEnumDecl DictEntry_CSym_CEnumDecl;
 typedef struct DictEntry_CSym_i32 DictEntry_CSym_i32;
 typedef struct DictEntry_CSym_slice_CTupleField DictEntry_CSym_slice_CTupleField;
 typedef struct DictEntry_CSym_CLInterfaceDecl DictEntry_CSym_CLInterfaceDecl;
+typedef struct DictEntry_CSym_slice_CMatchArm DictEntry_CSym_slice_CMatchArm;
 typedef struct DictEntry_CSym_opt_CLType DictEntry_CSym_opt_CLType;
 typedef struct DictEntry_CSym_CLFuncDecl DictEntry_CSym_CLFuncDecl;
+typedef struct DictEntry_CSym_slice_CLFuncDecl DictEntry_CSym_slice_CLFuncDecl;
 typedef struct DictEntry_CSym_CLClassDecl DictEntry_CSym_CLClassDecl;
 typedef struct DictEntry_CSym_CLStructDecl DictEntry_CSym_CLStructDecl;
-typedef struct DictEntry_CSym_slice_CLFuncDecl DictEntry_CSym_slice_CLFuncDecl;
 typedef struct DictEntry_CSym_slice_string DictEntry_CSym_slice_string;
-typedef struct DictEntry_CSym_CConstDecl DictEntry_CSym_CConstDecl;
-typedef struct DictEntry_CSym_slice_CMatchArm DictEntry_CSym_slice_CMatchArm;
 typedef struct TypeExprKind TypeExprKind;
 typedef enum {
     ImplMappingKind_Alias = 0,
@@ -580,6 +582,7 @@ LYRIC_SLICE_DEF(DictEntry_CSym_CVariantInfo*, LyricSlice_DictEntry_CSym_CVariant
 LYRIC_SLICE_DEF(DictEntry_CSym_CTypeInfo*, LyricSlice_DictEntry_CSym_CTypeInfoptr)
 LYRIC_SLICE_DEF(DictEntry_CSym_CInterfaceDecl*, LyricSlice_DictEntry_CSym_CInterfaceDeclptr)
 LYRIC_SLICE_DEF(DictEntry_CSym_CDict_CSym_CType*, LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr)
+LYRIC_SLICE_DEF(DictEntry_CSym_slice_CTypeExpr*, LyricSlice_DictEntry_CSym_slice_CTypeExprptr)
 LYRIC_SLICE_DEF(DictEntry_CSym_string*, LyricSlice_DictEntry_CSym_stringptr)
 LYRIC_SLICE_DEF(DictEntry_CSym_CStructDecl*, LyricSlice_DictEntry_CSym_CStructDeclptr)
 LYRIC_SLICE_DEF(DictEntry_CSym_CClassDecl*, LyricSlice_DictEntry_CSym_CClassDeclptr)
@@ -1664,10 +1667,11 @@ LYRIC_OPT_DEF(Dict_CSym_slice_CLFuncDecl*, LyricOpt_Dict_CSym_slice_CLFuncDeclpt
 LYRIC_OPT_DEF(StringBuilder*, LyricOpt_StringBuilderptr)
 LYRIC_OPT_DEF(LFuncDecl*, LyricOpt_LFuncDeclptr)
 LYRIC_OPT_DEF(Dict_CSym_slice_string*, LyricOpt_Dict_CSym_slice_stringptr)
-LYRIC_OPT_DEF(Dict_CSym_CType*, LyricOpt_Dict_CSym_CTypeptr)
-LYRIC_OPT_DEF(Dict_CSym_CVariantInfo*, LyricOpt_Dict_CSym_CVariantInfoptr)
-LYRIC_OPT_DEF(Dict_CSym_CTypeInfo*, LyricOpt_Dict_CSym_CTypeInfoptr)
 LYRIC_OPT_DEF(Dict_CSym_CConstDecl*, LyricOpt_Dict_CSym_CConstDeclptr)
+LYRIC_OPT_DEF(Dict_CSym_CType*, LyricOpt_Dict_CSym_CTypeptr)
+LYRIC_OPT_DEF(Dict_CSym_CTypeInfo*, LyricOpt_Dict_CSym_CTypeInfoptr)
+LYRIC_OPT_DEF(Dict_CSym_slice_CTypeExpr*, LyricOpt_Dict_CSym_slice_CTypeExprptr)
+LYRIC_OPT_DEF(Dict_CSym_CVariantInfo*, LyricOpt_Dict_CSym_CVariantInfoptr)
 LYRIC_OPT_DEF(Dict_CSym_slice_CMatchArm*, LyricOpt_Dict_CSym_slice_CMatchArmptr)
 LYRIC_RESULT_DEF(File*, LyricResult_Fileptr)
 LYRIC_RESULT_DEF(Token*, LyricResult_Tokenptr)
@@ -2178,6 +2182,7 @@ struct Checker {
     lyric_string current_func_name;
     Dict_CSym_CInterfaceDecl* iface_decls;
     Dict_CSym_CDict_CSym_CType* type_var_methods;
+    Dict_CSym_slice_CTypeExpr* method_type_args;
     struct Checker* lyric_next;
 };
 
@@ -2508,6 +2513,14 @@ struct Dict_CSym_CDict_CSym_CType {
     struct Dict_CSym_CDict_CSym_CType* lyric_next;
 };
 
+struct Dict_CSym_slice_CTypeExpr {
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr d_children;
+    LyricSlice_int32_t d_buckets;
+    int32_t d_hash_cap;
+    int32_t d_hash_count;
+    struct Dict_CSym_slice_CTypeExpr* lyric_next;
+};
+
 struct Dict_CSym_string {
     LyricSlice_DictEntry_CSym_stringptr d_children;
     LyricSlice_int32_t d_buckets;
@@ -2676,36 +2689,12 @@ struct Dict_CSym_slice_CMatchArm {
     struct Dict_CSym_slice_CMatchArm* lyric_next;
 };
 
-struct DictEntry_CSym_ETokenKind {
+struct DictEntry_CSym_bool {
     Sym* key;
-    TokenKind value;
-    Dict_CSym_ETokenKind* d_parent;
+    bool value;
+    Dict_CSym_bool* d_parent;
     int32_t d_index;
-    struct DictEntry_CSym_ETokenKind* lyric_next;
-};
-
-struct DictEntry_CSym_CType {
-    Sym* key;
-    Type* value;
-    Dict_CSym_CType* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CType* lyric_next;
-};
-
-struct DictEntry_CSym_CVariantInfo {
-    Sym* key;
-    VariantInfo* value;
-    Dict_CSym_CVariantInfo* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CVariantInfo* lyric_next;
-};
-
-struct DictEntry_CSym_CTypeInfo {
-    Sym* key;
-    TypeInfo* value;
-    Dict_CSym_CTypeInfo* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CTypeInfo* lyric_next;
+    struct DictEntry_CSym_bool* lyric_next;
 };
 
 struct DictEntry_CSym_CInterfaceDecl {
@@ -2716,52 +2705,12 @@ struct DictEntry_CSym_CInterfaceDecl {
     struct DictEntry_CSym_CInterfaceDecl* lyric_next;
 };
 
-struct DictEntry_CSym_CDict_CSym_CType {
-    Sym* key;
-    Dict_CSym_CType* value;
-    Dict_CSym_CDict_CSym_CType* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CDict_CSym_CType* lyric_next;
-};
-
-struct DictEntry_CSym_string {
-    Sym* key;
-    lyric_string value;
-    Dict_CSym_string* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_string* lyric_next;
-};
-
-struct DictEntry_CSym_CStructDecl {
-    Sym* key;
-    StructDecl* value;
-    Dict_CSym_CStructDecl* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CStructDecl* lyric_next;
-};
-
 struct DictEntry_CSym_CClassDecl {
     Sym* key;
     ClassDecl* value;
     Dict_CSym_CClassDecl* d_parent;
     int32_t d_index;
     struct DictEntry_CSym_CClassDecl* lyric_next;
-};
-
-struct DictEntry_CSym_CEnumDecl {
-    Sym* key;
-    EnumDecl* value;
-    Dict_CSym_CEnumDecl* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CEnumDecl* lyric_next;
-};
-
-struct DictEntry_CSym_CTypeExpr {
-    Sym* key;
-    TypeExpr* value;
-    Dict_CSym_CTypeExpr* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CTypeExpr* lyric_next;
 };
 
 struct DictEntry_CSym_CFuncDecl {
@@ -2772,12 +2721,92 @@ struct DictEntry_CSym_CFuncDecl {
     struct DictEntry_CSym_CFuncDecl* lyric_next;
 };
 
+struct DictEntry_CSym_CConstDecl {
+    Sym* key;
+    ConstDecl* value;
+    Dict_CSym_CConstDecl* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CConstDecl* lyric_next;
+};
+
+struct DictEntry_CSym_ETokenKind {
+    Sym* key;
+    TokenKind value;
+    Dict_CSym_ETokenKind* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_ETokenKind* lyric_next;
+};
+
+struct DictEntry_CSym_string {
+    Sym* key;
+    lyric_string value;
+    Dict_CSym_string* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_string* lyric_next;
+};
+
+struct DictEntry_CSym_CTypeExpr {
+    Sym* key;
+    TypeExpr* value;
+    Dict_CSym_CTypeExpr* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CTypeExpr* lyric_next;
+};
+
+struct DictEntry_CSym_CType {
+    Sym* key;
+    Type* value;
+    Dict_CSym_CType* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CType* lyric_next;
+};
+
+struct DictEntry_CSym_CTypeInfo {
+    Sym* key;
+    TypeInfo* value;
+    Dict_CSym_CTypeInfo* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CTypeInfo* lyric_next;
+};
+
+struct DictEntry_CSym_slice_CTypeExpr {
+    Sym* key;
+    LyricSlice_TypeExprptr value;
+    Dict_CSym_slice_CTypeExpr* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_slice_CTypeExpr* lyric_next;
+};
+
+struct DictEntry_CSym_CVariantInfo {
+    Sym* key;
+    VariantInfo* value;
+    Dict_CSym_CVariantInfo* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CVariantInfo* lyric_next;
+};
+
+struct DictEntry_CSym_CDict_CSym_CType {
+    Sym* key;
+    Dict_CSym_CType* value;
+    Dict_CSym_CDict_CSym_CType* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CDict_CSym_CType* lyric_next;
+};
+
 struct DictEntry_CSym_CLType {
     Sym* key;
     LType* value;
     Dict_CSym_CLType* d_parent;
     int32_t d_index;
     struct DictEntry_CSym_CLType* lyric_next;
+};
+
+struct DictEntry_CSym_CStructDecl {
+    Sym* key;
+    StructDecl* value;
+    Dict_CSym_CStructDecl* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_CStructDecl* lyric_next;
 };
 
 struct DictEntry_CSym_CDict_CSym_CLType {
@@ -2796,12 +2825,12 @@ struct DictEntry_CSym_CExpr {
     struct DictEntry_CSym_CExpr* lyric_next;
 };
 
-struct DictEntry_CSym_bool {
+struct DictEntry_CSym_CEnumDecl {
     Sym* key;
-    bool value;
-    Dict_CSym_bool* d_parent;
+    EnumDecl* value;
+    Dict_CSym_CEnumDecl* d_parent;
     int32_t d_index;
-    struct DictEntry_CSym_bool* lyric_next;
+    struct DictEntry_CSym_CEnumDecl* lyric_next;
 };
 
 struct DictEntry_CSym_i32 {
@@ -2828,6 +2857,14 @@ struct DictEntry_CSym_CLInterfaceDecl {
     struct DictEntry_CSym_CLInterfaceDecl* lyric_next;
 };
 
+struct DictEntry_CSym_slice_CMatchArm {
+    Sym* key;
+    LyricSlice_MatchArmptr value;
+    Dict_CSym_slice_CMatchArm* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_slice_CMatchArm* lyric_next;
+};
+
 struct DictEntry_CSym_opt_CLType {
     Sym* key;
     LType* value;
@@ -2842,6 +2879,14 @@ struct DictEntry_CSym_CLFuncDecl {
     Dict_CSym_CLFuncDecl* d_parent;
     int32_t d_index;
     struct DictEntry_CSym_CLFuncDecl* lyric_next;
+};
+
+struct DictEntry_CSym_slice_CLFuncDecl {
+    Sym* key;
+    LyricSlice_LFuncDeclptr value;
+    Dict_CSym_slice_CLFuncDecl* d_parent;
+    int32_t d_index;
+    struct DictEntry_CSym_slice_CLFuncDecl* lyric_next;
 };
 
 struct DictEntry_CSym_CLClassDecl {
@@ -2860,36 +2905,12 @@ struct DictEntry_CSym_CLStructDecl {
     struct DictEntry_CSym_CLStructDecl* lyric_next;
 };
 
-struct DictEntry_CSym_slice_CLFuncDecl {
-    Sym* key;
-    LyricSlice_LFuncDeclptr value;
-    Dict_CSym_slice_CLFuncDecl* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_slice_CLFuncDecl* lyric_next;
-};
-
 struct DictEntry_CSym_slice_string {
     Sym* key;
     LyricSlice_lyric_string value;
     Dict_CSym_slice_string* d_parent;
     int32_t d_index;
     struct DictEntry_CSym_slice_string* lyric_next;
-};
-
-struct DictEntry_CSym_CConstDecl {
-    Sym* key;
-    ConstDecl* value;
-    Dict_CSym_CConstDecl* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_CConstDecl* lyric_next;
-};
-
-struct DictEntry_CSym_slice_CMatchArm {
-    Sym* key;
-    LyricSlice_MatchArmptr value;
-    Dict_CSym_slice_CMatchArm* d_parent;
-    int32_t d_index;
-    struct DictEntry_CSym_slice_CMatchArm* lyric_next;
 };
 
 /* Slab allocator infrastructure (AoS block-based) */
@@ -3453,6 +3474,14 @@ typedef struct LyricSlab_Dict_CSym_CDict_CSym_CType_Block {
 typedef struct { LyricSlab_Dict_CSym_CDict_CSym_CType_Block* cur; Dict_CSym_CDict_CSym_CType* free; } LyricSlab_Dict_CSym_CDict_CSym_CType;
 static LyricSlab_Dict_CSym_CDict_CSym_CType _lyric_slab_Dict_CSym_CDict_CSym_CType = {0};
 
+typedef struct LyricSlab_Dict_CSym_slice_CTypeExpr_Block {
+    struct Dict_CSym_slice_CTypeExpr data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_Dict_CSym_slice_CTypeExpr_Block* next;
+    int32_t used;
+} LyricSlab_Dict_CSym_slice_CTypeExpr_Block;
+typedef struct { LyricSlab_Dict_CSym_slice_CTypeExpr_Block* cur; Dict_CSym_slice_CTypeExpr* free; } LyricSlab_Dict_CSym_slice_CTypeExpr;
+static LyricSlab_Dict_CSym_slice_CTypeExpr _lyric_slab_Dict_CSym_slice_CTypeExpr = {0};
+
 typedef struct LyricSlab_Dict_CSym_string_Block {
     struct Dict_CSym_string data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_Dict_CSym_string_Block* next;
@@ -3621,37 +3650,13 @@ typedef struct LyricSlab_Dict_CSym_slice_CMatchArm_Block {
 typedef struct { LyricSlab_Dict_CSym_slice_CMatchArm_Block* cur; Dict_CSym_slice_CMatchArm* free; } LyricSlab_Dict_CSym_slice_CMatchArm;
 static LyricSlab_Dict_CSym_slice_CMatchArm _lyric_slab_Dict_CSym_slice_CMatchArm = {0};
 
-typedef struct LyricSlab_DictEntry_CSym_ETokenKind_Block {
-    struct DictEntry_CSym_ETokenKind data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_ETokenKind_Block* next;
+typedef struct LyricSlab_DictEntry_CSym_bool_Block {
+    struct DictEntry_CSym_bool data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_bool_Block* next;
     int32_t used;
-} LyricSlab_DictEntry_CSym_ETokenKind_Block;
-typedef struct { LyricSlab_DictEntry_CSym_ETokenKind_Block* cur; DictEntry_CSym_ETokenKind* free; } LyricSlab_DictEntry_CSym_ETokenKind;
-static LyricSlab_DictEntry_CSym_ETokenKind _lyric_slab_DictEntry_CSym_ETokenKind = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CType_Block {
-    struct DictEntry_CSym_CType data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CType_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CType_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CType_Block* cur; DictEntry_CSym_CType* free; } LyricSlab_DictEntry_CSym_CType;
-static LyricSlab_DictEntry_CSym_CType _lyric_slab_DictEntry_CSym_CType = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CVariantInfo_Block {
-    struct DictEntry_CSym_CVariantInfo data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CVariantInfo_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CVariantInfo_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CVariantInfo_Block* cur; DictEntry_CSym_CVariantInfo* free; } LyricSlab_DictEntry_CSym_CVariantInfo;
-static LyricSlab_DictEntry_CSym_CVariantInfo _lyric_slab_DictEntry_CSym_CVariantInfo = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CTypeInfo_Block {
-    struct DictEntry_CSym_CTypeInfo data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CTypeInfo_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CTypeInfo_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CTypeInfo_Block* cur; DictEntry_CSym_CTypeInfo* free; } LyricSlab_DictEntry_CSym_CTypeInfo;
-static LyricSlab_DictEntry_CSym_CTypeInfo _lyric_slab_DictEntry_CSym_CTypeInfo = {0};
+} LyricSlab_DictEntry_CSym_bool_Block;
+typedef struct { LyricSlab_DictEntry_CSym_bool_Block* cur; DictEntry_CSym_bool* free; } LyricSlab_DictEntry_CSym_bool;
+static LyricSlab_DictEntry_CSym_bool _lyric_slab_DictEntry_CSym_bool = {0};
 
 typedef struct LyricSlab_DictEntry_CSym_CInterfaceDecl_Block {
     struct DictEntry_CSym_CInterfaceDecl data[LYRIC_SLAB_BLOCK];
@@ -3661,30 +3666,6 @@ typedef struct LyricSlab_DictEntry_CSym_CInterfaceDecl_Block {
 typedef struct { LyricSlab_DictEntry_CSym_CInterfaceDecl_Block* cur; DictEntry_CSym_CInterfaceDecl* free; } LyricSlab_DictEntry_CSym_CInterfaceDecl;
 static LyricSlab_DictEntry_CSym_CInterfaceDecl _lyric_slab_DictEntry_CSym_CInterfaceDecl = {0};
 
-typedef struct LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block {
-    struct DictEntry_CSym_CDict_CSym_CType data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* cur; DictEntry_CSym_CDict_CSym_CType* free; } LyricSlab_DictEntry_CSym_CDict_CSym_CType;
-static LyricSlab_DictEntry_CSym_CDict_CSym_CType _lyric_slab_DictEntry_CSym_CDict_CSym_CType = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_string_Block {
-    struct DictEntry_CSym_string data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_string_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_string_Block;
-typedef struct { LyricSlab_DictEntry_CSym_string_Block* cur; DictEntry_CSym_string* free; } LyricSlab_DictEntry_CSym_string;
-static LyricSlab_DictEntry_CSym_string _lyric_slab_DictEntry_CSym_string = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CStructDecl_Block {
-    struct DictEntry_CSym_CStructDecl data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CStructDecl_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CStructDecl_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CStructDecl_Block* cur; DictEntry_CSym_CStructDecl* free; } LyricSlab_DictEntry_CSym_CStructDecl;
-static LyricSlab_DictEntry_CSym_CStructDecl _lyric_slab_DictEntry_CSym_CStructDecl = {0};
-
 typedef struct LyricSlab_DictEntry_CSym_CClassDecl_Block {
     struct DictEntry_CSym_CClassDecl data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_DictEntry_CSym_CClassDecl_Block* next;
@@ -3692,22 +3673,6 @@ typedef struct LyricSlab_DictEntry_CSym_CClassDecl_Block {
 } LyricSlab_DictEntry_CSym_CClassDecl_Block;
 typedef struct { LyricSlab_DictEntry_CSym_CClassDecl_Block* cur; DictEntry_CSym_CClassDecl* free; } LyricSlab_DictEntry_CSym_CClassDecl;
 static LyricSlab_DictEntry_CSym_CClassDecl _lyric_slab_DictEntry_CSym_CClassDecl = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CEnumDecl_Block {
-    struct DictEntry_CSym_CEnumDecl data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CEnumDecl_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CEnumDecl_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CEnumDecl_Block* cur; DictEntry_CSym_CEnumDecl* free; } LyricSlab_DictEntry_CSym_CEnumDecl;
-static LyricSlab_DictEntry_CSym_CEnumDecl _lyric_slab_DictEntry_CSym_CEnumDecl = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CTypeExpr_Block {
-    struct DictEntry_CSym_CTypeExpr data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CTypeExpr_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CTypeExpr_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CTypeExpr_Block* cur; DictEntry_CSym_CTypeExpr* free; } LyricSlab_DictEntry_CSym_CTypeExpr;
-static LyricSlab_DictEntry_CSym_CTypeExpr _lyric_slab_DictEntry_CSym_CTypeExpr = {0};
 
 typedef struct LyricSlab_DictEntry_CSym_CFuncDecl_Block {
     struct DictEntry_CSym_CFuncDecl data[LYRIC_SLAB_BLOCK];
@@ -3717,6 +3682,78 @@ typedef struct LyricSlab_DictEntry_CSym_CFuncDecl_Block {
 typedef struct { LyricSlab_DictEntry_CSym_CFuncDecl_Block* cur; DictEntry_CSym_CFuncDecl* free; } LyricSlab_DictEntry_CSym_CFuncDecl;
 static LyricSlab_DictEntry_CSym_CFuncDecl _lyric_slab_DictEntry_CSym_CFuncDecl = {0};
 
+typedef struct LyricSlab_DictEntry_CSym_CConstDecl_Block {
+    struct DictEntry_CSym_CConstDecl data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CConstDecl_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CConstDecl_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CConstDecl_Block* cur; DictEntry_CSym_CConstDecl* free; } LyricSlab_DictEntry_CSym_CConstDecl;
+static LyricSlab_DictEntry_CSym_CConstDecl _lyric_slab_DictEntry_CSym_CConstDecl = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_ETokenKind_Block {
+    struct DictEntry_CSym_ETokenKind data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_ETokenKind_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_ETokenKind_Block;
+typedef struct { LyricSlab_DictEntry_CSym_ETokenKind_Block* cur; DictEntry_CSym_ETokenKind* free; } LyricSlab_DictEntry_CSym_ETokenKind;
+static LyricSlab_DictEntry_CSym_ETokenKind _lyric_slab_DictEntry_CSym_ETokenKind = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_string_Block {
+    struct DictEntry_CSym_string data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_string_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_string_Block;
+typedef struct { LyricSlab_DictEntry_CSym_string_Block* cur; DictEntry_CSym_string* free; } LyricSlab_DictEntry_CSym_string;
+static LyricSlab_DictEntry_CSym_string _lyric_slab_DictEntry_CSym_string = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CTypeExpr_Block {
+    struct DictEntry_CSym_CTypeExpr data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CTypeExpr_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CTypeExpr_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CTypeExpr_Block* cur; DictEntry_CSym_CTypeExpr* free; } LyricSlab_DictEntry_CSym_CTypeExpr;
+static LyricSlab_DictEntry_CSym_CTypeExpr _lyric_slab_DictEntry_CSym_CTypeExpr = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CType_Block {
+    struct DictEntry_CSym_CType data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CType_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CType_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CType_Block* cur; DictEntry_CSym_CType* free; } LyricSlab_DictEntry_CSym_CType;
+static LyricSlab_DictEntry_CSym_CType _lyric_slab_DictEntry_CSym_CType = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CTypeInfo_Block {
+    struct DictEntry_CSym_CTypeInfo data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CTypeInfo_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CTypeInfo_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CTypeInfo_Block* cur; DictEntry_CSym_CTypeInfo* free; } LyricSlab_DictEntry_CSym_CTypeInfo;
+static LyricSlab_DictEntry_CSym_CTypeInfo _lyric_slab_DictEntry_CSym_CTypeInfo = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block {
+    struct DictEntry_CSym_slice_CTypeExpr data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block;
+typedef struct { LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block* cur; DictEntry_CSym_slice_CTypeExpr* free; } LyricSlab_DictEntry_CSym_slice_CTypeExpr;
+static LyricSlab_DictEntry_CSym_slice_CTypeExpr _lyric_slab_DictEntry_CSym_slice_CTypeExpr = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CVariantInfo_Block {
+    struct DictEntry_CSym_CVariantInfo data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CVariantInfo_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CVariantInfo_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CVariantInfo_Block* cur; DictEntry_CSym_CVariantInfo* free; } LyricSlab_DictEntry_CSym_CVariantInfo;
+static LyricSlab_DictEntry_CSym_CVariantInfo _lyric_slab_DictEntry_CSym_CVariantInfo = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block {
+    struct DictEntry_CSym_CDict_CSym_CType data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* cur; DictEntry_CSym_CDict_CSym_CType* free; } LyricSlab_DictEntry_CSym_CDict_CSym_CType;
+static LyricSlab_DictEntry_CSym_CDict_CSym_CType _lyric_slab_DictEntry_CSym_CDict_CSym_CType = {0};
+
 typedef struct LyricSlab_DictEntry_CSym_CLType_Block {
     struct DictEntry_CSym_CLType data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_DictEntry_CSym_CLType_Block* next;
@@ -3724,6 +3761,14 @@ typedef struct LyricSlab_DictEntry_CSym_CLType_Block {
 } LyricSlab_DictEntry_CSym_CLType_Block;
 typedef struct { LyricSlab_DictEntry_CSym_CLType_Block* cur; DictEntry_CSym_CLType* free; } LyricSlab_DictEntry_CSym_CLType;
 static LyricSlab_DictEntry_CSym_CLType _lyric_slab_DictEntry_CSym_CLType = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_CStructDecl_Block {
+    struct DictEntry_CSym_CStructDecl data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CStructDecl_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_CStructDecl_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CStructDecl_Block* cur; DictEntry_CSym_CStructDecl* free; } LyricSlab_DictEntry_CSym_CStructDecl;
+static LyricSlab_DictEntry_CSym_CStructDecl _lyric_slab_DictEntry_CSym_CStructDecl = {0};
 
 typedef struct LyricSlab_DictEntry_CSym_CDict_CSym_CLType_Block {
     struct DictEntry_CSym_CDict_CSym_CLType data[LYRIC_SLAB_BLOCK];
@@ -3741,13 +3786,13 @@ typedef struct LyricSlab_DictEntry_CSym_CExpr_Block {
 typedef struct { LyricSlab_DictEntry_CSym_CExpr_Block* cur; DictEntry_CSym_CExpr* free; } LyricSlab_DictEntry_CSym_CExpr;
 static LyricSlab_DictEntry_CSym_CExpr _lyric_slab_DictEntry_CSym_CExpr = {0};
 
-typedef struct LyricSlab_DictEntry_CSym_bool_Block {
-    struct DictEntry_CSym_bool data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_bool_Block* next;
+typedef struct LyricSlab_DictEntry_CSym_CEnumDecl_Block {
+    struct DictEntry_CSym_CEnumDecl data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_CEnumDecl_Block* next;
     int32_t used;
-} LyricSlab_DictEntry_CSym_bool_Block;
-typedef struct { LyricSlab_DictEntry_CSym_bool_Block* cur; DictEntry_CSym_bool* free; } LyricSlab_DictEntry_CSym_bool;
-static LyricSlab_DictEntry_CSym_bool _lyric_slab_DictEntry_CSym_bool = {0};
+} LyricSlab_DictEntry_CSym_CEnumDecl_Block;
+typedef struct { LyricSlab_DictEntry_CSym_CEnumDecl_Block* cur; DictEntry_CSym_CEnumDecl* free; } LyricSlab_DictEntry_CSym_CEnumDecl;
+static LyricSlab_DictEntry_CSym_CEnumDecl _lyric_slab_DictEntry_CSym_CEnumDecl = {0};
 
 typedef struct LyricSlab_DictEntry_CSym_i32_Block {
     struct DictEntry_CSym_i32 data[LYRIC_SLAB_BLOCK];
@@ -3773,6 +3818,14 @@ typedef struct LyricSlab_DictEntry_CSym_CLInterfaceDecl_Block {
 typedef struct { LyricSlab_DictEntry_CSym_CLInterfaceDecl_Block* cur; DictEntry_CSym_CLInterfaceDecl* free; } LyricSlab_DictEntry_CSym_CLInterfaceDecl;
 static LyricSlab_DictEntry_CSym_CLInterfaceDecl _lyric_slab_DictEntry_CSym_CLInterfaceDecl = {0};
 
+typedef struct LyricSlab_DictEntry_CSym_slice_CMatchArm_Block {
+    struct DictEntry_CSym_slice_CMatchArm data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_slice_CMatchArm_Block;
+typedef struct { LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* cur; DictEntry_CSym_slice_CMatchArm* free; } LyricSlab_DictEntry_CSym_slice_CMatchArm;
+static LyricSlab_DictEntry_CSym_slice_CMatchArm _lyric_slab_DictEntry_CSym_slice_CMatchArm = {0};
+
 typedef struct LyricSlab_DictEntry_CSym_opt_CLType_Block {
     struct DictEntry_CSym_opt_CLType data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_DictEntry_CSym_opt_CLType_Block* next;
@@ -3788,6 +3841,14 @@ typedef struct LyricSlab_DictEntry_CSym_CLFuncDecl_Block {
 } LyricSlab_DictEntry_CSym_CLFuncDecl_Block;
 typedef struct { LyricSlab_DictEntry_CSym_CLFuncDecl_Block* cur; DictEntry_CSym_CLFuncDecl* free; } LyricSlab_DictEntry_CSym_CLFuncDecl;
 static LyricSlab_DictEntry_CSym_CLFuncDecl _lyric_slab_DictEntry_CSym_CLFuncDecl = {0};
+
+typedef struct LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block {
+    struct DictEntry_CSym_slice_CLFuncDecl data[LYRIC_SLAB_BLOCK];
+    struct LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* next;
+    int32_t used;
+} LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block;
+typedef struct { LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* cur; DictEntry_CSym_slice_CLFuncDecl* free; } LyricSlab_DictEntry_CSym_slice_CLFuncDecl;
+static LyricSlab_DictEntry_CSym_slice_CLFuncDecl _lyric_slab_DictEntry_CSym_slice_CLFuncDecl = {0};
 
 typedef struct LyricSlab_DictEntry_CSym_CLClassDecl_Block {
     struct DictEntry_CSym_CLClassDecl data[LYRIC_SLAB_BLOCK];
@@ -3805,14 +3866,6 @@ typedef struct LyricSlab_DictEntry_CSym_CLStructDecl_Block {
 typedef struct { LyricSlab_DictEntry_CSym_CLStructDecl_Block* cur; DictEntry_CSym_CLStructDecl* free; } LyricSlab_DictEntry_CSym_CLStructDecl;
 static LyricSlab_DictEntry_CSym_CLStructDecl _lyric_slab_DictEntry_CSym_CLStructDecl = {0};
 
-typedef struct LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block {
-    struct DictEntry_CSym_slice_CLFuncDecl data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block;
-typedef struct { LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* cur; DictEntry_CSym_slice_CLFuncDecl* free; } LyricSlab_DictEntry_CSym_slice_CLFuncDecl;
-static LyricSlab_DictEntry_CSym_slice_CLFuncDecl _lyric_slab_DictEntry_CSym_slice_CLFuncDecl = {0};
-
 typedef struct LyricSlab_DictEntry_CSym_slice_string_Block {
     struct DictEntry_CSym_slice_string data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_DictEntry_CSym_slice_string_Block* next;
@@ -3820,22 +3873,6 @@ typedef struct LyricSlab_DictEntry_CSym_slice_string_Block {
 } LyricSlab_DictEntry_CSym_slice_string_Block;
 typedef struct { LyricSlab_DictEntry_CSym_slice_string_Block* cur; DictEntry_CSym_slice_string* free; } LyricSlab_DictEntry_CSym_slice_string;
 static LyricSlab_DictEntry_CSym_slice_string _lyric_slab_DictEntry_CSym_slice_string = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_CConstDecl_Block {
-    struct DictEntry_CSym_CConstDecl data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_CConstDecl_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_CConstDecl_Block;
-typedef struct { LyricSlab_DictEntry_CSym_CConstDecl_Block* cur; DictEntry_CSym_CConstDecl* free; } LyricSlab_DictEntry_CSym_CConstDecl;
-static LyricSlab_DictEntry_CSym_CConstDecl _lyric_slab_DictEntry_CSym_CConstDecl = {0};
-
-typedef struct LyricSlab_DictEntry_CSym_slice_CMatchArm_Block {
-    struct DictEntry_CSym_slice_CMatchArm data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* next;
-    int32_t used;
-} LyricSlab_DictEntry_CSym_slice_CMatchArm_Block;
-typedef struct { LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* cur; DictEntry_CSym_slice_CMatchArm* free; } LyricSlab_DictEntry_CSym_slice_CMatchArm;
-static LyricSlab_DictEntry_CSym_slice_CMatchArm _lyric_slab_DictEntry_CSym_slice_CMatchArm = {0};
 
 static TypeExpr* _lyric_slab_alloc_TypeExpr(void) {
     if (_lyric_slab_TypeExpr.free) {
@@ -4887,6 +4924,21 @@ static Dict_CSym_CDict_CSym_CType* _lyric_slab_alloc_Dict_CSym_CDict_CSym_CType(
     return &_lyric_slab_Dict_CSym_CDict_CSym_CType.cur->data[_lyric_slab_Dict_CSym_CDict_CSym_CType.cur->used++];
 }
 
+static Dict_CSym_slice_CTypeExpr* _lyric_slab_alloc_Dict_CSym_slice_CTypeExpr(void) {
+    if (_lyric_slab_Dict_CSym_slice_CTypeExpr.free) {
+        Dict_CSym_slice_CTypeExpr* p = _lyric_slab_Dict_CSym_slice_CTypeExpr.free;
+        _lyric_slab_Dict_CSym_slice_CTypeExpr.free = p->lyric_next;
+        memset(p, 0, sizeof(Dict_CSym_slice_CTypeExpr));
+        return p;
+    }
+    if (!_lyric_slab_Dict_CSym_slice_CTypeExpr.cur || _lyric_slab_Dict_CSym_slice_CTypeExpr.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_Dict_CSym_slice_CTypeExpr_Block* b = (LyricSlab_Dict_CSym_slice_CTypeExpr_Block*)calloc(1, sizeof(LyricSlab_Dict_CSym_slice_CTypeExpr_Block));
+        b->next = _lyric_slab_Dict_CSym_slice_CTypeExpr.cur;
+        _lyric_slab_Dict_CSym_slice_CTypeExpr.cur = b;
+    }
+    return &_lyric_slab_Dict_CSym_slice_CTypeExpr.cur->data[_lyric_slab_Dict_CSym_slice_CTypeExpr.cur->used++];
+}
+
 static Dict_CSym_string* _lyric_slab_alloc_Dict_CSym_string(void) {
     if (_lyric_slab_Dict_CSym_string.free) {
         Dict_CSym_string* p = _lyric_slab_Dict_CSym_string.free;
@@ -5202,64 +5254,19 @@ static Dict_CSym_slice_CMatchArm* _lyric_slab_alloc_Dict_CSym_slice_CMatchArm(vo
     return &_lyric_slab_Dict_CSym_slice_CMatchArm.cur->data[_lyric_slab_Dict_CSym_slice_CMatchArm.cur->used++];
 }
 
-static DictEntry_CSym_ETokenKind* _lyric_slab_alloc_DictEntry_CSym_ETokenKind(void) {
-    if (_lyric_slab_DictEntry_CSym_ETokenKind.free) {
-        DictEntry_CSym_ETokenKind* p = _lyric_slab_DictEntry_CSym_ETokenKind.free;
-        _lyric_slab_DictEntry_CSym_ETokenKind.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_ETokenKind));
+static DictEntry_CSym_bool* _lyric_slab_alloc_DictEntry_CSym_bool(void) {
+    if (_lyric_slab_DictEntry_CSym_bool.free) {
+        DictEntry_CSym_bool* p = _lyric_slab_DictEntry_CSym_bool.free;
+        _lyric_slab_DictEntry_CSym_bool.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_bool));
         return p;
     }
-    if (!_lyric_slab_DictEntry_CSym_ETokenKind.cur || _lyric_slab_DictEntry_CSym_ETokenKind.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_ETokenKind_Block* b = (LyricSlab_DictEntry_CSym_ETokenKind_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_ETokenKind_Block));
-        b->next = _lyric_slab_DictEntry_CSym_ETokenKind.cur;
-        _lyric_slab_DictEntry_CSym_ETokenKind.cur = b;
+    if (!_lyric_slab_DictEntry_CSym_bool.cur || _lyric_slab_DictEntry_CSym_bool.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_bool_Block* b = (LyricSlab_DictEntry_CSym_bool_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_bool_Block));
+        b->next = _lyric_slab_DictEntry_CSym_bool.cur;
+        _lyric_slab_DictEntry_CSym_bool.cur = b;
     }
-    return &_lyric_slab_DictEntry_CSym_ETokenKind.cur->data[_lyric_slab_DictEntry_CSym_ETokenKind.cur->used++];
-}
-
-static DictEntry_CSym_CType* _lyric_slab_alloc_DictEntry_CSym_CType(void) {
-    if (_lyric_slab_DictEntry_CSym_CType.free) {
-        DictEntry_CSym_CType* p = _lyric_slab_DictEntry_CSym_CType.free;
-        _lyric_slab_DictEntry_CSym_CType.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CType));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CType.cur || _lyric_slab_DictEntry_CSym_CType.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CType_Block* b = (LyricSlab_DictEntry_CSym_CType_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CType_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CType.cur;
-        _lyric_slab_DictEntry_CSym_CType.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CType.cur->data[_lyric_slab_DictEntry_CSym_CType.cur->used++];
-}
-
-static DictEntry_CSym_CVariantInfo* _lyric_slab_alloc_DictEntry_CSym_CVariantInfo(void) {
-    if (_lyric_slab_DictEntry_CSym_CVariantInfo.free) {
-        DictEntry_CSym_CVariantInfo* p = _lyric_slab_DictEntry_CSym_CVariantInfo.free;
-        _lyric_slab_DictEntry_CSym_CVariantInfo.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CVariantInfo));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CVariantInfo.cur || _lyric_slab_DictEntry_CSym_CVariantInfo.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CVariantInfo_Block* b = (LyricSlab_DictEntry_CSym_CVariantInfo_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CVariantInfo_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CVariantInfo.cur;
-        _lyric_slab_DictEntry_CSym_CVariantInfo.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CVariantInfo.cur->data[_lyric_slab_DictEntry_CSym_CVariantInfo.cur->used++];
-}
-
-static DictEntry_CSym_CTypeInfo* _lyric_slab_alloc_DictEntry_CSym_CTypeInfo(void) {
-    if (_lyric_slab_DictEntry_CSym_CTypeInfo.free) {
-        DictEntry_CSym_CTypeInfo* p = _lyric_slab_DictEntry_CSym_CTypeInfo.free;
-        _lyric_slab_DictEntry_CSym_CTypeInfo.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CTypeInfo));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CTypeInfo.cur || _lyric_slab_DictEntry_CSym_CTypeInfo.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CTypeInfo_Block* b = (LyricSlab_DictEntry_CSym_CTypeInfo_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CTypeInfo_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CTypeInfo.cur;
-        _lyric_slab_DictEntry_CSym_CTypeInfo.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CTypeInfo.cur->data[_lyric_slab_DictEntry_CSym_CTypeInfo.cur->used++];
+    return &_lyric_slab_DictEntry_CSym_bool.cur->data[_lyric_slab_DictEntry_CSym_bool.cur->used++];
 }
 
 static DictEntry_CSym_CInterfaceDecl* _lyric_slab_alloc_DictEntry_CSym_CInterfaceDecl(void) {
@@ -5277,51 +5284,6 @@ static DictEntry_CSym_CInterfaceDecl* _lyric_slab_alloc_DictEntry_CSym_CInterfac
     return &_lyric_slab_DictEntry_CSym_CInterfaceDecl.cur->data[_lyric_slab_DictEntry_CSym_CInterfaceDecl.cur->used++];
 }
 
-static DictEntry_CSym_CDict_CSym_CType* _lyric_slab_alloc_DictEntry_CSym_CDict_CSym_CType(void) {
-    if (_lyric_slab_DictEntry_CSym_CDict_CSym_CType.free) {
-        DictEntry_CSym_CDict_CSym_CType* p = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free;
-        _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CDict_CSym_CType));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur || _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* b = (LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur;
-        _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->data[_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->used++];
-}
-
-static DictEntry_CSym_string* _lyric_slab_alloc_DictEntry_CSym_string(void) {
-    if (_lyric_slab_DictEntry_CSym_string.free) {
-        DictEntry_CSym_string* p = _lyric_slab_DictEntry_CSym_string.free;
-        _lyric_slab_DictEntry_CSym_string.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_string));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_string.cur || _lyric_slab_DictEntry_CSym_string.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_string_Block* b = (LyricSlab_DictEntry_CSym_string_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_string_Block));
-        b->next = _lyric_slab_DictEntry_CSym_string.cur;
-        _lyric_slab_DictEntry_CSym_string.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_string.cur->data[_lyric_slab_DictEntry_CSym_string.cur->used++];
-}
-
-static DictEntry_CSym_CStructDecl* _lyric_slab_alloc_DictEntry_CSym_CStructDecl(void) {
-    if (_lyric_slab_DictEntry_CSym_CStructDecl.free) {
-        DictEntry_CSym_CStructDecl* p = _lyric_slab_DictEntry_CSym_CStructDecl.free;
-        _lyric_slab_DictEntry_CSym_CStructDecl.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CStructDecl));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CStructDecl.cur || _lyric_slab_DictEntry_CSym_CStructDecl.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CStructDecl_Block* b = (LyricSlab_DictEntry_CSym_CStructDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CStructDecl_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CStructDecl.cur;
-        _lyric_slab_DictEntry_CSym_CStructDecl.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CStructDecl.cur->data[_lyric_slab_DictEntry_CSym_CStructDecl.cur->used++];
-}
-
 static DictEntry_CSym_CClassDecl* _lyric_slab_alloc_DictEntry_CSym_CClassDecl(void) {
     if (_lyric_slab_DictEntry_CSym_CClassDecl.free) {
         DictEntry_CSym_CClassDecl* p = _lyric_slab_DictEntry_CSym_CClassDecl.free;
@@ -5335,36 +5297,6 @@ static DictEntry_CSym_CClassDecl* _lyric_slab_alloc_DictEntry_CSym_CClassDecl(vo
         _lyric_slab_DictEntry_CSym_CClassDecl.cur = b;
     }
     return &_lyric_slab_DictEntry_CSym_CClassDecl.cur->data[_lyric_slab_DictEntry_CSym_CClassDecl.cur->used++];
-}
-
-static DictEntry_CSym_CEnumDecl* _lyric_slab_alloc_DictEntry_CSym_CEnumDecl(void) {
-    if (_lyric_slab_DictEntry_CSym_CEnumDecl.free) {
-        DictEntry_CSym_CEnumDecl* p = _lyric_slab_DictEntry_CSym_CEnumDecl.free;
-        _lyric_slab_DictEntry_CSym_CEnumDecl.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CEnumDecl));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CEnumDecl.cur || _lyric_slab_DictEntry_CSym_CEnumDecl.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CEnumDecl_Block* b = (LyricSlab_DictEntry_CSym_CEnumDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CEnumDecl_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CEnumDecl.cur;
-        _lyric_slab_DictEntry_CSym_CEnumDecl.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CEnumDecl.cur->data[_lyric_slab_DictEntry_CSym_CEnumDecl.cur->used++];
-}
-
-static DictEntry_CSym_CTypeExpr* _lyric_slab_alloc_DictEntry_CSym_CTypeExpr(void) {
-    if (_lyric_slab_DictEntry_CSym_CTypeExpr.free) {
-        DictEntry_CSym_CTypeExpr* p = _lyric_slab_DictEntry_CSym_CTypeExpr.free;
-        _lyric_slab_DictEntry_CSym_CTypeExpr.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CTypeExpr));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CTypeExpr.cur || _lyric_slab_DictEntry_CSym_CTypeExpr.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CTypeExpr_Block* b = (LyricSlab_DictEntry_CSym_CTypeExpr_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CTypeExpr_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CTypeExpr.cur;
-        _lyric_slab_DictEntry_CSym_CTypeExpr.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CTypeExpr.cur->data[_lyric_slab_DictEntry_CSym_CTypeExpr.cur->used++];
 }
 
 static DictEntry_CSym_CFuncDecl* _lyric_slab_alloc_DictEntry_CSym_CFuncDecl(void) {
@@ -5382,6 +5314,141 @@ static DictEntry_CSym_CFuncDecl* _lyric_slab_alloc_DictEntry_CSym_CFuncDecl(void
     return &_lyric_slab_DictEntry_CSym_CFuncDecl.cur->data[_lyric_slab_DictEntry_CSym_CFuncDecl.cur->used++];
 }
 
+static DictEntry_CSym_CConstDecl* _lyric_slab_alloc_DictEntry_CSym_CConstDecl(void) {
+    if (_lyric_slab_DictEntry_CSym_CConstDecl.free) {
+        DictEntry_CSym_CConstDecl* p = _lyric_slab_DictEntry_CSym_CConstDecl.free;
+        _lyric_slab_DictEntry_CSym_CConstDecl.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CConstDecl));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CConstDecl.cur || _lyric_slab_DictEntry_CSym_CConstDecl.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CConstDecl_Block* b = (LyricSlab_DictEntry_CSym_CConstDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CConstDecl_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CConstDecl.cur;
+        _lyric_slab_DictEntry_CSym_CConstDecl.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CConstDecl.cur->data[_lyric_slab_DictEntry_CSym_CConstDecl.cur->used++];
+}
+
+static DictEntry_CSym_ETokenKind* _lyric_slab_alloc_DictEntry_CSym_ETokenKind(void) {
+    if (_lyric_slab_DictEntry_CSym_ETokenKind.free) {
+        DictEntry_CSym_ETokenKind* p = _lyric_slab_DictEntry_CSym_ETokenKind.free;
+        _lyric_slab_DictEntry_CSym_ETokenKind.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_ETokenKind));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_ETokenKind.cur || _lyric_slab_DictEntry_CSym_ETokenKind.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_ETokenKind_Block* b = (LyricSlab_DictEntry_CSym_ETokenKind_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_ETokenKind_Block));
+        b->next = _lyric_slab_DictEntry_CSym_ETokenKind.cur;
+        _lyric_slab_DictEntry_CSym_ETokenKind.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_ETokenKind.cur->data[_lyric_slab_DictEntry_CSym_ETokenKind.cur->used++];
+}
+
+static DictEntry_CSym_string* _lyric_slab_alloc_DictEntry_CSym_string(void) {
+    if (_lyric_slab_DictEntry_CSym_string.free) {
+        DictEntry_CSym_string* p = _lyric_slab_DictEntry_CSym_string.free;
+        _lyric_slab_DictEntry_CSym_string.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_string));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_string.cur || _lyric_slab_DictEntry_CSym_string.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_string_Block* b = (LyricSlab_DictEntry_CSym_string_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_string_Block));
+        b->next = _lyric_slab_DictEntry_CSym_string.cur;
+        _lyric_slab_DictEntry_CSym_string.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_string.cur->data[_lyric_slab_DictEntry_CSym_string.cur->used++];
+}
+
+static DictEntry_CSym_CTypeExpr* _lyric_slab_alloc_DictEntry_CSym_CTypeExpr(void) {
+    if (_lyric_slab_DictEntry_CSym_CTypeExpr.free) {
+        DictEntry_CSym_CTypeExpr* p = _lyric_slab_DictEntry_CSym_CTypeExpr.free;
+        _lyric_slab_DictEntry_CSym_CTypeExpr.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CTypeExpr));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CTypeExpr.cur || _lyric_slab_DictEntry_CSym_CTypeExpr.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CTypeExpr_Block* b = (LyricSlab_DictEntry_CSym_CTypeExpr_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CTypeExpr_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CTypeExpr.cur;
+        _lyric_slab_DictEntry_CSym_CTypeExpr.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CTypeExpr.cur->data[_lyric_slab_DictEntry_CSym_CTypeExpr.cur->used++];
+}
+
+static DictEntry_CSym_CType* _lyric_slab_alloc_DictEntry_CSym_CType(void) {
+    if (_lyric_slab_DictEntry_CSym_CType.free) {
+        DictEntry_CSym_CType* p = _lyric_slab_DictEntry_CSym_CType.free;
+        _lyric_slab_DictEntry_CSym_CType.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CType));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CType.cur || _lyric_slab_DictEntry_CSym_CType.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CType_Block* b = (LyricSlab_DictEntry_CSym_CType_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CType_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CType.cur;
+        _lyric_slab_DictEntry_CSym_CType.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CType.cur->data[_lyric_slab_DictEntry_CSym_CType.cur->used++];
+}
+
+static DictEntry_CSym_CTypeInfo* _lyric_slab_alloc_DictEntry_CSym_CTypeInfo(void) {
+    if (_lyric_slab_DictEntry_CSym_CTypeInfo.free) {
+        DictEntry_CSym_CTypeInfo* p = _lyric_slab_DictEntry_CSym_CTypeInfo.free;
+        _lyric_slab_DictEntry_CSym_CTypeInfo.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CTypeInfo));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CTypeInfo.cur || _lyric_slab_DictEntry_CSym_CTypeInfo.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CTypeInfo_Block* b = (LyricSlab_DictEntry_CSym_CTypeInfo_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CTypeInfo_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CTypeInfo.cur;
+        _lyric_slab_DictEntry_CSym_CTypeInfo.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CTypeInfo.cur->data[_lyric_slab_DictEntry_CSym_CTypeInfo.cur->used++];
+}
+
+static DictEntry_CSym_slice_CTypeExpr* _lyric_slab_alloc_DictEntry_CSym_slice_CTypeExpr(void) {
+    if (_lyric_slab_DictEntry_CSym_slice_CTypeExpr.free) {
+        DictEntry_CSym_slice_CTypeExpr* p = _lyric_slab_DictEntry_CSym_slice_CTypeExpr.free;
+        _lyric_slab_DictEntry_CSym_slice_CTypeExpr.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_slice_CTypeExpr));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur || _lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block* b = (LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_slice_CTypeExpr_Block));
+        b->next = _lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur;
+        _lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur->data[_lyric_slab_DictEntry_CSym_slice_CTypeExpr.cur->used++];
+}
+
+static DictEntry_CSym_CVariantInfo* _lyric_slab_alloc_DictEntry_CSym_CVariantInfo(void) {
+    if (_lyric_slab_DictEntry_CSym_CVariantInfo.free) {
+        DictEntry_CSym_CVariantInfo* p = _lyric_slab_DictEntry_CSym_CVariantInfo.free;
+        _lyric_slab_DictEntry_CSym_CVariantInfo.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CVariantInfo));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CVariantInfo.cur || _lyric_slab_DictEntry_CSym_CVariantInfo.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CVariantInfo_Block* b = (LyricSlab_DictEntry_CSym_CVariantInfo_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CVariantInfo_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CVariantInfo.cur;
+        _lyric_slab_DictEntry_CSym_CVariantInfo.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CVariantInfo.cur->data[_lyric_slab_DictEntry_CSym_CVariantInfo.cur->used++];
+}
+
+static DictEntry_CSym_CDict_CSym_CType* _lyric_slab_alloc_DictEntry_CSym_CDict_CSym_CType(void) {
+    if (_lyric_slab_DictEntry_CSym_CDict_CSym_CType.free) {
+        DictEntry_CSym_CDict_CSym_CType* p = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free;
+        _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CDict_CSym_CType));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur || _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block* b = (LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CDict_CSym_CType_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur;
+        _lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->data[_lyric_slab_DictEntry_CSym_CDict_CSym_CType.cur->used++];
+}
+
 static DictEntry_CSym_CLType* _lyric_slab_alloc_DictEntry_CSym_CLType(void) {
     if (_lyric_slab_DictEntry_CSym_CLType.free) {
         DictEntry_CSym_CLType* p = _lyric_slab_DictEntry_CSym_CLType.free;
@@ -5395,6 +5462,21 @@ static DictEntry_CSym_CLType* _lyric_slab_alloc_DictEntry_CSym_CLType(void) {
         _lyric_slab_DictEntry_CSym_CLType.cur = b;
     }
     return &_lyric_slab_DictEntry_CSym_CLType.cur->data[_lyric_slab_DictEntry_CSym_CLType.cur->used++];
+}
+
+static DictEntry_CSym_CStructDecl* _lyric_slab_alloc_DictEntry_CSym_CStructDecl(void) {
+    if (_lyric_slab_DictEntry_CSym_CStructDecl.free) {
+        DictEntry_CSym_CStructDecl* p = _lyric_slab_DictEntry_CSym_CStructDecl.free;
+        _lyric_slab_DictEntry_CSym_CStructDecl.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CStructDecl));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_CStructDecl.cur || _lyric_slab_DictEntry_CSym_CStructDecl.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CStructDecl_Block* b = (LyricSlab_DictEntry_CSym_CStructDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CStructDecl_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CStructDecl.cur;
+        _lyric_slab_DictEntry_CSym_CStructDecl.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_CStructDecl.cur->data[_lyric_slab_DictEntry_CSym_CStructDecl.cur->used++];
 }
 
 static DictEntry_CSym_CDict_CSym_CLType* _lyric_slab_alloc_DictEntry_CSym_CDict_CSym_CLType(void) {
@@ -5427,19 +5509,19 @@ static DictEntry_CSym_CExpr* _lyric_slab_alloc_DictEntry_CSym_CExpr(void) {
     return &_lyric_slab_DictEntry_CSym_CExpr.cur->data[_lyric_slab_DictEntry_CSym_CExpr.cur->used++];
 }
 
-static DictEntry_CSym_bool* _lyric_slab_alloc_DictEntry_CSym_bool(void) {
-    if (_lyric_slab_DictEntry_CSym_bool.free) {
-        DictEntry_CSym_bool* p = _lyric_slab_DictEntry_CSym_bool.free;
-        _lyric_slab_DictEntry_CSym_bool.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_bool));
+static DictEntry_CSym_CEnumDecl* _lyric_slab_alloc_DictEntry_CSym_CEnumDecl(void) {
+    if (_lyric_slab_DictEntry_CSym_CEnumDecl.free) {
+        DictEntry_CSym_CEnumDecl* p = _lyric_slab_DictEntry_CSym_CEnumDecl.free;
+        _lyric_slab_DictEntry_CSym_CEnumDecl.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_CEnumDecl));
         return p;
     }
-    if (!_lyric_slab_DictEntry_CSym_bool.cur || _lyric_slab_DictEntry_CSym_bool.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_bool_Block* b = (LyricSlab_DictEntry_CSym_bool_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_bool_Block));
-        b->next = _lyric_slab_DictEntry_CSym_bool.cur;
-        _lyric_slab_DictEntry_CSym_bool.cur = b;
+    if (!_lyric_slab_DictEntry_CSym_CEnumDecl.cur || _lyric_slab_DictEntry_CSym_CEnumDecl.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_CEnumDecl_Block* b = (LyricSlab_DictEntry_CSym_CEnumDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CEnumDecl_Block));
+        b->next = _lyric_slab_DictEntry_CSym_CEnumDecl.cur;
+        _lyric_slab_DictEntry_CSym_CEnumDecl.cur = b;
     }
-    return &_lyric_slab_DictEntry_CSym_bool.cur->data[_lyric_slab_DictEntry_CSym_bool.cur->used++];
+    return &_lyric_slab_DictEntry_CSym_CEnumDecl.cur->data[_lyric_slab_DictEntry_CSym_CEnumDecl.cur->used++];
 }
 
 static DictEntry_CSym_i32* _lyric_slab_alloc_DictEntry_CSym_i32(void) {
@@ -5487,6 +5569,21 @@ static DictEntry_CSym_CLInterfaceDecl* _lyric_slab_alloc_DictEntry_CSym_CLInterf
     return &_lyric_slab_DictEntry_CSym_CLInterfaceDecl.cur->data[_lyric_slab_DictEntry_CSym_CLInterfaceDecl.cur->used++];
 }
 
+static DictEntry_CSym_slice_CMatchArm* _lyric_slab_alloc_DictEntry_CSym_slice_CMatchArm(void) {
+    if (_lyric_slab_DictEntry_CSym_slice_CMatchArm.free) {
+        DictEntry_CSym_slice_CMatchArm* p = _lyric_slab_DictEntry_CSym_slice_CMatchArm.free;
+        _lyric_slab_DictEntry_CSym_slice_CMatchArm.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_slice_CMatchArm));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur || _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* b = (LyricSlab_DictEntry_CSym_slice_CMatchArm_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_slice_CMatchArm_Block));
+        b->next = _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur;
+        _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->data[_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->used++];
+}
+
 static DictEntry_CSym_opt_CLType* _lyric_slab_alloc_DictEntry_CSym_opt_CLType(void) {
     if (_lyric_slab_DictEntry_CSym_opt_CLType.free) {
         DictEntry_CSym_opt_CLType* p = _lyric_slab_DictEntry_CSym_opt_CLType.free;
@@ -5515,6 +5612,21 @@ static DictEntry_CSym_CLFuncDecl* _lyric_slab_alloc_DictEntry_CSym_CLFuncDecl(vo
         _lyric_slab_DictEntry_CSym_CLFuncDecl.cur = b;
     }
     return &_lyric_slab_DictEntry_CSym_CLFuncDecl.cur->data[_lyric_slab_DictEntry_CSym_CLFuncDecl.cur->used++];
+}
+
+static DictEntry_CSym_slice_CLFuncDecl* _lyric_slab_alloc_DictEntry_CSym_slice_CLFuncDecl(void) {
+    if (_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free) {
+        DictEntry_CSym_slice_CLFuncDecl* p = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free;
+        _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free = p->lyric_next;
+        memset(p, 0, sizeof(DictEntry_CSym_slice_CLFuncDecl));
+        return p;
+    }
+    if (!_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur || _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->used == LYRIC_SLAB_BLOCK) {
+        LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* b = (LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block));
+        b->next = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur;
+        _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur = b;
+    }
+    return &_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->data[_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->used++];
 }
 
 static DictEntry_CSym_CLClassDecl* _lyric_slab_alloc_DictEntry_CSym_CLClassDecl(void) {
@@ -5547,21 +5659,6 @@ static DictEntry_CSym_CLStructDecl* _lyric_slab_alloc_DictEntry_CSym_CLStructDec
     return &_lyric_slab_DictEntry_CSym_CLStructDecl.cur->data[_lyric_slab_DictEntry_CSym_CLStructDecl.cur->used++];
 }
 
-static DictEntry_CSym_slice_CLFuncDecl* _lyric_slab_alloc_DictEntry_CSym_slice_CLFuncDecl(void) {
-    if (_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free) {
-        DictEntry_CSym_slice_CLFuncDecl* p = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free;
-        _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_slice_CLFuncDecl));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur || _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block* b = (LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_slice_CLFuncDecl_Block));
-        b->next = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur;
-        _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->data[_lyric_slab_DictEntry_CSym_slice_CLFuncDecl.cur->used++];
-}
-
 static DictEntry_CSym_slice_string* _lyric_slab_alloc_DictEntry_CSym_slice_string(void) {
     if (_lyric_slab_DictEntry_CSym_slice_string.free) {
         DictEntry_CSym_slice_string* p = _lyric_slab_DictEntry_CSym_slice_string.free;
@@ -5575,36 +5672,6 @@ static DictEntry_CSym_slice_string* _lyric_slab_alloc_DictEntry_CSym_slice_strin
         _lyric_slab_DictEntry_CSym_slice_string.cur = b;
     }
     return &_lyric_slab_DictEntry_CSym_slice_string.cur->data[_lyric_slab_DictEntry_CSym_slice_string.cur->used++];
-}
-
-static DictEntry_CSym_CConstDecl* _lyric_slab_alloc_DictEntry_CSym_CConstDecl(void) {
-    if (_lyric_slab_DictEntry_CSym_CConstDecl.free) {
-        DictEntry_CSym_CConstDecl* p = _lyric_slab_DictEntry_CSym_CConstDecl.free;
-        _lyric_slab_DictEntry_CSym_CConstDecl.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_CConstDecl));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_CConstDecl.cur || _lyric_slab_DictEntry_CSym_CConstDecl.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_CConstDecl_Block* b = (LyricSlab_DictEntry_CSym_CConstDecl_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_CConstDecl_Block));
-        b->next = _lyric_slab_DictEntry_CSym_CConstDecl.cur;
-        _lyric_slab_DictEntry_CSym_CConstDecl.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_CConstDecl.cur->data[_lyric_slab_DictEntry_CSym_CConstDecl.cur->used++];
-}
-
-static DictEntry_CSym_slice_CMatchArm* _lyric_slab_alloc_DictEntry_CSym_slice_CMatchArm(void) {
-    if (_lyric_slab_DictEntry_CSym_slice_CMatchArm.free) {
-        DictEntry_CSym_slice_CMatchArm* p = _lyric_slab_DictEntry_CSym_slice_CMatchArm.free;
-        _lyric_slab_DictEntry_CSym_slice_CMatchArm.free = p->lyric_next;
-        memset(p, 0, sizeof(DictEntry_CSym_slice_CMatchArm));
-        return p;
-    }
-    if (!_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur || _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DictEntry_CSym_slice_CMatchArm_Block* b = (LyricSlab_DictEntry_CSym_slice_CMatchArm_Block*)calloc(1, sizeof(LyricSlab_DictEntry_CSym_slice_CMatchArm_Block));
-        b->next = _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur;
-        _lyric_slab_DictEntry_CSym_slice_CMatchArm.cur = b;
-    }
-    return &_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->data[_lyric_slab_DictEntry_CSym_slice_CMatchArm.cur->used++];
 }
 
 static void _lyric_slab_free_TypeExpr(TypeExpr* p) {
@@ -6027,6 +6094,12 @@ static void _lyric_slab_free_Dict_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CTy
     _lyric_slab_Dict_CSym_CDict_CSym_CType.free = p;
 }
 
+static void _lyric_slab_free_Dict_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_Dict_CSym_slice_CTypeExpr.free;
+    _lyric_slab_Dict_CSym_slice_CTypeExpr.free = p;
+}
+
 static void _lyric_slab_free_Dict_CSym_string(Dict_CSym_string* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_Dict_CSym_string.free;
@@ -6153,28 +6226,10 @@ static void _lyric_slab_free_Dict_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm
     _lyric_slab_Dict_CSym_slice_CMatchArm.free = p;
 }
 
-static void _lyric_slab_free_DictEntry_CSym_ETokenKind(DictEntry_CSym_ETokenKind* p) {
+static void _lyric_slab_free_DictEntry_CSym_bool(DictEntry_CSym_bool* p) {
     if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_ETokenKind.free;
-    _lyric_slab_DictEntry_CSym_ETokenKind.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CType(DictEntry_CSym_CType* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CType.free;
-    _lyric_slab_DictEntry_CSym_CType.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CVariantInfo(DictEntry_CSym_CVariantInfo* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CVariantInfo.free;
-    _lyric_slab_DictEntry_CSym_CVariantInfo.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CTypeInfo(DictEntry_CSym_CTypeInfo* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CTypeInfo.free;
-    _lyric_slab_DictEntry_CSym_CTypeInfo.free = p;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_bool.free;
+    _lyric_slab_DictEntry_CSym_bool.free = p;
 }
 
 static void _lyric_slab_free_DictEntry_CSym_CInterfaceDecl(DictEntry_CSym_CInterfaceDecl* p) {
@@ -6183,40 +6238,10 @@ static void _lyric_slab_free_DictEntry_CSym_CInterfaceDecl(DictEntry_CSym_CInter
     _lyric_slab_DictEntry_CSym_CInterfaceDecl.free = p;
 }
 
-static void _lyric_slab_free_DictEntry_CSym_CDict_CSym_CType(DictEntry_CSym_CDict_CSym_CType* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free;
-    _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_string(DictEntry_CSym_string* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_string.free;
-    _lyric_slab_DictEntry_CSym_string.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CStructDecl(DictEntry_CSym_CStructDecl* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CStructDecl.free;
-    _lyric_slab_DictEntry_CSym_CStructDecl.free = p;
-}
-
 static void _lyric_slab_free_DictEntry_CSym_CClassDecl(DictEntry_CSym_CClassDecl* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_DictEntry_CSym_CClassDecl.free;
     _lyric_slab_DictEntry_CSym_CClassDecl.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CEnumDecl(DictEntry_CSym_CEnumDecl* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CEnumDecl.free;
-    _lyric_slab_DictEntry_CSym_CEnumDecl.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CTypeExpr(DictEntry_CSym_CTypeExpr* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CTypeExpr.free;
-    _lyric_slab_DictEntry_CSym_CTypeExpr.free = p;
 }
 
 static void _lyric_slab_free_DictEntry_CSym_CFuncDecl(DictEntry_CSym_CFuncDecl* p) {
@@ -6225,10 +6250,70 @@ static void _lyric_slab_free_DictEntry_CSym_CFuncDecl(DictEntry_CSym_CFuncDecl* 
     _lyric_slab_DictEntry_CSym_CFuncDecl.free = p;
 }
 
+static void _lyric_slab_free_DictEntry_CSym_CConstDecl(DictEntry_CSym_CConstDecl* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CConstDecl.free;
+    _lyric_slab_DictEntry_CSym_CConstDecl.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_ETokenKind(DictEntry_CSym_ETokenKind* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_ETokenKind.free;
+    _lyric_slab_DictEntry_CSym_ETokenKind.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_string(DictEntry_CSym_string* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_string.free;
+    _lyric_slab_DictEntry_CSym_string.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CTypeExpr(DictEntry_CSym_CTypeExpr* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CTypeExpr.free;
+    _lyric_slab_DictEntry_CSym_CTypeExpr.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CType(DictEntry_CSym_CType* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CType.free;
+    _lyric_slab_DictEntry_CSym_CType.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CTypeInfo(DictEntry_CSym_CTypeInfo* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CTypeInfo.free;
+    _lyric_slab_DictEntry_CSym_CTypeInfo.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_slice_CTypeExpr(DictEntry_CSym_slice_CTypeExpr* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_slice_CTypeExpr.free;
+    _lyric_slab_DictEntry_CSym_slice_CTypeExpr.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CVariantInfo(DictEntry_CSym_CVariantInfo* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CVariantInfo.free;
+    _lyric_slab_DictEntry_CSym_CVariantInfo.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CDict_CSym_CType(DictEntry_CSym_CDict_CSym_CType* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free;
+    _lyric_slab_DictEntry_CSym_CDict_CSym_CType.free = p;
+}
+
 static void _lyric_slab_free_DictEntry_CSym_CLType(DictEntry_CSym_CLType* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_DictEntry_CSym_CLType.free;
     _lyric_slab_DictEntry_CSym_CLType.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_CStructDecl(DictEntry_CSym_CStructDecl* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CStructDecl.free;
+    _lyric_slab_DictEntry_CSym_CStructDecl.free = p;
 }
 
 static void _lyric_slab_free_DictEntry_CSym_CDict_CSym_CLType(DictEntry_CSym_CDict_CSym_CLType* p) {
@@ -6243,10 +6328,10 @@ static void _lyric_slab_free_DictEntry_CSym_CExpr(DictEntry_CSym_CExpr* p) {
     _lyric_slab_DictEntry_CSym_CExpr.free = p;
 }
 
-static void _lyric_slab_free_DictEntry_CSym_bool(DictEntry_CSym_bool* p) {
+static void _lyric_slab_free_DictEntry_CSym_CEnumDecl(DictEntry_CSym_CEnumDecl* p) {
     if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_bool.free;
-    _lyric_slab_DictEntry_CSym_bool.free = p;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_CEnumDecl.free;
+    _lyric_slab_DictEntry_CSym_CEnumDecl.free = p;
 }
 
 static void _lyric_slab_free_DictEntry_CSym_i32(DictEntry_CSym_i32* p) {
@@ -6267,6 +6352,12 @@ static void _lyric_slab_free_DictEntry_CSym_CLInterfaceDecl(DictEntry_CSym_CLInt
     _lyric_slab_DictEntry_CSym_CLInterfaceDecl.free = p;
 }
 
+static void _lyric_slab_free_DictEntry_CSym_slice_CMatchArm(DictEntry_CSym_slice_CMatchArm* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_slice_CMatchArm.free;
+    _lyric_slab_DictEntry_CSym_slice_CMatchArm.free = p;
+}
+
 static void _lyric_slab_free_DictEntry_CSym_opt_CLType(DictEntry_CSym_opt_CLType* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_DictEntry_CSym_opt_CLType.free;
@@ -6277,6 +6368,12 @@ static void _lyric_slab_free_DictEntry_CSym_CLFuncDecl(DictEntry_CSym_CLFuncDecl
     if (!p) return;
     p->lyric_next = _lyric_slab_DictEntry_CSym_CLFuncDecl.free;
     _lyric_slab_DictEntry_CSym_CLFuncDecl.free = p;
+}
+
+static void _lyric_slab_free_DictEntry_CSym_slice_CLFuncDecl(DictEntry_CSym_slice_CLFuncDecl* p) {
+    if (!p) return;
+    p->lyric_next = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free;
+    _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free = p;
 }
 
 static void _lyric_slab_free_DictEntry_CSym_CLClassDecl(DictEntry_CSym_CLClassDecl* p) {
@@ -6291,28 +6388,10 @@ static void _lyric_slab_free_DictEntry_CSym_CLStructDecl(DictEntry_CSym_CLStruct
     _lyric_slab_DictEntry_CSym_CLStructDecl.free = p;
 }
 
-static void _lyric_slab_free_DictEntry_CSym_slice_CLFuncDecl(DictEntry_CSym_slice_CLFuncDecl* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free;
-    _lyric_slab_DictEntry_CSym_slice_CLFuncDecl.free = p;
-}
-
 static void _lyric_slab_free_DictEntry_CSym_slice_string(DictEntry_CSym_slice_string* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_DictEntry_CSym_slice_string.free;
     _lyric_slab_DictEntry_CSym_slice_string.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_CConstDecl(DictEntry_CSym_CConstDecl* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_CConstDecl.free;
-    _lyric_slab_DictEntry_CSym_CConstDecl.free = p;
-}
-
-static void _lyric_slab_free_DictEntry_CSym_slice_CMatchArm(DictEntry_CSym_slice_CMatchArm* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DictEntry_CSym_slice_CMatchArm.free;
-    _lyric_slab_DictEntry_CSym_slice_CMatchArm.free = p;
 }
 
 typedef struct range_gen_t {
@@ -6492,6 +6571,7 @@ static lyric_string Dict_CSym_CVariantInfo_to_string(Dict_CSym_CVariantInfo* v);
 static lyric_string Dict_CSym_CTypeInfo_to_string(Dict_CSym_CTypeInfo* v);
 static lyric_string Dict_CSym_CInterfaceDecl_to_string(Dict_CSym_CInterfaceDecl* v);
 static lyric_string Dict_CSym_CDict_CSym_CType_to_string(Dict_CSym_CDict_CSym_CType* v);
+static lyric_string Dict_CSym_slice_CTypeExpr_to_string(Dict_CSym_slice_CTypeExpr* v);
 static lyric_string Dict_CSym_string_to_string(Dict_CSym_string* v);
 static lyric_string Dict_CSym_CStructDecl_to_string(Dict_CSym_CStructDecl* v);
 static lyric_string Dict_CSym_CClassDecl_to_string(Dict_CSym_CClassDecl* v);
@@ -6513,33 +6593,34 @@ static lyric_string Dict_CSym_slice_CLFuncDecl_to_string(Dict_CSym_slice_CLFuncD
 static lyric_string Dict_CSym_slice_string_to_string(Dict_CSym_slice_string* v);
 static lyric_string Dict_CSym_CConstDecl_to_string(Dict_CSym_CConstDecl* v);
 static lyric_string Dict_CSym_slice_CMatchArm_to_string(Dict_CSym_slice_CMatchArm* v);
-static lyric_string DictEntry_CSym_ETokenKind_to_string(DictEntry_CSym_ETokenKind* v);
-static lyric_string DictEntry_CSym_CType_to_string(DictEntry_CSym_CType* v);
-static lyric_string DictEntry_CSym_CVariantInfo_to_string(DictEntry_CSym_CVariantInfo* v);
-static lyric_string DictEntry_CSym_CTypeInfo_to_string(DictEntry_CSym_CTypeInfo* v);
+static lyric_string DictEntry_CSym_bool_to_string(DictEntry_CSym_bool* v);
 static lyric_string DictEntry_CSym_CInterfaceDecl_to_string(DictEntry_CSym_CInterfaceDecl* v);
-static lyric_string DictEntry_CSym_CDict_CSym_CType_to_string(DictEntry_CSym_CDict_CSym_CType* v);
-static lyric_string DictEntry_CSym_string_to_string(DictEntry_CSym_string* v);
-static lyric_string DictEntry_CSym_CStructDecl_to_string(DictEntry_CSym_CStructDecl* v);
 static lyric_string DictEntry_CSym_CClassDecl_to_string(DictEntry_CSym_CClassDecl* v);
-static lyric_string DictEntry_CSym_CEnumDecl_to_string(DictEntry_CSym_CEnumDecl* v);
-static lyric_string DictEntry_CSym_CTypeExpr_to_string(DictEntry_CSym_CTypeExpr* v);
 static lyric_string DictEntry_CSym_CFuncDecl_to_string(DictEntry_CSym_CFuncDecl* v);
+static lyric_string DictEntry_CSym_CConstDecl_to_string(DictEntry_CSym_CConstDecl* v);
+static lyric_string DictEntry_CSym_ETokenKind_to_string(DictEntry_CSym_ETokenKind* v);
+static lyric_string DictEntry_CSym_string_to_string(DictEntry_CSym_string* v);
+static lyric_string DictEntry_CSym_CTypeExpr_to_string(DictEntry_CSym_CTypeExpr* v);
+static lyric_string DictEntry_CSym_CType_to_string(DictEntry_CSym_CType* v);
+static lyric_string DictEntry_CSym_CTypeInfo_to_string(DictEntry_CSym_CTypeInfo* v);
+static lyric_string DictEntry_CSym_slice_CTypeExpr_to_string(DictEntry_CSym_slice_CTypeExpr* v);
+static lyric_string DictEntry_CSym_CVariantInfo_to_string(DictEntry_CSym_CVariantInfo* v);
+static lyric_string DictEntry_CSym_CDict_CSym_CType_to_string(DictEntry_CSym_CDict_CSym_CType* v);
 static lyric_string DictEntry_CSym_CLType_to_string(DictEntry_CSym_CLType* v);
+static lyric_string DictEntry_CSym_CStructDecl_to_string(DictEntry_CSym_CStructDecl* v);
 static lyric_string DictEntry_CSym_CDict_CSym_CLType_to_string(DictEntry_CSym_CDict_CSym_CLType* v);
 static lyric_string DictEntry_CSym_CExpr_to_string(DictEntry_CSym_CExpr* v);
-static lyric_string DictEntry_CSym_bool_to_string(DictEntry_CSym_bool* v);
+static lyric_string DictEntry_CSym_CEnumDecl_to_string(DictEntry_CSym_CEnumDecl* v);
 static lyric_string DictEntry_CSym_i32_to_string(DictEntry_CSym_i32* v);
 static lyric_string DictEntry_CSym_slice_CTupleField_to_string(DictEntry_CSym_slice_CTupleField* v);
 static lyric_string DictEntry_CSym_CLInterfaceDecl_to_string(DictEntry_CSym_CLInterfaceDecl* v);
+static lyric_string DictEntry_CSym_slice_CMatchArm_to_string(DictEntry_CSym_slice_CMatchArm* v);
 static lyric_string DictEntry_CSym_opt_CLType_to_string(DictEntry_CSym_opt_CLType* v);
 static lyric_string DictEntry_CSym_CLFuncDecl_to_string(DictEntry_CSym_CLFuncDecl* v);
+static lyric_string DictEntry_CSym_slice_CLFuncDecl_to_string(DictEntry_CSym_slice_CLFuncDecl* v);
 static lyric_string DictEntry_CSym_CLClassDecl_to_string(DictEntry_CSym_CLClassDecl* v);
 static lyric_string DictEntry_CSym_CLStructDecl_to_string(DictEntry_CSym_CLStructDecl* v);
-static lyric_string DictEntry_CSym_slice_CLFuncDecl_to_string(DictEntry_CSym_slice_CLFuncDecl* v);
 static lyric_string DictEntry_CSym_slice_string_to_string(DictEntry_CSym_slice_string* v);
-static lyric_string DictEntry_CSym_CConstDecl_to_string(DictEntry_CSym_CConstDecl* v);
-static lyric_string DictEntry_CSym_slice_CMatchArm_to_string(DictEntry_CSym_slice_CMatchArm* v);
 
 static lyric_string TypeExprKind_to_string(TypeExprKind v) {
     switch (v.tag) {
@@ -8987,6 +9068,9 @@ static lyric_string Checker_to_string(Checker* v) {
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("type_var_methods: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("method_type_args: "));
+    _result = lyric_str_concat(_result, (v->method_type_args == NULL ? LYRIC_STR("null") : Dict_CSym_slice_CTypeExpr_to_string(v->method_type_args)));
     _result = lyric_str_concat(_result, LYRIC_STR("}"));
     return _result;
 }
@@ -9811,6 +9895,23 @@ static lyric_string Dict_CSym_CDict_CSym_CType_to_string(Dict_CSym_CDict_CSym_CT
     return _result;
 }
 
+static lyric_string Dict_CSym_slice_CTypeExpr_to_string(Dict_CSym_slice_CTypeExpr* v) {
+    lyric_string _result = LYRIC_STR("Dict_CSym_slice_CTypeExpr{");
+    _result = lyric_str_concat(_result, LYRIC_STR("d_children: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_buckets: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_hash_cap: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_hash_cap));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_hash_count: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_hash_count));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
 static lyric_string Dict_CSym_string_to_string(Dict_CSym_string* v) {
     lyric_string _result = LYRIC_STR("Dict_CSym_string{");
     _result = lyric_str_concat(_result, LYRIC_STR("d_children: "));
@@ -10168,64 +10269,13 @@ static lyric_string Dict_CSym_slice_CMatchArm_to_string(Dict_CSym_slice_CMatchAr
     return _result;
 }
 
-static lyric_string DictEntry_CSym_ETokenKind_to_string(DictEntry_CSym_ETokenKind* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_ETokenKind{");
+static lyric_string DictEntry_CSym_bool_to_string(DictEntry_CSym_bool* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_bool{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
     _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, TokenKind_to_string(v->value));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CType_to_string(DictEntry_CSym_CType* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CType{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : Type_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CVariantInfo_to_string(DictEntry_CSym_CVariantInfo* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CVariantInfo{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : VariantInfo_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CTypeInfo_to_string(DictEntry_CSym_CTypeInfo* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CTypeInfo{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : TypeInfo_to_string(v->value)));
+    _result = lyric_str_concat(_result, (v->value ? LYRIC_STR("true") : LYRIC_STR("false")));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
@@ -10253,57 +10303,6 @@ static lyric_string DictEntry_CSym_CInterfaceDecl_to_string(DictEntry_CSym_CInte
     return _result;
 }
 
-static lyric_string DictEntry_CSym_CDict_CSym_CType_to_string(DictEntry_CSym_CDict_CSym_CType* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CDict_CSym_CType{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : Dict_CSym_CType_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_string_to_string(DictEntry_CSym_string* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_string{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->value.len, (const char*)v->value.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CStructDecl_to_string(DictEntry_CSym_CStructDecl* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CStructDecl{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : StructDecl_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
 static lyric_string DictEntry_CSym_CClassDecl_to_string(DictEntry_CSym_CClassDecl* v) {
     lyric_string _result = LYRIC_STR("DictEntry_CSym_CClassDecl{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
@@ -10311,40 +10310,6 @@ static lyric_string DictEntry_CSym_CClassDecl_to_string(DictEntry_CSym_CClassDec
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("value: "));
     _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : ClassDecl_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CEnumDecl_to_string(DictEntry_CSym_CEnumDecl* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CEnumDecl{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : EnumDecl_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CTypeExpr_to_string(DictEntry_CSym_CTypeExpr* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CTypeExpr{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : TypeExpr_to_string(v->value)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
@@ -10372,6 +10337,159 @@ static lyric_string DictEntry_CSym_CFuncDecl_to_string(DictEntry_CSym_CFuncDecl*
     return _result;
 }
 
+static lyric_string DictEntry_CSym_CConstDecl_to_string(DictEntry_CSym_CConstDecl* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CConstDecl{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : ConstDecl_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_ETokenKind_to_string(DictEntry_CSym_ETokenKind* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_ETokenKind{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, TokenKind_to_string(v->value));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_string_to_string(DictEntry_CSym_string* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_string{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->value.len, (const char*)v->value.data));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CTypeExpr_to_string(DictEntry_CSym_CTypeExpr* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CTypeExpr{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : TypeExpr_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CType_to_string(DictEntry_CSym_CType* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CType{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : Type_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CTypeInfo_to_string(DictEntry_CSym_CTypeInfo* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CTypeInfo{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : TypeInfo_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_slice_CTypeExpr_to_string(DictEntry_CSym_slice_CTypeExpr* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_CTypeExpr{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CVariantInfo_to_string(DictEntry_CSym_CVariantInfo* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CVariantInfo{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : VariantInfo_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CDict_CSym_CType_to_string(DictEntry_CSym_CDict_CSym_CType* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CDict_CSym_CType{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : Dict_CSym_CType_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
 static lyric_string DictEntry_CSym_CLType_to_string(DictEntry_CSym_CLType* v) {
     lyric_string _result = LYRIC_STR("DictEntry_CSym_CLType{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
@@ -10379,6 +10497,23 @@ static lyric_string DictEntry_CSym_CLType_to_string(DictEntry_CSym_CLType* v) {
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("value: "));
     _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : LType_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_CStructDecl_to_string(DictEntry_CSym_CStructDecl* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CStructDecl{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : StructDecl_to_string(v->value)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
@@ -10423,13 +10558,13 @@ static lyric_string DictEntry_CSym_CExpr_to_string(DictEntry_CSym_CExpr* v) {
     return _result;
 }
 
-static lyric_string DictEntry_CSym_bool_to_string(DictEntry_CSym_bool* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_bool{");
+static lyric_string DictEntry_CSym_CEnumDecl_to_string(DictEntry_CSym_CEnumDecl* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_CEnumDecl{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
     _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value ? LYRIC_STR("true") : LYRIC_STR("false")));
+    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : EnumDecl_to_string(v->value)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
@@ -10491,6 +10626,23 @@ static lyric_string DictEntry_CSym_CLInterfaceDecl_to_string(DictEntry_CSym_CLIn
     return _result;
 }
 
+static lyric_string DictEntry_CSym_slice_CMatchArm_to_string(DictEntry_CSym_slice_CMatchArm* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_CMatchArm{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
 static lyric_string DictEntry_CSym_opt_CLType_to_string(DictEntry_CSym_opt_CLType* v) {
     lyric_string _result = LYRIC_STR("DictEntry_CSym_opt_CLType{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
@@ -10515,6 +10667,23 @@ static lyric_string DictEntry_CSym_CLFuncDecl_to_string(DictEntry_CSym_CLFuncDec
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("value: "));
     _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : LFuncDecl_to_string(v->value)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
+    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
+    _result = lyric_str_concat(_result, LYRIC_STR("}"));
+    return _result;
+}
+
+static lyric_string DictEntry_CSym_slice_CLFuncDecl_to_string(DictEntry_CSym_slice_CLFuncDecl* v) {
+    lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_CLFuncDecl{");
+    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
+    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
+    _result = lyric_str_concat(_result, LYRIC_STR(", "));
+    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
+    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
@@ -10559,59 +10728,8 @@ static lyric_string DictEntry_CSym_CLStructDecl_to_string(DictEntry_CSym_CLStruc
     return _result;
 }
 
-static lyric_string DictEntry_CSym_slice_CLFuncDecl_to_string(DictEntry_CSym_slice_CLFuncDecl* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_CLFuncDecl{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
 static lyric_string DictEntry_CSym_slice_string_to_string(DictEntry_CSym_slice_string* v) {
     lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_string{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_CConstDecl_to_string(DictEntry_CSym_CConstDecl* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_CConstDecl{");
-    _result = lyric_str_concat(_result, LYRIC_STR("key: "));
-    _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("value: "));
-    _result = lyric_str_concat(_result, (v->value == NULL ? LYRIC_STR("null") : ConstDecl_to_string(v->value)));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("d_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->d_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string DictEntry_CSym_slice_CMatchArm_to_string(DictEntry_CSym_slice_CMatchArm* v) {
-    lyric_string _result = LYRIC_STR("DictEntry_CSym_slice_CMatchArm{");
     _result = lyric_str_concat(_result, LYRIC_STR("key: "));
     _result = lyric_str_concat(_result, (v->key == NULL ? LYRIC_STR("null") : Sym_to_string(v->key)));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
@@ -11560,6 +11678,19 @@ void fmt_type_params(StringBuilder* sb, LyricSlice_TypeParamptr tps);
 void fmt_type_expr(StringBuilder* sb, TypeExpr* te);
 void array_append_CFile_CLyricBlock(File* parent, LyricBlock* child);
 void array_append_CFile_CComment(File* parent, Comment* child);
+void set_CSym_bool(Dict_CSym_bool* self, Sym* key, bool value);
+LyricSlice_Symptr keys_CSym_bool(Dict_CSym_bool* self);
+DictEntry_CSym_bool* get_CSym_bool(Dict_CSym_bool* self, Sym* key);
+void set_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key, InterfaceDecl* value);
+void set_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key, ClassDecl* value);
+void set_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self, Sym* key, FuncDecl* value);
+DictEntry_CSym_CInterfaceDecl* get_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key);
+DictEntry_CSym_CClassDecl* get_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key);
+LyricSlice_Symptr keys_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self);
+DictEntry_CSym_CFuncDecl* get_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self, Sym* key);
+void set_CSym_CConstDecl(Dict_CSym_CConstDecl* self, Sym* key, ConstDecl* value);
+LyricSlice_Symptr keys_CSym_CConstDecl(Dict_CSym_CConstDecl* self);
+DictEntry_CSym_CConstDecl* get_CSym_CConstDecl(Dict_CSym_CConstDecl* self, Sym* key);
 void array_append_CLyricBlock_CInterfaceDecl(LyricBlock* parent, InterfaceDecl* child);
 void array_append_CLyricBlock_CClassDecl(LyricBlock* parent, ClassDecl* child);
 void array_append_CLyricBlock_CFuncDecl(LyricBlock* parent, FuncDecl* child);
@@ -11604,6 +11735,8 @@ void array_remove_CFile_CComment(Comment* child);
 void array_remove_CBlock_CStmt(Stmt* child);
 void array_remove_CFile_CLyricBlock(LyricBlock* child);
 bool hash_remove_CSymTable_CSym(SymTable* parent, uint64_t key);
+void set_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key, TokenKind value);
+DictEntry_CSym_ETokenKind* get_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key);
 void array_append_CLexer_CComment(Lexer* parent, Comment* child);
 void array_append_CLyricBlock_CDocBlock(LyricBlock* parent, DocBlock* child);
 void array_append_CLyricBlock_CInvariantDecl(LyricBlock* parent, InvariantDecl* child);
@@ -11634,6 +11767,61 @@ void array_append_CFuncDecl_CTypeParam(FuncDecl* parent, TypeParam* child);
 void array_append_CFuncDecl_CWhereClause(FuncDecl* parent, WhereClause* child);
 void array_append_CWhereClause_CTypeExpr(WhereClause* parent, TypeExpr* child);
 void array_append_CBlock_CStmt(Block* parent, Stmt* child);
+void set_CSym_string(Dict_CSym_string* self, Sym* key, lyric_string value);
+void set_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key, TypeExpr* value);
+DictEntry_CSym_string* get_CSym_string(Dict_CSym_string* self, Sym* key);
+DictEntry_CSym_CTypeExpr* get_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key);
+DictEntry_CSym_CType* get_CSym_CType(Dict_CSym_CType* self, Sym* key);
+void set_CSym_CType(Dict_CSym_CType* self, Sym* key, Type* value);
+LyricSlice_Symptr keys_CSym_CType(Dict_CSym_CType* self);
+void set_CSym_CTypeInfo(Dict_CSym_CTypeInfo* self, Sym* key, TypeInfo* value);
+DictEntry_CSym_CTypeInfo* get_CSym_CTypeInfo(Dict_CSym_CTypeInfo* self, Sym* key);
+void set_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* self, Sym* key, LyricSlice_TypeExprptr value);
+void set_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self, Sym* key, VariantInfo* value);
+DictEntry_CSym_CDict_CSym_CType* get_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self, Sym* key);
+void set_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self, Sym* key, Dict_CSym_CType* value);
+LyricSlice_Symptr keys_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self);
+DictEntry_CSym_CVariantInfo* get_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self, Sym* key);
+LyricSlice_Symptr keys_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self);
+DictEntry_CSym_slice_CTypeExpr* get_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* self, Sym* key);
+void set_CSym_CLType(Dict_CSym_CLType* self, Sym* key, LType* value);
+DictEntry_CSym_CLType* get_CSym_CLType(Dict_CSym_CLType* self, Sym* key);
+bool has_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key);
+bool has_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key);
+bool has_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key);
+bool has_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key);
+bool has_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key);
+void set_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key, StructDecl* value);
+void set_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* self, Sym* key, Dict_CSym_CLType* value);
+void set_CSym_CExpr(Dict_CSym_CExpr* self, Sym* key, Expr* value);
+void set_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key, EnumDecl* value);
+void set_CSym_i32(Dict_CSym_i32* self, Sym* key, int32_t value);
+void set_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* self, Sym* key, LyricSlice_TupleFieldptr value);
+void set_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* self, Sym* key, LInterfaceDecl* value);
+DictEntry_CSym_CLInterfaceDecl* get_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* self, Sym* key);
+DictEntry_CSym_slice_CMatchArm* get_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* self, Sym* key);
+void set_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* self, Sym* key, LyricSlice_MatchArmptr value);
+bool has_CSym_bool(Dict_CSym_bool* self, Sym* key);
+LyricSlice_Symptr keys_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self);
+bool has_CSym_i32(Dict_CSym_i32* self, Sym* key);
+bool has_CSym_string(Dict_CSym_string* self, Sym* key);
+DictEntry_CSym_CStructDecl* get_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key);
+DictEntry_CSym_i32* get_CSym_i32(Dict_CSym_i32* self, Sym* key);
+DictEntry_CSym_slice_CTupleField* get_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* self, Sym* key);
+void set_CSym_opt_CLType(Dict_CSym_opt_CLType* self, Sym* key, LType* value);
+DictEntry_CSym_opt_CLType* get_CSym_opt_CLType(Dict_CSym_opt_CLType* self, Sym* key);
+DictEntry_CSym_CLClassDecl* get_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self, Sym* key);
+DictEntry_CSym_CLFuncDecl* get_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* self, Sym* key);
+LyricSlice_Symptr keys_CSym_string(Dict_CSym_string* self);
+LyricSlice_Symptr keys_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self);
+LyricSlice_Symptr keys_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self);
+DictEntry_CSym_CLStructDecl* get_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self, Sym* key);
+void set_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* self, Sym* key, LFuncDecl* value);
+DictEntry_CSym_slice_CLFuncDecl* get_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* self, Sym* key);
+void set_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* self, Sym* key, LyricSlice_LFuncDeclptr value);
+void set_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self, Sym* key, LClassDecl* value);
+void set_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self, Sym* key, LStructDecl* value);
+void set_CSym_slice_string(Dict_CSym_slice_string* self, Sym* key, LyricSlice_lyric_string value);
 void Dict_CSym_ETokenKind_set(Dict_CSym_ETokenKind* self, Sym* key, TokenKind value);
 DictEntry_CSym_ETokenKind* Dict_CSym_ETokenKind_get(Dict_CSym_ETokenKind* self, Sym* key);
 bool Dict_CSym_ETokenKind_has(Dict_CSym_ETokenKind* self, Sym* key);
@@ -11718,6 +11906,20 @@ int32_t Dict_CSym_CDict_CSym_CType_d_hash_cap(Dict_CSym_CDict_CSym_CType* self);
 void Dict_CSym_CDict_CSym_CType_set_d_hash_cap(Dict_CSym_CDict_CSym_CType* self, int32_t val);
 int32_t Dict_CSym_CDict_CSym_CType_d_hash_count(Dict_CSym_CDict_CSym_CType* self);
 void Dict_CSym_CDict_CSym_CType_set_d_hash_count(Dict_CSym_CDict_CSym_CType* self, int32_t val);
+void Dict_CSym_slice_CTypeExpr_set(Dict_CSym_slice_CTypeExpr* self, Sym* key, LyricSlice_TypeExprptr value);
+DictEntry_CSym_slice_CTypeExpr* Dict_CSym_slice_CTypeExpr_get(Dict_CSym_slice_CTypeExpr* self, Sym* key);
+bool Dict_CSym_slice_CTypeExpr_has(Dict_CSym_slice_CTypeExpr* self, Sym* key);
+bool Dict_CSym_slice_CTypeExpr_remove(Dict_CSym_slice_CTypeExpr* self, Sym* key);
+LyricSlice_Symptr Dict_CSym_slice_CTypeExpr_keys(Dict_CSym_slice_CTypeExpr* self);
+void Dict_CSym_slice_CTypeExpr_destroy(Dict_CSym_slice_CTypeExpr* self);
+LyricSlice_DictEntry_CSym_slice_CTypeExprptr Dict_CSym_slice_CTypeExpr_d_children(Dict_CSym_slice_CTypeExpr* self);
+void Dict_CSym_slice_CTypeExpr_set_d_children(Dict_CSym_slice_CTypeExpr* self, LyricSlice_DictEntry_CSym_slice_CTypeExprptr val);
+LyricSlice_int32_t Dict_CSym_slice_CTypeExpr_d_buckets(Dict_CSym_slice_CTypeExpr* self);
+void Dict_CSym_slice_CTypeExpr_set_d_buckets(Dict_CSym_slice_CTypeExpr* self, LyricSlice_int32_t val);
+int32_t Dict_CSym_slice_CTypeExpr_d_hash_cap(Dict_CSym_slice_CTypeExpr* self);
+void Dict_CSym_slice_CTypeExpr_set_d_hash_cap(Dict_CSym_slice_CTypeExpr* self, int32_t val);
+int32_t Dict_CSym_slice_CTypeExpr_d_hash_count(Dict_CSym_slice_CTypeExpr* self);
+void Dict_CSym_slice_CTypeExpr_set_d_hash_count(Dict_CSym_slice_CTypeExpr* self, int32_t val);
 void Dict_CSym_string_set(Dict_CSym_string* self, Sym* key, lyric_string value);
 DictEntry_CSym_string* Dict_CSym_string_get(Dict_CSym_string* self, Sym* key);
 bool Dict_CSym_string_has(Dict_CSym_string* self, Sym* key);
@@ -12012,168 +12214,96 @@ int32_t Dict_CSym_slice_CMatchArm_d_hash_cap(Dict_CSym_slice_CMatchArm* self);
 void Dict_CSym_slice_CMatchArm_set_d_hash_cap(Dict_CSym_slice_CMatchArm* self, int32_t val);
 int32_t Dict_CSym_slice_CMatchArm_d_hash_count(Dict_CSym_slice_CMatchArm* self);
 void Dict_CSym_slice_CMatchArm_set_d_hash_count(Dict_CSym_slice_CMatchArm* self, int32_t val);
-void hash_init_CSymTable_CSym(SymTable* parent, int32_t capacity);
-void hash_rehash_CSymTable_CSym(SymTable* parent);
-int32_t hash_find_slot_CSymTable_CSym(SymTable* parent, uint64_t key);
-void hash_insert_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, DictEntry_CSym_ETokenKind* child);
-DictEntry_CSym_ETokenKind* hash_lookup_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
-bool hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
-void hash_insert_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, DictEntry_CSym_CType* child);
-DictEntry_CSym_CType* hash_lookup_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
-void hash_insert_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, DictEntry_CSym_CVariantInfo* child);
-DictEntry_CSym_CVariantInfo* hash_lookup_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
-void hash_insert_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, DictEntry_CSym_CTypeInfo* child);
-DictEntry_CSym_CTypeInfo* hash_lookup_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
-void hash_insert_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, DictEntry_CSym_CInterfaceDecl* child);
-DictEntry_CSym_CInterfaceDecl* hash_lookup_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, DictEntry_CSym_CDict_CSym_CType* child);
-DictEntry_CSym_CDict_CSym_CType* hash_lookup_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
-void hash_insert_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, DictEntry_CSym_string* child);
-DictEntry_CSym_string* hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
-bool hash_remove_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
-void hash_insert_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, DictEntry_CSym_CStructDecl* child);
-DictEntry_CSym_CStructDecl* hash_lookup_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, DictEntry_CSym_CClassDecl* child);
-DictEntry_CSym_CClassDecl* hash_lookup_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, DictEntry_CSym_CEnumDecl* child);
-DictEntry_CSym_CEnumDecl* hash_lookup_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, DictEntry_CSym_CTypeExpr* child);
-DictEntry_CSym_CTypeExpr* hash_lookup_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
-void hash_insert_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, DictEntry_CSym_CFuncDecl* child);
-DictEntry_CSym_CFuncDecl* hash_lookup_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, DictEntry_CSym_CLType* child);
-DictEntry_CSym_CLType* hash_lookup_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key);
-void hash_insert_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, DictEntry_CSym_CDict_CSym_CLType* child);
-DictEntry_CSym_CDict_CSym_CLType* hash_lookup_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key);
-void hash_insert_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, DictEntry_CSym_CExpr* child);
-DictEntry_CSym_CExpr* hash_lookup_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key);
-void hash_insert_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, DictEntry_CSym_bool* child);
-DictEntry_CSym_bool* hash_lookup_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
-bool hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
-void hash_insert_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, DictEntry_CSym_i32* child);
-DictEntry_CSym_i32* hash_lookup_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key);
-bool hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key);
-void hash_insert_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, DictEntry_CSym_slice_CTupleField* child);
-DictEntry_CSym_slice_CTupleField* hash_lookup_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key);
-bool hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key);
-void hash_insert_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, DictEntry_CSym_CLInterfaceDecl* child);
-DictEntry_CSym_CLInterfaceDecl* hash_lookup_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, DictEntry_CSym_opt_CLType* child);
-DictEntry_CSym_opt_CLType* hash_lookup_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key);
-bool hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key);
-void hash_insert_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, DictEntry_CSym_CLFuncDecl* child);
-DictEntry_CSym_CLFuncDecl* hash_lookup_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, DictEntry_CSym_CLClassDecl* child);
-DictEntry_CSym_CLClassDecl* hash_lookup_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, DictEntry_CSym_CLStructDecl* child);
-DictEntry_CSym_CLStructDecl* hash_lookup_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, DictEntry_CSym_slice_CLFuncDecl* child);
-DictEntry_CSym_slice_CLFuncDecl* hash_lookup_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, DictEntry_CSym_slice_string* child);
-DictEntry_CSym_slice_string* hash_lookup_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key);
-bool hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key);
-void hash_insert_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, DictEntry_CSym_CConstDecl* child);
-DictEntry_CSym_CConstDecl* hash_lookup_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
-bool hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
-void hash_insert_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, DictEntry_CSym_slice_CMatchArm* child);
-DictEntry_CSym_slice_CMatchArm* hash_lookup_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
-bool hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
-uint64_t DictEntry_CSym_ETokenKind_hash_key(DictEntry_CSym_ETokenKind* self);
-void DictEntry_CSym_ETokenKind_destroy(DictEntry_CSym_ETokenKind* self);
-Dict_CSym_ETokenKind* DictEntry_CSym_ETokenKind_d_parent(DictEntry_CSym_ETokenKind* self);
-void DictEntry_CSym_ETokenKind_set_d_parent(DictEntry_CSym_ETokenKind* self, Dict_CSym_ETokenKind* val);
-int32_t DictEntry_CSym_ETokenKind_d_index(DictEntry_CSym_ETokenKind* self);
-void DictEntry_CSym_ETokenKind_set_d_index(DictEntry_CSym_ETokenKind* self, int32_t val);
-uint64_t DictEntry_CSym_CType_hash_key(DictEntry_CSym_CType* self);
-void DictEntry_CSym_CType_destroy(DictEntry_CSym_CType* self);
-Dict_CSym_CType* DictEntry_CSym_CType_d_parent(DictEntry_CSym_CType* self);
-void DictEntry_CSym_CType_set_d_parent(DictEntry_CSym_CType* self, Dict_CSym_CType* val);
-int32_t DictEntry_CSym_CType_d_index(DictEntry_CSym_CType* self);
-void DictEntry_CSym_CType_set_d_index(DictEntry_CSym_CType* self, int32_t val);
-uint64_t DictEntry_CSym_CVariantInfo_hash_key(DictEntry_CSym_CVariantInfo* self);
-void DictEntry_CSym_CVariantInfo_destroy(DictEntry_CSym_CVariantInfo* self);
-Dict_CSym_CVariantInfo* DictEntry_CSym_CVariantInfo_d_parent(DictEntry_CSym_CVariantInfo* self);
-void DictEntry_CSym_CVariantInfo_set_d_parent(DictEntry_CSym_CVariantInfo* self, Dict_CSym_CVariantInfo* val);
-int32_t DictEntry_CSym_CVariantInfo_d_index(DictEntry_CSym_CVariantInfo* self);
-void DictEntry_CSym_CVariantInfo_set_d_index(DictEntry_CSym_CVariantInfo* self, int32_t val);
-uint64_t DictEntry_CSym_CTypeInfo_hash_key(DictEntry_CSym_CTypeInfo* self);
-void DictEntry_CSym_CTypeInfo_destroy(DictEntry_CSym_CTypeInfo* self);
-Dict_CSym_CTypeInfo* DictEntry_CSym_CTypeInfo_d_parent(DictEntry_CSym_CTypeInfo* self);
-void DictEntry_CSym_CTypeInfo_set_d_parent(DictEntry_CSym_CTypeInfo* self, Dict_CSym_CTypeInfo* val);
-int32_t DictEntry_CSym_CTypeInfo_d_index(DictEntry_CSym_CTypeInfo* self);
-void DictEntry_CSym_CTypeInfo_set_d_index(DictEntry_CSym_CTypeInfo* self, int32_t val);
+uint64_t DictEntry_CSym_bool_hash_key(DictEntry_CSym_bool* self);
+void DictEntry_CSym_bool_destroy(DictEntry_CSym_bool* self);
+Dict_CSym_bool* DictEntry_CSym_bool_d_parent(DictEntry_CSym_bool* self);
+void DictEntry_CSym_bool_set_d_parent(DictEntry_CSym_bool* self, Dict_CSym_bool* val);
+int32_t DictEntry_CSym_bool_d_index(DictEntry_CSym_bool* self);
+void DictEntry_CSym_bool_set_d_index(DictEntry_CSym_bool* self, int32_t val);
 uint64_t DictEntry_CSym_CInterfaceDecl_hash_key(DictEntry_CSym_CInterfaceDecl* self);
 void DictEntry_CSym_CInterfaceDecl_destroy(DictEntry_CSym_CInterfaceDecl* self);
 Dict_CSym_CInterfaceDecl* DictEntry_CSym_CInterfaceDecl_d_parent(DictEntry_CSym_CInterfaceDecl* self);
 void DictEntry_CSym_CInterfaceDecl_set_d_parent(DictEntry_CSym_CInterfaceDecl* self, Dict_CSym_CInterfaceDecl* val);
 int32_t DictEntry_CSym_CInterfaceDecl_d_index(DictEntry_CSym_CInterfaceDecl* self);
 void DictEntry_CSym_CInterfaceDecl_set_d_index(DictEntry_CSym_CInterfaceDecl* self, int32_t val);
-uint64_t DictEntry_CSym_CDict_CSym_CType_hash_key(DictEntry_CSym_CDict_CSym_CType* self);
-void DictEntry_CSym_CDict_CSym_CType_destroy(DictEntry_CSym_CDict_CSym_CType* self);
-Dict_CSym_CDict_CSym_CType* DictEntry_CSym_CDict_CSym_CType_d_parent(DictEntry_CSym_CDict_CSym_CType* self);
-void DictEntry_CSym_CDict_CSym_CType_set_d_parent(DictEntry_CSym_CDict_CSym_CType* self, Dict_CSym_CDict_CSym_CType* val);
-int32_t DictEntry_CSym_CDict_CSym_CType_d_index(DictEntry_CSym_CDict_CSym_CType* self);
-void DictEntry_CSym_CDict_CSym_CType_set_d_index(DictEntry_CSym_CDict_CSym_CType* self, int32_t val);
-uint64_t DictEntry_CSym_string_hash_key(DictEntry_CSym_string* self);
-void DictEntry_CSym_string_destroy(DictEntry_CSym_string* self);
-Dict_CSym_string* DictEntry_CSym_string_d_parent(DictEntry_CSym_string* self);
-void DictEntry_CSym_string_set_d_parent(DictEntry_CSym_string* self, Dict_CSym_string* val);
-int32_t DictEntry_CSym_string_d_index(DictEntry_CSym_string* self);
-void DictEntry_CSym_string_set_d_index(DictEntry_CSym_string* self, int32_t val);
-uint64_t DictEntry_CSym_CStructDecl_hash_key(DictEntry_CSym_CStructDecl* self);
-void DictEntry_CSym_CStructDecl_destroy(DictEntry_CSym_CStructDecl* self);
-Dict_CSym_CStructDecl* DictEntry_CSym_CStructDecl_d_parent(DictEntry_CSym_CStructDecl* self);
-void DictEntry_CSym_CStructDecl_set_d_parent(DictEntry_CSym_CStructDecl* self, Dict_CSym_CStructDecl* val);
-int32_t DictEntry_CSym_CStructDecl_d_index(DictEntry_CSym_CStructDecl* self);
-void DictEntry_CSym_CStructDecl_set_d_index(DictEntry_CSym_CStructDecl* self, int32_t val);
 uint64_t DictEntry_CSym_CClassDecl_hash_key(DictEntry_CSym_CClassDecl* self);
 void DictEntry_CSym_CClassDecl_destroy(DictEntry_CSym_CClassDecl* self);
 Dict_CSym_CClassDecl* DictEntry_CSym_CClassDecl_d_parent(DictEntry_CSym_CClassDecl* self);
 void DictEntry_CSym_CClassDecl_set_d_parent(DictEntry_CSym_CClassDecl* self, Dict_CSym_CClassDecl* val);
 int32_t DictEntry_CSym_CClassDecl_d_index(DictEntry_CSym_CClassDecl* self);
 void DictEntry_CSym_CClassDecl_set_d_index(DictEntry_CSym_CClassDecl* self, int32_t val);
-uint64_t DictEntry_CSym_CEnumDecl_hash_key(DictEntry_CSym_CEnumDecl* self);
-void DictEntry_CSym_CEnumDecl_destroy(DictEntry_CSym_CEnumDecl* self);
-Dict_CSym_CEnumDecl* DictEntry_CSym_CEnumDecl_d_parent(DictEntry_CSym_CEnumDecl* self);
-void DictEntry_CSym_CEnumDecl_set_d_parent(DictEntry_CSym_CEnumDecl* self, Dict_CSym_CEnumDecl* val);
-int32_t DictEntry_CSym_CEnumDecl_d_index(DictEntry_CSym_CEnumDecl* self);
-void DictEntry_CSym_CEnumDecl_set_d_index(DictEntry_CSym_CEnumDecl* self, int32_t val);
-uint64_t DictEntry_CSym_CTypeExpr_hash_key(DictEntry_CSym_CTypeExpr* self);
-void DictEntry_CSym_CTypeExpr_destroy(DictEntry_CSym_CTypeExpr* self);
-Dict_CSym_CTypeExpr* DictEntry_CSym_CTypeExpr_d_parent(DictEntry_CSym_CTypeExpr* self);
-void DictEntry_CSym_CTypeExpr_set_d_parent(DictEntry_CSym_CTypeExpr* self, Dict_CSym_CTypeExpr* val);
-int32_t DictEntry_CSym_CTypeExpr_d_index(DictEntry_CSym_CTypeExpr* self);
-void DictEntry_CSym_CTypeExpr_set_d_index(DictEntry_CSym_CTypeExpr* self, int32_t val);
 uint64_t DictEntry_CSym_CFuncDecl_hash_key(DictEntry_CSym_CFuncDecl* self);
 void DictEntry_CSym_CFuncDecl_destroy(DictEntry_CSym_CFuncDecl* self);
 Dict_CSym_CFuncDecl* DictEntry_CSym_CFuncDecl_d_parent(DictEntry_CSym_CFuncDecl* self);
 void DictEntry_CSym_CFuncDecl_set_d_parent(DictEntry_CSym_CFuncDecl* self, Dict_CSym_CFuncDecl* val);
 int32_t DictEntry_CSym_CFuncDecl_d_index(DictEntry_CSym_CFuncDecl* self);
 void DictEntry_CSym_CFuncDecl_set_d_index(DictEntry_CSym_CFuncDecl* self, int32_t val);
+uint64_t DictEntry_CSym_CConstDecl_hash_key(DictEntry_CSym_CConstDecl* self);
+void DictEntry_CSym_CConstDecl_destroy(DictEntry_CSym_CConstDecl* self);
+Dict_CSym_CConstDecl* DictEntry_CSym_CConstDecl_d_parent(DictEntry_CSym_CConstDecl* self);
+void DictEntry_CSym_CConstDecl_set_d_parent(DictEntry_CSym_CConstDecl* self, Dict_CSym_CConstDecl* val);
+int32_t DictEntry_CSym_CConstDecl_d_index(DictEntry_CSym_CConstDecl* self);
+void DictEntry_CSym_CConstDecl_set_d_index(DictEntry_CSym_CConstDecl* self, int32_t val);
+uint64_t DictEntry_CSym_ETokenKind_hash_key(DictEntry_CSym_ETokenKind* self);
+void DictEntry_CSym_ETokenKind_destroy(DictEntry_CSym_ETokenKind* self);
+Dict_CSym_ETokenKind* DictEntry_CSym_ETokenKind_d_parent(DictEntry_CSym_ETokenKind* self);
+void DictEntry_CSym_ETokenKind_set_d_parent(DictEntry_CSym_ETokenKind* self, Dict_CSym_ETokenKind* val);
+int32_t DictEntry_CSym_ETokenKind_d_index(DictEntry_CSym_ETokenKind* self);
+void DictEntry_CSym_ETokenKind_set_d_index(DictEntry_CSym_ETokenKind* self, int32_t val);
+uint64_t DictEntry_CSym_string_hash_key(DictEntry_CSym_string* self);
+void DictEntry_CSym_string_destroy(DictEntry_CSym_string* self);
+Dict_CSym_string* DictEntry_CSym_string_d_parent(DictEntry_CSym_string* self);
+void DictEntry_CSym_string_set_d_parent(DictEntry_CSym_string* self, Dict_CSym_string* val);
+int32_t DictEntry_CSym_string_d_index(DictEntry_CSym_string* self);
+void DictEntry_CSym_string_set_d_index(DictEntry_CSym_string* self, int32_t val);
+uint64_t DictEntry_CSym_CTypeExpr_hash_key(DictEntry_CSym_CTypeExpr* self);
+void DictEntry_CSym_CTypeExpr_destroy(DictEntry_CSym_CTypeExpr* self);
+Dict_CSym_CTypeExpr* DictEntry_CSym_CTypeExpr_d_parent(DictEntry_CSym_CTypeExpr* self);
+void DictEntry_CSym_CTypeExpr_set_d_parent(DictEntry_CSym_CTypeExpr* self, Dict_CSym_CTypeExpr* val);
+int32_t DictEntry_CSym_CTypeExpr_d_index(DictEntry_CSym_CTypeExpr* self);
+void DictEntry_CSym_CTypeExpr_set_d_index(DictEntry_CSym_CTypeExpr* self, int32_t val);
+uint64_t DictEntry_CSym_CType_hash_key(DictEntry_CSym_CType* self);
+void DictEntry_CSym_CType_destroy(DictEntry_CSym_CType* self);
+Dict_CSym_CType* DictEntry_CSym_CType_d_parent(DictEntry_CSym_CType* self);
+void DictEntry_CSym_CType_set_d_parent(DictEntry_CSym_CType* self, Dict_CSym_CType* val);
+int32_t DictEntry_CSym_CType_d_index(DictEntry_CSym_CType* self);
+void DictEntry_CSym_CType_set_d_index(DictEntry_CSym_CType* self, int32_t val);
+uint64_t DictEntry_CSym_CTypeInfo_hash_key(DictEntry_CSym_CTypeInfo* self);
+void DictEntry_CSym_CTypeInfo_destroy(DictEntry_CSym_CTypeInfo* self);
+Dict_CSym_CTypeInfo* DictEntry_CSym_CTypeInfo_d_parent(DictEntry_CSym_CTypeInfo* self);
+void DictEntry_CSym_CTypeInfo_set_d_parent(DictEntry_CSym_CTypeInfo* self, Dict_CSym_CTypeInfo* val);
+int32_t DictEntry_CSym_CTypeInfo_d_index(DictEntry_CSym_CTypeInfo* self);
+void DictEntry_CSym_CTypeInfo_set_d_index(DictEntry_CSym_CTypeInfo* self, int32_t val);
+uint64_t DictEntry_CSym_slice_CTypeExpr_hash_key(DictEntry_CSym_slice_CTypeExpr* self);
+void DictEntry_CSym_slice_CTypeExpr_destroy(DictEntry_CSym_slice_CTypeExpr* self);
+Dict_CSym_slice_CTypeExpr* DictEntry_CSym_slice_CTypeExpr_d_parent(DictEntry_CSym_slice_CTypeExpr* self);
+void DictEntry_CSym_slice_CTypeExpr_set_d_parent(DictEntry_CSym_slice_CTypeExpr* self, Dict_CSym_slice_CTypeExpr* val);
+int32_t DictEntry_CSym_slice_CTypeExpr_d_index(DictEntry_CSym_slice_CTypeExpr* self);
+void DictEntry_CSym_slice_CTypeExpr_set_d_index(DictEntry_CSym_slice_CTypeExpr* self, int32_t val);
+uint64_t DictEntry_CSym_CVariantInfo_hash_key(DictEntry_CSym_CVariantInfo* self);
+void DictEntry_CSym_CVariantInfo_destroy(DictEntry_CSym_CVariantInfo* self);
+Dict_CSym_CVariantInfo* DictEntry_CSym_CVariantInfo_d_parent(DictEntry_CSym_CVariantInfo* self);
+void DictEntry_CSym_CVariantInfo_set_d_parent(DictEntry_CSym_CVariantInfo* self, Dict_CSym_CVariantInfo* val);
+int32_t DictEntry_CSym_CVariantInfo_d_index(DictEntry_CSym_CVariantInfo* self);
+void DictEntry_CSym_CVariantInfo_set_d_index(DictEntry_CSym_CVariantInfo* self, int32_t val);
+uint64_t DictEntry_CSym_CDict_CSym_CType_hash_key(DictEntry_CSym_CDict_CSym_CType* self);
+void DictEntry_CSym_CDict_CSym_CType_destroy(DictEntry_CSym_CDict_CSym_CType* self);
+Dict_CSym_CDict_CSym_CType* DictEntry_CSym_CDict_CSym_CType_d_parent(DictEntry_CSym_CDict_CSym_CType* self);
+void DictEntry_CSym_CDict_CSym_CType_set_d_parent(DictEntry_CSym_CDict_CSym_CType* self, Dict_CSym_CDict_CSym_CType* val);
+int32_t DictEntry_CSym_CDict_CSym_CType_d_index(DictEntry_CSym_CDict_CSym_CType* self);
+void DictEntry_CSym_CDict_CSym_CType_set_d_index(DictEntry_CSym_CDict_CSym_CType* self, int32_t val);
 uint64_t DictEntry_CSym_CLType_hash_key(DictEntry_CSym_CLType* self);
 void DictEntry_CSym_CLType_destroy(DictEntry_CSym_CLType* self);
 Dict_CSym_CLType* DictEntry_CSym_CLType_d_parent(DictEntry_CSym_CLType* self);
 void DictEntry_CSym_CLType_set_d_parent(DictEntry_CSym_CLType* self, Dict_CSym_CLType* val);
 int32_t DictEntry_CSym_CLType_d_index(DictEntry_CSym_CLType* self);
 void DictEntry_CSym_CLType_set_d_index(DictEntry_CSym_CLType* self, int32_t val);
+uint64_t DictEntry_CSym_CStructDecl_hash_key(DictEntry_CSym_CStructDecl* self);
+void DictEntry_CSym_CStructDecl_destroy(DictEntry_CSym_CStructDecl* self);
+Dict_CSym_CStructDecl* DictEntry_CSym_CStructDecl_d_parent(DictEntry_CSym_CStructDecl* self);
+void DictEntry_CSym_CStructDecl_set_d_parent(DictEntry_CSym_CStructDecl* self, Dict_CSym_CStructDecl* val);
+int32_t DictEntry_CSym_CStructDecl_d_index(DictEntry_CSym_CStructDecl* self);
+void DictEntry_CSym_CStructDecl_set_d_index(DictEntry_CSym_CStructDecl* self, int32_t val);
 uint64_t DictEntry_CSym_CDict_CSym_CLType_hash_key(DictEntry_CSym_CDict_CSym_CLType* self);
 void DictEntry_CSym_CDict_CSym_CLType_destroy(DictEntry_CSym_CDict_CSym_CLType* self);
 Dict_CSym_CDict_CSym_CLType* DictEntry_CSym_CDict_CSym_CLType_d_parent(DictEntry_CSym_CDict_CSym_CLType* self);
@@ -12186,12 +12316,12 @@ Dict_CSym_CExpr* DictEntry_CSym_CExpr_d_parent(DictEntry_CSym_CExpr* self);
 void DictEntry_CSym_CExpr_set_d_parent(DictEntry_CSym_CExpr* self, Dict_CSym_CExpr* val);
 int32_t DictEntry_CSym_CExpr_d_index(DictEntry_CSym_CExpr* self);
 void DictEntry_CSym_CExpr_set_d_index(DictEntry_CSym_CExpr* self, int32_t val);
-uint64_t DictEntry_CSym_bool_hash_key(DictEntry_CSym_bool* self);
-void DictEntry_CSym_bool_destroy(DictEntry_CSym_bool* self);
-Dict_CSym_bool* DictEntry_CSym_bool_d_parent(DictEntry_CSym_bool* self);
-void DictEntry_CSym_bool_set_d_parent(DictEntry_CSym_bool* self, Dict_CSym_bool* val);
-int32_t DictEntry_CSym_bool_d_index(DictEntry_CSym_bool* self);
-void DictEntry_CSym_bool_set_d_index(DictEntry_CSym_bool* self, int32_t val);
+uint64_t DictEntry_CSym_CEnumDecl_hash_key(DictEntry_CSym_CEnumDecl* self);
+void DictEntry_CSym_CEnumDecl_destroy(DictEntry_CSym_CEnumDecl* self);
+Dict_CSym_CEnumDecl* DictEntry_CSym_CEnumDecl_d_parent(DictEntry_CSym_CEnumDecl* self);
+void DictEntry_CSym_CEnumDecl_set_d_parent(DictEntry_CSym_CEnumDecl* self, Dict_CSym_CEnumDecl* val);
+int32_t DictEntry_CSym_CEnumDecl_d_index(DictEntry_CSym_CEnumDecl* self);
+void DictEntry_CSym_CEnumDecl_set_d_index(DictEntry_CSym_CEnumDecl* self, int32_t val);
 uint64_t DictEntry_CSym_i32_hash_key(DictEntry_CSym_i32* self);
 void DictEntry_CSym_i32_destroy(DictEntry_CSym_i32* self);
 Dict_CSym_i32* DictEntry_CSym_i32_d_parent(DictEntry_CSym_i32* self);
@@ -12210,6 +12340,12 @@ Dict_CSym_CLInterfaceDecl* DictEntry_CSym_CLInterfaceDecl_d_parent(DictEntry_CSy
 void DictEntry_CSym_CLInterfaceDecl_set_d_parent(DictEntry_CSym_CLInterfaceDecl* self, Dict_CSym_CLInterfaceDecl* val);
 int32_t DictEntry_CSym_CLInterfaceDecl_d_index(DictEntry_CSym_CLInterfaceDecl* self);
 void DictEntry_CSym_CLInterfaceDecl_set_d_index(DictEntry_CSym_CLInterfaceDecl* self, int32_t val);
+uint64_t DictEntry_CSym_slice_CMatchArm_hash_key(DictEntry_CSym_slice_CMatchArm* self);
+void DictEntry_CSym_slice_CMatchArm_destroy(DictEntry_CSym_slice_CMatchArm* self);
+Dict_CSym_slice_CMatchArm* DictEntry_CSym_slice_CMatchArm_d_parent(DictEntry_CSym_slice_CMatchArm* self);
+void DictEntry_CSym_slice_CMatchArm_set_d_parent(DictEntry_CSym_slice_CMatchArm* self, Dict_CSym_slice_CMatchArm* val);
+int32_t DictEntry_CSym_slice_CMatchArm_d_index(DictEntry_CSym_slice_CMatchArm* self);
+void DictEntry_CSym_slice_CMatchArm_set_d_index(DictEntry_CSym_slice_CMatchArm* self, int32_t val);
 uint64_t DictEntry_CSym_opt_CLType_hash_key(DictEntry_CSym_opt_CLType* self);
 void DictEntry_CSym_opt_CLType_destroy(DictEntry_CSym_opt_CLType* self);
 Dict_CSym_opt_CLType* DictEntry_CSym_opt_CLType_d_parent(DictEntry_CSym_opt_CLType* self);
@@ -12222,6 +12358,12 @@ Dict_CSym_CLFuncDecl* DictEntry_CSym_CLFuncDecl_d_parent(DictEntry_CSym_CLFuncDe
 void DictEntry_CSym_CLFuncDecl_set_d_parent(DictEntry_CSym_CLFuncDecl* self, Dict_CSym_CLFuncDecl* val);
 int32_t DictEntry_CSym_CLFuncDecl_d_index(DictEntry_CSym_CLFuncDecl* self);
 void DictEntry_CSym_CLFuncDecl_set_d_index(DictEntry_CSym_CLFuncDecl* self, int32_t val);
+uint64_t DictEntry_CSym_slice_CLFuncDecl_hash_key(DictEntry_CSym_slice_CLFuncDecl* self);
+void DictEntry_CSym_slice_CLFuncDecl_destroy(DictEntry_CSym_slice_CLFuncDecl* self);
+Dict_CSym_slice_CLFuncDecl* DictEntry_CSym_slice_CLFuncDecl_d_parent(DictEntry_CSym_slice_CLFuncDecl* self);
+void DictEntry_CSym_slice_CLFuncDecl_set_d_parent(DictEntry_CSym_slice_CLFuncDecl* self, Dict_CSym_slice_CLFuncDecl* val);
+int32_t DictEntry_CSym_slice_CLFuncDecl_d_index(DictEntry_CSym_slice_CLFuncDecl* self);
+void DictEntry_CSym_slice_CLFuncDecl_set_d_index(DictEntry_CSym_slice_CLFuncDecl* self, int32_t val);
 uint64_t DictEntry_CSym_CLClassDecl_hash_key(DictEntry_CSym_CLClassDecl* self);
 void DictEntry_CSym_CLClassDecl_destroy(DictEntry_CSym_CLClassDecl* self);
 Dict_CSym_CLClassDecl* DictEntry_CSym_CLClassDecl_d_parent(DictEntry_CSym_CLClassDecl* self);
@@ -12234,78 +12376,157 @@ Dict_CSym_CLStructDecl* DictEntry_CSym_CLStructDecl_d_parent(DictEntry_CSym_CLSt
 void DictEntry_CSym_CLStructDecl_set_d_parent(DictEntry_CSym_CLStructDecl* self, Dict_CSym_CLStructDecl* val);
 int32_t DictEntry_CSym_CLStructDecl_d_index(DictEntry_CSym_CLStructDecl* self);
 void DictEntry_CSym_CLStructDecl_set_d_index(DictEntry_CSym_CLStructDecl* self, int32_t val);
-uint64_t DictEntry_CSym_slice_CLFuncDecl_hash_key(DictEntry_CSym_slice_CLFuncDecl* self);
-void DictEntry_CSym_slice_CLFuncDecl_destroy(DictEntry_CSym_slice_CLFuncDecl* self);
-Dict_CSym_slice_CLFuncDecl* DictEntry_CSym_slice_CLFuncDecl_d_parent(DictEntry_CSym_slice_CLFuncDecl* self);
-void DictEntry_CSym_slice_CLFuncDecl_set_d_parent(DictEntry_CSym_slice_CLFuncDecl* self, Dict_CSym_slice_CLFuncDecl* val);
-int32_t DictEntry_CSym_slice_CLFuncDecl_d_index(DictEntry_CSym_slice_CLFuncDecl* self);
-void DictEntry_CSym_slice_CLFuncDecl_set_d_index(DictEntry_CSym_slice_CLFuncDecl* self, int32_t val);
 uint64_t DictEntry_CSym_slice_string_hash_key(DictEntry_CSym_slice_string* self);
 void DictEntry_CSym_slice_string_destroy(DictEntry_CSym_slice_string* self);
 Dict_CSym_slice_string* DictEntry_CSym_slice_string_d_parent(DictEntry_CSym_slice_string* self);
 void DictEntry_CSym_slice_string_set_d_parent(DictEntry_CSym_slice_string* self, Dict_CSym_slice_string* val);
 int32_t DictEntry_CSym_slice_string_d_index(DictEntry_CSym_slice_string* self);
 void DictEntry_CSym_slice_string_set_d_index(DictEntry_CSym_slice_string* self, int32_t val);
-uint64_t DictEntry_CSym_CConstDecl_hash_key(DictEntry_CSym_CConstDecl* self);
-void DictEntry_CSym_CConstDecl_destroy(DictEntry_CSym_CConstDecl* self);
-Dict_CSym_CConstDecl* DictEntry_CSym_CConstDecl_d_parent(DictEntry_CSym_CConstDecl* self);
-void DictEntry_CSym_CConstDecl_set_d_parent(DictEntry_CSym_CConstDecl* self, Dict_CSym_CConstDecl* val);
-int32_t DictEntry_CSym_CConstDecl_d_index(DictEntry_CSym_CConstDecl* self);
-void DictEntry_CSym_CConstDecl_set_d_index(DictEntry_CSym_CConstDecl* self, int32_t val);
-uint64_t DictEntry_CSym_slice_CMatchArm_hash_key(DictEntry_CSym_slice_CMatchArm* self);
-void DictEntry_CSym_slice_CMatchArm_destroy(DictEntry_CSym_slice_CMatchArm* self);
-Dict_CSym_slice_CMatchArm* DictEntry_CSym_slice_CMatchArm_d_parent(DictEntry_CSym_slice_CMatchArm* self);
-void DictEntry_CSym_slice_CMatchArm_set_d_parent(DictEntry_CSym_slice_CMatchArm* self, Dict_CSym_slice_CMatchArm* val);
-int32_t DictEntry_CSym_slice_CMatchArm_d_index(DictEntry_CSym_slice_CMatchArm* self);
-void DictEntry_CSym_slice_CMatchArm_set_d_index(DictEntry_CSym_slice_CMatchArm* self, int32_t val);
-void hash_init_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent);
-int32_t hash_find_slot_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
-void hash_init_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent);
-int32_t hash_find_slot_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
-void hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent);
-int32_t hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
-void hash_init_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent);
-int32_t hash_find_slot_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
+void hash_insert_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, DictEntry_CSym_bool* child);
+DictEntry_CSym_bool* hash_lookup_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
+void hash_insert_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, DictEntry_CSym_CInterfaceDecl* child);
+void hash_insert_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, DictEntry_CSym_CClassDecl* child);
+void hash_insert_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, DictEntry_CSym_CFuncDecl* child);
+DictEntry_CSym_CInterfaceDecl* hash_lookup_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key);
+DictEntry_CSym_CClassDecl* hash_lookup_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key);
+DictEntry_CSym_CFuncDecl* hash_lookup_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key);
+void hash_insert_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, DictEntry_CSym_CConstDecl* child);
+DictEntry_CSym_CConstDecl* hash_lookup_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
+void hash_init_CSymTable_CSym(SymTable* parent, int32_t capacity);
+void hash_rehash_CSymTable_CSym(SymTable* parent);
+int32_t hash_find_slot_CSymTable_CSym(SymTable* parent, uint64_t key);
+void hash_insert_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, DictEntry_CSym_ETokenKind* child);
+DictEntry_CSym_ETokenKind* hash_lookup_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
+void hash_insert_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, DictEntry_CSym_string* child);
+void hash_insert_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, DictEntry_CSym_CTypeExpr* child);
+DictEntry_CSym_string* hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
+DictEntry_CSym_CTypeExpr* hash_lookup_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
+DictEntry_CSym_CType* hash_lookup_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
+void hash_insert_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, DictEntry_CSym_CType* child);
+void hash_insert_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, DictEntry_CSym_CTypeInfo* child);
+DictEntry_CSym_CTypeInfo* hash_lookup_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
+void hash_insert_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, DictEntry_CSym_slice_CTypeExpr* child);
+void hash_insert_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, DictEntry_CSym_CVariantInfo* child);
+DictEntry_CSym_CDict_CSym_CType* hash_lookup_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
+void hash_insert_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, DictEntry_CSym_CDict_CSym_CType* child);
+DictEntry_CSym_CVariantInfo* hash_lookup_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
+DictEntry_CSym_slice_CTypeExpr* hash_lookup_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key);
+void hash_insert_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, DictEntry_CSym_CLType* child);
+DictEntry_CSym_CLType* hash_lookup_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key);
+DictEntry_CSym_CEnumDecl* get_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key);
+void hash_insert_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, DictEntry_CSym_CStructDecl* child);
+void hash_insert_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, DictEntry_CSym_CDict_CSym_CLType* child);
+void hash_insert_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, DictEntry_CSym_CExpr* child);
+void hash_insert_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, DictEntry_CSym_CEnumDecl* child);
+void hash_insert_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, DictEntry_CSym_i32* child);
+void hash_insert_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, DictEntry_CSym_slice_CTupleField* child);
+void hash_insert_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, DictEntry_CSym_CLInterfaceDecl* child);
+DictEntry_CSym_CLInterfaceDecl* hash_lookup_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key);
+DictEntry_CSym_slice_CMatchArm* hash_lookup_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
+void hash_insert_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, DictEntry_CSym_slice_CMatchArm* child);
+DictEntry_CSym_CStructDecl* hash_lookup_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
+DictEntry_CSym_i32* hash_lookup_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key);
+DictEntry_CSym_slice_CTupleField* hash_lookup_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key);
+void hash_insert_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, DictEntry_CSym_opt_CLType* child);
+DictEntry_CSym_opt_CLType* hash_lookup_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key);
+DictEntry_CSym_CLClassDecl* hash_lookup_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key);
+DictEntry_CSym_CLFuncDecl* hash_lookup_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key);
+DictEntry_CSym_CLStructDecl* hash_lookup_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key);
+void hash_insert_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, DictEntry_CSym_CLFuncDecl* child);
+DictEntry_CSym_slice_CLFuncDecl* hash_lookup_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
+void hash_insert_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, DictEntry_CSym_slice_CLFuncDecl* child);
+void hash_insert_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, DictEntry_CSym_CLClassDecl* child);
+void hash_insert_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, DictEntry_CSym_CLStructDecl* child);
+void hash_insert_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, DictEntry_CSym_slice_string* child);
+bool hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
+bool hash_remove_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key);
+bool hash_remove_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key);
+DictEntry_CSym_CEnumDecl* hash_lookup_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key);
+DictEntry_CSym_CDict_CSym_CLType* hash_lookup_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key);
+DictEntry_CSym_CDict_CSym_CLType* get_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* self, Sym* key);
+bool hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key);
+DictEntry_CSym_CExpr* hash_lookup_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key);
+DictEntry_CSym_CExpr* get_CSym_CExpr(Dict_CSym_CExpr* self, Sym* key);
+bool hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key);
+bool hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
+bool hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key);
+bool hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
+DictEntry_CSym_slice_string* hash_lookup_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key);
+DictEntry_CSym_slice_string* get_CSym_slice_string(Dict_CSym_slice_string* self, Sym* key);
+bool hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key);
+bool hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
+bool hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
+void hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent);
+int32_t hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
 void hash_init_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key);
-void hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent);
-int32_t hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
-void hash_init_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent);
-int32_t hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
-void hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent);
-int32_t hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key);
-void hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent);
-int32_t hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
-void hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent);
-int32_t hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
 void hash_init_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key);
+void hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent);
+int32_t hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
+void hash_init_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent);
+int32_t hash_find_slot_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key);
+void hash_init_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent);
+int32_t hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key);
+void hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent);
+int32_t hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key);
+void hash_init_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent);
+int32_t hash_find_slot_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key);
+void hash_init_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent);
+int32_t hash_find_slot_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key);
+void hash_init_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent);
+int32_t hash_find_slot_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key);
+void hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent);
+int32_t hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key);
+void hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent);
+int32_t hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key);
 void hash_init_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent);
 int32_t hash_find_slot_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key);
+void hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent);
+int32_t hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent);
 int32_t hash_find_slot_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key);
 void hash_init_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent);
 int32_t hash_find_slot_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key);
-void hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent);
-int32_t hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key);
+void hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent);
+int32_t hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent);
 int32_t hash_find_slot_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key);
@@ -12315,30 +12536,27 @@ int32_t hash_find_slot_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTuple
 void hash_init_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key);
+void hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent);
+int32_t hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
 void hash_init_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent);
 int32_t hash_find_slot_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key);
 void hash_init_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key);
+void hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, int32_t capacity);
+void hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent);
+int32_t hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent);
 int32_t hash_find_slot_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key);
-void hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent);
-int32_t hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key);
 void hash_init_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, int32_t capacity);
 void hash_rehash_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent);
 int32_t hash_find_slot_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key);
-void hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent);
-int32_t hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key);
-void hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, int32_t capacity);
-void hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent);
-int32_t hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key);
 
 static SymTable* _sym_table = 0;
 static int32_t PREC_NONE = 0;
@@ -33531,14 +33749,16 @@ Checker* new_checker(void) {
     Scope* _t1 = new_scope(NULL);
     LyricSlice_lyric_string _t2 = lyric_slice_empty(LyricSlice_lyric_string);
     Dict_CSym_CInterfaceDecl* _t3 = _lyric_slab_alloc_Dict_CSym_CInterfaceDecl();
-    Checker* _t4 = _lyric_slab_alloc_Checker();
-    _t4->registry = _t0;
-    _t4->scope = _t1;
-    _t4->errors = _t2;
-    _t4->current_func_return = NULL;
-    _t4->current_func_name = LYRIC_STR("");
-    _t4->iface_decls = _t3;
-    Checker* c = _t4;
+    Dict_CSym_slice_CTypeExpr* _t4 = _lyric_slab_alloc_Dict_CSym_slice_CTypeExpr();
+    Checker* _t5 = _lyric_slab_alloc_Checker();
+    _t5->registry = _t0;
+    _t5->scope = _t1;
+    _t5->errors = _t2;
+    _t5->current_func_return = NULL;
+    _t5->current_func_name = LYRIC_STR("");
+    _t5->iface_decls = _t3;
+    _t5->method_type_args = _t4;
+    Checker* c = _t5;
     Checker_register_builtins(c);
     return c;
 }
@@ -36827,14 +37047,75 @@ void Checker_register_lyric_block(Checker* self, LyricBlock* block) {
                 Type* ft = _t146;
                 Type* _t147 = substitute_type(ft, subst);
                 Type* substituted = _t147;
-                TypeInfo* _t148 = cinfo;
-                Dict_CSym_CType* _t149 = _t148->methods;
-                Sym* _t150 = sym(fname);
-                Dict_CSym_CType_set(_t149, _t150, substituted);
-                Scope* _t152 = self->scope;
-                lyric_string _t153 = lyric_str_concat(concrete_name, LYRIC_STR("."));
-                lyric_string _t154 = lyric_str_concat(_t153, fname);
-                Scope_define(_t152, _t154, substituted);
+                Type* final_type = substituted;
+                TypeKind _t148 = substituted->kind;
+                int32_t _t149 = _t148.tag;
+                switch (_t149) {
+                case 14: {
+                    LyricSlice_Typeptr _t150 = _t148.data.func.params;
+                    LyricSlice_Typeptr sp = _t150;
+                    Type* _t151 = _t148.data.func.ret;
+                    Type* sr = _t151;
+                    LyricSlice_lyric_string _t152 = _t148.data.func.type_param_names;
+                    LyricSlice_lyric_string stpn = _t152;
+                    LyricSlice_lyric_string _t153 = lyric_slice_empty(LyricSlice_lyric_string);
+                    LyricSlice_lyric_string remaining = _t153;
+                    for (int32_t _idx = 0; _idx < stpn.len; _idx++) {
+                        lyric_string tpn = stpn.data[_idx];
+                        Sym* _t154 = sym(tpn);
+                        DictEntry_CSym_CType* _t155 = Dict_CSym_CType_get(subst, _t154);
+                        bool _t156 = (_t155 == 0);
+                        if (_t156) {
+                            LyricSlice_lyric_string _t157 = ({ lyric_push(&remaining, tpn, LyricSlice_lyric_string); remaining; });
+                            _t157;
+                        }
+                    }
+                    Type* _t158 = make_func_type(sp, sr, remaining);
+                    final_type = _t158;
+                    break;
+                }
+                default: {
+                    break;
+                }
+                }
+                LyricSlice_TypeExprptr _t159 = lyric_slice_empty(LyricSlice_TypeExprptr);
+                LyricSlice_TypeExprptr ta = _t159;
+                LyricSlice_TypeParamptr _t160 = FuncDecl_fp_children(f);
+                LyricSlice_TypeParamptr orig_tps = _t160;
+                for (int32_t _idx = 0; _idx < orig_tps.len; _idx++) {
+                    TypeParam* tp = orig_tps.data[_idx];
+                    Sym* _t161 = tp->name;
+                    bool _t162 = (_t161 != 0);
+                    if (_t162) {
+                        Sym* _t163 = tp->name;
+                        Sym* _t164 = _t163;
+                        lyric_string _t165 = sym_to_string(_t164);
+                        lyric_string tpname = _t165;
+                        Sym* _t166 = sym(tpname);
+                        DictEntry_CSym_CType* _t167 = Dict_CSym_CType_get(subst, _t166);
+                        DictEntry_CSym_CType* bound = _t167;
+                        bool _t168 = (bound != 0);
+                        if (_t168) {
+                            DictEntry_CSym_CType* _t169 = bound;
+                            Type* _t170 = _t169->value;
+                            TypeExpr* _t171 = type_to_type_expr(_t170);
+                            LyricSlice_TypeExprptr _t172 = ({ lyric_push(&ta, _t171, LyricSlice_TypeExprptr); ta; });
+                            _t172;
+                        }
+                    }
+                }
+                lyric_string _t173 = lyric_str_concat(concrete_name, LYRIC_STR("."));
+                lyric_string _t174 = lyric_str_concat(_t173, fname);
+                lyric_string method_key = _t174;
+                Dict_CSym_slice_CTypeExpr* _t175 = self->method_type_args;
+                Sym* _t176 = sym(method_key);
+                Dict_CSym_slice_CTypeExpr_set(_t175, _t176, ta);
+                TypeInfo* _t178 = cinfo;
+                Dict_CSym_CType* _t179 = _t178->methods;
+                Sym* _t180 = sym(fname);
+                Dict_CSym_CType_set(_t179, _t180, final_type);
+                Scope* _t182 = self->scope;
+                Scope_define(_t182, method_key, final_type);
             }
         }
     }
@@ -41603,101 +41884,115 @@ Type* Checker_check_method_call(Checker* self, Expr* call_expr, Expr* receiver, 
                             }
                             call_expr->inferred_type_args = inferred_ta;
                         }
+                    } else {
+                        lyric_string _t128 = lyric_str_concat(tname, LYRIC_STR("."));
+                        lyric_string _t129 = lyric_str_concat(_t128, method_str);
+                        lyric_string mta_key = _t129;
+                        Dict_CSym_slice_CTypeExpr* _t130 = self->method_type_args;
+                        Sym* _t131 = sym(mta_key);
+                        DictEntry_CSym_slice_CTypeExpr* _t132 = Dict_CSym_slice_CTypeExpr_get(_t130, _t131);
+                        DictEntry_CSym_slice_CTypeExpr* mta = _t132;
+                        bool _t133 = (mta != 0);
+                        if (_t133) {
+                            DictEntry_CSym_slice_CTypeExpr* _t134 = mta;
+                            LyricSlice_TypeExprptr _t135 = _t134->value;
+                            call_expr->inferred_type_args = _t135;
+                        }
                     }
-                    LyricSlice_Typeptr _t128 = lyric_slice_empty(LyricSlice_Typeptr);
-                    LyricSlice_Typeptr sub_params = _t128;
+                    LyricSlice_Typeptr _t136 = lyric_slice_empty(LyricSlice_Typeptr);
+                    LyricSlice_Typeptr sub_params = _t136;
                     for (int32_t _idx = 0; _idx < params.len; _idx++) {
                         Type* p = params.data[_idx];
-                        Type* _t129 = substitute_type(p, bindings);
-                        LyricSlice_Typeptr _t130 = ({ lyric_push(&sub_params, _t129, LyricSlice_Typeptr); sub_params; });
-                        _t130;
+                        Type* _t137 = substitute_type(p, bindings);
+                        LyricSlice_Typeptr _t138 = ({ lyric_push(&sub_params, _t137, LyricSlice_Typeptr); sub_params; });
+                        _t138;
                     }
                     propagate_arg_types(args, sub_params);
-                    Type* _t132 = substitute_type(ret, bindings);
+                    Type* _t140 = substitute_type(ret, bindings);
                     if (sub_params.cap > 0 && sub_params.data) free(sub_params.data);
-                    return _t132;
+                    return _t140;
                     if (sub_params.cap > 0 && sub_params.data) free(sub_params.data);
                     break;
                 }
                 default: {
-                    DictEntry_CSym_CType* _t133 = mt;
-                    Type* _t134 = _t133->value;
-                    return _t134;
+                    DictEntry_CSym_CType* _t141 = mt;
+                    Type* _t142 = _t141->value;
+                    return _t142;
                     break;
                 }
                 }
             }
         }
-        lyric_string _t135 = lyric_str_concat(tname, LYRIC_STR("."));
-        lyric_string _t136 = lyric_str_concat(_t135, method_str);
-        lyric_string key = _t136;
-        Scope* _t137 = self->scope;
-        Type* _t138 = Scope_lookup(_t137, key);
-        Type* ext = _t138;
-        bool _t139 = (ext != 0);
-        if (_t139) {
-            Type* _t140 = ext;
-            TypeKind _t141 = _t140->kind;
-            int32_t _t142 = _t141.tag;
-            switch (_t142) {
+        lyric_string _t143 = lyric_str_concat(tname, LYRIC_STR("."));
+        lyric_string _t144 = lyric_str_concat(_t143, method_str);
+        lyric_string key = _t144;
+        Scope* _t145 = self->scope;
+        Type* _t146 = Scope_lookup(_t145, key);
+        Type* ext = _t146;
+        bool _t147 = (ext != 0);
+        if (_t147) {
+            Type* _t148 = ext;
+            TypeKind _t149 = _t148->kind;
+            int32_t _t150 = _t149.tag;
+            switch (_t150) {
             case 14: {
-                Type* _t143 = _t141.data.func.ret;
-                Type* ret = _t143;
+                Type* _t151 = _t149.data.func.ret;
+                Type* ret = _t151;
                 return ret;
                 break;
             }
             default: {
-                Type* _t144 = ext;
-                return _t144;
+                Type* _t152 = ext;
+                return _t152;
                 break;
             }
             }
         }
     }
-    TypeKind _t145 = recv_type->kind;
-    int32_t _t146 = _t145.tag;
-    switch (_t146) {
+    TypeKind _t153 = recv_type->kind;
+    int32_t _t154 = _t153.tag;
+    switch (_t154) {
     case 10: {
-        Type* _t147 = _t145.data.optional.inner;
-        Type* inner = _t147;
-        Type* _t148 = Checker_check_builtin_method(self, inner, method_str, arg_types);
-        Type* inner_result = _t148;
-        bool _t149 = (inner_result != 0);
-        if (_t149) {
-            Type* _t150 = inner_result;
-            return _t150;
+        Type* _t155 = _t153.data.optional.inner;
+        Type* inner = _t155;
+        Type* _t156 = Checker_check_builtin_method(self, inner, method_str, arg_types);
+        Type* inner_result = _t156;
+        bool _t157 = (inner_result != 0);
+        if (_t157) {
+            Type* _t158 = inner_result;
+            return _t158;
         }
-        lyric_string _t151 = type_name(inner);
-        lyric_string inner_name = _t151;
-        bool _t152 = (!lyric_str_eq(inner_name, LYRIC_STR("")));
-        if (_t152) {
-            Registry* _t153 = self->registry;
-            TypeInfo* _t154 = Registry_lookup(_t153, inner_name);
-            TypeInfo* info = _t154;
-            bool _t155 = (info != 0);
-            if (_t155) {
-                TypeInfo* _t156 = info;
-                Dict_CSym_CType* _t157 = _t156->methods;
-                Sym* _t158 = sym(method_str);
-                DictEntry_CSym_CType* _t159 = Dict_CSym_CType_get(_t157, _t158);
-                DictEntry_CSym_CType* mt = _t159;
-                bool _t160 = (mt != 0);
-                if (_t160) {
-                    DictEntry_CSym_CType* _t161 = mt;
-                    Type* _t162 = _t161->value;
-                    TypeKind _t163 = _t162->kind;
-                    int32_t _t164 = _t163.tag;
-                    switch (_t164) {
+        lyric_string _t159 = type_name(inner);
+        lyric_string inner_name = _t159;
+        bool _t160 = (!lyric_str_eq(inner_name, LYRIC_STR("")));
+        if (_t160) {
+            Registry* _t161 = self->registry;
+            TypeInfo* _t162 = Registry_lookup(_t161, inner_name);
+            TypeInfo* info = _t162;
+            bool _t163 = (info != 0);
+            if (_t163) {
+                TypeInfo* _t164 = info;
+                Dict_CSym_CType* _t165 = _t164->methods;
+                Sym* _t166 = sym(method_str);
+                DictEntry_CSym_CType* _t167 = Dict_CSym_CType_get(_t165, _t166);
+                DictEntry_CSym_CType* mt = _t167;
+                bool _t168 = (mt != 0);
+                if (_t168) {
+                    DictEntry_CSym_CType* _t169 = mt;
+                    Type* _t170 = _t169->value;
+                    TypeKind _t171 = _t170->kind;
+                    int32_t _t172 = _t171.tag;
+                    switch (_t172) {
                     case 14: {
-                        Type* _t165 = _t163.data.func.ret;
-                        Type* ret = _t165;
+                        Type* _t173 = _t171.data.func.ret;
+                        Type* ret = _t173;
                         return ret;
                         break;
                     }
                     default: {
-                        DictEntry_CSym_CType* _t166 = mt;
-                        Type* _t167 = _t166->value;
-                        return _t167;
+                        DictEntry_CSym_CType* _t174 = mt;
+                        Type* _t175 = _t174->value;
+                        return _t175;
                         break;
                     }
                     }
@@ -41710,51 +42005,51 @@ Type* Checker_check_method_call(Checker* self, Expr* call_expr, Expr* receiver, 
         break;
     }
     }
-    bool _t168 = lyric_str_eq(method_str, LYRIC_STR("to_string"));
-    if (_t168) {
-        Type* _t169 = make_string_type();
-        return _t169;
+    bool _t176 = lyric_str_eq(method_str, LYRIC_STR("to_string"));
+    if (_t176) {
+        Type* _t177 = make_string_type();
+        return _t177;
     }
-    TypeKind _t170 = recv_type->kind;
-    int32_t _t171 = _t170.tag;
-    switch (_t171) {
+    TypeKind _t178 = recv_type->kind;
+    int32_t _t179 = _t178.tag;
+    switch (_t179) {
     case 19: {
-        lyric_string _t172 = _t170.data.typevar.name;
-        lyric_string tv_name = _t172;
-        Dict_CSym_CDict_CSym_CType* _t173 = self->type_var_methods;
-        bool _t174 = (_t173 != 0);
-        if (_t174) {
-            Dict_CSym_CDict_CSym_CType* _t175 = self->type_var_methods;
-            Dict_CSym_CDict_CSym_CType* _t176 = _t175;
-            Sym* _t177 = sym(tv_name);
-            DictEntry_CSym_CDict_CSym_CType* _t178 = Dict_CSym_CDict_CSym_CType_get(_t176, _t177);
-            DictEntry_CSym_CDict_CSym_CType* tv_methods = _t178;
-            bool _t179 = (tv_methods != 0);
-            if (_t179) {
-                DictEntry_CSym_CDict_CSym_CType* _t180 = tv_methods;
-                Dict_CSym_CType* _t181 = _t180->value;
-                Sym* _t182 = sym(method_str);
-                DictEntry_CSym_CType* _t183 = Dict_CSym_CType_get(_t181, _t182);
-                DictEntry_CSym_CType* meth = _t183;
-                bool _t184 = (meth != 0);
-                if (_t184) {
-                    DictEntry_CSym_CType* _t185 = meth;
-                    Type* _t186 = _t185->value;
-                    TypeKind _t187 = _t186->kind;
-                    int32_t _t188 = _t187.tag;
-                    switch (_t188) {
+        lyric_string _t180 = _t178.data.typevar.name;
+        lyric_string tv_name = _t180;
+        Dict_CSym_CDict_CSym_CType* _t181 = self->type_var_methods;
+        bool _t182 = (_t181 != 0);
+        if (_t182) {
+            Dict_CSym_CDict_CSym_CType* _t183 = self->type_var_methods;
+            Dict_CSym_CDict_CSym_CType* _t184 = _t183;
+            Sym* _t185 = sym(tv_name);
+            DictEntry_CSym_CDict_CSym_CType* _t186 = Dict_CSym_CDict_CSym_CType_get(_t184, _t185);
+            DictEntry_CSym_CDict_CSym_CType* tv_methods = _t186;
+            bool _t187 = (tv_methods != 0);
+            if (_t187) {
+                DictEntry_CSym_CDict_CSym_CType* _t188 = tv_methods;
+                Dict_CSym_CType* _t189 = _t188->value;
+                Sym* _t190 = sym(method_str);
+                DictEntry_CSym_CType* _t191 = Dict_CSym_CType_get(_t189, _t190);
+                DictEntry_CSym_CType* meth = _t191;
+                bool _t192 = (meth != 0);
+                if (_t192) {
+                    DictEntry_CSym_CType* _t193 = meth;
+                    Type* _t194 = _t193->value;
+                    TypeKind _t195 = _t194->kind;
+                    int32_t _t196 = _t195.tag;
+                    switch (_t196) {
                     case 14: {
-                        LyricSlice_Typeptr _t189 = _t187.data.func.params;
-                        LyricSlice_Typeptr params = _t189;
-                        Type* _t190 = _t187.data.func.ret;
-                        Type* ret = _t190;
+                        LyricSlice_Typeptr _t197 = _t195.data.func.params;
+                        LyricSlice_Typeptr params = _t197;
+                        Type* _t198 = _t195.data.func.ret;
+                        Type* ret = _t198;
                         return ret;
                         break;
                     }
                     default: {
-                        DictEntry_CSym_CType* _t191 = meth;
-                        Type* _t192 = _t191->value;
-                        return _t192;
+                        DictEntry_CSym_CType* _t199 = meth;
+                        Type* _t200 = _t199->value;
+                        return _t200;
                         break;
                     }
                     }
@@ -41767,24 +42062,24 @@ Type* Checker_check_method_call(Checker* self, Expr* call_expr, Expr* receiver, 
         break;
     }
     }
-    Span _t193 = call_expr->span;
-    Pos _t194 = _t193.start;
-    Sym* _t195 = _t194.file;
-    Span _t196 = call_expr->span;
-    Pos _t197 = _t196.start;
-    int32_t _t198 = _t197.line;
-    int64_t _t199 = ((int64_t)_t198);
-    lyric_string _t200 = lyric_itoa(_t199);
     Span _t201 = call_expr->span;
     Pos _t202 = _t201.start;
-    int32_t _t203 = _t202.column;
-    int64_t _t204 = ((int64_t)_t203);
-    lyric_string _t205 = lyric_itoa(_t204);
-    lyric_string _t206 = lyric_sprintf("checker: unknown method: %.*s at %d:%.*s:%.*s", (int)method_str.len, (const char*)method_str.data, _t195, (int)_t200.len, (const char*)_t200.data, (int)_t205.len, (const char*)_t205.data);
-    fprintf(stderr, "%.*s\n", (int)_t206.len, (const char*)_t206.data);
-    Type* _t209 = make_error_type();
+    Sym* _t203 = _t202.file;
+    Span _t204 = call_expr->span;
+    Pos _t205 = _t204.start;
+    int32_t _t206 = _t205.line;
+    int64_t _t207 = ((int64_t)_t206);
+    lyric_string _t208 = lyric_itoa(_t207);
+    Span _t209 = call_expr->span;
+    Pos _t210 = _t209.start;
+    int32_t _t211 = _t210.column;
+    int64_t _t212 = ((int64_t)_t211);
+    lyric_string _t213 = lyric_itoa(_t212);
+    lyric_string _t214 = lyric_sprintf("checker: unknown method: %.*s at %d:%.*s:%.*s", (int)method_str.len, (const char*)method_str.data, _t203, (int)_t208.len, (const char*)_t208.data, (int)_t213.len, (const char*)_t213.data);
+    fprintf(stderr, "%.*s\n", (int)_t214.len, (const char*)_t214.data);
+    Type* _t217 = make_error_type();
     if (arg_types.cap > 0 && arg_types.data) free(arg_types.data);
-    return _t209;
+    return _t217;
     if (arg_types.cap > 0 && arg_types.data) free(arg_types.data);
 }
 
@@ -59088,15 +59383,16 @@ void MonoPass_collect_from_expr(MonoPass* self, LExpr* e) {
                     int32_t _t40 = _t39;
                     bool _t41 = (_t40 == 17);
                     if (_t41) {
-                        Dict_CSym_CLClassDecl* _t42 = self->class_by_name;
-                        Dict_CSym_CLClassDecl* _t43 = _t42;
-                        LValue* _t44 = mc->receiver;
-                        LValue* _t45 = _t44;
-                        LType* _t46 = _t45->typ;
-                        LType* _t47 = _t46;
-                        lyric_string _t48 = _t47->name;
-                        Sym* _t49 = sym(_t48);
-                        DictEntry_CSym_CLClassDecl* _t50 = Dict_CSym_CLClassDecl_get(_t43, _t49);
+                        LValue* _t42 = mc->receiver;
+                        LValue* _t43 = _t42;
+                        LType* _t44 = _t43->typ;
+                        LType* _t45 = _t44;
+                        lyric_string _t46 = _t45->name;
+                        lyric_string recv_name = _t46;
+                        Dict_CSym_CLClassDecl* _t47 = self->class_by_name;
+                        Dict_CSym_CLClassDecl* _t48 = _t47;
+                        Sym* _t49 = sym(recv_name);
+                        DictEntry_CSym_CLClassDecl* _t50 = Dict_CSym_CLClassDecl_get(_t48, _t49);
                         DictEntry_CSym_CLClassDecl* cls_entry = _t50;
                         bool _t51 = (cls_entry == NULL);
                         bool _t52 = (!_t51);
@@ -59115,14 +59411,89 @@ void MonoPass_collect_from_expr(MonoPass* self, LExpr* e) {
                                     bool _t62 = has_type_vars(_t61);
                                     bool _t63 = (!_t62);
                                     if (_t63) {
-                                        LValue* _t64 = mc->receiver;
-                                        LValue* _t65 = _t64;
-                                        LType* _t66 = _t65->typ;
-                                        LType* _t67 = _t66;
-                                        lyric_string _t68 = _t67->name;
-                                        LyricSlice_LTypeptr _t69 = mc->type_args;
-                                        MonoPass_record_class_instance(self, _t68, _t69);
+                                        LyricSlice_LTypeptr _t64 = mc->type_args;
+                                        MonoPass_record_class_instance(self, recv_name, _t64);
                                     }
+                                }
+                            }
+                        }
+                        LyricSlice_LTypeptr _t66 = mc->type_args;
+                        int32_t _t67 = _t66.len;
+                        bool _t68 = (_t67 > 0);
+                        bool _sc69 = false;
+                        _sc69 = _t68;
+                        if (_sc69) {
+                            LyricSlice_LTypeptr _t70 = mc->type_args;
+                            bool _t71 = has_type_vars(_t70);
+                            bool _t72 = (!_t71);
+                            _sc69 = _t72;
+                        }
+                        if (_sc69) {
+                            lyric_string _t73 = lyric_str_concat(recv_name, LYRIC_STR("."));
+                            lyric_string _t74 = mc->method;
+                            lyric_string _t75 = lyric_str_concat(_t73, _t74);
+                            lyric_string direct_key = _t75;
+                            Dict_CSym_CLFuncDecl* _t76 = self->func_by_name;
+                            Dict_CSym_CLFuncDecl* _t77 = _t76;
+                            Sym* _t78 = sym(direct_key);
+                            DictEntry_CSym_CLFuncDecl* _t79 = Dict_CSym_CLFuncDecl_get(_t77, _t78);
+                            DictEntry_CSym_CLFuncDecl* direct_entry = _t79;
+                            bool _t80 = (direct_entry == NULL);
+                            bool _t81 = (!_t80);
+                            bool _sc82 = false;
+                            _sc82 = _t81;
+                            if (_sc82) {
+                                DictEntry_CSym_CLFuncDecl* _t83 = direct_entry;
+                                LFuncDecl* _t84 = _t83->value;
+                                LyricSlice_LTypeParam _t85 = _t84->type_params;
+                                int32_t _t86 = _t85.len;
+                                bool _t87 = (_t86 > 0);
+                                _sc82 = _t87;
+                            }
+                            if (_sc82) {
+                                LyricSlice_LTypeptr _t88 = mc->type_args;
+                                MonoPass_record_func_instance(self, direct_key, _t88);
+                            } else {
+                                int32_t fi2 = 0;
+                                while (1) {
+                                    LProgram* _t90 = self->prog;
+                                    LProgram* _t91 = _t90;
+                                    LyricSlice_LFuncDeclptr _t92 = _t91->functions;
+                                    int32_t _t93 = _t92.len;
+                                    bool _t94 = (fi2 < _t93);
+                                    if (!(_t94)) break;
+                                    LProgram* _t95 = self->prog;
+                                    LProgram* _t96 = _t95;
+                                    LyricSlice_LFuncDeclptr _t97 = _t96->functions;
+                                    LFuncDecl* _t98 = _t97.data[fi2];
+                                    LFuncDecl* f = _t98;
+                                    lyric_string _t99 = f->name;
+                                    lyric_string _t100 = mc->method;
+                                    bool _t101 = lyric_str_eq(_t99, _t100);
+                                    bool _sc102 = false;
+                                    _sc102 = _t101;
+                                    if (_sc102) {
+                                        LyricSlice_LTypeParam _t103 = f->type_params;
+                                        int32_t _t104 = _t103.len;
+                                        bool _t105 = (_t104 > 0);
+                                        _sc102 = _t105;
+                                    }
+                                    bool _sc106 = false;
+                                    _sc106 = _sc102;
+                                    if (_sc106) {
+                                        LyricSlice_LRelationalConstraint _t107 = f->relational_constraints;
+                                        int32_t _t108 = _t107.len;
+                                        bool _t109 = (_t108 > 0);
+                                        _sc106 = _t109;
+                                    }
+                                    if (_sc106) {
+                                        lyric_string _t110 = MonoPass_func_key(self, f);
+                                        lyric_string fkey = _t110;
+                                        LyricSlice_LTypeptr _t111 = mc->type_args;
+                                        MonoPass_record_func_instance(self, fkey, _t111);
+                                    }
+                                    int32_t _t113 = (fi2 + 1);
+                                    fi2 = _t113;
                                 }
                             }
                         }
@@ -59133,43 +59504,43 @@ void MonoPass_collect_from_expr(MonoPass* self, LExpr* e) {
         break;
     }
     case 11: {
-        LClassAllocData* _t71 = e->class_alloc;
-        bool _t72 = (_t71 == NULL);
-        bool _t73 = (!_t72);
-        if (_t73) {
-            LClassAllocData* _t74 = e->class_alloc;
-            LClassAllocData* _t75 = _t74;
-            LyricSlice_LTypeptr _t76 = _t75->type_args;
-            int32_t _t77 = _t76.len;
-            bool _t78 = (_t77 > 0);
-            if (_t78) {
-                LClassAllocData* _t79 = e->class_alloc;
-                LClassAllocData* _t80 = _t79;
-                LyricSlice_LTypeptr _t81 = _t80->type_args;
-                bool _t82 = has_type_vars(_t81);
-                bool _t83 = (!_t82);
-                if (_t83) {
-                    LClassAllocData* _t84 = e->class_alloc;
-                    LClassAllocData* _t85 = _t84;
-                    lyric_string _t86 = _t85->class_name;
-                    LClassAllocData* _t87 = e->class_alloc;
-                    LClassAllocData* _t88 = _t87;
-                    LyricSlice_LTypeptr _t89 = _t88->type_args;
-                    MonoPass_record_class_instance(self, _t86, _t89);
+        LClassAllocData* _t114 = e->class_alloc;
+        bool _t115 = (_t114 == NULL);
+        bool _t116 = (!_t115);
+        if (_t116) {
+            LClassAllocData* _t117 = e->class_alloc;
+            LClassAllocData* _t118 = _t117;
+            LyricSlice_LTypeptr _t119 = _t118->type_args;
+            int32_t _t120 = _t119.len;
+            bool _t121 = (_t120 > 0);
+            if (_t121) {
+                LClassAllocData* _t122 = e->class_alloc;
+                LClassAllocData* _t123 = _t122;
+                LyricSlice_LTypeptr _t124 = _t123->type_args;
+                bool _t125 = has_type_vars(_t124);
+                bool _t126 = (!_t125);
+                if (_t126) {
+                    LClassAllocData* _t127 = e->class_alloc;
+                    LClassAllocData* _t128 = _t127;
+                    lyric_string _t129 = _t128->class_name;
+                    LClassAllocData* _t130 = e->class_alloc;
+                    LClassAllocData* _t131 = _t130;
+                    LyricSlice_LTypeptr _t132 = _t131->type_args;
+                    MonoPass_record_class_instance(self, _t129, _t132);
                 }
             }
         }
         break;
     }
     case 26: {
-        LyricOpt_LFuncLitData _t91 = e->func_lit;
-        bool _t92 = lyric_isnull(_t91);
-        bool _t93 = (!_t92);
-        if (_t93) {
-            LyricOpt_LFuncLitData _t94 = e->func_lit;
-            LFuncLitData _t95 = lyric_unwrap(_t94);
-            LyricSlice_LStmtptr _t96 = _t95.body;
-            MonoPass_collect_from_stmts(self, _t96);
+        LyricOpt_LFuncLitData _t134 = e->func_lit;
+        bool _t135 = lyric_isnull(_t134);
+        bool _t136 = (!_t135);
+        if (_t136) {
+            LyricOpt_LFuncLitData _t137 = e->func_lit;
+            LFuncLitData _t138 = lyric_unwrap(_t137);
+            LyricSlice_LStmtptr _t139 = _t138.body;
+            MonoPass_collect_from_stmts(self, _t139);
         }
         break;
     }
@@ -60764,510 +61135,518 @@ void MonoPass_rewrite_expr(MonoPass* self, LExpr* e) {
                                     mc->type_args = _t116;
                                 }
                             }
+                        } else {
+                            LyricSlice_LTypeptr _t117 = mc->type_args;
+                            int32_t _t118 = _t117.len;
+                            bool _t119 = (_t118 > 0);
+                            if (_t119) {
+                                LyricSlice_LTypeptr _t120 = lyric_slice_empty(LyricSlice_LTypeptr);
+                                mc->type_args = _t120;
+                            }
                         }
                     }
                 }
             }
             int32_t i = 0;
             while (1) {
-                LyricSlice_LValueptr _t117 = mc->args;
-                int32_t _t118 = _t117.len;
-                bool _t119 = (i < _t118);
-                if (!(_t119)) break;
-                LyricSlice_LValueptr _t120 = mc->args;
-                LValue* _t121 = _t120.data[i];
-                bool _t122 = (_t121 == NULL);
-                bool _t123 = (!_t122);
-                if (_t123) {
-                    LyricSlice_LValueptr _t124 = mc->args;
-                    LValue* _t125 = _t124.data[i];
-                    MonoPass_rewrite_value(self, _t125);
+                LyricSlice_LValueptr _t121 = mc->args;
+                int32_t _t122 = _t121.len;
+                bool _t123 = (i < _t122);
+                if (!(_t123)) break;
+                LyricSlice_LValueptr _t124 = mc->args;
+                LValue* _t125 = _t124.data[i];
+                bool _t126 = (_t125 == NULL);
+                bool _t127 = (!_t126);
+                if (_t127) {
+                    LyricSlice_LValueptr _t128 = mc->args;
+                    LValue* _t129 = _t128.data[i];
+                    MonoPass_rewrite_value(self, _t129);
                 }
-                int32_t _t127 = (i + 1);
-                i = _t127;
+                int32_t _t131 = (i + 1);
+                i = _t131;
             }
         }
         break;
     }
     case 11: {
-        LClassAllocData* _t128 = e->class_alloc;
-        bool _t129 = (_t128 == NULL);
-        bool _t130 = (!_t129);
-        if (_t130) {
-            LClassAllocData* _t131 = e->class_alloc;
-            LClassAllocData* _t132 = _t131;
-            LyricSlice_LTypeptr _t133 = _t132->type_args;
-            int32_t _t134 = _t133.len;
-            bool _t135 = (_t134 > 0);
-            if (_t135) {
-                LClassAllocData* _t136 = e->class_alloc;
-                LClassAllocData* _t137 = _t136;
-                LyricSlice_LTypeptr _t138 = _t137->type_args;
-                bool _t139 = has_type_vars(_t138);
-                bool _t140 = (!_t139);
-                if (_t140) {
-                    LClassAllocData* _t141 = e->class_alloc;
-                    LClassAllocData* _t142 = _t141;
-                    lyric_string _t143 = _t142->class_name;
-                    LClassAllocData* _t144 = e->class_alloc;
-                    LClassAllocData* _t145 = _t144;
-                    LyricSlice_LTypeptr _t146 = _t145->type_args;
-                    lyric_string _t147 = mangle_name(_t143, _t146);
-                    lyric_string mangled = _t147;
+        LClassAllocData* _t132 = e->class_alloc;
+        bool _t133 = (_t132 == NULL);
+        bool _t134 = (!_t133);
+        if (_t134) {
+            LClassAllocData* _t135 = e->class_alloc;
+            LClassAllocData* _t136 = _t135;
+            LyricSlice_LTypeptr _t137 = _t136->type_args;
+            int32_t _t138 = _t137.len;
+            bool _t139 = (_t138 > 0);
+            if (_t139) {
+                LClassAllocData* _t140 = e->class_alloc;
+                LClassAllocData* _t141 = _t140;
+                LyricSlice_LTypeptr _t142 = _t141->type_args;
+                bool _t143 = has_type_vars(_t142);
+                bool _t144 = (!_t143);
+                if (_t144) {
+                    LClassAllocData* _t145 = e->class_alloc;
+                    LClassAllocData* _t146 = _t145;
+                    lyric_string _t147 = _t146->class_name;
                     LClassAllocData* _t148 = e->class_alloc;
                     LClassAllocData* _t149 = _t148;
-                    _t149->class_name = mangled;
-                    LTypeKind _t150 = LTypeKind_TyClassHandle;
-                    LyricSlice_LField _t151 = lyric_slice_empty(LyricSlice_LField);
-                    LyricSlice_LTypeptr _t152 = lyric_slice_empty(LyricSlice_LTypeptr);
-                    LyricSlice_LVariant _t153 = lyric_slice_empty(LyricSlice_LVariant);
-                    LyricSlice_LTypeptr _t154 = lyric_slice_empty(LyricSlice_LTypeptr);
-                    LType* _t155 = _lyric_slab_alloc_LType();
-                    _t155->kind = _t150;
-                    _t155->name = mangled;
-                    _t155->elem = NULL;
-                    _t155->key = NULL;
-                    _t155->fields = _t151;
-                    _t155->params = _t152;
-                    _t155->ret = NULL;
-                    _t155->variants = _t153;
-                    _t155->type_args = _t154;
-                    _t155->bits = 0;
-                    _t155->is_exported = false;
-                    e->typ = _t155;
+                    LyricSlice_LTypeptr _t150 = _t149->type_args;
+                    lyric_string _t151 = mangle_name(_t147, _t150);
+                    lyric_string mangled = _t151;
+                    LClassAllocData* _t152 = e->class_alloc;
+                    LClassAllocData* _t153 = _t152;
+                    _t153->class_name = mangled;
+                    LTypeKind _t154 = LTypeKind_TyClassHandle;
+                    LyricSlice_LField _t155 = lyric_slice_empty(LyricSlice_LField);
                     LyricSlice_LTypeptr _t156 = lyric_slice_empty(LyricSlice_LTypeptr);
-                    LClassAllocData* _t157 = e->class_alloc;
-                    LClassAllocData* _t158 = _t157;
-                    _t158->type_args = _t156;
+                    LyricSlice_LVariant _t157 = lyric_slice_empty(LyricSlice_LVariant);
+                    LyricSlice_LTypeptr _t158 = lyric_slice_empty(LyricSlice_LTypeptr);
+                    LType* _t159 = _lyric_slab_alloc_LType();
+                    _t159->kind = _t154;
+                    _t159->name = mangled;
+                    _t159->elem = NULL;
+                    _t159->key = NULL;
+                    _t159->fields = _t155;
+                    _t159->params = _t156;
+                    _t159->ret = NULL;
+                    _t159->variants = _t157;
+                    _t159->type_args = _t158;
+                    _t159->bits = 0;
+                    _t159->is_exported = false;
+                    e->typ = _t159;
+                    LyricSlice_LTypeptr _t160 = lyric_slice_empty(LyricSlice_LTypeptr);
+                    LClassAllocData* _t161 = e->class_alloc;
+                    LClassAllocData* _t162 = _t161;
+                    _t162->type_args = _t160;
                 }
             }
             int32_t i = 0;
             while (1) {
-                LClassAllocData* _t159 = e->class_alloc;
-                LClassAllocData* _t160 = _t159;
-                LyricSlice_LFieldInit _t161 = _t160->fields;
-                int32_t _t162 = _t161.len;
-                bool _t163 = (i < _t162);
-                if (!(_t163)) break;
-                LClassAllocData* _t164 = e->class_alloc;
-                LClassAllocData* _t165 = _t164;
-                LyricSlice_LFieldInit _t166 = _t165->fields;
-                LFieldInit _t167 = _t166.data[i];
-                LValue* _t168 = _t167.value;
-                bool _t169 = (_t168 == NULL);
-                bool _t170 = (!_t169);
-                if (_t170) {
-                    LClassAllocData* _t171 = e->class_alloc;
-                    LClassAllocData* _t172 = _t171;
-                    LyricSlice_LFieldInit _t173 = _t172->fields;
-                    LFieldInit _t174 = _t173.data[i];
-                    LValue* _t175 = _t174.value;
-                    MonoPass_rewrite_value(self, _t175);
+                LClassAllocData* _t163 = e->class_alloc;
+                LClassAllocData* _t164 = _t163;
+                LyricSlice_LFieldInit _t165 = _t164->fields;
+                int32_t _t166 = _t165.len;
+                bool _t167 = (i < _t166);
+                if (!(_t167)) break;
+                LClassAllocData* _t168 = e->class_alloc;
+                LClassAllocData* _t169 = _t168;
+                LyricSlice_LFieldInit _t170 = _t169->fields;
+                LFieldInit _t171 = _t170.data[i];
+                LValue* _t172 = _t171.value;
+                bool _t173 = (_t172 == NULL);
+                bool _t174 = (!_t173);
+                if (_t174) {
+                    LClassAllocData* _t175 = e->class_alloc;
+                    LClassAllocData* _t176 = _t175;
+                    LyricSlice_LFieldInit _t177 = _t176->fields;
+                    LFieldInit _t178 = _t177.data[i];
+                    LValue* _t179 = _t178.value;
+                    MonoPass_rewrite_value(self, _t179);
                 }
-                int32_t _t177 = (i + 1);
-                i = _t177;
+                int32_t _t181 = (i + 1);
+                i = _t181;
             }
         }
         break;
     }
     case 0: {
-        LyricOpt_LBinOpData _t178 = e->bin_op;
-        bool _t179 = lyric_isnull(_t178);
-        bool _t180 = (!_t179);
-        if (_t180) {
-            LyricOpt_LBinOpData _t181 = e->bin_op;
-            LBinOpData _t182 = lyric_unwrap(_t181);
-            LValue* _t183 = _t182.left;
-            bool _t184 = (_t183 == NULL);
-            bool _t185 = (!_t184);
-            if (_t185) {
-                LyricOpt_LBinOpData _t186 = e->bin_op;
-                LBinOpData _t187 = lyric_unwrap(_t186);
-                LValue* _t188 = _t187.left;
-                LValue* _t189 = _t188;
-                LType* _t190 = _t189->typ;
-                LType* _t191 = MonoPass_subst_type_remove_vars(self, _t190);
-                LyricOpt_LBinOpData _t192 = e->bin_op;
-                LBinOpData _t193 = lyric_unwrap(_t192);
-                LValue* _t194 = _t193.left;
-                LValue* _t195 = _t194;
-                _t195->typ = _t191;
+        LyricOpt_LBinOpData _t182 = e->bin_op;
+        bool _t183 = lyric_isnull(_t182);
+        bool _t184 = (!_t183);
+        if (_t184) {
+            LyricOpt_LBinOpData _t185 = e->bin_op;
+            LBinOpData _t186 = lyric_unwrap(_t185);
+            LValue* _t187 = _t186.left;
+            bool _t188 = (_t187 == NULL);
+            bool _t189 = (!_t188);
+            if (_t189) {
+                LyricOpt_LBinOpData _t190 = e->bin_op;
+                LBinOpData _t191 = lyric_unwrap(_t190);
+                LValue* _t192 = _t191.left;
+                LValue* _t193 = _t192;
+                LType* _t194 = _t193->typ;
+                LType* _t195 = MonoPass_subst_type_remove_vars(self, _t194);
+                LyricOpt_LBinOpData _t196 = e->bin_op;
+                LBinOpData _t197 = lyric_unwrap(_t196);
+                LValue* _t198 = _t197.left;
+                LValue* _t199 = _t198;
+                _t199->typ = _t195;
             }
-            LyricOpt_LBinOpData _t196 = e->bin_op;
-            LBinOpData _t197 = lyric_unwrap(_t196);
-            LValue* _t198 = _t197.right;
-            bool _t199 = (_t198 == NULL);
-            bool _t200 = (!_t199);
-            if (_t200) {
-                LyricOpt_LBinOpData _t201 = e->bin_op;
-                LBinOpData _t202 = lyric_unwrap(_t201);
-                LValue* _t203 = _t202.right;
-                LValue* _t204 = _t203;
-                LType* _t205 = _t204->typ;
-                LType* _t206 = MonoPass_subst_type_remove_vars(self, _t205);
-                LyricOpt_LBinOpData _t207 = e->bin_op;
-                LBinOpData _t208 = lyric_unwrap(_t207);
-                LValue* _t209 = _t208.right;
-                LValue* _t210 = _t209;
-                _t210->typ = _t206;
+            LyricOpt_LBinOpData _t200 = e->bin_op;
+            LBinOpData _t201 = lyric_unwrap(_t200);
+            LValue* _t202 = _t201.right;
+            bool _t203 = (_t202 == NULL);
+            bool _t204 = (!_t203);
+            if (_t204) {
+                LyricOpt_LBinOpData _t205 = e->bin_op;
+                LBinOpData _t206 = lyric_unwrap(_t205);
+                LValue* _t207 = _t206.right;
+                LValue* _t208 = _t207;
+                LType* _t209 = _t208->typ;
+                LType* _t210 = MonoPass_subst_type_remove_vars(self, _t209);
+                LyricOpt_LBinOpData _t211 = e->bin_op;
+                LBinOpData _t212 = lyric_unwrap(_t211);
+                LValue* _t213 = _t212.right;
+                LValue* _t214 = _t213;
+                _t214->typ = _t210;
             }
         }
         break;
     }
     case 1: {
-        LyricOpt_LUnOpData _t211 = e->un_op;
-        bool _t212 = lyric_isnull(_t211);
-        bool _t213 = (!_t212);
-        if (_t213) {
-            LyricOpt_LUnOpData _t214 = e->un_op;
-            LUnOpData _t215 = lyric_unwrap(_t214);
-            LValue* _t216 = _t215.operand;
-            bool _t217 = (_t216 == NULL);
-            bool _t218 = (!_t217);
-            if (_t218) {
-                LyricOpt_LUnOpData _t219 = e->un_op;
-                LUnOpData _t220 = lyric_unwrap(_t219);
-                LValue* _t221 = _t220.operand;
-                MonoPass_rewrite_value(self, _t221);
+        LyricOpt_LUnOpData _t215 = e->un_op;
+        bool _t216 = lyric_isnull(_t215);
+        bool _t217 = (!_t216);
+        if (_t217) {
+            LyricOpt_LUnOpData _t218 = e->un_op;
+            LUnOpData _t219 = lyric_unwrap(_t218);
+            LValue* _t220 = _t219.operand;
+            bool _t221 = (_t220 == NULL);
+            bool _t222 = (!_t221);
+            if (_t222) {
+                LyricOpt_LUnOpData _t223 = e->un_op;
+                LUnOpData _t224 = lyric_unwrap(_t223);
+                LValue* _t225 = _t224.operand;
+                MonoPass_rewrite_value(self, _t225);
             }
         }
         break;
     }
     case 2: {
-        LyricOpt_LCastData _t223 = e->cast;
-        bool _t224 = lyric_isnull(_t223);
-        bool _t225 = (!_t224);
-        if (_t225) {
-            LyricOpt_LCastData _t226 = e->cast;
-            LCastData _t227 = lyric_unwrap(_t226);
-            LType* _t228 = _t227.target;
-            LType* _t229 = MonoPass_subst_type_remove_vars(self, _t228);
+        LyricOpt_LCastData _t227 = e->cast;
+        bool _t228 = lyric_isnull(_t227);
+        bool _t229 = (!_t228);
+        if (_t229) {
             LyricOpt_LCastData _t230 = e->cast;
             LCastData _t231 = lyric_unwrap(_t230);
-            _t231.target = _t229;
-            LyricOpt_LCastData _t232 = e->cast;
-            LCastData _t233 = lyric_unwrap(_t232);
-            LValue* _t234 = _t233.operand;
-            bool _t235 = (_t234 == NULL);
-            bool _t236 = (!_t235);
-            if (_t236) {
-                LyricOpt_LCastData _t237 = e->cast;
-                LCastData _t238 = lyric_unwrap(_t237);
-                LValue* _t239 = _t238.operand;
-                MonoPass_rewrite_value(self, _t239);
+            LType* _t232 = _t231.target;
+            LType* _t233 = MonoPass_subst_type_remove_vars(self, _t232);
+            LyricOpt_LCastData _t234 = e->cast;
+            LCastData _t235 = lyric_unwrap(_t234);
+            _t235.target = _t233;
+            LyricOpt_LCastData _t236 = e->cast;
+            LCastData _t237 = lyric_unwrap(_t236);
+            LValue* _t238 = _t237.operand;
+            bool _t239 = (_t238 == NULL);
+            bool _t240 = (!_t239);
+            if (_t240) {
+                LyricOpt_LCastData _t241 = e->cast;
+                LCastData _t242 = lyric_unwrap(_t241);
+                LValue* _t243 = _t242.operand;
+                MonoPass_rewrite_value(self, _t243);
             }
         }
         break;
     }
     case 9: {
-        LyricOpt_LBuiltinData _t241 = e->builtin;
-        bool _t242 = lyric_isnull(_t241);
-        bool _t243 = (!_t242);
-        if (_t243) {
+        LyricOpt_LBuiltinData _t245 = e->builtin;
+        bool _t246 = lyric_isnull(_t245);
+        bool _t247 = (!_t246);
+        if (_t247) {
             int32_t i = 0;
             while (1) {
-                LyricOpt_LBuiltinData _t244 = e->builtin;
-                LBuiltinData _t245 = lyric_unwrap(_t244);
-                LyricSlice_LValueptr _t246 = _t245.args;
-                int32_t _t247 = _t246.len;
-                bool _t248 = (i < _t247);
-                if (!(_t248)) break;
-                LyricOpt_LBuiltinData _t249 = e->builtin;
-                LBuiltinData _t250 = lyric_unwrap(_t249);
-                LyricSlice_LValueptr _t251 = _t250.args;
-                LValue* _t252 = _t251.data[i];
-                bool _t253 = (_t252 == NULL);
-                bool _t254 = (!_t253);
-                if (_t254) {
-                    LyricOpt_LBuiltinData _t255 = e->builtin;
-                    LBuiltinData _t256 = lyric_unwrap(_t255);
-                    LyricSlice_LValueptr _t257 = _t256.args;
-                    LValue* _t258 = _t257.data[i];
-                    MonoPass_rewrite_value(self, _t258);
+                LyricOpt_LBuiltinData _t248 = e->builtin;
+                LBuiltinData _t249 = lyric_unwrap(_t248);
+                LyricSlice_LValueptr _t250 = _t249.args;
+                int32_t _t251 = _t250.len;
+                bool _t252 = (i < _t251);
+                if (!(_t252)) break;
+                LyricOpt_LBuiltinData _t253 = e->builtin;
+                LBuiltinData _t254 = lyric_unwrap(_t253);
+                LyricSlice_LValueptr _t255 = _t254.args;
+                LValue* _t256 = _t255.data[i];
+                bool _t257 = (_t256 == NULL);
+                bool _t258 = (!_t257);
+                if (_t258) {
+                    LyricOpt_LBuiltinData _t259 = e->builtin;
+                    LBuiltinData _t260 = lyric_unwrap(_t259);
+                    LyricSlice_LValueptr _t261 = _t260.args;
+                    LValue* _t262 = _t261.data[i];
+                    MonoPass_rewrite_value(self, _t262);
                 }
-                int32_t _t260 = (i + 1);
-                i = _t260;
+                int32_t _t264 = (i + 1);
+                i = _t264;
             }
         }
         break;
     }
     case 26: {
-        LyricOpt_LFuncLitData _t261 = e->func_lit;
-        bool _t262 = lyric_isnull(_t261);
-        bool _t263 = (!_t262);
-        if (_t263) {
-            LyricOpt_LFuncLitData _t264 = e->func_lit;
-            LFuncLitData _t265 = lyric_unwrap(_t264);
-            LType* _t266 = _t265.return_type;
-            LType* _t267 = MonoPass_subst_type_remove_vars(self, _t266);
+        LyricOpt_LFuncLitData _t265 = e->func_lit;
+        bool _t266 = lyric_isnull(_t265);
+        bool _t267 = (!_t266);
+        if (_t267) {
             LyricOpt_LFuncLitData _t268 = e->func_lit;
             LFuncLitData _t269 = lyric_unwrap(_t268);
-            _t269.return_type = _t267;
+            LType* _t270 = _t269.return_type;
+            LType* _t271 = MonoPass_subst_type_remove_vars(self, _t270);
+            LyricOpt_LFuncLitData _t272 = e->func_lit;
+            LFuncLitData _t273 = lyric_unwrap(_t272);
+            _t273.return_type = _t271;
             int32_t i = 0;
             while (1) {
-                LyricOpt_LFuncLitData _t270 = e->func_lit;
-                LFuncLitData _t271 = lyric_unwrap(_t270);
-                LyricSlice_LParam _t272 = _t271.params;
-                int32_t _t273 = _t272.len;
-                bool _t274 = (i < _t273);
-                if (!(_t274)) break;
-                LyricOpt_LFuncLitData _t275 = e->func_lit;
-                LFuncLitData _t276 = lyric_unwrap(_t275);
-                LyricSlice_LParam _t277 = _t276.params;
-                LParam _t278 = _t277.data[i];
-                LType* _t279 = _t278.typ;
-                LType* _t280 = MonoPass_subst_type_remove_vars(self, _t279);
-                LyricOpt_LFuncLitData _t281 = e->func_lit;
-                LFuncLitData _t282 = lyric_unwrap(_t281);
-                LyricSlice_LParam _t283 = _t282.params;
-                _t283.data[i].typ = _t280;
-                int32_t _t284 = (i + 1);
-                i = _t284;
+                LyricOpt_LFuncLitData _t274 = e->func_lit;
+                LFuncLitData _t275 = lyric_unwrap(_t274);
+                LyricSlice_LParam _t276 = _t275.params;
+                int32_t _t277 = _t276.len;
+                bool _t278 = (i < _t277);
+                if (!(_t278)) break;
+                LyricOpt_LFuncLitData _t279 = e->func_lit;
+                LFuncLitData _t280 = lyric_unwrap(_t279);
+                LyricSlice_LParam _t281 = _t280.params;
+                LParam _t282 = _t281.data[i];
+                LType* _t283 = _t282.typ;
+                LType* _t284 = MonoPass_subst_type_remove_vars(self, _t283);
+                LyricOpt_LFuncLitData _t285 = e->func_lit;
+                LFuncLitData _t286 = lyric_unwrap(_t285);
+                LyricSlice_LParam _t287 = _t286.params;
+                _t287.data[i].typ = _t284;
+                int32_t _t288 = (i + 1);
+                i = _t288;
             }
-            LyricOpt_LFuncLitData _t285 = e->func_lit;
-            LFuncLitData _t286 = lyric_unwrap(_t285);
-            LyricSlice_LStmtptr _t287 = _t286.body;
-            MonoPass_rewrite_stmts(self, _t287);
+            LyricOpt_LFuncLitData _t289 = e->func_lit;
+            LFuncLitData _t290 = lyric_unwrap(_t289);
+            LyricSlice_LStmtptr _t291 = _t290.body;
+            MonoPass_rewrite_stmts(self, _t291);
         }
         break;
     }
     case 15: {
-        LyricOpt_LWrapOptionalData _t289 = e->wrap_opt;
-        bool _t290 = lyric_isnull(_t289);
-        bool _t291 = (!_t290);
-        if (_t291) {
-            LyricOpt_LWrapOptionalData _t292 = e->wrap_opt;
-            LWrapOptionalData _t293 = lyric_unwrap(_t292);
-            LValue* _t294 = _t293.value;
-            bool _t295 = (_t294 == NULL);
-            bool _t296 = (!_t295);
-            if (_t296) {
-                LyricOpt_LWrapOptionalData _t297 = e->wrap_opt;
-                LWrapOptionalData _t298 = lyric_unwrap(_t297);
-                LValue* _t299 = _t298.value;
-                MonoPass_rewrite_value(self, _t299);
+        LyricOpt_LWrapOptionalData _t293 = e->wrap_opt;
+        bool _t294 = lyric_isnull(_t293);
+        bool _t295 = (!_t294);
+        if (_t295) {
+            LyricOpt_LWrapOptionalData _t296 = e->wrap_opt;
+            LWrapOptionalData _t297 = lyric_unwrap(_t296);
+            LValue* _t298 = _t297.value;
+            bool _t299 = (_t298 == NULL);
+            bool _t300 = (!_t299);
+            if (_t300) {
+                LyricOpt_LWrapOptionalData _t301 = e->wrap_opt;
+                LWrapOptionalData _t302 = lyric_unwrap(_t301);
+                LValue* _t303 = _t302.value;
+                MonoPass_rewrite_value(self, _t303);
             }
         }
         break;
     }
     case 16: {
-        LyricOpt_LUnwrapOptionalData _t301 = e->unwrap_opt;
-        bool _t302 = lyric_isnull(_t301);
-        bool _t303 = (!_t302);
-        if (_t303) {
-            LyricOpt_LUnwrapOptionalData _t304 = e->unwrap_opt;
-            LUnwrapOptionalData _t305 = lyric_unwrap(_t304);
-            LValue* _t306 = _t305.value;
-            bool _t307 = (_t306 == NULL);
-            bool _t308 = (!_t307);
-            if (_t308) {
-                LyricOpt_LUnwrapOptionalData _t309 = e->unwrap_opt;
-                LUnwrapOptionalData _t310 = lyric_unwrap(_t309);
-                LValue* _t311 = _t310.value;
-                MonoPass_rewrite_value(self, _t311);
+        LyricOpt_LUnwrapOptionalData _t305 = e->unwrap_opt;
+        bool _t306 = lyric_isnull(_t305);
+        bool _t307 = (!_t306);
+        if (_t307) {
+            LyricOpt_LUnwrapOptionalData _t308 = e->unwrap_opt;
+            LUnwrapOptionalData _t309 = lyric_unwrap(_t308);
+            LValue* _t310 = _t309.value;
+            bool _t311 = (_t310 == NULL);
+            bool _t312 = (!_t311);
+            if (_t312) {
+                LyricOpt_LUnwrapOptionalData _t313 = e->unwrap_opt;
+                LUnwrapOptionalData _t314 = lyric_unwrap(_t313);
+                LValue* _t315 = _t314.value;
+                MonoPass_rewrite_value(self, _t315);
             }
         }
         break;
     }
     case 17: {
-        LyricOpt_LIsNullData _t313 = e->is_null;
-        bool _t314 = lyric_isnull(_t313);
-        bool _t315 = (!_t314);
-        if (_t315) {
-            LyricOpt_LIsNullData _t316 = e->is_null;
-            LIsNullData _t317 = lyric_unwrap(_t316);
-            LValue* _t318 = _t317.value;
-            bool _t319 = (_t318 == NULL);
-            bool _t320 = (!_t319);
-            if (_t320) {
-                LyricOpt_LIsNullData _t321 = e->is_null;
-                LIsNullData _t322 = lyric_unwrap(_t321);
-                LValue* _t323 = _t322.value;
-                MonoPass_rewrite_value(self, _t323);
+        LyricOpt_LIsNullData _t317 = e->is_null;
+        bool _t318 = lyric_isnull(_t317);
+        bool _t319 = (!_t318);
+        if (_t319) {
+            LyricOpt_LIsNullData _t320 = e->is_null;
+            LIsNullData _t321 = lyric_unwrap(_t320);
+            LValue* _t322 = _t321.value;
+            bool _t323 = (_t322 == NULL);
+            bool _t324 = (!_t323);
+            if (_t324) {
+                LyricOpt_LIsNullData _t325 = e->is_null;
+                LIsNullData _t326 = lyric_unwrap(_t325);
+                LValue* _t327 = _t326.value;
+                MonoPass_rewrite_value(self, _t327);
             }
         }
         break;
     }
     case 18: {
-        LyricOpt_LVariantConstructData _t325 = e->variant_construct;
-        bool _t326 = lyric_isnull(_t325);
-        bool _t327 = (!_t326);
-        if (_t327) {
+        LyricOpt_LVariantConstructData _t329 = e->variant_construct;
+        bool _t330 = lyric_isnull(_t329);
+        bool _t331 = (!_t330);
+        if (_t331) {
             int32_t i = 0;
             while (1) {
-                LyricOpt_LVariantConstructData _t328 = e->variant_construct;
-                LVariantConstructData _t329 = lyric_unwrap(_t328);
-                LyricSlice_LValueptr _t330 = _t329.fields;
-                int32_t _t331 = _t330.len;
-                bool _t332 = (i < _t331);
-                if (!(_t332)) break;
-                LyricOpt_LVariantConstructData _t333 = e->variant_construct;
-                LVariantConstructData _t334 = lyric_unwrap(_t333);
-                LyricSlice_LValueptr _t335 = _t334.fields;
-                LValue* _t336 = _t335.data[i];
-                bool _t337 = (_t336 == NULL);
-                bool _t338 = (!_t337);
-                if (_t338) {
-                    LyricOpt_LVariantConstructData _t339 = e->variant_construct;
-                    LVariantConstructData _t340 = lyric_unwrap(_t339);
-                    LyricSlice_LValueptr _t341 = _t340.fields;
-                    LValue* _t342 = _t341.data[i];
-                    MonoPass_rewrite_value(self, _t342);
+                LyricOpt_LVariantConstructData _t332 = e->variant_construct;
+                LVariantConstructData _t333 = lyric_unwrap(_t332);
+                LyricSlice_LValueptr _t334 = _t333.fields;
+                int32_t _t335 = _t334.len;
+                bool _t336 = (i < _t335);
+                if (!(_t336)) break;
+                LyricOpt_LVariantConstructData _t337 = e->variant_construct;
+                LVariantConstructData _t338 = lyric_unwrap(_t337);
+                LyricSlice_LValueptr _t339 = _t338.fields;
+                LValue* _t340 = _t339.data[i];
+                bool _t341 = (_t340 == NULL);
+                bool _t342 = (!_t341);
+                if (_t342) {
+                    LyricOpt_LVariantConstructData _t343 = e->variant_construct;
+                    LVariantConstructData _t344 = lyric_unwrap(_t343);
+                    LyricSlice_LValueptr _t345 = _t344.fields;
+                    LValue* _t346 = _t345.data[i];
+                    MonoPass_rewrite_value(self, _t346);
                 }
-                int32_t _t344 = (i + 1);
-                i = _t344;
+                int32_t _t348 = (i + 1);
+                i = _t348;
             }
         }
         break;
     }
     case 20: {
-        LyricOpt_LVariantDataData _t345 = e->variant_data;
-        bool _t346 = lyric_isnull(_t345);
-        bool _t347 = (!_t346);
-        if (_t347) {
-            LyricOpt_LVariantDataData _t348 = e->variant_data;
-            LVariantDataData _t349 = lyric_unwrap(_t348);
-            LValue* _t350 = _t349.value;
-            bool _t351 = (_t350 == NULL);
-            bool _t352 = (!_t351);
-            if (_t352) {
-                LyricOpt_LVariantDataData _t353 = e->variant_data;
-                LVariantDataData _t354 = lyric_unwrap(_t353);
-                LValue* _t355 = _t354.value;
-                MonoPass_rewrite_value(self, _t355);
+        LyricOpt_LVariantDataData _t349 = e->variant_data;
+        bool _t350 = lyric_isnull(_t349);
+        bool _t351 = (!_t350);
+        if (_t351) {
+            LyricOpt_LVariantDataData _t352 = e->variant_data;
+            LVariantDataData _t353 = lyric_unwrap(_t352);
+            LValue* _t354 = _t353.value;
+            bool _t355 = (_t354 == NULL);
+            bool _t356 = (!_t355);
+            if (_t356) {
+                LyricOpt_LVariantDataData _t357 = e->variant_data;
+                LVariantDataData _t358 = lyric_unwrap(_t357);
+                LValue* _t359 = _t358.value;
+                MonoPass_rewrite_value(self, _t359);
             }
         }
         break;
     }
     case 19: {
-        LyricOpt_LVariantTagData _t357 = e->variant_tag;
-        bool _t358 = lyric_isnull(_t357);
-        bool _t359 = (!_t358);
-        if (_t359) {
-            LyricOpt_LVariantTagData _t360 = e->variant_tag;
-            LVariantTagData _t361 = lyric_unwrap(_t360);
-            LValue* _t362 = _t361.value;
-            bool _t363 = (_t362 == NULL);
-            bool _t364 = (!_t363);
-            if (_t364) {
-                LyricOpt_LVariantTagData _t365 = e->variant_tag;
-                LVariantTagData _t366 = lyric_unwrap(_t365);
-                LValue* _t367 = _t366.value;
-                MonoPass_rewrite_value(self, _t367);
+        LyricOpt_LVariantTagData _t361 = e->variant_tag;
+        bool _t362 = lyric_isnull(_t361);
+        bool _t363 = (!_t362);
+        if (_t363) {
+            LyricOpt_LVariantTagData _t364 = e->variant_tag;
+            LVariantTagData _t365 = lyric_unwrap(_t364);
+            LValue* _t366 = _t365.value;
+            bool _t367 = (_t366 == NULL);
+            bool _t368 = (!_t367);
+            if (_t368) {
+                LyricOpt_LVariantTagData _t369 = e->variant_tag;
+                LVariantTagData _t370 = lyric_unwrap(_t369);
+                LValue* _t371 = _t370.value;
+                MonoPass_rewrite_value(self, _t371);
             }
         }
         break;
     }
     case 6: {
-        LyricOpt_LSliceData _t369 = e->slice_data;
-        bool _t370 = lyric_isnull(_t369);
-        bool _t371 = (!_t370);
-        if (_t371) {
-            LyricOpt_LSliceData _t372 = e->slice_data;
-            LSliceData _t373 = lyric_unwrap(_t372);
-            LValue* _t374 = _t373.collection;
-            bool _t375 = (_t374 == NULL);
-            bool _t376 = (!_t375);
-            if (_t376) {
-                LyricOpt_LSliceData _t377 = e->slice_data;
-                LSliceData _t378 = lyric_unwrap(_t377);
-                LValue* _t379 = _t378.collection;
-                MonoPass_rewrite_value(self, _t379);
+        LyricOpt_LSliceData _t373 = e->slice_data;
+        bool _t374 = lyric_isnull(_t373);
+        bool _t375 = (!_t374);
+        if (_t375) {
+            LyricOpt_LSliceData _t376 = e->slice_data;
+            LSliceData _t377 = lyric_unwrap(_t376);
+            LValue* _t378 = _t377.collection;
+            bool _t379 = (_t378 == NULL);
+            bool _t380 = (!_t379);
+            if (_t380) {
+                LyricOpt_LSliceData _t381 = e->slice_data;
+                LSliceData _t382 = lyric_unwrap(_t381);
+                LValue* _t383 = _t382.collection;
+                MonoPass_rewrite_value(self, _t383);
             }
         }
         break;
     }
     case 10: {
-        LyricOpt_LStructLitData _t381 = e->struct_lit;
-        bool _t382 = lyric_isnull(_t381);
-        bool _t383 = (!_t382);
-        if (_t383) {
+        LyricOpt_LStructLitData _t385 = e->struct_lit;
+        bool _t386 = lyric_isnull(_t385);
+        bool _t387 = (!_t386);
+        if (_t387) {
             int32_t i = 0;
             while (1) {
-                LyricOpt_LStructLitData _t384 = e->struct_lit;
-                LStructLitData _t385 = lyric_unwrap(_t384);
-                LyricSlice_LFieldInit _t386 = _t385.fields;
-                int32_t _t387 = _t386.len;
-                bool _t388 = (i < _t387);
-                if (!(_t388)) break;
-                LyricOpt_LStructLitData _t389 = e->struct_lit;
-                LStructLitData _t390 = lyric_unwrap(_t389);
-                LyricSlice_LFieldInit _t391 = _t390.fields;
-                LFieldInit _t392 = _t391.data[i];
-                LValue* _t393 = _t392.value;
-                bool _t394 = (_t393 == NULL);
-                bool _t395 = (!_t394);
-                if (_t395) {
-                    LyricOpt_LStructLitData _t396 = e->struct_lit;
-                    LStructLitData _t397 = lyric_unwrap(_t396);
-                    LyricSlice_LFieldInit _t398 = _t397.fields;
-                    LFieldInit _t399 = _t398.data[i];
-                    LValue* _t400 = _t399.value;
-                    MonoPass_rewrite_value(self, _t400);
+                LyricOpt_LStructLitData _t388 = e->struct_lit;
+                LStructLitData _t389 = lyric_unwrap(_t388);
+                LyricSlice_LFieldInit _t390 = _t389.fields;
+                int32_t _t391 = _t390.len;
+                bool _t392 = (i < _t391);
+                if (!(_t392)) break;
+                LyricOpt_LStructLitData _t393 = e->struct_lit;
+                LStructLitData _t394 = lyric_unwrap(_t393);
+                LyricSlice_LFieldInit _t395 = _t394.fields;
+                LFieldInit _t396 = _t395.data[i];
+                LValue* _t397 = _t396.value;
+                bool _t398 = (_t397 == NULL);
+                bool _t399 = (!_t398);
+                if (_t399) {
+                    LyricOpt_LStructLitData _t400 = e->struct_lit;
+                    LStructLitData _t401 = lyric_unwrap(_t400);
+                    LyricSlice_LFieldInit _t402 = _t401.fields;
+                    LFieldInit _t403 = _t402.data[i];
+                    LValue* _t404 = _t403.value;
+                    MonoPass_rewrite_value(self, _t404);
                 }
-                int32_t _t402 = (i + 1);
-                i = _t402;
+                int32_t _t406 = (i + 1);
+                i = _t406;
             }
         }
         break;
     }
     case 3: {
-        LyricOpt_LStructFieldData _t403 = e->struct_field;
-        bool _t404 = lyric_isnull(_t403);
-        bool _t405 = (!_t404);
-        if (_t405) {
-            LyricOpt_LStructFieldData _t406 = e->struct_field;
-            LStructFieldData _t407 = lyric_unwrap(_t406);
-            LValue* _t408 = _t407.receiver;
-            bool _t409 = (_t408 == NULL);
-            bool _t410 = (!_t409);
-            if (_t410) {
-                LyricOpt_LStructFieldData _t411 = e->struct_field;
-                LStructFieldData _t412 = lyric_unwrap(_t411);
-                LValue* _t413 = _t412.receiver;
-                MonoPass_rewrite_value(self, _t413);
+        LyricOpt_LStructFieldData _t407 = e->struct_field;
+        bool _t408 = lyric_isnull(_t407);
+        bool _t409 = (!_t408);
+        if (_t409) {
+            LyricOpt_LStructFieldData _t410 = e->struct_field;
+            LStructFieldData _t411 = lyric_unwrap(_t410);
+            LValue* _t412 = _t411.receiver;
+            bool _t413 = (_t412 == NULL);
+            bool _t414 = (!_t413);
+            if (_t414) {
+                LyricOpt_LStructFieldData _t415 = e->struct_field;
+                LStructFieldData _t416 = lyric_unwrap(_t415);
+                LValue* _t417 = _t416.receiver;
+                MonoPass_rewrite_value(self, _t417);
             }
         }
         break;
     }
     case 4: {
-        LyricOpt_LClassGetData _t415 = e->class_get;
-        bool _t416 = lyric_isnull(_t415);
-        bool _t417 = (!_t416);
-        if (_t417) {
-            LyricOpt_LClassGetData _t418 = e->class_get;
-            LClassGetData _t419 = lyric_unwrap(_t418);
-            LClassGetData cg = _t419;
-            LValue* _t420 = cg.handle;
-            bool _t421 = (_t420 == NULL);
-            bool _t422 = (!_t421);
-            if (_t422) {
-                LValue* _t423 = cg.handle;
-                MonoPass_rewrite_value(self, _t423);
-                LValue* _t425 = cg.handle;
-                LValue* _t426 = _t425;
-                LType* _t427 = _t426->typ;
-                bool _t428 = (_t427 == NULL);
-                bool _t429 = (!_t428);
-                bool _sc430 = false;
-                _sc430 = _t429;
-                if (_sc430) {
-                    LValue* _t431 = cg.handle;
-                    LValue* _t432 = _t431;
-                    LType* _t433 = _t432->typ;
-                    LType* _t434 = _t433;
-                    LTypeKind _t435 = _t434->kind;
-                    int32_t _t436 = _t435;
-                    bool _t437 = (_t436 == 17);
-                    _sc430 = _t437;
+        LyricOpt_LClassGetData _t419 = e->class_get;
+        bool _t420 = lyric_isnull(_t419);
+        bool _t421 = (!_t420);
+        if (_t421) {
+            LyricOpt_LClassGetData _t422 = e->class_get;
+            LClassGetData _t423 = lyric_unwrap(_t422);
+            LClassGetData cg = _t423;
+            LValue* _t424 = cg.handle;
+            bool _t425 = (_t424 == NULL);
+            bool _t426 = (!_t425);
+            if (_t426) {
+                LValue* _t427 = cg.handle;
+                MonoPass_rewrite_value(self, _t427);
+                LValue* _t429 = cg.handle;
+                LValue* _t430 = _t429;
+                LType* _t431 = _t430->typ;
+                bool _t432 = (_t431 == NULL);
+                bool _t433 = (!_t432);
+                bool _sc434 = false;
+                _sc434 = _t433;
+                if (_sc434) {
+                    LValue* _t435 = cg.handle;
+                    LValue* _t436 = _t435;
+                    LType* _t437 = _t436->typ;
+                    LType* _t438 = _t437;
+                    LTypeKind _t439 = _t438->kind;
+                    int32_t _t440 = _t439;
+                    bool _t441 = (_t440 == 17);
+                    _sc434 = _t441;
                 }
-                if (_sc430) {
-                    LValue* _t438 = cg.handle;
-                    LValue* _t439 = _t438;
-                    LType* _t440 = _t439->typ;
-                    LType* _t441 = _t440;
-                    lyric_string _t442 = _t441->name;
-                    cg.class_name = _t442;
+                if (_sc434) {
+                    LValue* _t442 = cg.handle;
+                    LValue* _t443 = _t442;
+                    LType* _t444 = _t443->typ;
+                    LType* _t445 = _t444;
+                    lyric_string _t446 = _t445->name;
+                    cg.class_name = _t446;
                 }
             }
             e->class_get = lyric_some(cg, LyricOpt_LClassGetData);
@@ -61275,216 +61654,216 @@ void MonoPass_rewrite_expr(MonoPass* self, LExpr* e) {
         break;
     }
     case 5: {
-        LyricOpt_LIndexGetData _t443 = e->index_get;
-        bool _t444 = lyric_isnull(_t443);
-        bool _t445 = (!_t444);
-        if (_t445) {
-            LyricOpt_LIndexGetData _t446 = e->index_get;
-            LIndexGetData _t447 = lyric_unwrap(_t446);
-            LValue* _t448 = _t447.collection;
-            bool _t449 = (_t448 == NULL);
-            bool _t450 = (!_t449);
-            if (_t450) {
-                LyricOpt_LIndexGetData _t451 = e->index_get;
-                LIndexGetData _t452 = lyric_unwrap(_t451);
-                LValue* _t453 = _t452.collection;
-                MonoPass_rewrite_value(self, _t453);
+        LyricOpt_LIndexGetData _t447 = e->index_get;
+        bool _t448 = lyric_isnull(_t447);
+        bool _t449 = (!_t448);
+        if (_t449) {
+            LyricOpt_LIndexGetData _t450 = e->index_get;
+            LIndexGetData _t451 = lyric_unwrap(_t450);
+            LValue* _t452 = _t451.collection;
+            bool _t453 = (_t452 == NULL);
+            bool _t454 = (!_t453);
+            if (_t454) {
+                LyricOpt_LIndexGetData _t455 = e->index_get;
+                LIndexGetData _t456 = lyric_unwrap(_t455);
+                LValue* _t457 = _t456.collection;
+                MonoPass_rewrite_value(self, _t457);
             }
-            LyricOpt_LIndexGetData _t455 = e->index_get;
-            LIndexGetData _t456 = lyric_unwrap(_t455);
-            LValue* _t457 = _t456.index;
-            bool _t458 = (_t457 == NULL);
-            bool _t459 = (!_t458);
-            if (_t459) {
-                LyricOpt_LIndexGetData _t460 = e->index_get;
-                LIndexGetData _t461 = lyric_unwrap(_t460);
-                LValue* _t462 = _t461.index;
-                MonoPass_rewrite_value(self, _t462);
+            LyricOpt_LIndexGetData _t459 = e->index_get;
+            LIndexGetData _t460 = lyric_unwrap(_t459);
+            LValue* _t461 = _t460.index;
+            bool _t462 = (_t461 == NULL);
+            bool _t463 = (!_t462);
+            if (_t463) {
+                LyricOpt_LIndexGetData _t464 = e->index_get;
+                LIndexGetData _t465 = lyric_unwrap(_t464);
+                LValue* _t466 = _t465.index;
+                MonoPass_rewrite_value(self, _t466);
             }
         }
         break;
     }
     case 21: {
-        LyricOpt_LExtractValueData _t464 = e->extract_value;
-        bool _t465 = lyric_isnull(_t464);
-        bool _t466 = (!_t465);
-        if (_t466) {
-            LyricOpt_LExtractValueData _t467 = e->extract_value;
-            LExtractValueData _t468 = lyric_unwrap(_t467);
-            LValue* _t469 = _t468.value;
-            bool _t470 = (_t469 == NULL);
-            bool _t471 = (!_t470);
-            if (_t471) {
-                LyricOpt_LExtractValueData _t472 = e->extract_value;
-                LExtractValueData _t473 = lyric_unwrap(_t472);
-                LValue* _t474 = _t473.value;
-                MonoPass_rewrite_value(self, _t474);
+        LyricOpt_LExtractValueData _t468 = e->extract_value;
+        bool _t469 = lyric_isnull(_t468);
+        bool _t470 = (!_t469);
+        if (_t470) {
+            LyricOpt_LExtractValueData _t471 = e->extract_value;
+            LExtractValueData _t472 = lyric_unwrap(_t471);
+            LValue* _t473 = _t472.value;
+            bool _t474 = (_t473 == NULL);
+            bool _t475 = (!_t474);
+            if (_t475) {
+                LyricOpt_LExtractValueData _t476 = e->extract_value;
+                LExtractValueData _t477 = lyric_unwrap(_t476);
+                LValue* _t478 = _t477.value;
+                MonoPass_rewrite_value(self, _t478);
             }
         }
         break;
     }
     case 22: {
-        LyricOpt_LExtractErrorData _t476 = e->extract_error;
-        bool _t477 = lyric_isnull(_t476);
-        bool _t478 = (!_t477);
-        if (_t478) {
-            LyricOpt_LExtractErrorData _t479 = e->extract_error;
-            LExtractErrorData _t480 = lyric_unwrap(_t479);
-            LValue* _t481 = _t480.value;
-            bool _t482 = (_t481 == NULL);
-            bool _t483 = (!_t482);
-            if (_t483) {
-                LyricOpt_LExtractErrorData _t484 = e->extract_error;
-                LExtractErrorData _t485 = lyric_unwrap(_t484);
-                LValue* _t486 = _t485.value;
-                MonoPass_rewrite_value(self, _t486);
+        LyricOpt_LExtractErrorData _t480 = e->extract_error;
+        bool _t481 = lyric_isnull(_t480);
+        bool _t482 = (!_t481);
+        if (_t482) {
+            LyricOpt_LExtractErrorData _t483 = e->extract_error;
+            LExtractErrorData _t484 = lyric_unwrap(_t483);
+            LValue* _t485 = _t484.value;
+            bool _t486 = (_t485 == NULL);
+            bool _t487 = (!_t486);
+            if (_t487) {
+                LyricOpt_LExtractErrorData _t488 = e->extract_error;
+                LExtractErrorData _t489 = lyric_unwrap(_t488);
+                LValue* _t490 = _t489.value;
+                MonoPass_rewrite_value(self, _t490);
             }
         }
         break;
     }
     case 23: {
-        LyricOpt_LMakeResultData _t488 = e->make_result;
-        bool _t489 = lyric_isnull(_t488);
-        bool _t490 = (!_t489);
-        if (_t490) {
-            LyricOpt_LMakeResultData _t491 = e->make_result;
-            LMakeResultData _t492 = lyric_unwrap(_t491);
-            LValue* _t493 = _t492.value;
-            bool _t494 = (_t493 == NULL);
-            bool _t495 = (!_t494);
-            if (_t495) {
-                LyricOpt_LMakeResultData _t496 = e->make_result;
-                LMakeResultData _t497 = lyric_unwrap(_t496);
-                LValue* _t498 = _t497.value;
-                MonoPass_rewrite_value(self, _t498);
+        LyricOpt_LMakeResultData _t492 = e->make_result;
+        bool _t493 = lyric_isnull(_t492);
+        bool _t494 = (!_t493);
+        if (_t494) {
+            LyricOpt_LMakeResultData _t495 = e->make_result;
+            LMakeResultData _t496 = lyric_unwrap(_t495);
+            LValue* _t497 = _t496.value;
+            bool _t498 = (_t497 == NULL);
+            bool _t499 = (!_t498);
+            if (_t499) {
+                LyricOpt_LMakeResultData _t500 = e->make_result;
+                LMakeResultData _t501 = lyric_unwrap(_t500);
+                LValue* _t502 = _t501.value;
+                MonoPass_rewrite_value(self, _t502);
             }
-            LyricOpt_LMakeResultData _t500 = e->make_result;
-            LMakeResultData _t501 = lyric_unwrap(_t500);
-            LValue* _t502 = _t501.err;
-            bool _t503 = (_t502 == NULL);
-            bool _t504 = (!_t503);
-            if (_t504) {
-                LyricOpt_LMakeResultData _t505 = e->make_result;
-                LMakeResultData _t506 = lyric_unwrap(_t505);
-                LValue* _t507 = _t506.err;
-                LValue* _t508 = _t507;
-                LType* _t509 = _t508->typ;
-                LType* _t510 = MonoPass_subst_type_remove_vars(self, _t509);
-                LyricOpt_LMakeResultData _t511 = e->make_result;
-                LMakeResultData _t512 = lyric_unwrap(_t511);
-                LValue* _t513 = _t512.err;
-                LValue* _t514 = _t513;
-                _t514->typ = _t510;
+            LyricOpt_LMakeResultData _t504 = e->make_result;
+            LMakeResultData _t505 = lyric_unwrap(_t504);
+            LValue* _t506 = _t505.err;
+            bool _t507 = (_t506 == NULL);
+            bool _t508 = (!_t507);
+            if (_t508) {
+                LyricOpt_LMakeResultData _t509 = e->make_result;
+                LMakeResultData _t510 = lyric_unwrap(_t509);
+                LValue* _t511 = _t510.err;
+                LValue* _t512 = _t511;
+                LType* _t513 = _t512->typ;
+                LType* _t514 = MonoPass_subst_type_remove_vars(self, _t513);
+                LyricOpt_LMakeResultData _t515 = e->make_result;
+                LMakeResultData _t516 = lyric_unwrap(_t515);
+                LValue* _t517 = _t516.err;
+                LValue* _t518 = _t517;
+                _t518->typ = _t514;
             }
         }
         break;
     }
     case 27: {
-        LyricOpt_LFormatData _t515 = e->format;
-        bool _t516 = lyric_isnull(_t515);
-        bool _t517 = (!_t516);
-        if (_t517) {
+        LyricOpt_LFormatData _t519 = e->format;
+        bool _t520 = lyric_isnull(_t519);
+        bool _t521 = (!_t520);
+        if (_t521) {
             int32_t i = 0;
             while (1) {
-                LyricOpt_LFormatData _t518 = e->format;
-                LFormatData _t519 = lyric_unwrap(_t518);
-                LyricSlice_LFormatPart _t520 = _t519.parts;
-                int32_t _t521 = _t520.len;
-                bool _t522 = (i < _t521);
-                if (!(_t522)) break;
-                LyricOpt_LFormatData _t523 = e->format;
-                LFormatData _t524 = lyric_unwrap(_t523);
-                LyricSlice_LFormatPart _t525 = _t524.parts;
-                LFormatPart _t526 = _t525.data[i];
-                bool _t527 = _t526.is_literal;
-                bool _t528 = (!_t527);
-                if (_t528) {
-                    LyricOpt_LFormatData _t529 = e->format;
-                    LFormatData _t530 = lyric_unwrap(_t529);
-                    LyricSlice_LFormatPart _t531 = _t530.parts;
-                    LFormatPart _t532 = _t531.data[i];
-                    LValue* _t533 = _t532.value;
-                    bool _t534 = (_t533 == NULL);
-                    bool _t535 = (!_t534);
-                    if (_t535) {
-                        LyricOpt_LFormatData _t536 = e->format;
-                        LFormatData _t537 = lyric_unwrap(_t536);
-                        LyricSlice_LFormatPart _t538 = _t537.parts;
-                        LFormatPart _t539 = _t538.data[i];
-                        LValue* _t540 = _t539.value;
-                        MonoPass_rewrite_value(self, _t540);
+                LyricOpt_LFormatData _t522 = e->format;
+                LFormatData _t523 = lyric_unwrap(_t522);
+                LyricSlice_LFormatPart _t524 = _t523.parts;
+                int32_t _t525 = _t524.len;
+                bool _t526 = (i < _t525);
+                if (!(_t526)) break;
+                LyricOpt_LFormatData _t527 = e->format;
+                LFormatData _t528 = lyric_unwrap(_t527);
+                LyricSlice_LFormatPart _t529 = _t528.parts;
+                LFormatPart _t530 = _t529.data[i];
+                bool _t531 = _t530.is_literal;
+                bool _t532 = (!_t531);
+                if (_t532) {
+                    LyricOpt_LFormatData _t533 = e->format;
+                    LFormatData _t534 = lyric_unwrap(_t533);
+                    LyricSlice_LFormatPart _t535 = _t534.parts;
+                    LFormatPart _t536 = _t535.data[i];
+                    LValue* _t537 = _t536.value;
+                    bool _t538 = (_t537 == NULL);
+                    bool _t539 = (!_t538);
+                    if (_t539) {
+                        LyricOpt_LFormatData _t540 = e->format;
+                        LFormatData _t541 = lyric_unwrap(_t540);
+                        LyricSlice_LFormatPart _t542 = _t541.parts;
+                        LFormatPart _t543 = _t542.data[i];
+                        LValue* _t544 = _t543.value;
+                        MonoPass_rewrite_value(self, _t544);
                     }
                 }
-                int32_t _t542 = (i + 1);
-                i = _t542;
+                int32_t _t546 = (i + 1);
+                i = _t546;
             }
         }
         break;
     }
     case 24: {
-        LyricOpt_LEnvGetData _t543 = e->env_get;
-        bool _t544 = lyric_isnull(_t543);
-        bool _t545 = (!_t544);
-        if (_t545) {
-            LyricOpt_LEnvGetData _t546 = e->env_get;
-            LEnvGetData _t547 = lyric_unwrap(_t546);
-            LValue* _t548 = _t547.env;
-            bool _t549 = (_t548 == NULL);
-            bool _t550 = (!_t549);
-            if (_t550) {
-                LyricOpt_LEnvGetData _t551 = e->env_get;
-                LEnvGetData _t552 = lyric_unwrap(_t551);
-                LValue* _t553 = _t552.env;
-                LValue* _t554 = _t553;
-                LType* _t555 = _t554->typ;
-                LType* _t556 = MonoPass_subst_type_remove_vars(self, _t555);
-                LyricOpt_LEnvGetData _t557 = e->env_get;
-                LEnvGetData _t558 = lyric_unwrap(_t557);
-                LValue* _t559 = _t558.env;
-                LValue* _t560 = _t559;
-                _t560->typ = _t556;
+        LyricOpt_LEnvGetData _t547 = e->env_get;
+        bool _t548 = lyric_isnull(_t547);
+        bool _t549 = (!_t548);
+        if (_t549) {
+            LyricOpt_LEnvGetData _t550 = e->env_get;
+            LEnvGetData _t551 = lyric_unwrap(_t550);
+            LValue* _t552 = _t551.env;
+            bool _t553 = (_t552 == NULL);
+            bool _t554 = (!_t553);
+            if (_t554) {
+                LyricOpt_LEnvGetData _t555 = e->env_get;
+                LEnvGetData _t556 = lyric_unwrap(_t555);
+                LValue* _t557 = _t556.env;
+                LValue* _t558 = _t557;
+                LType* _t559 = _t558->typ;
+                LType* _t560 = MonoPass_subst_type_remove_vars(self, _t559);
+                LyricOpt_LEnvGetData _t561 = e->env_get;
+                LEnvGetData _t562 = lyric_unwrap(_t561);
+                LValue* _t563 = _t562.env;
+                LValue* _t564 = _t563;
+                _t564->typ = _t560;
             }
         }
         break;
     }
     case 25: {
-        LyricOpt_LFuncRefData _t561 = e->func_ref;
-        bool _t562 = lyric_isnull(_t561);
-        bool _t563 = (!_t562);
-        if (_t563) {
-            LyricOpt_LFuncRefData _t564 = e->func_ref;
-            LFuncRefData _t565 = lyric_unwrap(_t564);
-            LValue* _t566 = _t565.env;
-            bool _t567 = (_t566 == NULL);
-            bool _t568 = (!_t567);
-            if (_t568) {
-                LyricOpt_LFuncRefData _t569 = e->func_ref;
-                LFuncRefData _t570 = lyric_unwrap(_t569);
-                LValue* _t571 = _t570.env;
-                LValue* _t572 = _t571;
-                LType* _t573 = _t572->typ;
-                LType* _t574 = MonoPass_subst_type_remove_vars(self, _t573);
-                LyricOpt_LFuncRefData _t575 = e->func_ref;
-                LFuncRefData _t576 = lyric_unwrap(_t575);
-                LValue* _t577 = _t576.env;
-                LValue* _t578 = _t577;
-                _t578->typ = _t574;
+        LyricOpt_LFuncRefData _t565 = e->func_ref;
+        bool _t566 = lyric_isnull(_t565);
+        bool _t567 = (!_t566);
+        if (_t567) {
+            LyricOpt_LFuncRefData _t568 = e->func_ref;
+            LFuncRefData _t569 = lyric_unwrap(_t568);
+            LValue* _t570 = _t569.env;
+            bool _t571 = (_t570 == NULL);
+            bool _t572 = (!_t571);
+            if (_t572) {
+                LyricOpt_LFuncRefData _t573 = e->func_ref;
+                LFuncRefData _t574 = lyric_unwrap(_t573);
+                LValue* _t575 = _t574.env;
+                LValue* _t576 = _t575;
+                LType* _t577 = _t576->typ;
+                LType* _t578 = MonoPass_subst_type_remove_vars(self, _t577);
+                LyricOpt_LFuncRefData _t579 = e->func_ref;
+                LFuncRefData _t580 = lyric_unwrap(_t579);
+                LValue* _t581 = _t580.env;
+                LValue* _t582 = _t581;
+                _t582->typ = _t578;
             }
         }
         break;
     }
     case 14: {
-        LyricOpt_LMakeChannelData _t579 = e->make_channel;
-        bool _t580 = lyric_isnull(_t579);
-        bool _t581 = (!_t580);
-        if (_t581) {
-            LyricOpt_LMakeChannelData _t582 = e->make_channel;
-            LMakeChannelData _t583 = lyric_unwrap(_t582);
-            LType* _t584 = _t583.elem_type;
-            LType* _t585 = MonoPass_subst_type_remove_vars(self, _t584);
+        LyricOpt_LMakeChannelData _t583 = e->make_channel;
+        bool _t584 = lyric_isnull(_t583);
+        bool _t585 = (!_t584);
+        if (_t585) {
             LyricOpt_LMakeChannelData _t586 = e->make_channel;
             LMakeChannelData _t587 = lyric_unwrap(_t586);
-            _t587.elem_type = _t585;
+            LType* _t588 = _t587.elem_type;
+            LType* _t589 = MonoPass_subst_type_remove_vars(self, _t588);
+            LyricOpt_LMakeChannelData _t590 = e->make_channel;
+            LMakeChannelData _t591 = lyric_unwrap(_t590);
+            _t591.elem_type = _t589;
         }
         break;
     }
@@ -61523,149 +61902,178 @@ LType* subst_type(LType* t, Dict_CSym_opt_CLType* subst) {
         }
         return t;
     }
-    LyricSlice_LField _t15 = lyric_slice_empty(LyricSlice_LField);
-    LyricSlice_LField new_fields = _t15;
+    LType* _t15 = t;
+    LTypeKind _t16 = _t15->kind;
+    int32_t _t17 = _t16;
+    bool _t18 = (_t17 == 17);
+    bool _sc19 = false;
+    _sc19 = _t18;
+    bool _t20 = (!_sc19);
+    if (_t20) {
+        LType* _t21 = t;
+        LTypeKind _t22 = _t21->kind;
+        int32_t _t23 = _t22;
+        bool _t24 = (_t23 == 16);
+        _sc19 = _t24;
+    }
+    if (_sc19) {
+        Dict_CSym_opt_CLType* _t25 = subst;
+        LType* _t26 = t;
+        lyric_string _t27 = _t26->name;
+        Sym* _t28 = sym(_t27);
+        DictEntry_CSym_opt_CLType* _t29 = Dict_CSym_opt_CLType_get(_t25, _t28);
+        DictEntry_CSym_opt_CLType* concrete = _t29;
+        bool _t30 = (concrete == NULL);
+        bool _t31 = (!_t30);
+        if (_t31) {
+            DictEntry_CSym_opt_CLType* _t32 = concrete;
+            LType* _t33 = _t32->value;
+            return _t33;
+        }
+    }
+    LyricSlice_LField _t34 = lyric_slice_empty(LyricSlice_LField);
+    LyricSlice_LField new_fields = _t34;
     int32_t i = 0;
     while (1) {
-        LType* _t16 = t;
-        LyricSlice_LField _t17 = _t16->fields;
-        int32_t _t18 = _t17.len;
-        bool _t19 = (i < _t18);
-        if (!(_t19)) break;
-        LType* _t20 = t;
-        LyricSlice_LField _t21 = _t20->fields;
-        LField _t22 = _t21.data[i];
-        lyric_string _t23 = _t22.name;
-        LType* _t24 = t;
-        LyricSlice_LField _t25 = _t24->fields;
-        LField _t26 = _t25.data[i];
-        LType* _t27 = _t26.typ;
-        LType* _t28 = subst_type(_t27, subst);
-        LField _t29 = (LField){.name = _t23, .typ = _t28};
-        LyricSlice_LField _t30 = ({ lyric_push(&new_fields, _t29, LyricSlice_LField); new_fields; });
-        _t30;
-        int32_t _t31 = (i + 1);
-        i = _t31;
+        LType* _t35 = t;
+        LyricSlice_LField _t36 = _t35->fields;
+        int32_t _t37 = _t36.len;
+        bool _t38 = (i < _t37);
+        if (!(_t38)) break;
+        LType* _t39 = t;
+        LyricSlice_LField _t40 = _t39->fields;
+        LField _t41 = _t40.data[i];
+        lyric_string _t42 = _t41.name;
+        LType* _t43 = t;
+        LyricSlice_LField _t44 = _t43->fields;
+        LField _t45 = _t44.data[i];
+        LType* _t46 = _t45.typ;
+        LType* _t47 = subst_type(_t46, subst);
+        LField _t48 = (LField){.name = _t42, .typ = _t47};
+        LyricSlice_LField _t49 = ({ lyric_push(&new_fields, _t48, LyricSlice_LField); new_fields; });
+        _t49;
+        int32_t _t50 = (i + 1);
+        i = _t50;
     }
-    LyricSlice_LTypeptr _t32 = lyric_slice_empty(LyricSlice_LTypeptr);
-    LyricSlice_LTypeptr new_params = _t32;
+    LyricSlice_LTypeptr _t51 = lyric_slice_empty(LyricSlice_LTypeptr);
+    LyricSlice_LTypeptr new_params = _t51;
     i = 0;
     while (1) {
-        LType* _t33 = t;
-        LyricSlice_LTypeptr _t34 = _t33->params;
-        int32_t _t35 = _t34.len;
-        bool _t36 = (i < _t35);
-        if (!(_t36)) break;
-        LType* _t37 = t;
-        LyricSlice_LTypeptr _t38 = _t37->params;
-        LType* _t39 = _t38.data[i];
-        LType* _t40 = subst_type(_t39, subst);
-        LyricSlice_LTypeptr _t41 = ({ lyric_push(&new_params, _t40, LyricSlice_LTypeptr); new_params; });
-        _t41;
-        int32_t _t42 = (i + 1);
-        i = _t42;
+        LType* _t52 = t;
+        LyricSlice_LTypeptr _t53 = _t52->params;
+        int32_t _t54 = _t53.len;
+        bool _t55 = (i < _t54);
+        if (!(_t55)) break;
+        LType* _t56 = t;
+        LyricSlice_LTypeptr _t57 = _t56->params;
+        LType* _t58 = _t57.data[i];
+        LType* _t59 = subst_type(_t58, subst);
+        LyricSlice_LTypeptr _t60 = ({ lyric_push(&new_params, _t59, LyricSlice_LTypeptr); new_params; });
+        _t60;
+        int32_t _t61 = (i + 1);
+        i = _t61;
     }
-    LyricSlice_LVariant _t43 = lyric_slice_empty(LyricSlice_LVariant);
-    LyricSlice_LVariant new_variants = _t43;
+    LyricSlice_LVariant _t62 = lyric_slice_empty(LyricSlice_LVariant);
+    LyricSlice_LVariant new_variants = _t62;
     i = 0;
     while (1) {
-        LType* _t44 = t;
-        LyricSlice_LVariant _t45 = _t44->variants;
-        int32_t _t46 = _t45.len;
-        bool _t47 = (i < _t46);
-        if (!(_t47)) break;
-        LyricSlice_LField _t48 = lyric_slice_empty(LyricSlice_LField);
-        LyricSlice_LField vfields = _t48;
+        LType* _t63 = t;
+        LyricSlice_LVariant _t64 = _t63->variants;
+        int32_t _t65 = _t64.len;
+        bool _t66 = (i < _t65);
+        if (!(_t66)) break;
+        LyricSlice_LField _t67 = lyric_slice_empty(LyricSlice_LField);
+        LyricSlice_LField vfields = _t67;
         int32_t j = 0;
         while (1) {
-            LType* _t49 = t;
-            LyricSlice_LVariant _t50 = _t49->variants;
-            LVariant _t51 = _t50.data[i];
-            LyricSlice_LField _t52 = _t51.fields;
-            int32_t _t53 = _t52.len;
-            bool _t54 = (j < _t53);
-            if (!(_t54)) break;
-            LType* _t55 = t;
-            LyricSlice_LVariant _t56 = _t55->variants;
-            LVariant _t57 = _t56.data[i];
-            LyricSlice_LField _t58 = _t57.fields;
-            LField _t59 = _t58.data[j];
-            lyric_string _t60 = _t59.name;
-            LType* _t61 = t;
-            LyricSlice_LVariant _t62 = _t61->variants;
-            LVariant _t63 = _t62.data[i];
-            LyricSlice_LField _t64 = _t63.fields;
-            LField _t65 = _t64.data[j];
-            LType* _t66 = _t65.typ;
-            LType* _t67 = subst_type(_t66, subst);
-            LField _t68 = (LField){.name = _t60, .typ = _t67};
-            LyricSlice_LField _t69 = ({ lyric_push(&vfields, _t68, LyricSlice_LField); vfields; });
-            _t69;
-            int32_t _t70 = (j + 1);
-            j = _t70;
+            LType* _t68 = t;
+            LyricSlice_LVariant _t69 = _t68->variants;
+            LVariant _t70 = _t69.data[i];
+            LyricSlice_LField _t71 = _t70.fields;
+            int32_t _t72 = _t71.len;
+            bool _t73 = (j < _t72);
+            if (!(_t73)) break;
+            LType* _t74 = t;
+            LyricSlice_LVariant _t75 = _t74->variants;
+            LVariant _t76 = _t75.data[i];
+            LyricSlice_LField _t77 = _t76.fields;
+            LField _t78 = _t77.data[j];
+            lyric_string _t79 = _t78.name;
+            LType* _t80 = t;
+            LyricSlice_LVariant _t81 = _t80->variants;
+            LVariant _t82 = _t81.data[i];
+            LyricSlice_LField _t83 = _t82.fields;
+            LField _t84 = _t83.data[j];
+            LType* _t85 = _t84.typ;
+            LType* _t86 = subst_type(_t85, subst);
+            LField _t87 = (LField){.name = _t79, .typ = _t86};
+            LyricSlice_LField _t88 = ({ lyric_push(&vfields, _t87, LyricSlice_LField); vfields; });
+            _t88;
+            int32_t _t89 = (j + 1);
+            j = _t89;
         }
-        LType* _t71 = t;
-        LyricSlice_LVariant _t72 = _t71->variants;
-        LVariant _t73 = _t72.data[i];
-        lyric_string _t74 = _t73.name;
-        LType* _t75 = t;
-        LyricSlice_LVariant _t76 = _t75->variants;
-        LVariant _t77 = _t76.data[i];
-        int32_t _t78 = _t77.tag;
-        LVariant _t79 = (LVariant){.name = _t74, .tag = _t78, .fields = vfields};
-        LyricSlice_LVariant _t80 = ({ lyric_push(&new_variants, _t79, LyricSlice_LVariant); new_variants; });
-        _t80;
-        int32_t _t81 = (i + 1);
-        i = _t81;
+        LType* _t90 = t;
+        LyricSlice_LVariant _t91 = _t90->variants;
+        LVariant _t92 = _t91.data[i];
+        lyric_string _t93 = _t92.name;
+        LType* _t94 = t;
+        LyricSlice_LVariant _t95 = _t94->variants;
+        LVariant _t96 = _t95.data[i];
+        int32_t _t97 = _t96.tag;
+        LVariant _t98 = (LVariant){.name = _t93, .tag = _t97, .fields = vfields};
+        LyricSlice_LVariant _t99 = ({ lyric_push(&new_variants, _t98, LyricSlice_LVariant); new_variants; });
+        _t99;
+        int32_t _t100 = (i + 1);
+        i = _t100;
     }
-    LyricSlice_LTypeptr _t82 = lyric_slice_empty(LyricSlice_LTypeptr);
-    LyricSlice_LTypeptr new_type_args = _t82;
+    LyricSlice_LTypeptr _t101 = lyric_slice_empty(LyricSlice_LTypeptr);
+    LyricSlice_LTypeptr new_type_args = _t101;
     i = 0;
     while (1) {
-        LType* _t83 = t;
-        LyricSlice_LTypeptr _t84 = _t83->type_args;
-        int32_t _t85 = _t84.len;
-        bool _t86 = (i < _t85);
-        if (!(_t86)) break;
-        LType* _t87 = t;
-        LyricSlice_LTypeptr _t88 = _t87->type_args;
-        LType* _t89 = _t88.data[i];
-        LType* _t90 = subst_type(_t89, subst);
-        LyricSlice_LTypeptr _t91 = ({ lyric_push(&new_type_args, _t90, LyricSlice_LTypeptr); new_type_args; });
-        _t91;
-        int32_t _t92 = (i + 1);
-        i = _t92;
+        LType* _t102 = t;
+        LyricSlice_LTypeptr _t103 = _t102->type_args;
+        int32_t _t104 = _t103.len;
+        bool _t105 = (i < _t104);
+        if (!(_t105)) break;
+        LType* _t106 = t;
+        LyricSlice_LTypeptr _t107 = _t106->type_args;
+        LType* _t108 = _t107.data[i];
+        LType* _t109 = subst_type(_t108, subst);
+        LyricSlice_LTypeptr _t110 = ({ lyric_push(&new_type_args, _t109, LyricSlice_LTypeptr); new_type_args; });
+        _t110;
+        int32_t _t111 = (i + 1);
+        i = _t111;
     }
-    LType* _t93 = t;
-    LTypeKind _t94 = _t93->kind;
-    LType* _t95 = t;
-    lyric_string _t96 = _t95->name;
-    LType* _t97 = t;
-    LType* _t98 = _t97->elem;
-    LType* _t99 = subst_type(_t98, subst);
-    LType* _t100 = t;
-    LType* _t101 = _t100->key;
-    LType* _t102 = subst_type(_t101, subst);
-    LType* _t103 = t;
-    LType* _t104 = _t103->ret;
-    LType* _t105 = subst_type(_t104, subst);
-    LType* _t106 = t;
-    int32_t _t107 = _t106->bits;
-    LType* _t108 = t;
-    bool _t109 = _t108->is_exported;
-    LType* _t110 = _lyric_slab_alloc_LType();
-    _t110->kind = _t94;
-    _t110->name = _t96;
-    _t110->elem = _t99;
-    _t110->key = _t102;
-    _t110->fields = new_fields;
-    _t110->params = new_params;
-    _t110->ret = _t105;
-    _t110->variants = new_variants;
-    _t110->type_args = new_type_args;
-    _t110->bits = _t107;
-    _t110->is_exported = _t109;
-    return _t110;
+    LType* _t112 = t;
+    LTypeKind _t113 = _t112->kind;
+    LType* _t114 = t;
+    lyric_string _t115 = _t114->name;
+    LType* _t116 = t;
+    LType* _t117 = _t116->elem;
+    LType* _t118 = subst_type(_t117, subst);
+    LType* _t119 = t;
+    LType* _t120 = _t119->key;
+    LType* _t121 = subst_type(_t120, subst);
+    LType* _t122 = t;
+    LType* _t123 = _t122->ret;
+    LType* _t124 = subst_type(_t123, subst);
+    LType* _t125 = t;
+    int32_t _t126 = _t125->bits;
+    LType* _t127 = t;
+    bool _t128 = _t127->is_exported;
+    LType* _t129 = _lyric_slab_alloc_LType();
+    _t129->kind = _t113;
+    _t129->name = _t115;
+    _t129->elem = _t118;
+    _t129->key = _t121;
+    _t129->fields = new_fields;
+    _t129->params = new_params;
+    _t129->ret = _t124;
+    _t129->variants = new_variants;
+    _t129->type_args = new_type_args;
+    _t129->bits = _t126;
+    _t129->is_exported = _t128;
+    return _t129;
 }
 
 LType* MonoPass_subst_type_remove_vars(MonoPass* self, LType* t) {
@@ -65561,40 +65969,36 @@ LyricSlice_LFuncDeclptr filter_funcs(LyricSlice_LFuncDeclptr funcs, Dict_CSym_st
         int32_t _t5 = _t4.len;
         bool _t6 = (_t5 > 0);
         if (_t6) {
-            lyric_string _t7 = f->receiver;
-            bool _t8 = lyric_str_eq(_t7, LYRIC_STR(""));
-            if (_t8) {
-                skip = true;
-            }
+            skip = true;
         }
-        lyric_string _t9 = f->receiver;
-        bool _t10 = (!lyric_str_eq(_t9, LYRIC_STR("")));
-        if (_t10) {
-            Dict_CSym_CLClassDecl* _t11 = class_by_name;
-            lyric_string _t12 = f->receiver;
-            Sym* _t13 = sym(_t12);
-            DictEntry_CSym_CLClassDecl* _t14 = Dict_CSym_CLClassDecl_get(_t11, _t13);
-            DictEntry_CSym_CLClassDecl* cls_entry = _t14;
-            bool _t15 = (cls_entry == NULL);
-            bool _t16 = (!_t15);
-            if (_t16) {
-                DictEntry_CSym_CLClassDecl* _t17 = cls_entry;
-                LClassDecl* _t18 = _t17->value;
-                LyricSlice_LTypeParam _t19 = _t18->type_params;
-                int32_t _t20 = _t19.len;
-                bool _t21 = (_t20 > 0);
-                if (_t21) {
+        lyric_string _t7 = f->receiver;
+        bool _t8 = (!lyric_str_eq(_t7, LYRIC_STR("")));
+        if (_t8) {
+            Dict_CSym_CLClassDecl* _t9 = class_by_name;
+            lyric_string _t10 = f->receiver;
+            Sym* _t11 = sym(_t10);
+            DictEntry_CSym_CLClassDecl* _t12 = Dict_CSym_CLClassDecl_get(_t9, _t11);
+            DictEntry_CSym_CLClassDecl* cls_entry = _t12;
+            bool _t13 = (cls_entry == NULL);
+            bool _t14 = (!_t13);
+            if (_t14) {
+                DictEntry_CSym_CLClassDecl* _t15 = cls_entry;
+                LClassDecl* _t16 = _t15->value;
+                LyricSlice_LTypeParam _t17 = _t16->type_params;
+                int32_t _t18 = _t17.len;
+                bool _t19 = (_t18 > 0);
+                if (_t19) {
                     skip = true;
                 }
             }
         }
-        bool _t22 = (!skip);
-        if (_t22) {
-            LyricSlice_LFuncDeclptr _t23 = ({ lyric_push(&out, f, LyricSlice_LFuncDeclptr); out; });
-            _t23;
+        bool _t20 = (!skip);
+        if (_t20) {
+            LyricSlice_LFuncDeclptr _t21 = ({ lyric_push(&out, f, LyricSlice_LFuncDeclptr); out; });
+            _t21;
         }
-        int32_t _t24 = (i + 1);
-        i = _t24;
+        int32_t _t22 = (i + 1);
+        i = _t22;
     }
     return out;
     if (out.cap > 0 && out.data) free(out.data);
@@ -67019,462 +67423,497 @@ void monomorphize(LProgram* prog) {
                 int32_t _t172 = (ti + 1);
                 ti = _t172;
             }
-            lyric_string _t173 = orig->name;
-            lyric_string _t174 = mangle_name(_t173, types);
-            lyric_string mangled = _t174;
-            LFuncDecl* _t175 = MonoPass_specialize_func(m, orig, subst, mangled, LYRIC_STR(""));
-            LFuncDecl* spec = _t175;
-            LyricSlice_LStmtptr _t176 = spec->body;
-            MonoPass_collect_from_stmts(m, _t176);
-            LyricSlice_LFuncDeclptr _t178 = ({ lyric_push(&new_funcs, spec, LyricSlice_LFuncDeclptr); new_funcs; });
-            _t178;
-            int32_t _t179 = (fi + 1);
-            fi = _t179;
+            lyric_string new_receiver = LYRIC_STR("");
+            lyric_string _t173 = orig->receiver;
+            bool _t174 = (!lyric_str_eq(_t173, LYRIC_STR("")));
+            if (_t174) {
+                lyric_string _t175 = orig->receiver;
+                Sym* _t176 = sym(_t175);
+                DictEntry_CSym_opt_CLType* _t177 = Dict_CSym_opt_CLType_get(subst, _t176);
+                DictEntry_CSym_opt_CLType* recv_type = _t177;
+                bool _t178 = (recv_type == NULL);
+                bool _t179 = (!_t178);
+                bool _sc180 = false;
+                _sc180 = _t179;
+                if (_sc180) {
+                    DictEntry_CSym_opt_CLType* _t181 = recv_type;
+                    LType* _t182 = _t181->value;
+                    bool _t183 = (_t182 == NULL);
+                    bool _t184 = (!_t183);
+                    _sc180 = _t184;
+                }
+                if (_sc180) {
+                    DictEntry_CSym_opt_CLType* _t185 = recv_type;
+                    LType* _t186 = _t185->value;
+                    LType* _t187 = _t186;
+                    lyric_string _t188 = _t187->name;
+                    new_receiver = _t188;
+                }
+            }
+            lyric_string __ifexpr_189 = LYRIC_STR_EMPTY;
+            bool _t190 = (!lyric_str_eq(new_receiver, LYRIC_STR("")));
+            if (_t190) {
+                lyric_string _t191 = orig->name;
+                __ifexpr_189 = _t191;
+            } else {
+                lyric_string _t192 = orig->name;
+                lyric_string _t193 = mangle_name(_t192, types);
+                __ifexpr_189 = _t193;
+            }
+            lyric_string mangled = __ifexpr_189;
+            LFuncDecl* _t194 = MonoPass_specialize_func(m, orig, subst, mangled, new_receiver);
+            LFuncDecl* spec = _t194;
+            LyricSlice_LStmtptr _t195 = spec->body;
+            MonoPass_collect_from_stmts(m, _t195);
+            LyricSlice_LFuncDeclptr _t197 = ({ lyric_push(&new_funcs, spec, LyricSlice_LFuncDeclptr); new_funcs; });
+            _t197;
+            int32_t _t198 = (fi + 1);
+            fi = _t198;
         }
-        Dict_CSym_string* _t180 = m->class_instances;
-        Dict_CSym_string* _t181 = _t180;
-        LyricSlice_Symptr _t182 = Dict_CSym_string_keys(_t181);
-        LyricSlice_Symptr class_keys = _t182;
+        Dict_CSym_string* _t199 = m->class_instances;
+        Dict_CSym_string* _t200 = _t199;
+        LyricSlice_Symptr _t201 = Dict_CSym_string_keys(_t200);
+        LyricSlice_Symptr class_keys = _t201;
         int32_t ci = 0;
         while (1) {
-            int32_t _t183 = class_keys.len;
-            bool _t184 = (ci < _t183);
-            if (!(_t184)) break;
-            Sym* _t185 = class_keys.data[ci];
-            Sym* key = _t185;
-            DictEntry_CSym_bool* _t186 = Dict_CSym_bool_get(generated_classes, key);
-            DictEntry_CSym_bool* gen_entry = _t186;
-            bool _t187 = (gen_entry == NULL);
-            bool _t188 = (!_t187);
-            if (_t188) {
-                int32_t _t189 = (ci + 1);
-                ci = _t189;
+            int32_t _t202 = class_keys.len;
+            bool _t203 = (ci < _t202);
+            if (!(_t203)) break;
+            Sym* _t204 = class_keys.data[ci];
+            Sym* key = _t204;
+            DictEntry_CSym_bool* _t205 = Dict_CSym_bool_get(generated_classes, key);
+            DictEntry_CSym_bool* gen_entry = _t205;
+            bool _t206 = (gen_entry == NULL);
+            bool _t207 = (!_t206);
+            if (_t207) {
+                int32_t _t208 = (ci + 1);
+                ci = _t208;
                 continue;
             }
-            lyric_string _t190 = Sym_get_name(key);
-            LyricSlice_lyric_string _t191 = str_split(_t190, LYRIC_STR("|"));
-            LyricSlice_lyric_string parts = _t191;
-            int32_t _t192 = parts.len;
-            bool _t193 = (_t192 < 2);
-            if (_t193) {
-                int32_t _t194 = (ci + 1);
-                ci = _t194;
+            lyric_string _t209 = Sym_get_name(key);
+            LyricSlice_lyric_string _t210 = str_split(_t209, LYRIC_STR("|"));
+            LyricSlice_lyric_string parts = _t210;
+            int32_t _t211 = parts.len;
+            bool _t212 = (_t211 < 2);
+            if (_t212) {
+                int32_t _t213 = (ci + 1);
+                ci = _t213;
                 continue;
             }
-            lyric_string _t195 = parts.data[0];
-            lyric_string class_name = _t195;
-            Dict_CSym_CLClassDecl* _t196 = m->class_by_name;
-            Dict_CSym_CLClassDecl* _t197 = _t196;
-            Sym* _t198 = sym(class_name);
-            DictEntry_CSym_CLClassDecl* _t199 = Dict_CSym_CLClassDecl_get(_t197, _t198);
-            DictEntry_CSym_CLClassDecl* orig_entry = _t199;
-            bool _t200 = (orig_entry == NULL);
-            if (_t200) {
-                int32_t _t201 = (ci + 1);
-                ci = _t201;
+            lyric_string _t214 = parts.data[0];
+            lyric_string class_name = _t214;
+            Dict_CSym_CLClassDecl* _t215 = m->class_by_name;
+            Dict_CSym_CLClassDecl* _t216 = _t215;
+            Sym* _t217 = sym(class_name);
+            DictEntry_CSym_CLClassDecl* _t218 = Dict_CSym_CLClassDecl_get(_t216, _t217);
+            DictEntry_CSym_CLClassDecl* orig_entry = _t218;
+            bool _t219 = (orig_entry == NULL);
+            if (_t219) {
+                int32_t _t220 = (ci + 1);
+                ci = _t220;
                 continue;
             }
-            DictEntry_CSym_CLClassDecl* _t202 = orig_entry;
-            LClassDecl* _t203 = _t202->value;
-            LClassDecl* orig = _t203;
-            LyricSlice_LTypeParam _t204 = orig->type_params;
-            int32_t _t205 = _t204.len;
-            bool _t206 = (_t205 == 0);
-            if (_t206) {
-                int32_t _t207 = (ci + 1);
-                ci = _t207;
+            DictEntry_CSym_CLClassDecl* _t221 = orig_entry;
+            LClassDecl* _t222 = _t221->value;
+            LClassDecl* orig = _t222;
+            LyricSlice_LTypeParam _t223 = orig->type_params;
+            int32_t _t224 = _t223.len;
+            bool _t225 = (_t224 == 0);
+            if (_t225) {
+                int32_t _t226 = (ci + 1);
+                ci = _t226;
                 continue;
             }
-            Dict_CSym_opt_CLType* _t208 = m->class_inst_types;
-            Dict_CSym_i32* _t209 = m->class_inst_count;
-            lyric_string _t210 = Sym_get_name(key);
-            LyricSlice_LTypeptr _t211 = get_inst_types(_t208, _t209, _t210);
-            LyricSlice_LTypeptr types = _t211;
-            int32_t _t212 = types.len;
-            LyricSlice_LTypeParam _t213 = orig->type_params;
-            int32_t _t214 = _t213.len;
-            bool _t215 = (_t212 != _t214);
-            if (_t215) {
-                int32_t _t216 = (ci + 1);
-                ci = _t216;
+            Dict_CSym_opt_CLType* _t227 = m->class_inst_types;
+            Dict_CSym_i32* _t228 = m->class_inst_count;
+            lyric_string _t229 = Sym_get_name(key);
+            LyricSlice_LTypeptr _t230 = get_inst_types(_t227, _t228, _t229);
+            LyricSlice_LTypeptr types = _t230;
+            int32_t _t231 = types.len;
+            LyricSlice_LTypeParam _t232 = orig->type_params;
+            int32_t _t233 = _t232.len;
+            bool _t234 = (_t231 != _t233);
+            if (_t234) {
+                int32_t _t235 = (ci + 1);
+                ci = _t235;
                 continue;
             }
             Dict_CSym_bool_set(generated_classes, key, true);
             changed = true;
-            Dict_CSym_opt_CLType* _t218 = _lyric_slab_alloc_Dict_CSym_opt_CLType();
-            Dict_CSym_opt_CLType* subst = _t218;
+            Dict_CSym_opt_CLType* _t237 = _lyric_slab_alloc_Dict_CSym_opt_CLType();
+            Dict_CSym_opt_CLType* subst = _t237;
             int32_t ti = 0;
             while (1) {
-                LyricSlice_LTypeParam _t219 = orig->type_params;
-                int32_t _t220 = _t219.len;
-                bool _t221 = (ti < _t220);
-                if (!(_t221)) break;
-                LyricSlice_LTypeParam _t222 = orig->type_params;
-                LTypeParam _t223 = _t222.data[ti];
-                lyric_string _t224 = _t223.name;
-                Sym* _t225 = sym(_t224);
-                LType* _t226 = types.data[ti];
-                Dict_CSym_opt_CLType_set(subst, _t225, _t226);
-                int32_t _t228 = (ti + 1);
-                ti = _t228;
+                LyricSlice_LTypeParam _t238 = orig->type_params;
+                int32_t _t239 = _t238.len;
+                bool _t240 = (ti < _t239);
+                if (!(_t240)) break;
+                LyricSlice_LTypeParam _t241 = orig->type_params;
+                LTypeParam _t242 = _t241.data[ti];
+                lyric_string _t243 = _t242.name;
+                Sym* _t244 = sym(_t243);
+                LType* _t245 = types.data[ti];
+                Dict_CSym_opt_CLType_set(subst, _t244, _t245);
+                int32_t _t247 = (ti + 1);
+                ti = _t247;
             }
-            lyric_string _t229 = orig->name;
-            lyric_string _t230 = mangle_name(_t229, types);
-            lyric_string mangled = _t230;
-            Dict_CSym_string* _t231 = m->class_renames;
-            Dict_CSym_string* _t232 = _t231;
-            lyric_string _t233 = orig->name;
-            Sym* _t234 = sym(_t233);
-            Dict_CSym_string_set(_t232, _t234, mangled);
-            LClassDecl* _t236 = MonoPass_specialize_class(m, orig, subst, mangled);
-            LClassDecl* spec = _t236;
+            lyric_string _t248 = orig->name;
+            lyric_string _t249 = mangle_name(_t248, types);
+            lyric_string mangled = _t249;
+            Dict_CSym_string* _t250 = m->class_renames;
+            Dict_CSym_string* _t251 = _t250;
+            lyric_string _t252 = orig->name;
+            Sym* _t253 = sym(_t252);
+            Dict_CSym_string_set(_t251, _t253, mangled);
+            LClassDecl* _t255 = MonoPass_specialize_class(m, orig, subst, mangled);
+            LClassDecl* spec = _t255;
             int32_t fi2 = 0;
             while (1) {
-                LyricSlice_LField _t237 = spec->fields;
-                int32_t _t238 = _t237.len;
-                bool _t239 = (fi2 < _t238);
-                if (!(_t239)) break;
-                LyricSlice_LField _t240 = spec->fields;
-                LField _t241 = _t240.data[fi2];
-                LType* _t242 = _t241.typ;
-                MonoPass_collect_from_type(m, _t242);
-                int32_t _t244 = (fi2 + 1);
-                fi2 = _t244;
+                LyricSlice_LField _t256 = spec->fields;
+                int32_t _t257 = _t256.len;
+                bool _t258 = (fi2 < _t257);
+                if (!(_t258)) break;
+                LyricSlice_LField _t259 = spec->fields;
+                LField _t260 = _t259.data[fi2];
+                LType* _t261 = _t260.typ;
+                MonoPass_collect_from_type(m, _t261);
+                int32_t _t263 = (fi2 + 1);
+                fi2 = _t263;
             }
-            LyricSlice_LClassDeclptr _t245 = ({ lyric_push(&new_classes, spec, LyricSlice_LClassDeclptr); new_classes; });
-            _t245;
-            Dict_CSym_slice_CLFuncDecl* _t246 = m->methods_by_class;
-            Dict_CSym_slice_CLFuncDecl* _t247 = _t246;
-            Sym* _t248 = sym(class_name);
-            DictEntry_CSym_slice_CLFuncDecl* _t249 = Dict_CSym_slice_CLFuncDecl_get(_t247, _t248);
-            DictEntry_CSym_slice_CLFuncDecl* methods_entry = _t249;
-            bool _t250 = (methods_entry == NULL);
-            bool _t251 = (!_t250);
-            if (_t251) {
-                DictEntry_CSym_slice_CLFuncDecl* _t252 = methods_entry;
-                LyricSlice_LFuncDeclptr _t253 = _t252->value;
-                LyricSlice_LFuncDeclptr methods = _t253;
+            LyricSlice_LClassDeclptr _t264 = ({ lyric_push(&new_classes, spec, LyricSlice_LClassDeclptr); new_classes; });
+            _t264;
+            Dict_CSym_slice_CLFuncDecl* _t265 = m->methods_by_class;
+            Dict_CSym_slice_CLFuncDecl* _t266 = _t265;
+            Sym* _t267 = sym(class_name);
+            DictEntry_CSym_slice_CLFuncDecl* _t268 = Dict_CSym_slice_CLFuncDecl_get(_t266, _t267);
+            DictEntry_CSym_slice_CLFuncDecl* methods_entry = _t268;
+            bool _t269 = (methods_entry == NULL);
+            bool _t270 = (!_t269);
+            if (_t270) {
+                DictEntry_CSym_slice_CLFuncDecl* _t271 = methods_entry;
+                LyricSlice_LFuncDeclptr _t272 = _t271->value;
+                LyricSlice_LFuncDeclptr methods = _t272;
                 int32_t mi = 0;
                 while (1) {
-                    int32_t _t254 = methods.len;
-                    bool _t255 = (mi < _t254);
-                    if (!(_t255)) break;
-                    LFuncDecl* _t256 = methods.data[mi];
-                    LFuncDecl* method = _t256;
-                    lyric_string _t257 = method->name;
-                    lyric_string _t258 = lyric_sprintf("%d.%.*s", key, (int)_t257.len, (const char*)_t257.data);
-                    lyric_string meth_key = _t258;
-                    Sym* _t259 = sym(meth_key);
-                    DictEntry_CSym_bool* _t260 = Dict_CSym_bool_get(generated_funcs, _t259);
-                    DictEntry_CSym_bool* meth_gen = _t260;
-                    bool _t261 = (meth_gen == NULL);
-                    if (_t261) {
-                        Sym* _t262 = sym(meth_key);
-                        Dict_CSym_bool_set(generated_funcs, _t262, true);
-                        lyric_string _t264 = method->name;
-                        LFuncDecl* _t265 = MonoPass_specialize_func(m, method, subst, _t264, mangled);
-                        LFuncDecl* spec_method = _t265;
-                        LyricSlice_LStmtptr _t266 = spec_method->body;
-                        MonoPass_collect_from_stmts(m, _t266);
-                        LyricSlice_LFuncDeclptr _t268 = ({ lyric_push(&new_funcs, spec_method, LyricSlice_LFuncDeclptr); new_funcs; });
-                        _t268;
+                    int32_t _t273 = methods.len;
+                    bool _t274 = (mi < _t273);
+                    if (!(_t274)) break;
+                    LFuncDecl* _t275 = methods.data[mi];
+                    LFuncDecl* method = _t275;
+                    lyric_string _t276 = method->name;
+                    lyric_string _t277 = lyric_sprintf("%d.%.*s", key, (int)_t276.len, (const char*)_t276.data);
+                    lyric_string meth_key = _t277;
+                    Sym* _t278 = sym(meth_key);
+                    DictEntry_CSym_bool* _t279 = Dict_CSym_bool_get(generated_funcs, _t278);
+                    DictEntry_CSym_bool* meth_gen = _t279;
+                    bool _t280 = (meth_gen == NULL);
+                    if (_t280) {
+                        Sym* _t281 = sym(meth_key);
+                        Dict_CSym_bool_set(generated_funcs, _t281, true);
+                        lyric_string _t283 = method->name;
+                        LFuncDecl* _t284 = MonoPass_specialize_func(m, method, subst, _t283, mangled);
+                        LFuncDecl* spec_method = _t284;
+                        LyricSlice_LStmtptr _t285 = spec_method->body;
+                        MonoPass_collect_from_stmts(m, _t285);
+                        LyricSlice_LFuncDeclptr _t287 = ({ lyric_push(&new_funcs, spec_method, LyricSlice_LFuncDeclptr); new_funcs; });
+                        _t287;
                     }
-                    int32_t _t269 = (mi + 1);
-                    mi = _t269;
+                    int32_t _t288 = (mi + 1);
+                    mi = _t288;
                 }
             }
-            int32_t _t270 = (ci + 1);
-            ci = _t270;
+            int32_t _t289 = (ci + 1);
+            ci = _t289;
         }
-        Dict_CSym_string* _t271 = m->struct_instances;
-        Dict_CSym_string* _t272 = _t271;
-        LyricSlice_Symptr _t273 = Dict_CSym_string_keys(_t272);
-        LyricSlice_Symptr struct_keys = _t273;
+        Dict_CSym_string* _t290 = m->struct_instances;
+        Dict_CSym_string* _t291 = _t290;
+        LyricSlice_Symptr _t292 = Dict_CSym_string_keys(_t291);
+        LyricSlice_Symptr struct_keys = _t292;
         int32_t si = 0;
         while (1) {
-            int32_t _t274 = struct_keys.len;
-            bool _t275 = (si < _t274);
-            if (!(_t275)) break;
-            Sym* _t276 = struct_keys.data[si];
-            Sym* key = _t276;
-            DictEntry_CSym_bool* _t277 = Dict_CSym_bool_get(generated_structs, key);
-            DictEntry_CSym_bool* gen_entry = _t277;
-            bool _t278 = (gen_entry == NULL);
-            bool _t279 = (!_t278);
-            if (_t279) {
-                int32_t _t280 = (si + 1);
-                si = _t280;
+            int32_t _t293 = struct_keys.len;
+            bool _t294 = (si < _t293);
+            if (!(_t294)) break;
+            Sym* _t295 = struct_keys.data[si];
+            Sym* key = _t295;
+            DictEntry_CSym_bool* _t296 = Dict_CSym_bool_get(generated_structs, key);
+            DictEntry_CSym_bool* gen_entry = _t296;
+            bool _t297 = (gen_entry == NULL);
+            bool _t298 = (!_t297);
+            if (_t298) {
+                int32_t _t299 = (si + 1);
+                si = _t299;
                 continue;
             }
-            lyric_string _t281 = Sym_get_name(key);
-            LyricSlice_lyric_string _t282 = str_split(_t281, LYRIC_STR("|"));
-            LyricSlice_lyric_string parts = _t282;
-            int32_t _t283 = parts.len;
-            bool _t284 = (_t283 < 2);
-            if (_t284) {
-                int32_t _t285 = (si + 1);
-                si = _t285;
+            lyric_string _t300 = Sym_get_name(key);
+            LyricSlice_lyric_string _t301 = str_split(_t300, LYRIC_STR("|"));
+            LyricSlice_lyric_string parts = _t301;
+            int32_t _t302 = parts.len;
+            bool _t303 = (_t302 < 2);
+            if (_t303) {
+                int32_t _t304 = (si + 1);
+                si = _t304;
                 continue;
             }
-            lyric_string _t286 = parts.data[0];
-            lyric_string struct_name = _t286;
-            Dict_CSym_CLStructDecl* _t287 = m->struct_by_name;
-            Dict_CSym_CLStructDecl* _t288 = _t287;
-            Sym* _t289 = sym(struct_name);
-            DictEntry_CSym_CLStructDecl* _t290 = Dict_CSym_CLStructDecl_get(_t288, _t289);
-            DictEntry_CSym_CLStructDecl* orig_entry = _t290;
-            bool _t291 = (orig_entry == NULL);
-            if (_t291) {
-                int32_t _t292 = (si + 1);
-                si = _t292;
+            lyric_string _t305 = parts.data[0];
+            lyric_string struct_name = _t305;
+            Dict_CSym_CLStructDecl* _t306 = m->struct_by_name;
+            Dict_CSym_CLStructDecl* _t307 = _t306;
+            Sym* _t308 = sym(struct_name);
+            DictEntry_CSym_CLStructDecl* _t309 = Dict_CSym_CLStructDecl_get(_t307, _t308);
+            DictEntry_CSym_CLStructDecl* orig_entry = _t309;
+            bool _t310 = (orig_entry == NULL);
+            if (_t310) {
+                int32_t _t311 = (si + 1);
+                si = _t311;
                 continue;
             }
-            DictEntry_CSym_CLStructDecl* _t293 = orig_entry;
-            LStructDecl* _t294 = _t293->value;
-            LStructDecl* orig = _t294;
-            LyricSlice_LTypeParam _t295 = orig->type_params;
-            int32_t _t296 = _t295.len;
-            bool _t297 = (_t296 == 0);
-            if (_t297) {
-                int32_t _t298 = (si + 1);
-                si = _t298;
+            DictEntry_CSym_CLStructDecl* _t312 = orig_entry;
+            LStructDecl* _t313 = _t312->value;
+            LStructDecl* orig = _t313;
+            LyricSlice_LTypeParam _t314 = orig->type_params;
+            int32_t _t315 = _t314.len;
+            bool _t316 = (_t315 == 0);
+            if (_t316) {
+                int32_t _t317 = (si + 1);
+                si = _t317;
                 continue;
             }
-            Dict_CSym_opt_CLType* _t299 = m->struct_inst_types;
-            Dict_CSym_i32* _t300 = m->struct_inst_count;
-            lyric_string _t301 = Sym_get_name(key);
-            LyricSlice_LTypeptr _t302 = get_inst_types(_t299, _t300, _t301);
-            LyricSlice_LTypeptr types = _t302;
-            int32_t _t303 = types.len;
-            LyricSlice_LTypeParam _t304 = orig->type_params;
-            int32_t _t305 = _t304.len;
-            bool _t306 = (_t303 != _t305);
-            if (_t306) {
-                int32_t _t307 = (si + 1);
-                si = _t307;
+            Dict_CSym_opt_CLType* _t318 = m->struct_inst_types;
+            Dict_CSym_i32* _t319 = m->struct_inst_count;
+            lyric_string _t320 = Sym_get_name(key);
+            LyricSlice_LTypeptr _t321 = get_inst_types(_t318, _t319, _t320);
+            LyricSlice_LTypeptr types = _t321;
+            int32_t _t322 = types.len;
+            LyricSlice_LTypeParam _t323 = orig->type_params;
+            int32_t _t324 = _t323.len;
+            bool _t325 = (_t322 != _t324);
+            if (_t325) {
+                int32_t _t326 = (si + 1);
+                si = _t326;
                 continue;
             }
             Dict_CSym_bool_set(generated_structs, key, true);
             changed = true;
-            Dict_CSym_opt_CLType* _t309 = _lyric_slab_alloc_Dict_CSym_opt_CLType();
-            Dict_CSym_opt_CLType* subst = _t309;
+            Dict_CSym_opt_CLType* _t328 = _lyric_slab_alloc_Dict_CSym_opt_CLType();
+            Dict_CSym_opt_CLType* subst = _t328;
             int32_t ti = 0;
             while (1) {
-                LyricSlice_LTypeParam _t310 = orig->type_params;
-                int32_t _t311 = _t310.len;
-                bool _t312 = (ti < _t311);
-                if (!(_t312)) break;
-                LyricSlice_LTypeParam _t313 = orig->type_params;
-                LTypeParam _t314 = _t313.data[ti];
-                lyric_string _t315 = _t314.name;
-                Sym* _t316 = sym(_t315);
-                LType* _t317 = types.data[ti];
-                Dict_CSym_opt_CLType_set(subst, _t316, _t317);
-                int32_t _t319 = (ti + 1);
-                ti = _t319;
+                LyricSlice_LTypeParam _t329 = orig->type_params;
+                int32_t _t330 = _t329.len;
+                bool _t331 = (ti < _t330);
+                if (!(_t331)) break;
+                LyricSlice_LTypeParam _t332 = orig->type_params;
+                LTypeParam _t333 = _t332.data[ti];
+                lyric_string _t334 = _t333.name;
+                Sym* _t335 = sym(_t334);
+                LType* _t336 = types.data[ti];
+                Dict_CSym_opt_CLType_set(subst, _t335, _t336);
+                int32_t _t338 = (ti + 1);
+                ti = _t338;
             }
-            lyric_string _t320 = mangle_name(struct_name, types);
-            lyric_string mangled = _t320;
-            LStructDecl* _t321 = MonoPass_specialize_struct(m, orig, subst, mangled);
-            LStructDecl* spec = _t321;
+            lyric_string _t339 = mangle_name(struct_name, types);
+            lyric_string mangled = _t339;
+            LStructDecl* _t340 = MonoPass_specialize_struct(m, orig, subst, mangled);
+            LStructDecl* spec = _t340;
             int32_t fi3 = 0;
             while (1) {
-                LyricSlice_LField _t322 = spec->fields;
-                int32_t _t323 = _t322.len;
-                bool _t324 = (fi3 < _t323);
-                if (!(_t324)) break;
-                LyricSlice_LField _t325 = spec->fields;
-                LField _t326 = _t325.data[fi3];
-                LType* _t327 = _t326.typ;
-                MonoPass_collect_from_type(m, _t327);
-                int32_t _t329 = (fi3 + 1);
-                fi3 = _t329;
+                LyricSlice_LField _t341 = spec->fields;
+                int32_t _t342 = _t341.len;
+                bool _t343 = (fi3 < _t342);
+                if (!(_t343)) break;
+                LyricSlice_LField _t344 = spec->fields;
+                LField _t345 = _t344.data[fi3];
+                LType* _t346 = _t345.typ;
+                MonoPass_collect_from_type(m, _t346);
+                int32_t _t348 = (fi3 + 1);
+                fi3 = _t348;
             }
-            LyricSlice_LStructDeclptr _t330 = ({ lyric_push(&new_structs, spec, LyricSlice_LStructDeclptr); new_structs; });
-            _t330;
-            int32_t _t331 = (si + 1);
-            si = _t331;
+            LyricSlice_LStructDeclptr _t349 = ({ lyric_push(&new_structs, spec, LyricSlice_LStructDeclptr); new_structs; });
+            _t349;
+            int32_t _t350 = (si + 1);
+            si = _t350;
         }
     }
-    LProgram* _t332 = prog;
-    LyricSlice_LFuncDeclptr _t333 = _t332->functions;
-    Dict_CSym_string* _t334 = m->class_instances;
-    Dict_CSym_CLClassDecl* _t335 = m->class_by_name;
-    LyricSlice_LFuncDeclptr _t336 = filter_funcs(_t333, _t334, _t335);
-    LProgram* _t337 = prog;
-    _t337->functions = _t336;
+    LProgram* _t351 = prog;
+    LyricSlice_LFuncDeclptr _t352 = _t351->functions;
+    Dict_CSym_string* _t353 = m->class_instances;
+    Dict_CSym_CLClassDecl* _t354 = m->class_by_name;
+    LyricSlice_LFuncDeclptr _t355 = filter_funcs(_t352, _t353, _t354);
+    LProgram* _t356 = prog;
+    _t356->functions = _t355;
     int32_t fi4 = 0;
     while (1) {
-        int32_t _t338 = new_funcs.len;
-        bool _t339 = (fi4 < _t338);
-        if (!(_t339)) break;
-        LProgram* _t340 = prog;
-        LyricSlice_LFuncDeclptr _t341 = _t340->functions;
-        LFuncDecl* _t342 = new_funcs.data[fi4];
-        LyricSlice_LFuncDeclptr _t343 = ({ lyric_push(&_t341, _t342, LyricSlice_LFuncDeclptr); _t341; });
-        _t340->functions = _t341;
-        _t343;
-        int32_t _t344 = (fi4 + 1);
-        fi4 = _t344;
+        int32_t _t357 = new_funcs.len;
+        bool _t358 = (fi4 < _t357);
+        if (!(_t358)) break;
+        LProgram* _t359 = prog;
+        LyricSlice_LFuncDeclptr _t360 = _t359->functions;
+        LFuncDecl* _t361 = new_funcs.data[fi4];
+        LyricSlice_LFuncDeclptr _t362 = ({ lyric_push(&_t360, _t361, LyricSlice_LFuncDeclptr); _t360; });
+        _t359->functions = _t360;
+        _t362;
+        int32_t _t363 = (fi4 + 1);
+        fi4 = _t363;
     }
-    LProgram* _t345 = prog;
-    LyricSlice_LClassDeclptr _t346 = _t345->classes;
-    Dict_CSym_string* _t347 = m->class_instances;
-    LyricSlice_LClassDeclptr _t348 = filter_classes(_t346, _t347);
-    LProgram* _t349 = prog;
-    _t349->classes = _t348;
+    LProgram* _t364 = prog;
+    LyricSlice_LClassDeclptr _t365 = _t364->classes;
+    Dict_CSym_string* _t366 = m->class_instances;
+    LyricSlice_LClassDeclptr _t367 = filter_classes(_t365, _t366);
+    LProgram* _t368 = prog;
+    _t368->classes = _t367;
     int32_t ci2 = 0;
     while (1) {
-        int32_t _t350 = new_classes.len;
-        bool _t351 = (ci2 < _t350);
-        if (!(_t351)) break;
-        LProgram* _t352 = prog;
-        LyricSlice_LClassDeclptr _t353 = _t352->classes;
-        LClassDecl* _t354 = new_classes.data[ci2];
-        LyricSlice_LClassDeclptr _t355 = ({ lyric_push(&_t353, _t354, LyricSlice_LClassDeclptr); _t353; });
-        _t352->classes = _t353;
-        _t355;
-        int32_t _t356 = (ci2 + 1);
-        ci2 = _t356;
+        int32_t _t369 = new_classes.len;
+        bool _t370 = (ci2 < _t369);
+        if (!(_t370)) break;
+        LProgram* _t371 = prog;
+        LyricSlice_LClassDeclptr _t372 = _t371->classes;
+        LClassDecl* _t373 = new_classes.data[ci2];
+        LyricSlice_LClassDeclptr _t374 = ({ lyric_push(&_t372, _t373, LyricSlice_LClassDeclptr); _t372; });
+        _t371->classes = _t372;
+        _t374;
+        int32_t _t375 = (ci2 + 1);
+        ci2 = _t375;
     }
-    LProgram* _t357 = prog;
-    LyricSlice_LStructDeclptr _t358 = _t357->structs;
-    Dict_CSym_string* _t359 = m->struct_instances;
-    LyricSlice_LStructDeclptr _t360 = filter_structs(_t358, _t359);
-    LProgram* _t361 = prog;
-    _t361->structs = _t360;
+    LProgram* _t376 = prog;
+    LyricSlice_LStructDeclptr _t377 = _t376->structs;
+    Dict_CSym_string* _t378 = m->struct_instances;
+    LyricSlice_LStructDeclptr _t379 = filter_structs(_t377, _t378);
+    LProgram* _t380 = prog;
+    _t380->structs = _t379;
     int32_t si2 = 0;
     while (1) {
-        int32_t _t362 = new_structs.len;
-        bool _t363 = (si2 < _t362);
-        if (!(_t363)) break;
-        LProgram* _t364 = prog;
-        LyricSlice_LStructDeclptr _t365 = _t364->structs;
-        LStructDecl* _t366 = new_structs.data[si2];
-        LyricSlice_LStructDeclptr _t367 = ({ lyric_push(&_t365, _t366, LyricSlice_LStructDeclptr); _t365; });
-        _t364->structs = _t365;
-        _t367;
-        int32_t _t368 = (si2 + 1);
-        si2 = _t368;
-    }
-    i = 0;
-    while (1) {
-        LProgram* _t369 = prog;
-        LyricSlice_LFuncDeclptr _t370 = _t369->functions;
-        int32_t _t371 = _t370.len;
-        bool _t372 = (i < _t371);
-        if (!(_t372)) break;
-        LProgram* _t373 = prog;
-        LyricSlice_LFuncDeclptr _t374 = _t373->functions;
-        LFuncDecl* _t375 = _t374.data[i];
-        LyricSlice_LStmtptr _t376 = _t375->body;
-        MonoPass_rewrite_stmts(m, _t376);
-        int32_t _t378 = (i + 1);
-        i = _t378;
-    }
-    i = 0;
-    while (1) {
-        LProgram* _t379 = prog;
-        LyricSlice_LFuncDeclptr _t380 = _t379->functions;
-        int32_t _t381 = _t380.len;
-        bool _t382 = (i < _t381);
+        int32_t _t381 = new_structs.len;
+        bool _t382 = (si2 < _t381);
         if (!(_t382)) break;
         LProgram* _t383 = prog;
-        LyricSlice_LFuncDeclptr _t384 = _t383->functions;
-        LFuncDecl* _t385 = _t384.data[i];
-        LFuncDecl* f = _t385;
-        int32_t j = 0;
-        while (1) {
-            LyricSlice_LParam _t386 = f->params;
-            int32_t _t387 = _t386.len;
-            bool _t388 = (j < _t387);
-            if (!(_t388)) break;
-            LyricSlice_LParam _t389 = f->params;
-            LParam _t390 = _t389.data[j];
-            LType* _t391 = _t390.typ;
-            LType* _t392 = MonoPass_subst_type_remove_vars(m, _t391);
-            LyricSlice_LParam _t393 = f->params;
-            _t393.data[j].typ = _t392;
-            int32_t _t394 = (j + 1);
-            j = _t394;
-        }
-        LType* _t395 = f->return_type;
-        LType* _t396 = MonoPass_subst_type_remove_vars(m, _t395);
-        f->return_type = _t396;
-        LProgram* _t397 = prog;
-        LyricSlice_LFuncDeclptr _t398 = _t397->functions;
-        _t398.data[i] = f;
-        int32_t _t399 = (i + 1);
-        i = _t399;
+        LyricSlice_LStructDeclptr _t384 = _t383->structs;
+        LStructDecl* _t385 = new_structs.data[si2];
+        LyricSlice_LStructDeclptr _t386 = ({ lyric_push(&_t384, _t385, LyricSlice_LStructDeclptr); _t384; });
+        _t383->structs = _t384;
+        _t386;
+        int32_t _t387 = (si2 + 1);
+        si2 = _t387;
     }
     i = 0;
     while (1) {
-        LProgram* _t400 = prog;
-        LyricSlice_LClassDeclptr _t401 = _t400->classes;
-        int32_t _t402 = _t401.len;
-        bool _t403 = (i < _t402);
-        if (!(_t403)) break;
-        LProgram* _t404 = prog;
-        LyricSlice_LClassDeclptr _t405 = _t404->classes;
-        LClassDecl* _t406 = _t405.data[i];
-        LClassDecl* c = _t406;
+        LProgram* _t388 = prog;
+        LyricSlice_LFuncDeclptr _t389 = _t388->functions;
+        int32_t _t390 = _t389.len;
+        bool _t391 = (i < _t390);
+        if (!(_t391)) break;
+        LProgram* _t392 = prog;
+        LyricSlice_LFuncDeclptr _t393 = _t392->functions;
+        LFuncDecl* _t394 = _t393.data[i];
+        LyricSlice_LStmtptr _t395 = _t394->body;
+        MonoPass_rewrite_stmts(m, _t395);
+        int32_t _t397 = (i + 1);
+        i = _t397;
+    }
+    i = 0;
+    while (1) {
+        LProgram* _t398 = prog;
+        LyricSlice_LFuncDeclptr _t399 = _t398->functions;
+        int32_t _t400 = _t399.len;
+        bool _t401 = (i < _t400);
+        if (!(_t401)) break;
+        LProgram* _t402 = prog;
+        LyricSlice_LFuncDeclptr _t403 = _t402->functions;
+        LFuncDecl* _t404 = _t403.data[i];
+        LFuncDecl* f = _t404;
         int32_t j = 0;
         while (1) {
-            LyricSlice_LField _t407 = c->fields;
-            int32_t _t408 = _t407.len;
-            bool _t409 = (j < _t408);
-            if (!(_t409)) break;
-            LyricSlice_LField _t410 = c->fields;
-            LField _t411 = _t410.data[j];
-            LType* _t412 = _t411.typ;
-            LType* _t413 = MonoPass_subst_type_remove_vars(m, _t412);
-            LyricSlice_LField _t414 = c->fields;
-            _t414.data[j].typ = _t413;
-            int32_t _t415 = (j + 1);
-            j = _t415;
+            LyricSlice_LParam _t405 = f->params;
+            int32_t _t406 = _t405.len;
+            bool _t407 = (j < _t406);
+            if (!(_t407)) break;
+            LyricSlice_LParam _t408 = f->params;
+            LParam _t409 = _t408.data[j];
+            LType* _t410 = _t409.typ;
+            LType* _t411 = MonoPass_subst_type_remove_vars(m, _t410);
+            LyricSlice_LParam _t412 = f->params;
+            _t412.data[j].typ = _t411;
+            int32_t _t413 = (j + 1);
+            j = _t413;
         }
+        LType* _t414 = f->return_type;
+        LType* _t415 = MonoPass_subst_type_remove_vars(m, _t414);
+        f->return_type = _t415;
         LProgram* _t416 = prog;
-        LyricSlice_LClassDeclptr _t417 = _t416->classes;
-        _t417.data[i] = c;
+        LyricSlice_LFuncDeclptr _t417 = _t416->functions;
+        _t417.data[i] = f;
         int32_t _t418 = (i + 1);
         i = _t418;
     }
     i = 0;
     while (1) {
         LProgram* _t419 = prog;
-        LyricSlice_LStructDeclptr _t420 = _t419->structs;
+        LyricSlice_LClassDeclptr _t420 = _t419->classes;
         int32_t _t421 = _t420.len;
         bool _t422 = (i < _t421);
         if (!(_t422)) break;
         LProgram* _t423 = prog;
-        LyricSlice_LStructDeclptr _t424 = _t423->structs;
-        LStructDecl* _t425 = _t424.data[i];
-        LStructDecl* s = _t425;
+        LyricSlice_LClassDeclptr _t424 = _t423->classes;
+        LClassDecl* _t425 = _t424.data[i];
+        LClassDecl* c = _t425;
         int32_t j = 0;
         while (1) {
-            LyricSlice_LField _t426 = s->fields;
+            LyricSlice_LField _t426 = c->fields;
             int32_t _t427 = _t426.len;
             bool _t428 = (j < _t427);
             if (!(_t428)) break;
-            LyricSlice_LField _t429 = s->fields;
+            LyricSlice_LField _t429 = c->fields;
             LField _t430 = _t429.data[j];
             LType* _t431 = _t430.typ;
             LType* _t432 = MonoPass_subst_type_remove_vars(m, _t431);
-            LyricSlice_LField _t433 = s->fields;
+            LyricSlice_LField _t433 = c->fields;
             _t433.data[j].typ = _t432;
             int32_t _t434 = (j + 1);
             j = _t434;
         }
         LProgram* _t435 = prog;
-        LyricSlice_LStructDeclptr _t436 = _t435->structs;
-        _t436.data[i] = s;
+        LyricSlice_LClassDeclptr _t436 = _t435->classes;
+        _t436.data[i] = c;
         int32_t _t437 = (i + 1);
         i = _t437;
     }
+    i = 0;
+    while (1) {
+        LProgram* _t438 = prog;
+        LyricSlice_LStructDeclptr _t439 = _t438->structs;
+        int32_t _t440 = _t439.len;
+        bool _t441 = (i < _t440);
+        if (!(_t441)) break;
+        LProgram* _t442 = prog;
+        LyricSlice_LStructDeclptr _t443 = _t442->structs;
+        LStructDecl* _t444 = _t443.data[i];
+        LStructDecl* s = _t444;
+        int32_t j = 0;
+        while (1) {
+            LyricSlice_LField _t445 = s->fields;
+            int32_t _t446 = _t445.len;
+            bool _t447 = (j < _t446);
+            if (!(_t447)) break;
+            LyricSlice_LField _t448 = s->fields;
+            LField _t449 = _t448.data[j];
+            LType* _t450 = _t449.typ;
+            LType* _t451 = MonoPass_subst_type_remove_vars(m, _t450);
+            LyricSlice_LField _t452 = s->fields;
+            _t452.data[j].typ = _t451;
+            int32_t _t453 = (j + 1);
+            j = _t453;
+        }
+        LProgram* _t454 = prog;
+        LyricSlice_LStructDeclptr _t455 = _t454->structs;
+        _t455.data[i] = s;
+        int32_t _t456 = (i + 1);
+        i = _t456;
+    }
     resolve_class_names(prog);
-    Dict_CSym_string* _t439 = m->class_renames;
-    LProgram* _t440 = prog;
-    _t440->class_renames = _t439;
+    Dict_CSym_string* _t458 = m->class_renames;
+    LProgram* _t459 = prog;
+    _t459->class_renames = _t458;
     if (new_funcs.cap > 0 && new_funcs.data) free(new_funcs.data);
     if (new_classes.cap > 0 && new_classes.data) free(new_classes.data);
     if (new_structs.cap > 0 && new_structs.data) free(new_structs.data);
@@ -90181,6 +90620,123 @@ void array_append_CFile_CComment(File* parent, Comment* child) {
     File_set_fc_children(parent, _t4);
 }
 
+void set_CSym_bool(Dict_CSym_bool* self, Sym* key, bool value) {
+    DictEntry_CSym_bool* _t0 = _lyric_slab_alloc_DictEntry_CSym_bool();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_bool* entry = _t0;
+    hash_insert_CDict_CSym_bool_CDictEntry_CSym_bool(self, entry);
+}
+
+LyricSlice_Symptr keys_CSym_bool(Dict_CSym_bool* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_boolptr _t1 = Dict_CSym_bool_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_bool* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_bool* get_CSym_bool(Dict_CSym_bool* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_bool* _t1 = hash_lookup_CDict_CSym_bool_CDictEntry_CSym_bool(self, h);
+    return _t1;
+}
+
+void set_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key, InterfaceDecl* value) {
+    DictEntry_CSym_CInterfaceDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CInterfaceDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CInterfaceDecl* entry = _t0;
+    hash_insert_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(self, entry);
+}
+
+void set_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key, ClassDecl* value) {
+    DictEntry_CSym_CClassDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CClassDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CClassDecl* entry = _t0;
+    hash_insert_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(self, entry);
+}
+
+void set_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self, Sym* key, FuncDecl* value) {
+    DictEntry_CSym_CFuncDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CFuncDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CFuncDecl* entry = _t0;
+    hash_insert_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(self, entry);
+}
+
+DictEntry_CSym_CInterfaceDecl* get_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CInterfaceDecl* _t1 = hash_lookup_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_CClassDecl* get_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CClassDecl* _t1 = hash_lookup_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(self, h);
+    return _t1;
+}
+
+LyricSlice_Symptr keys_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CFuncDeclptr _t1 = Dict_CSym_CFuncDecl_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CFuncDecl* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_CFuncDecl* get_CSym_CFuncDecl(Dict_CSym_CFuncDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CFuncDecl* _t1 = hash_lookup_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(self, h);
+    return _t1;
+}
+
+void set_CSym_CConstDecl(Dict_CSym_CConstDecl* self, Sym* key, ConstDecl* value) {
+    DictEntry_CSym_CConstDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CConstDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CConstDecl* entry = _t0;
+    hash_insert_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(self, entry);
+}
+
+LyricSlice_Symptr keys_CSym_CConstDecl(Dict_CSym_CConstDecl* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t1 = Dict_CSym_CConstDecl_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CConstDecl* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_CConstDecl* get_CSym_CConstDecl(Dict_CSym_CConstDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CConstDecl* _t1 = hash_lookup_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(self, h);
+    return _t1;
+}
+
 void array_append_CLyricBlock_CInterfaceDecl(LyricBlock* parent, InterfaceDecl* child) {
     LyricSlice_InterfaceDeclptr _t0 = LyricBlock_id_children(parent);
     LyricSlice_InterfaceDeclptr kids = _t0;
@@ -91470,6 +92026,21 @@ bool hash_remove_CSymTable_CSym(SymTable* parent, uint64_t key) {
     return false;
 }
 
+void set_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key, TokenKind value) {
+    DictEntry_CSym_ETokenKind* _t0 = _lyric_slab_alloc_DictEntry_CSym_ETokenKind();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_ETokenKind* entry = _t0;
+    hash_insert_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(self, entry);
+}
+
+DictEntry_CSym_ETokenKind* get_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_ETokenKind* _t1 = hash_lookup_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(self, h);
+    return _t1;
+}
+
 void array_append_CLexer_CComment(Lexer* parent, Comment* child) {
     LyricSlice_Commentptr _t0 = Lexer_lc_children(parent);
     LyricSlice_Commentptr kids = _t0;
@@ -91798,6 +92369,462 @@ void array_append_CBlock_CStmt(Block* parent, Stmt* child) {
     Stmt_set_bs_parent(child, parent);
     LyricSlice_Stmtptr _t4 = ({ lyric_push(&kids, child, LyricSlice_Stmtptr); kids; });
     Block_set_bs_children(parent, _t4);
+}
+
+void set_CSym_string(Dict_CSym_string* self, Sym* key, lyric_string value) {
+    DictEntry_CSym_string* _t0 = _lyric_slab_alloc_DictEntry_CSym_string();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_string* entry = _t0;
+    hash_insert_CDict_CSym_string_CDictEntry_CSym_string(self, entry);
+}
+
+void set_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key, TypeExpr* value) {
+    DictEntry_CSym_CTypeExpr* _t0 = _lyric_slab_alloc_DictEntry_CSym_CTypeExpr();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CTypeExpr* entry = _t0;
+    hash_insert_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(self, entry);
+}
+
+DictEntry_CSym_string* get_CSym_string(Dict_CSym_string* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_string* _t1 = hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_CTypeExpr* get_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CTypeExpr* _t1 = hash_lookup_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_CType* get_CSym_CType(Dict_CSym_CType* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CType* _t1 = hash_lookup_CDict_CSym_CType_CDictEntry_CSym_CType(self, h);
+    return _t1;
+}
+
+void set_CSym_CType(Dict_CSym_CType* self, Sym* key, Type* value) {
+    DictEntry_CSym_CType* _t0 = _lyric_slab_alloc_DictEntry_CSym_CType();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CType* entry = _t0;
+    hash_insert_CDict_CSym_CType_CDictEntry_CSym_CType(self, entry);
+}
+
+LyricSlice_Symptr keys_CSym_CType(Dict_CSym_CType* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CTypeptr _t1 = Dict_CSym_CType_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CType* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+void set_CSym_CTypeInfo(Dict_CSym_CTypeInfo* self, Sym* key, TypeInfo* value) {
+    DictEntry_CSym_CTypeInfo* _t0 = _lyric_slab_alloc_DictEntry_CSym_CTypeInfo();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CTypeInfo* entry = _t0;
+    hash_insert_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(self, entry);
+}
+
+DictEntry_CSym_CTypeInfo* get_CSym_CTypeInfo(Dict_CSym_CTypeInfo* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CTypeInfo* _t1 = hash_lookup_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(self, h);
+    return _t1;
+}
+
+void set_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* self, Sym* key, LyricSlice_TypeExprptr value) {
+    DictEntry_CSym_slice_CTypeExpr* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_CTypeExpr();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_CTypeExpr* entry = _t0;
+    hash_insert_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(self, entry);
+}
+
+void set_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self, Sym* key, VariantInfo* value) {
+    DictEntry_CSym_CVariantInfo* _t0 = _lyric_slab_alloc_DictEntry_CSym_CVariantInfo();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CVariantInfo* entry = _t0;
+    hash_insert_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(self, entry);
+}
+
+DictEntry_CSym_CDict_CSym_CType* get_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CDict_CSym_CType* _t1 = hash_lookup_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(self, h);
+    return _t1;
+}
+
+void set_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self, Sym* key, Dict_CSym_CType* value) {
+    DictEntry_CSym_CDict_CSym_CType* _t0 = _lyric_slab_alloc_DictEntry_CSym_CDict_CSym_CType();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CDict_CSym_CType* entry = _t0;
+    hash_insert_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(self, entry);
+}
+
+LyricSlice_Symptr keys_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t1 = Dict_CSym_CDict_CSym_CType_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CDict_CSym_CType* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_CVariantInfo* get_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CVariantInfo* _t1 = hash_lookup_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(self, h);
+    return _t1;
+}
+
+LyricSlice_Symptr keys_CSym_CVariantInfo(Dict_CSym_CVariantInfo* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t1 = Dict_CSym_CVariantInfo_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CVariantInfo* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_slice_CTypeExpr* get_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_CTypeExpr* _t1 = hash_lookup_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(self, h);
+    return _t1;
+}
+
+void set_CSym_CLType(Dict_CSym_CLType* self, Sym* key, LType* value) {
+    DictEntry_CSym_CLType* _t0 = _lyric_slab_alloc_DictEntry_CSym_CLType();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CLType* entry = _t0;
+    hash_insert_CDict_CSym_CLType_CDictEntry_CSym_CLType(self, entry);
+}
+
+DictEntry_CSym_CLType* get_CSym_CLType(Dict_CSym_CLType* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CLType* _t1 = hash_lookup_CDict_CSym_CLType_CDictEntry_CSym_CLType(self, h);
+    return _t1;
+}
+
+bool has_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key) {
+    DictEntry_CSym_CStructDecl* _t0 = Dict_CSym_CStructDecl_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool has_CSym_CClassDecl(Dict_CSym_CClassDecl* self, Sym* key) {
+    DictEntry_CSym_CClassDecl* _t0 = Dict_CSym_CClassDecl_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool has_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key) {
+    DictEntry_CSym_CEnumDecl* _t0 = Dict_CSym_CEnumDecl_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool has_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* self, Sym* key) {
+    DictEntry_CSym_CInterfaceDecl* _t0 = Dict_CSym_CInterfaceDecl_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool has_CSym_CTypeExpr(Dict_CSym_CTypeExpr* self, Sym* key) {
+    DictEntry_CSym_CTypeExpr* _t0 = Dict_CSym_CTypeExpr_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+void set_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key, StructDecl* value) {
+    DictEntry_CSym_CStructDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CStructDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CStructDecl* entry = _t0;
+    hash_insert_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(self, entry);
+}
+
+void set_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* self, Sym* key, Dict_CSym_CLType* value) {
+    DictEntry_CSym_CDict_CSym_CLType* _t0 = _lyric_slab_alloc_DictEntry_CSym_CDict_CSym_CLType();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CDict_CSym_CLType* entry = _t0;
+    hash_insert_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(self, entry);
+}
+
+void set_CSym_CExpr(Dict_CSym_CExpr* self, Sym* key, Expr* value) {
+    DictEntry_CSym_CExpr* _t0 = _lyric_slab_alloc_DictEntry_CSym_CExpr();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CExpr* entry = _t0;
+    hash_insert_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(self, entry);
+}
+
+void set_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key, EnumDecl* value) {
+    DictEntry_CSym_CEnumDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CEnumDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CEnumDecl* entry = _t0;
+    hash_insert_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(self, entry);
+}
+
+void set_CSym_i32(Dict_CSym_i32* self, Sym* key, int32_t value) {
+    DictEntry_CSym_i32* _t0 = _lyric_slab_alloc_DictEntry_CSym_i32();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_i32* entry = _t0;
+    hash_insert_CDict_CSym_i32_CDictEntry_CSym_i32(self, entry);
+}
+
+void set_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* self, Sym* key, LyricSlice_TupleFieldptr value) {
+    DictEntry_CSym_slice_CTupleField* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_CTupleField();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_CTupleField* entry = _t0;
+    hash_insert_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(self, entry);
+}
+
+void set_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* self, Sym* key, LInterfaceDecl* value) {
+    DictEntry_CSym_CLInterfaceDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CLInterfaceDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CLInterfaceDecl* entry = _t0;
+    hash_insert_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(self, entry);
+}
+
+DictEntry_CSym_CLInterfaceDecl* get_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CLInterfaceDecl* _t1 = hash_lookup_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_slice_CMatchArm* get_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_CMatchArm* _t1 = hash_lookup_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(self, h);
+    return _t1;
+}
+
+void set_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* self, Sym* key, LyricSlice_MatchArmptr value) {
+    DictEntry_CSym_slice_CMatchArm* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_CMatchArm();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_CMatchArm* entry = _t0;
+    hash_insert_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(self, entry);
+}
+
+bool has_CSym_bool(Dict_CSym_bool* self, Sym* key) {
+    DictEntry_CSym_bool* _t0 = Dict_CSym_bool_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+LyricSlice_Symptr keys_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CEnumDeclptr _t1 = Dict_CSym_CEnumDecl_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CEnumDecl* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+bool has_CSym_i32(Dict_CSym_i32* self, Sym* key) {
+    DictEntry_CSym_i32* _t0 = Dict_CSym_i32_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool has_CSym_string(Dict_CSym_string* self, Sym* key) {
+    DictEntry_CSym_string* _t0 = Dict_CSym_string_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+DictEntry_CSym_CStructDecl* get_CSym_CStructDecl(Dict_CSym_CStructDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CStructDecl* _t1 = hash_lookup_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_i32* get_CSym_i32(Dict_CSym_i32* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_i32* _t1 = hash_lookup_CDict_CSym_i32_CDictEntry_CSym_i32(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_slice_CTupleField* get_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_CTupleField* _t1 = hash_lookup_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(self, h);
+    return _t1;
+}
+
+void set_CSym_opt_CLType(Dict_CSym_opt_CLType* self, Sym* key, LType* value) {
+    DictEntry_CSym_opt_CLType* _t0 = _lyric_slab_alloc_DictEntry_CSym_opt_CLType();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_opt_CLType* entry = _t0;
+    hash_insert_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(self, entry);
+}
+
+DictEntry_CSym_opt_CLType* get_CSym_opt_CLType(Dict_CSym_opt_CLType* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_opt_CLType* _t1 = hash_lookup_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_CLClassDecl* get_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CLClassDecl* _t1 = hash_lookup_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(self, h);
+    return _t1;
+}
+
+DictEntry_CSym_CLFuncDecl* get_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CLFuncDecl* _t1 = hash_lookup_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(self, h);
+    return _t1;
+}
+
+LyricSlice_Symptr keys_CSym_string(Dict_CSym_string* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_stringptr _t1 = Dict_CSym_string_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_string* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+LyricSlice_Symptr keys_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CLClassDeclptr _t1 = Dict_CSym_CLClassDecl_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CLClassDecl* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+LyricSlice_Symptr keys_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_CLStructDeclptr _t1 = Dict_CSym_CLStructDecl_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_CLStructDecl* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+DictEntry_CSym_CLStructDecl* get_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CLStructDecl* _t1 = hash_lookup_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(self, h);
+    return _t1;
+}
+
+void set_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* self, Sym* key, LFuncDecl* value) {
+    DictEntry_CSym_CLFuncDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CLFuncDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CLFuncDecl* entry = _t0;
+    hash_insert_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(self, entry);
+}
+
+DictEntry_CSym_slice_CLFuncDecl* get_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_CLFuncDecl* _t1 = hash_lookup_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(self, h);
+    return _t1;
+}
+
+void set_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* self, Sym* key, LyricSlice_LFuncDeclptr value) {
+    DictEntry_CSym_slice_CLFuncDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_CLFuncDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_CLFuncDecl* entry = _t0;
+    hash_insert_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(self, entry);
+}
+
+void set_CSym_CLClassDecl(Dict_CSym_CLClassDecl* self, Sym* key, LClassDecl* value) {
+    DictEntry_CSym_CLClassDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CLClassDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CLClassDecl* entry = _t0;
+    hash_insert_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(self, entry);
+}
+
+void set_CSym_CLStructDecl(Dict_CSym_CLStructDecl* self, Sym* key, LStructDecl* value) {
+    DictEntry_CSym_CLStructDecl* _t0 = _lyric_slab_alloc_DictEntry_CSym_CLStructDecl();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_CLStructDecl* entry = _t0;
+    hash_insert_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(self, entry);
+}
+
+void set_CSym_slice_string(Dict_CSym_slice_string* self, Sym* key, LyricSlice_lyric_string value) {
+    DictEntry_CSym_slice_string* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_string();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_string* entry = _t0;
+    hash_insert_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(self, entry);
 }
 
 void Dict_CSym_ETokenKind_set(Dict_CSym_ETokenKind* self, Sym* key, TokenKind value) {
@@ -92397,6 +93424,106 @@ int32_t Dict_CSym_CDict_CSym_CType_d_hash_count(Dict_CSym_CDict_CSym_CType* self
 }
 
 void Dict_CSym_CDict_CSym_CType_set_d_hash_count(Dict_CSym_CDict_CSym_CType* self, int32_t val) {
+    self->d_hash_count = val;
+}
+
+void Dict_CSym_slice_CTypeExpr_set(Dict_CSym_slice_CTypeExpr* self, Sym* key, LyricSlice_TypeExprptr value) {
+    DictEntry_CSym_slice_CTypeExpr* _t0 = _lyric_slab_alloc_DictEntry_CSym_slice_CTypeExpr();
+    _t0->key = key;
+    _t0->value = value;
+    DictEntry_CSym_slice_CTypeExpr* entry = _t0;
+    hash_insert_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(self, entry);
+}
+
+DictEntry_CSym_slice_CTypeExpr* Dict_CSym_slice_CTypeExpr_get(Dict_CSym_slice_CTypeExpr* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_CTypeExpr* _t1 = hash_lookup_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(self, h);
+    return _t1;
+}
+
+bool Dict_CSym_slice_CTypeExpr_has(Dict_CSym_slice_CTypeExpr* self, Sym* key) {
+    DictEntry_CSym_slice_CTypeExpr* _t0 = Dict_CSym_slice_CTypeExpr_get(self, key);
+    bool _t1 = (_t0 == NULL);
+    bool _t2 = (!_t1);
+    return _t2;
+}
+
+bool Dict_CSym_slice_CTypeExpr_remove(Dict_CSym_slice_CTypeExpr* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    bool _t1 = hash_remove_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(self, h);
+    return _t1;
+}
+
+LyricSlice_Symptr Dict_CSym_slice_CTypeExpr_keys(Dict_CSym_slice_CTypeExpr* self) {
+    LyricSlice_Symptr _t0 = lyric_slice_empty(LyricSlice_Symptr);
+    LyricSlice_Symptr result = _t0;
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t1 = Dict_CSym_slice_CTypeExpr_d_children(self);
+    for (int32_t _idx = 0; _idx < _t1.len; _idx++) {
+        DictEntry_CSym_slice_CTypeExpr* entry = _t1.data[_idx];
+        Sym* _t2 = entry->key;
+        LyricSlice_Symptr _t3 = ({ lyric_push(&result, _t2, LyricSlice_Symptr); result; });
+        _t3;
+    }
+    return result;
+    if (result.cap > 0 && result.data) free(result.data);
+}
+
+void Dict_CSym_slice_CTypeExpr_destroy(Dict_CSym_slice_CTypeExpr* self) {
+    {
+        LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t0 = Dict_CSym_slice_CTypeExpr_d_children(self);
+        LyricSlice_DictEntry_CSym_slice_CTypeExprptr kids = _t0;
+        int32_t _t1 = kids.len;
+        int32_t _t2 = (_t1 - 1);
+        int32_t i = _t2;
+        while (1) {
+            bool _t3 = (i >= 0);
+            if (!(_t3)) break;
+            DictEntry_CSym_slice_CTypeExpr* _t4 = kids.data[i];
+            DictEntry_CSym_slice_CTypeExpr_set_d_parent(_t4, NULL);
+            DictEntry_CSym_slice_CTypeExpr* _t6 = kids.data[i];
+            DictEntry_CSym_slice_CTypeExpr_destroy(_t6);
+            int32_t _t8 = (i - 1);
+            i = _t8;
+        }
+    }
+    _lyric_slab_free_Dict_CSym_slice_CTypeExpr(self);
+}
+
+LyricSlice_DictEntry_CSym_slice_CTypeExprptr Dict_CSym_slice_CTypeExpr_d_children(Dict_CSym_slice_CTypeExpr* self) {
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t0 = self->d_children;
+    return _t0;
+}
+
+void Dict_CSym_slice_CTypeExpr_set_d_children(Dict_CSym_slice_CTypeExpr* self, LyricSlice_DictEntry_CSym_slice_CTypeExprptr val) {
+    self->d_children = val;
+}
+
+LyricSlice_int32_t Dict_CSym_slice_CTypeExpr_d_buckets(Dict_CSym_slice_CTypeExpr* self) {
+    LyricSlice_int32_t _t0 = self->d_buckets;
+    return _t0;
+}
+
+void Dict_CSym_slice_CTypeExpr_set_d_buckets(Dict_CSym_slice_CTypeExpr* self, LyricSlice_int32_t val) {
+    self->d_buckets = val;
+}
+
+int32_t Dict_CSym_slice_CTypeExpr_d_hash_cap(Dict_CSym_slice_CTypeExpr* self) {
+    int32_t _t0 = self->d_hash_cap;
+    return _t0;
+}
+
+void Dict_CSym_slice_CTypeExpr_set_d_hash_cap(Dict_CSym_slice_CTypeExpr* self, int32_t val) {
+    self->d_hash_cap = val;
+}
+
+int32_t Dict_CSym_slice_CTypeExpr_d_hash_count(Dict_CSym_slice_CTypeExpr* self) {
+    int32_t _t0 = self->d_hash_count;
+    return _t0;
+}
+
+void Dict_CSym_slice_CTypeExpr_set_d_hash_count(Dict_CSym_slice_CTypeExpr* self, int32_t val) {
     self->d_hash_count = val;
 }
 
@@ -94500,6 +95627,1626 @@ void Dict_CSym_slice_CMatchArm_set_d_hash_count(Dict_CSym_slice_CMatchArm* self,
     self->d_hash_count = val;
 }
 
+uint64_t DictEntry_CSym_bool_hash_key(DictEntry_CSym_bool* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_bool_destroy(DictEntry_CSym_bool* self) {
+    {
+        Dict_CSym_bool* _t0 = DictEntry_CSym_bool_d_parent(self);
+        Dict_CSym_bool* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_bool* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_bool_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_bool(self);
+}
+
+Dict_CSym_bool* DictEntry_CSym_bool_d_parent(DictEntry_CSym_bool* self) {
+    Dict_CSym_bool* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_bool_set_d_parent(DictEntry_CSym_bool* self, Dict_CSym_bool* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_bool_d_index(DictEntry_CSym_bool* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_bool_set_d_index(DictEntry_CSym_bool* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CInterfaceDecl_hash_key(DictEntry_CSym_CInterfaceDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CInterfaceDecl_destroy(DictEntry_CSym_CInterfaceDecl* self) {
+    {
+        Dict_CSym_CInterfaceDecl* _t0 = DictEntry_CSym_CInterfaceDecl_d_parent(self);
+        Dict_CSym_CInterfaceDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CInterfaceDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CInterfaceDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CInterfaceDecl(self);
+}
+
+Dict_CSym_CInterfaceDecl* DictEntry_CSym_CInterfaceDecl_d_parent(DictEntry_CSym_CInterfaceDecl* self) {
+    Dict_CSym_CInterfaceDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CInterfaceDecl_set_d_parent(DictEntry_CSym_CInterfaceDecl* self, Dict_CSym_CInterfaceDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CInterfaceDecl_d_index(DictEntry_CSym_CInterfaceDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CInterfaceDecl_set_d_index(DictEntry_CSym_CInterfaceDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CClassDecl_hash_key(DictEntry_CSym_CClassDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CClassDecl_destroy(DictEntry_CSym_CClassDecl* self) {
+    {
+        Dict_CSym_CClassDecl* _t0 = DictEntry_CSym_CClassDecl_d_parent(self);
+        Dict_CSym_CClassDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CClassDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CClassDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CClassDecl(self);
+}
+
+Dict_CSym_CClassDecl* DictEntry_CSym_CClassDecl_d_parent(DictEntry_CSym_CClassDecl* self) {
+    Dict_CSym_CClassDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CClassDecl_set_d_parent(DictEntry_CSym_CClassDecl* self, Dict_CSym_CClassDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CClassDecl_d_index(DictEntry_CSym_CClassDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CClassDecl_set_d_index(DictEntry_CSym_CClassDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CFuncDecl_hash_key(DictEntry_CSym_CFuncDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CFuncDecl_destroy(DictEntry_CSym_CFuncDecl* self) {
+    {
+        Dict_CSym_CFuncDecl* _t0 = DictEntry_CSym_CFuncDecl_d_parent(self);
+        Dict_CSym_CFuncDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CFuncDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CFuncDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CFuncDecl(self);
+}
+
+Dict_CSym_CFuncDecl* DictEntry_CSym_CFuncDecl_d_parent(DictEntry_CSym_CFuncDecl* self) {
+    Dict_CSym_CFuncDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CFuncDecl_set_d_parent(DictEntry_CSym_CFuncDecl* self, Dict_CSym_CFuncDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CFuncDecl_d_index(DictEntry_CSym_CFuncDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CFuncDecl_set_d_index(DictEntry_CSym_CFuncDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CConstDecl_hash_key(DictEntry_CSym_CConstDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CConstDecl_destroy(DictEntry_CSym_CConstDecl* self) {
+    {
+        Dict_CSym_CConstDecl* _t0 = DictEntry_CSym_CConstDecl_d_parent(self);
+        Dict_CSym_CConstDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CConstDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CConstDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CConstDecl(self);
+}
+
+Dict_CSym_CConstDecl* DictEntry_CSym_CConstDecl_d_parent(DictEntry_CSym_CConstDecl* self) {
+    Dict_CSym_CConstDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CConstDecl_set_d_parent(DictEntry_CSym_CConstDecl* self, Dict_CSym_CConstDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CConstDecl_d_index(DictEntry_CSym_CConstDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CConstDecl_set_d_index(DictEntry_CSym_CConstDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_ETokenKind_hash_key(DictEntry_CSym_ETokenKind* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_ETokenKind_destroy(DictEntry_CSym_ETokenKind* self) {
+    {
+        Dict_CSym_ETokenKind* _t0 = DictEntry_CSym_ETokenKind_d_parent(self);
+        Dict_CSym_ETokenKind* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_ETokenKind* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_ETokenKind_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_ETokenKind(self);
+}
+
+Dict_CSym_ETokenKind* DictEntry_CSym_ETokenKind_d_parent(DictEntry_CSym_ETokenKind* self) {
+    Dict_CSym_ETokenKind* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_ETokenKind_set_d_parent(DictEntry_CSym_ETokenKind* self, Dict_CSym_ETokenKind* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_ETokenKind_d_index(DictEntry_CSym_ETokenKind* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_ETokenKind_set_d_index(DictEntry_CSym_ETokenKind* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_string_hash_key(DictEntry_CSym_string* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_string_destroy(DictEntry_CSym_string* self) {
+    {
+        Dict_CSym_string* _t0 = DictEntry_CSym_string_d_parent(self);
+        Dict_CSym_string* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_string* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_string_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_string_CDictEntry_CSym_string(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_string(self);
+}
+
+Dict_CSym_string* DictEntry_CSym_string_d_parent(DictEntry_CSym_string* self) {
+    Dict_CSym_string* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_string_set_d_parent(DictEntry_CSym_string* self, Dict_CSym_string* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_string_d_index(DictEntry_CSym_string* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_string_set_d_index(DictEntry_CSym_string* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CTypeExpr_hash_key(DictEntry_CSym_CTypeExpr* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CTypeExpr_destroy(DictEntry_CSym_CTypeExpr* self) {
+    {
+        Dict_CSym_CTypeExpr* _t0 = DictEntry_CSym_CTypeExpr_d_parent(self);
+        Dict_CSym_CTypeExpr* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CTypeExpr* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CTypeExpr_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CTypeExpr(self);
+}
+
+Dict_CSym_CTypeExpr* DictEntry_CSym_CTypeExpr_d_parent(DictEntry_CSym_CTypeExpr* self) {
+    Dict_CSym_CTypeExpr* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CTypeExpr_set_d_parent(DictEntry_CSym_CTypeExpr* self, Dict_CSym_CTypeExpr* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CTypeExpr_d_index(DictEntry_CSym_CTypeExpr* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CTypeExpr_set_d_index(DictEntry_CSym_CTypeExpr* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CType_hash_key(DictEntry_CSym_CType* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CType_destroy(DictEntry_CSym_CType* self) {
+    {
+        Dict_CSym_CType* _t0 = DictEntry_CSym_CType_d_parent(self);
+        Dict_CSym_CType* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CType* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CType_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CType(self);
+}
+
+Dict_CSym_CType* DictEntry_CSym_CType_d_parent(DictEntry_CSym_CType* self) {
+    Dict_CSym_CType* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CType_set_d_parent(DictEntry_CSym_CType* self, Dict_CSym_CType* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CType_d_index(DictEntry_CSym_CType* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CType_set_d_index(DictEntry_CSym_CType* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CTypeInfo_hash_key(DictEntry_CSym_CTypeInfo* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CTypeInfo_destroy(DictEntry_CSym_CTypeInfo* self) {
+    {
+        Dict_CSym_CTypeInfo* _t0 = DictEntry_CSym_CTypeInfo_d_parent(self);
+        Dict_CSym_CTypeInfo* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CTypeInfo* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CTypeInfo_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CTypeInfo(self);
+}
+
+Dict_CSym_CTypeInfo* DictEntry_CSym_CTypeInfo_d_parent(DictEntry_CSym_CTypeInfo* self) {
+    Dict_CSym_CTypeInfo* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CTypeInfo_set_d_parent(DictEntry_CSym_CTypeInfo* self, Dict_CSym_CTypeInfo* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CTypeInfo_d_index(DictEntry_CSym_CTypeInfo* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CTypeInfo_set_d_index(DictEntry_CSym_CTypeInfo* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_slice_CTypeExpr_hash_key(DictEntry_CSym_slice_CTypeExpr* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_slice_CTypeExpr_destroy(DictEntry_CSym_slice_CTypeExpr* self) {
+    {
+        Dict_CSym_slice_CTypeExpr* _t0 = DictEntry_CSym_slice_CTypeExpr_d_parent(self);
+        Dict_CSym_slice_CTypeExpr* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_slice_CTypeExpr* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_slice_CTypeExpr_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_slice_CTypeExpr(self);
+}
+
+Dict_CSym_slice_CTypeExpr* DictEntry_CSym_slice_CTypeExpr_d_parent(DictEntry_CSym_slice_CTypeExpr* self) {
+    Dict_CSym_slice_CTypeExpr* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CTypeExpr_set_d_parent(DictEntry_CSym_slice_CTypeExpr* self, Dict_CSym_slice_CTypeExpr* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_slice_CTypeExpr_d_index(DictEntry_CSym_slice_CTypeExpr* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CTypeExpr_set_d_index(DictEntry_CSym_slice_CTypeExpr* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CVariantInfo_hash_key(DictEntry_CSym_CVariantInfo* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CVariantInfo_destroy(DictEntry_CSym_CVariantInfo* self) {
+    {
+        Dict_CSym_CVariantInfo* _t0 = DictEntry_CSym_CVariantInfo_d_parent(self);
+        Dict_CSym_CVariantInfo* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CVariantInfo* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CVariantInfo_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CVariantInfo(self);
+}
+
+Dict_CSym_CVariantInfo* DictEntry_CSym_CVariantInfo_d_parent(DictEntry_CSym_CVariantInfo* self) {
+    Dict_CSym_CVariantInfo* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CVariantInfo_set_d_parent(DictEntry_CSym_CVariantInfo* self, Dict_CSym_CVariantInfo* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CVariantInfo_d_index(DictEntry_CSym_CVariantInfo* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CVariantInfo_set_d_index(DictEntry_CSym_CVariantInfo* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CDict_CSym_CType_hash_key(DictEntry_CSym_CDict_CSym_CType* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CDict_CSym_CType_destroy(DictEntry_CSym_CDict_CSym_CType* self) {
+    {
+        Dict_CSym_CDict_CSym_CType* _t0 = DictEntry_CSym_CDict_CSym_CType_d_parent(self);
+        Dict_CSym_CDict_CSym_CType* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CDict_CSym_CType* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CDict_CSym_CType_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CDict_CSym_CType(self);
+}
+
+Dict_CSym_CDict_CSym_CType* DictEntry_CSym_CDict_CSym_CType_d_parent(DictEntry_CSym_CDict_CSym_CType* self) {
+    Dict_CSym_CDict_CSym_CType* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CDict_CSym_CType_set_d_parent(DictEntry_CSym_CDict_CSym_CType* self, Dict_CSym_CDict_CSym_CType* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CDict_CSym_CType_d_index(DictEntry_CSym_CDict_CSym_CType* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CDict_CSym_CType_set_d_index(DictEntry_CSym_CDict_CSym_CType* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CLType_hash_key(DictEntry_CSym_CLType* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CLType_destroy(DictEntry_CSym_CLType* self) {
+    {
+        Dict_CSym_CLType* _t0 = DictEntry_CSym_CLType_d_parent(self);
+        Dict_CSym_CLType* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CLType* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CLType_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CLType(self);
+}
+
+Dict_CSym_CLType* DictEntry_CSym_CLType_d_parent(DictEntry_CSym_CLType* self) {
+    Dict_CSym_CLType* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CLType_set_d_parent(DictEntry_CSym_CLType* self, Dict_CSym_CLType* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CLType_d_index(DictEntry_CSym_CLType* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CLType_set_d_index(DictEntry_CSym_CLType* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CStructDecl_hash_key(DictEntry_CSym_CStructDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CStructDecl_destroy(DictEntry_CSym_CStructDecl* self) {
+    {
+        Dict_CSym_CStructDecl* _t0 = DictEntry_CSym_CStructDecl_d_parent(self);
+        Dict_CSym_CStructDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CStructDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CStructDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CStructDecl(self);
+}
+
+Dict_CSym_CStructDecl* DictEntry_CSym_CStructDecl_d_parent(DictEntry_CSym_CStructDecl* self) {
+    Dict_CSym_CStructDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CStructDecl_set_d_parent(DictEntry_CSym_CStructDecl* self, Dict_CSym_CStructDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CStructDecl_d_index(DictEntry_CSym_CStructDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CStructDecl_set_d_index(DictEntry_CSym_CStructDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CDict_CSym_CLType_hash_key(DictEntry_CSym_CDict_CSym_CLType* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CDict_CSym_CLType_destroy(DictEntry_CSym_CDict_CSym_CLType* self) {
+    {
+        Dict_CSym_CDict_CSym_CLType* _t0 = DictEntry_CSym_CDict_CSym_CLType_d_parent(self);
+        Dict_CSym_CDict_CSym_CLType* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CDict_CSym_CLType* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CDict_CSym_CLType_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CDict_CSym_CLType(self);
+}
+
+Dict_CSym_CDict_CSym_CLType* DictEntry_CSym_CDict_CSym_CLType_d_parent(DictEntry_CSym_CDict_CSym_CLType* self) {
+    Dict_CSym_CDict_CSym_CLType* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CDict_CSym_CLType_set_d_parent(DictEntry_CSym_CDict_CSym_CLType* self, Dict_CSym_CDict_CSym_CLType* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CDict_CSym_CLType_d_index(DictEntry_CSym_CDict_CSym_CLType* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CDict_CSym_CLType_set_d_index(DictEntry_CSym_CDict_CSym_CLType* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CExpr_hash_key(DictEntry_CSym_CExpr* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CExpr_destroy(DictEntry_CSym_CExpr* self) {
+    {
+        Dict_CSym_CExpr* _t0 = DictEntry_CSym_CExpr_d_parent(self);
+        Dict_CSym_CExpr* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CExpr* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CExpr_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CExpr(self);
+}
+
+Dict_CSym_CExpr* DictEntry_CSym_CExpr_d_parent(DictEntry_CSym_CExpr* self) {
+    Dict_CSym_CExpr* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CExpr_set_d_parent(DictEntry_CSym_CExpr* self, Dict_CSym_CExpr* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CExpr_d_index(DictEntry_CSym_CExpr* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CExpr_set_d_index(DictEntry_CSym_CExpr* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CEnumDecl_hash_key(DictEntry_CSym_CEnumDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CEnumDecl_destroy(DictEntry_CSym_CEnumDecl* self) {
+    {
+        Dict_CSym_CEnumDecl* _t0 = DictEntry_CSym_CEnumDecl_d_parent(self);
+        Dict_CSym_CEnumDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CEnumDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CEnumDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CEnumDecl(self);
+}
+
+Dict_CSym_CEnumDecl* DictEntry_CSym_CEnumDecl_d_parent(DictEntry_CSym_CEnumDecl* self) {
+    Dict_CSym_CEnumDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CEnumDecl_set_d_parent(DictEntry_CSym_CEnumDecl* self, Dict_CSym_CEnumDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CEnumDecl_d_index(DictEntry_CSym_CEnumDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CEnumDecl_set_d_index(DictEntry_CSym_CEnumDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_i32_hash_key(DictEntry_CSym_i32* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_i32_destroy(DictEntry_CSym_i32* self) {
+    {
+        Dict_CSym_i32* _t0 = DictEntry_CSym_i32_d_parent(self);
+        Dict_CSym_i32* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_i32* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_i32_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_i32(self);
+}
+
+Dict_CSym_i32* DictEntry_CSym_i32_d_parent(DictEntry_CSym_i32* self) {
+    Dict_CSym_i32* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_i32_set_d_parent(DictEntry_CSym_i32* self, Dict_CSym_i32* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_i32_d_index(DictEntry_CSym_i32* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_i32_set_d_index(DictEntry_CSym_i32* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_slice_CTupleField_hash_key(DictEntry_CSym_slice_CTupleField* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_slice_CTupleField_destroy(DictEntry_CSym_slice_CTupleField* self) {
+    {
+        Dict_CSym_slice_CTupleField* _t0 = DictEntry_CSym_slice_CTupleField_d_parent(self);
+        Dict_CSym_slice_CTupleField* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_slice_CTupleField* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_slice_CTupleField_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_slice_CTupleField(self);
+}
+
+Dict_CSym_slice_CTupleField* DictEntry_CSym_slice_CTupleField_d_parent(DictEntry_CSym_slice_CTupleField* self) {
+    Dict_CSym_slice_CTupleField* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CTupleField_set_d_parent(DictEntry_CSym_slice_CTupleField* self, Dict_CSym_slice_CTupleField* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_slice_CTupleField_d_index(DictEntry_CSym_slice_CTupleField* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CTupleField_set_d_index(DictEntry_CSym_slice_CTupleField* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CLInterfaceDecl_hash_key(DictEntry_CSym_CLInterfaceDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CLInterfaceDecl_destroy(DictEntry_CSym_CLInterfaceDecl* self) {
+    {
+        Dict_CSym_CLInterfaceDecl* _t0 = DictEntry_CSym_CLInterfaceDecl_d_parent(self);
+        Dict_CSym_CLInterfaceDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CLInterfaceDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CLInterfaceDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CLInterfaceDecl(self);
+}
+
+Dict_CSym_CLInterfaceDecl* DictEntry_CSym_CLInterfaceDecl_d_parent(DictEntry_CSym_CLInterfaceDecl* self) {
+    Dict_CSym_CLInterfaceDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CLInterfaceDecl_set_d_parent(DictEntry_CSym_CLInterfaceDecl* self, Dict_CSym_CLInterfaceDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CLInterfaceDecl_d_index(DictEntry_CSym_CLInterfaceDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CLInterfaceDecl_set_d_index(DictEntry_CSym_CLInterfaceDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_slice_CMatchArm_hash_key(DictEntry_CSym_slice_CMatchArm* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_slice_CMatchArm_destroy(DictEntry_CSym_slice_CMatchArm* self) {
+    {
+        Dict_CSym_slice_CMatchArm* _t0 = DictEntry_CSym_slice_CMatchArm_d_parent(self);
+        Dict_CSym_slice_CMatchArm* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_slice_CMatchArm* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_slice_CMatchArm_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_slice_CMatchArm(self);
+}
+
+Dict_CSym_slice_CMatchArm* DictEntry_CSym_slice_CMatchArm_d_parent(DictEntry_CSym_slice_CMatchArm* self) {
+    Dict_CSym_slice_CMatchArm* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CMatchArm_set_d_parent(DictEntry_CSym_slice_CMatchArm* self, Dict_CSym_slice_CMatchArm* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_slice_CMatchArm_d_index(DictEntry_CSym_slice_CMatchArm* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CMatchArm_set_d_index(DictEntry_CSym_slice_CMatchArm* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_opt_CLType_hash_key(DictEntry_CSym_opt_CLType* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_opt_CLType_destroy(DictEntry_CSym_opt_CLType* self) {
+    {
+        Dict_CSym_opt_CLType* _t0 = DictEntry_CSym_opt_CLType_d_parent(self);
+        Dict_CSym_opt_CLType* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_opt_CLType* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_opt_CLType_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_opt_CLType(self);
+}
+
+Dict_CSym_opt_CLType* DictEntry_CSym_opt_CLType_d_parent(DictEntry_CSym_opt_CLType* self) {
+    Dict_CSym_opt_CLType* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_opt_CLType_set_d_parent(DictEntry_CSym_opt_CLType* self, Dict_CSym_opt_CLType* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_opt_CLType_d_index(DictEntry_CSym_opt_CLType* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_opt_CLType_set_d_index(DictEntry_CSym_opt_CLType* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CLFuncDecl_hash_key(DictEntry_CSym_CLFuncDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CLFuncDecl_destroy(DictEntry_CSym_CLFuncDecl* self) {
+    {
+        Dict_CSym_CLFuncDecl* _t0 = DictEntry_CSym_CLFuncDecl_d_parent(self);
+        Dict_CSym_CLFuncDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CLFuncDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CLFuncDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CLFuncDecl(self);
+}
+
+Dict_CSym_CLFuncDecl* DictEntry_CSym_CLFuncDecl_d_parent(DictEntry_CSym_CLFuncDecl* self) {
+    Dict_CSym_CLFuncDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CLFuncDecl_set_d_parent(DictEntry_CSym_CLFuncDecl* self, Dict_CSym_CLFuncDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CLFuncDecl_d_index(DictEntry_CSym_CLFuncDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CLFuncDecl_set_d_index(DictEntry_CSym_CLFuncDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_slice_CLFuncDecl_hash_key(DictEntry_CSym_slice_CLFuncDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_slice_CLFuncDecl_destroy(DictEntry_CSym_slice_CLFuncDecl* self) {
+    {
+        Dict_CSym_slice_CLFuncDecl* _t0 = DictEntry_CSym_slice_CLFuncDecl_d_parent(self);
+        Dict_CSym_slice_CLFuncDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_slice_CLFuncDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_slice_CLFuncDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_slice_CLFuncDecl(self);
+}
+
+Dict_CSym_slice_CLFuncDecl* DictEntry_CSym_slice_CLFuncDecl_d_parent(DictEntry_CSym_slice_CLFuncDecl* self) {
+    Dict_CSym_slice_CLFuncDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CLFuncDecl_set_d_parent(DictEntry_CSym_slice_CLFuncDecl* self, Dict_CSym_slice_CLFuncDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_slice_CLFuncDecl_d_index(DictEntry_CSym_slice_CLFuncDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_CLFuncDecl_set_d_index(DictEntry_CSym_slice_CLFuncDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CLClassDecl_hash_key(DictEntry_CSym_CLClassDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CLClassDecl_destroy(DictEntry_CSym_CLClassDecl* self) {
+    {
+        Dict_CSym_CLClassDecl* _t0 = DictEntry_CSym_CLClassDecl_d_parent(self);
+        Dict_CSym_CLClassDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CLClassDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CLClassDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CLClassDecl(self);
+}
+
+Dict_CSym_CLClassDecl* DictEntry_CSym_CLClassDecl_d_parent(DictEntry_CSym_CLClassDecl* self) {
+    Dict_CSym_CLClassDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CLClassDecl_set_d_parent(DictEntry_CSym_CLClassDecl* self, Dict_CSym_CLClassDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CLClassDecl_d_index(DictEntry_CSym_CLClassDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CLClassDecl_set_d_index(DictEntry_CSym_CLClassDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_CLStructDecl_hash_key(DictEntry_CSym_CLStructDecl* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_CLStructDecl_destroy(DictEntry_CSym_CLStructDecl* self) {
+    {
+        Dict_CSym_CLStructDecl* _t0 = DictEntry_CSym_CLStructDecl_d_parent(self);
+        Dict_CSym_CLStructDecl* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_CLStructDecl* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_CLStructDecl_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_CLStructDecl(self);
+}
+
+Dict_CSym_CLStructDecl* DictEntry_CSym_CLStructDecl_d_parent(DictEntry_CSym_CLStructDecl* self) {
+    Dict_CSym_CLStructDecl* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_CLStructDecl_set_d_parent(DictEntry_CSym_CLStructDecl* self, Dict_CSym_CLStructDecl* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_CLStructDecl_d_index(DictEntry_CSym_CLStructDecl* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_CLStructDecl_set_d_index(DictEntry_CSym_CLStructDecl* self, int32_t val) {
+    self->d_index = val;
+}
+
+uint64_t DictEntry_CSym_slice_string_hash_key(DictEntry_CSym_slice_string* self) {
+    Sym* _t0 = self->key;
+    uint64_t _t1 = Sym_get_hash(_t0);
+    return _t1;
+}
+
+void DictEntry_CSym_slice_string_destroy(DictEntry_CSym_slice_string* self) {
+    {
+        Dict_CSym_slice_string* _t0 = DictEntry_CSym_slice_string_d_parent(self);
+        Dict_CSym_slice_string* p = _t0;
+        bool _t1 = (p == NULL);
+        bool _t2 = (!_t1);
+        if (_t2) {
+            Dict_CSym_slice_string* _t3 = p;
+            uint64_t _t4 = DictEntry_CSym_slice_string_hash_key(self);
+            bool _t5 = hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(_t3, _t4);
+            _t5;
+        }
+    }
+    _lyric_slab_free_DictEntry_CSym_slice_string(self);
+}
+
+Dict_CSym_slice_string* DictEntry_CSym_slice_string_d_parent(DictEntry_CSym_slice_string* self) {
+    Dict_CSym_slice_string* _t0 = self->d_parent;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_string_set_d_parent(DictEntry_CSym_slice_string* self, Dict_CSym_slice_string* val) {
+    self->d_parent = val;
+}
+
+int32_t DictEntry_CSym_slice_string_d_index(DictEntry_CSym_slice_string* self) {
+    int32_t _t0 = self->d_index;
+    return _t0;
+}
+
+void DictEntry_CSym_slice_string_set_d_index(DictEntry_CSym_slice_string* self, int32_t val) {
+    self->d_index = val;
+}
+
+void hash_insert_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, DictEntry_CSym_bool* child) {
+    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_bool_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_bool_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_bool_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_bool_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_boolptr _t15 = Dict_CSym_bool_d_children(parent);
+        DictEntry_CSym_bool* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_bool* old_child = _t16;
+        DictEntry_CSym_bool_set_d_parent(old_child, 0);
+        DictEntry_CSym_bool_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_boolptr _t19 = Dict_CSym_bool_d_children(parent);
+        LyricSlice_DictEntry_CSym_boolptr kids = _t19;
+        DictEntry_CSym_bool_set_d_parent(child, parent);
+        DictEntry_CSym_bool_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_bool_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_bool_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_bool_set_d_parent(child, parent);
+    DictEntry_CSym_bool_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_boolptr _t26 = Dict_CSym_bool_d_children(parent);
+    LyricSlice_DictEntry_CSym_boolptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_boolptr); _t26; });
+    Dict_CSym_bool_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_bool_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_bool_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_bool_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_bool* hash_lookup_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_bool_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_bool_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_boolptr _t4 = Dict_CSym_bool_d_children(parent);
+    LyricSlice_DictEntry_CSym_boolptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_bool* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_bool_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_bool* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, DictEntry_CSym_CInterfaceDecl* child) {
+    int32_t _t0 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CInterfaceDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CInterfaceDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t15 = Dict_CSym_CInterfaceDecl_d_children(parent);
+        DictEntry_CSym_CInterfaceDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CInterfaceDecl* old_child = _t16;
+        DictEntry_CSym_CInterfaceDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CInterfaceDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t19 = Dict_CSym_CInterfaceDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CInterfaceDeclptr kids = _t19;
+        DictEntry_CSym_CInterfaceDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CInterfaceDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CInterfaceDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CInterfaceDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CInterfaceDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CInterfaceDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t26 = Dict_CSym_CInterfaceDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CInterfaceDeclptr); _t26; });
+    Dict_CSym_CInterfaceDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CInterfaceDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CInterfaceDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, DictEntry_CSym_CClassDecl* child) {
+    int32_t _t0 = Dict_CSym_CClassDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CClassDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CClassDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CClassDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CClassDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CClassDeclptr _t15 = Dict_CSym_CClassDecl_d_children(parent);
+        DictEntry_CSym_CClassDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CClassDecl* old_child = _t16;
+        DictEntry_CSym_CClassDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CClassDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CClassDeclptr _t19 = Dict_CSym_CClassDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CClassDeclptr kids = _t19;
+        DictEntry_CSym_CClassDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CClassDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CClassDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CClassDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CClassDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CClassDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CClassDeclptr _t26 = Dict_CSym_CClassDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CClassDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CClassDeclptr); _t26; });
+    Dict_CSym_CClassDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CClassDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CClassDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CClassDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, DictEntry_CSym_CFuncDecl* child) {
+    int32_t _t0 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CFuncDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CFuncDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CFuncDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CFuncDeclptr _t15 = Dict_CSym_CFuncDecl_d_children(parent);
+        DictEntry_CSym_CFuncDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CFuncDecl* old_child = _t16;
+        DictEntry_CSym_CFuncDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CFuncDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CFuncDeclptr _t19 = Dict_CSym_CFuncDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CFuncDeclptr kids = _t19;
+        DictEntry_CSym_CFuncDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CFuncDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CFuncDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CFuncDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CFuncDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CFuncDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CFuncDeclptr _t26 = Dict_CSym_CFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CFuncDeclptr); _t26; });
+    Dict_CSym_CFuncDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CFuncDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CFuncDecl_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CInterfaceDecl* hash_lookup_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t4 = Dict_CSym_CInterfaceDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CInterfaceDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CInterfaceDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CInterfaceDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CInterfaceDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CClassDecl* hash_lookup_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CClassDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CClassDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CClassDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CClassDeclptr _t4 = Dict_CSym_CClassDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CClassDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CClassDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CClassDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CClassDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CFuncDecl* hash_lookup_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CFuncDeclptr _t4 = Dict_CSym_CFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CFuncDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CFuncDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CFuncDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CFuncDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, DictEntry_CSym_CConstDecl* child) {
+    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CConstDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CConstDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CConstDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CConstDeclptr _t15 = Dict_CSym_CConstDecl_d_children(parent);
+        DictEntry_CSym_CConstDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CConstDecl* old_child = _t16;
+        DictEntry_CSym_CConstDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CConstDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CConstDeclptr _t19 = Dict_CSym_CConstDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t19;
+        DictEntry_CSym_CConstDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CConstDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CConstDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CConstDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CConstDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CConstDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t26 = Dict_CSym_CConstDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CConstDeclptr); _t26; });
+    Dict_CSym_CConstDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CConstDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CConstDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CConstDecl_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CConstDecl* hash_lookup_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CConstDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t4 = Dict_CSym_CConstDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CConstDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CConstDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CConstDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
 void hash_init_CSymTable_CSym(SymTable* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
@@ -94715,18 +97462,126 @@ DictEntry_CSym_ETokenKind* hash_lookup_CDict_CSym_ETokenKind_CDictEntry_CSym_ETo
     return NULL;
 }
 
-bool hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+void hash_insert_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, DictEntry_CSym_string* child) {
+    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
     if (_t1) {
-        return false;
+        hash_init_CDict_CSym_string_CDictEntry_CSym_string(parent, 8);
     }
-    int32_t _t2 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    int32_t _t3 = Dict_CSym_string_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_string_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_string_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_string_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_stringptr _t15 = Dict_CSym_string_d_children(parent);
+        DictEntry_CSym_string* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_string* old_child = _t16;
+        DictEntry_CSym_string_set_d_parent(old_child, 0);
+        DictEntry_CSym_string_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_stringptr _t19 = Dict_CSym_string_d_children(parent);
+        LyricSlice_DictEntry_CSym_stringptr kids = _t19;
+        DictEntry_CSym_string_set_d_parent(child, parent);
+        DictEntry_CSym_string_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_string_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_string_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_string_set_d_parent(child, parent);
+    DictEntry_CSym_string_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_stringptr _t26 = Dict_CSym_string_d_children(parent);
+    LyricSlice_DictEntry_CSym_stringptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_stringptr); _t26; });
+    Dict_CSym_string_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_string_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_string_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_string_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, DictEntry_CSym_CTypeExpr* child) {
+    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CTypeExpr_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CTypeExpr_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CTypeExpr_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CTypeExprptr _t15 = Dict_CSym_CTypeExpr_d_children(parent);
+        DictEntry_CSym_CTypeExpr* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CTypeExpr* old_child = _t16;
+        DictEntry_CSym_CTypeExpr_set_d_parent(old_child, 0);
+        DictEntry_CSym_CTypeExpr_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CTypeExprptr _t19 = Dict_CSym_CTypeExpr_d_children(parent);
+        LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t19;
+        DictEntry_CSym_CTypeExpr_set_d_parent(child, parent);
+        DictEntry_CSym_CTypeExpr_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CTypeExpr_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CTypeExpr_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CTypeExpr_set_d_parent(child, parent);
+    DictEntry_CSym_CTypeExpr_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CTypeExprptr _t26 = Dict_CSym_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeExprptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CTypeExprptr); _t26; });
+    Dict_CSym_CTypeExpr_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CTypeExpr_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_string* hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_string_d_hash_cap(parent);
     int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_ETokenKind_d_buckets(parent);
+    LyricSlice_int32_t _t3 = Dict_CSym_string_d_buckets(parent);
     LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_ETokenKindptr _t4 = Dict_CSym_ETokenKind_d_children(parent);
-    LyricSlice_DictEntry_CSym_ETokenKindptr kids = _t4;
+    LyricSlice_DictEntry_CSym_stringptr _t4 = Dict_CSym_string_d_children(parent);
+    LyricSlice_DictEntry_CSym_stringptr kids = _t4;
     uint64_t _t5 = ((uint64_t)cap);
     uint64_t _t6 = (key % _t5);
     int32_t _t7 = ((int32_t)_t6);
@@ -94740,69 +97595,117 @@ bool hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETok
         int32_t _t10 = (-1);
         bool _t11 = (idx == _t10);
         if (_t11) {
-            return false;
+            return NULL;
         }
         bool _t12 = (idx >= 0);
         if (_t12) {
-            DictEntry_CSym_ETokenKind* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_ETokenKind_hash_key(_t13);
+            DictEntry_CSym_string* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_string_hash_key(_t13);
             bool _t15 = (_t14 == key);
             if (_t15) {
-                int32_t _t16 = Dict_CSym_ETokenKind_d_hash_count(parent);
-                int32_t count = _t16;
-                int32_t _t17 = (count - 1);
-                int32_t last_idx = _t17;
-                DictEntry_CSym_ETokenKind* _t18 = kids.data[idx];
-                DictEntry_CSym_ETokenKind* child = _t18;
-                DictEntry_CSym_ETokenKind_set_d_parent(child, 0);
-                DictEntry_CSym_ETokenKind_set_d_index(child, 0);
-                bool _t21 = (idx < last_idx);
-                if (_t21) {
-                    DictEntry_CSym_ETokenKind* _t22 = kids.data[last_idx];
-                    DictEntry_CSym_ETokenKind* last_child = _t22;
-                    DictEntry_CSym_ETokenKind_set_d_index(last_child, idx);
-                    LyricSlice_DictEntry_CSym_ETokenKindptr _t24 = Dict_CSym_ETokenKind_d_children(parent);
-                    LyricSlice_DictEntry_CSym_ETokenKindptr k = _t24;
-                    k.data[idx] = last_child;
-                    Dict_CSym_ETokenKind_set_d_children(parent, k);
-                    uint64_t _t26 = DictEntry_CSym_ETokenKind_hash_key(last_child);
-                    uint64_t swapped_key = _t26;
-                    uint64_t _t27 = ((uint64_t)cap);
-                    uint64_t _t28 = (swapped_key % _t27);
-                    int32_t _t29 = ((int32_t)_t28);
-                    int32_t s = _t29;
-                    while (1) {
-                        int32_t _t30 = buckets.data[s];
-                        bool _t31 = (_t30 != last_idx);
-                        if (!(_t31)) break;
-                        int32_t _t32 = (s + 1);
-                        int32_t _t33 = (_t32 % cap);
-                        s = _t33;
-                    }
-                    LyricSlice_int32_t _t34 = Dict_CSym_ETokenKind_d_buckets(parent);
-                    LyricSlice_int32_t b2 = _t34;
-                    b2.data[s] = idx;
-                    Dict_CSym_ETokenKind_set_d_buckets(parent, b2);
-                }
-                LyricSlice_int32_t _t36 = Dict_CSym_ETokenKind_d_buckets(parent);
-                LyricSlice_int32_t b = _t36;
-                int32_t _t37 = (-2);
-                b.data[slot] = _t37;
-                Dict_CSym_ETokenKind_set_d_buckets(parent, b);
-                LyricSlice_DictEntry_CSym_ETokenKindptr _t39 = Dict_CSym_ETokenKind_d_children(parent);
-                LyricSlice_DictEntry_CSym_ETokenKindptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_ETokenKindptr);
-                Dict_CSym_ETokenKind_set_d_children(parent, _t40);
-                Dict_CSym_ETokenKind_set_d_hash_count(parent, last_idx);
-                return true;
+                DictEntry_CSym_string* _t16 = kids.data[idx];
+                return _t16;
             }
         }
-        int32_t _t43 = (slot + 1);
-        int32_t _t44 = (_t43 % cap);
-        slot = _t44;
-        int32_t _t45 = (i + 1);
-        i = _t45;
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
     }
-    return false;
+    return NULL;
+}
+
+DictEntry_CSym_CTypeExpr* hash_lookup_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CTypeExprptr _t4 = Dict_CSym_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CTypeExpr* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CTypeExpr_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CTypeExpr* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CType* hash_lookup_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CTypeptr _t4 = Dict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CType* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CType_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CType* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
 }
 
 void hash_insert_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, DictEntry_CSym_CType* child) {
@@ -94857,332 +97760,6 @@ void hash_insert_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent,
     Dict_CSym_CType_set_d_buckets(parent, b);
     int32_t _t31 = (idx + 1);
     Dict_CSym_CType_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CType* hash_lookup_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CTypeptr _t4 = Dict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CType* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CType_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CType* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
-bool hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return false;
-    }
-    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CTypeptr _t4 = Dict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return false;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CType* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CType_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                int32_t _t16 = Dict_CSym_CType_d_hash_count(parent);
-                int32_t count = _t16;
-                int32_t _t17 = (count - 1);
-                int32_t last_idx = _t17;
-                DictEntry_CSym_CType* _t18 = kids.data[idx];
-                DictEntry_CSym_CType* child = _t18;
-                DictEntry_CSym_CType_set_d_parent(child, 0);
-                DictEntry_CSym_CType_set_d_index(child, 0);
-                bool _t21 = (idx < last_idx);
-                if (_t21) {
-                    DictEntry_CSym_CType* _t22 = kids.data[last_idx];
-                    DictEntry_CSym_CType* last_child = _t22;
-                    DictEntry_CSym_CType_set_d_index(last_child, idx);
-                    LyricSlice_DictEntry_CSym_CTypeptr _t24 = Dict_CSym_CType_d_children(parent);
-                    LyricSlice_DictEntry_CSym_CTypeptr k = _t24;
-                    k.data[idx] = last_child;
-                    Dict_CSym_CType_set_d_children(parent, k);
-                    uint64_t _t26 = DictEntry_CSym_CType_hash_key(last_child);
-                    uint64_t swapped_key = _t26;
-                    uint64_t _t27 = ((uint64_t)cap);
-                    uint64_t _t28 = (swapped_key % _t27);
-                    int32_t _t29 = ((int32_t)_t28);
-                    int32_t s = _t29;
-                    while (1) {
-                        int32_t _t30 = buckets.data[s];
-                        bool _t31 = (_t30 != last_idx);
-                        if (!(_t31)) break;
-                        int32_t _t32 = (s + 1);
-                        int32_t _t33 = (_t32 % cap);
-                        s = _t33;
-                    }
-                    LyricSlice_int32_t _t34 = Dict_CSym_CType_d_buckets(parent);
-                    LyricSlice_int32_t b2 = _t34;
-                    b2.data[s] = idx;
-                    Dict_CSym_CType_set_d_buckets(parent, b2);
-                }
-                LyricSlice_int32_t _t36 = Dict_CSym_CType_d_buckets(parent);
-                LyricSlice_int32_t b = _t36;
-                int32_t _t37 = (-2);
-                b.data[slot] = _t37;
-                Dict_CSym_CType_set_d_buckets(parent, b);
-                LyricSlice_DictEntry_CSym_CTypeptr _t39 = Dict_CSym_CType_d_children(parent);
-                LyricSlice_DictEntry_CSym_CTypeptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_CTypeptr);
-                Dict_CSym_CType_set_d_children(parent, _t40);
-                Dict_CSym_CType_set_d_hash_count(parent, last_idx);
-                return true;
-            }
-        }
-        int32_t _t43 = (slot + 1);
-        int32_t _t44 = (_t43 % cap);
-        slot = _t44;
-        int32_t _t45 = (i + 1);
-        i = _t45;
-    }
-    return false;
-}
-
-void hash_insert_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, DictEntry_CSym_CVariantInfo* child) {
-    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CVariantInfo_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CVariantInfo_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CVariantInfo_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CVariantInfoptr _t15 = Dict_CSym_CVariantInfo_d_children(parent);
-        DictEntry_CSym_CVariantInfo* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CVariantInfo* old_child = _t16;
-        DictEntry_CSym_CVariantInfo_set_d_parent(old_child, 0);
-        DictEntry_CSym_CVariantInfo_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CVariantInfoptr _t19 = Dict_CSym_CVariantInfo_d_children(parent);
-        LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t19;
-        DictEntry_CSym_CVariantInfo_set_d_parent(child, parent);
-        DictEntry_CSym_CVariantInfo_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CVariantInfo_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CVariantInfo_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CVariantInfo_set_d_parent(child, parent);
-    DictEntry_CSym_CVariantInfo_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t26 = Dict_CSym_CVariantInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CVariantInfoptr); _t26; });
-    Dict_CSym_CVariantInfo_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CVariantInfo_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CVariantInfo_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CVariantInfo* hash_lookup_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CVariantInfo_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t4 = Dict_CSym_CVariantInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CVariantInfo* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CVariantInfo_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CVariantInfo* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
-bool hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return false;
-    }
-    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CVariantInfo_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t4 = Dict_CSym_CVariantInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return false;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CVariantInfo* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CVariantInfo_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                int32_t _t16 = Dict_CSym_CVariantInfo_d_hash_count(parent);
-                int32_t count = _t16;
-                int32_t _t17 = (count - 1);
-                int32_t last_idx = _t17;
-                DictEntry_CSym_CVariantInfo* _t18 = kids.data[idx];
-                DictEntry_CSym_CVariantInfo* child = _t18;
-                DictEntry_CSym_CVariantInfo_set_d_parent(child, 0);
-                DictEntry_CSym_CVariantInfo_set_d_index(child, 0);
-                bool _t21 = (idx < last_idx);
-                if (_t21) {
-                    DictEntry_CSym_CVariantInfo* _t22 = kids.data[last_idx];
-                    DictEntry_CSym_CVariantInfo* last_child = _t22;
-                    DictEntry_CSym_CVariantInfo_set_d_index(last_child, idx);
-                    LyricSlice_DictEntry_CSym_CVariantInfoptr _t24 = Dict_CSym_CVariantInfo_d_children(parent);
-                    LyricSlice_DictEntry_CSym_CVariantInfoptr k = _t24;
-                    k.data[idx] = last_child;
-                    Dict_CSym_CVariantInfo_set_d_children(parent, k);
-                    uint64_t _t26 = DictEntry_CSym_CVariantInfo_hash_key(last_child);
-                    uint64_t swapped_key = _t26;
-                    uint64_t _t27 = ((uint64_t)cap);
-                    uint64_t _t28 = (swapped_key % _t27);
-                    int32_t _t29 = ((int32_t)_t28);
-                    int32_t s = _t29;
-                    while (1) {
-                        int32_t _t30 = buckets.data[s];
-                        bool _t31 = (_t30 != last_idx);
-                        if (!(_t31)) break;
-                        int32_t _t32 = (s + 1);
-                        int32_t _t33 = (_t32 % cap);
-                        s = _t33;
-                    }
-                    LyricSlice_int32_t _t34 = Dict_CSym_CVariantInfo_d_buckets(parent);
-                    LyricSlice_int32_t b2 = _t34;
-                    b2.data[s] = idx;
-                    Dict_CSym_CVariantInfo_set_d_buckets(parent, b2);
-                }
-                LyricSlice_int32_t _t36 = Dict_CSym_CVariantInfo_d_buckets(parent);
-                LyricSlice_int32_t b = _t36;
-                int32_t _t37 = (-2);
-                b.data[slot] = _t37;
-                Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
-                LyricSlice_DictEntry_CSym_CVariantInfoptr _t39 = Dict_CSym_CVariantInfo_d_children(parent);
-                LyricSlice_DictEntry_CSym_CVariantInfoptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_CVariantInfoptr);
-                Dict_CSym_CVariantInfo_set_d_children(parent, _t40);
-                Dict_CSym_CVariantInfo_set_d_hash_count(parent, last_idx);
-                return true;
-            }
-        }
-        int32_t _t43 = (slot + 1);
-        int32_t _t44 = (_t43 % cap);
-        slot = _t44;
-        int32_t _t45 = (i + 1);
-        i = _t45;
-    }
-    return false;
 }
 
 void hash_insert_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, DictEntry_CSym_CTypeInfo* child) {
@@ -95285,6 +97862,1899 @@ DictEntry_CSym_CTypeInfo* hash_lookup_CDict_CSym_CTypeInfo_CDictEntry_CSym_CType
     return NULL;
 }
 
+void hash_insert_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, DictEntry_CSym_slice_CTypeExpr* child) {
+    int32_t _t0 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_slice_CTypeExpr_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_slice_CTypeExpr_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t15 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+        DictEntry_CSym_slice_CTypeExpr* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_slice_CTypeExpr* old_child = _t16;
+        DictEntry_CSym_slice_CTypeExpr_set_d_parent(old_child, 0);
+        DictEntry_CSym_slice_CTypeExpr_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t19 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+        LyricSlice_DictEntry_CSym_slice_CTypeExprptr kids = _t19;
+        DictEntry_CSym_slice_CTypeExpr_set_d_parent(child, parent);
+        DictEntry_CSym_slice_CTypeExpr_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_slice_CTypeExpr_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_slice_CTypeExpr_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_slice_CTypeExpr_set_d_parent(child, parent);
+    DictEntry_CSym_slice_CTypeExpr_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t26 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CTypeExprptr); _t26; });
+    Dict_CSym_slice_CTypeExpr_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_slice_CTypeExpr_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, DictEntry_CSym_CVariantInfo* child) {
+    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CVariantInfo_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CVariantInfo_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CVariantInfo_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CVariantInfoptr _t15 = Dict_CSym_CVariantInfo_d_children(parent);
+        DictEntry_CSym_CVariantInfo* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CVariantInfo* old_child = _t16;
+        DictEntry_CSym_CVariantInfo_set_d_parent(old_child, 0);
+        DictEntry_CSym_CVariantInfo_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CVariantInfoptr _t19 = Dict_CSym_CVariantInfo_d_children(parent);
+        LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t19;
+        DictEntry_CSym_CVariantInfo_set_d_parent(child, parent);
+        DictEntry_CSym_CVariantInfo_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CVariantInfo_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CVariantInfo_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CVariantInfo_set_d_parent(child, parent);
+    DictEntry_CSym_CVariantInfo_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t26 = Dict_CSym_CVariantInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CVariantInfoptr); _t26; });
+    Dict_CSym_CVariantInfo_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CVariantInfo_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CVariantInfo_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CDict_CSym_CType* hash_lookup_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t4 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CDict_CSym_CType* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CDict_CSym_CType* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, DictEntry_CSym_CDict_CSym_CType* child) {
+    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CDict_CSym_CType_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t15 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+        DictEntry_CSym_CDict_CSym_CType* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CDict_CSym_CType* old_child = _t16;
+        DictEntry_CSym_CDict_CSym_CType_set_d_parent(old_child, 0);
+        DictEntry_CSym_CDict_CSym_CType_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t19 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t19;
+        DictEntry_CSym_CDict_CSym_CType_set_d_parent(child, parent);
+        DictEntry_CSym_CDict_CSym_CType_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CDict_CSym_CType_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CDict_CSym_CType_set_d_parent(child, parent);
+    DictEntry_CSym_CDict_CSym_CType_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t26 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr); _t26; });
+    Dict_CSym_CDict_CSym_CType_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CDict_CSym_CType_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CVariantInfo* hash_lookup_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CVariantInfo_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t4 = Dict_CSym_CVariantInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CVariantInfo* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CVariantInfo_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CVariantInfo* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_slice_CTypeExpr* hash_lookup_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t4 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_slice_CTypeExpr* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_slice_CTypeExpr_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_slice_CTypeExpr* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, DictEntry_CSym_CLType* child) {
+    int32_t _t0 = Dict_CSym_CLType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CLType_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CLType_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CLType_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CLType_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CLTypeptr _t15 = Dict_CSym_CLType_d_children(parent);
+        DictEntry_CSym_CLType* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CLType* old_child = _t16;
+        DictEntry_CSym_CLType_set_d_parent(old_child, 0);
+        DictEntry_CSym_CLType_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CLTypeptr _t19 = Dict_CSym_CLType_d_children(parent);
+        LyricSlice_DictEntry_CSym_CLTypeptr kids = _t19;
+        DictEntry_CSym_CLType_set_d_parent(child, parent);
+        DictEntry_CSym_CLType_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CLType_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CLType_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CLType_set_d_parent(child, parent);
+    DictEntry_CSym_CLType_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CLTypeptr _t26 = Dict_CSym_CLType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLTypeptr); _t26; });
+    Dict_CSym_CLType_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CLType_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CLType_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CLType_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CLType* hash_lookup_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CLType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CLType_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CLType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CLTypeptr _t4 = Dict_CSym_CLType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLTypeptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CLType* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CLType_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CLType* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CEnumDecl* get_CSym_CEnumDecl(Dict_CSym_CEnumDecl* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CEnumDecl* _t1 = hash_lookup_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(self, h);
+    return _t1;
+}
+
+void hash_insert_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, DictEntry_CSym_CStructDecl* child) {
+    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CStructDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CStructDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CStructDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CStructDeclptr _t15 = Dict_CSym_CStructDecl_d_children(parent);
+        DictEntry_CSym_CStructDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CStructDecl* old_child = _t16;
+        DictEntry_CSym_CStructDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CStructDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CStructDeclptr _t19 = Dict_CSym_CStructDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t19;
+        DictEntry_CSym_CStructDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CStructDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CStructDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CStructDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CStructDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CStructDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CStructDeclptr _t26 = Dict_CSym_CStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CStructDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CStructDeclptr); _t26; });
+    Dict_CSym_CStructDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CStructDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CStructDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CStructDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, DictEntry_CSym_CDict_CSym_CLType* child) {
+    int32_t _t0 = Dict_CSym_CDict_CSym_CLType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CDict_CSym_CLType_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CDict_CSym_CLType_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CDict_CSym_CLType_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CDict_CSym_CLType_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t15 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
+        DictEntry_CSym_CDict_CSym_CLType* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CDict_CSym_CLType* old_child = _t16;
+        DictEntry_CSym_CDict_CSym_CLType_set_d_parent(old_child, 0);
+        DictEntry_CSym_CDict_CSym_CLType_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t19 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
+        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr kids = _t19;
+        DictEntry_CSym_CDict_CSym_CLType_set_d_parent(child, parent);
+        DictEntry_CSym_CDict_CSym_CLType_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CDict_CSym_CLType_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CDict_CSym_CLType_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CDict_CSym_CLType_set_d_parent(child, parent);
+    DictEntry_CSym_CDict_CSym_CLType_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t26 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr); _t26; });
+    Dict_CSym_CDict_CSym_CLType_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CDict_CSym_CLType_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CDict_CSym_CLType_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CDict_CSym_CLType_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, DictEntry_CSym_CExpr* child) {
+    int32_t _t0 = Dict_CSym_CExpr_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CExpr_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CExpr_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CExpr_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CExpr_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CExprptr _t15 = Dict_CSym_CExpr_d_children(parent);
+        DictEntry_CSym_CExpr* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CExpr* old_child = _t16;
+        DictEntry_CSym_CExpr_set_d_parent(old_child, 0);
+        DictEntry_CSym_CExpr_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CExprptr _t19 = Dict_CSym_CExpr_d_children(parent);
+        LyricSlice_DictEntry_CSym_CExprptr kids = _t19;
+        DictEntry_CSym_CExpr_set_d_parent(child, parent);
+        DictEntry_CSym_CExpr_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CExpr_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CExpr_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CExpr_set_d_parent(child, parent);
+    DictEntry_CSym_CExpr_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CExprptr _t26 = Dict_CSym_CExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_CExprptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CExprptr); _t26; });
+    Dict_CSym_CExpr_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CExpr_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CExpr_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CExpr_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, DictEntry_CSym_CEnumDecl* child) {
+    int32_t _t0 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CEnumDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CEnumDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CEnumDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CEnumDeclptr _t15 = Dict_CSym_CEnumDecl_d_children(parent);
+        DictEntry_CSym_CEnumDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CEnumDecl* old_child = _t16;
+        DictEntry_CSym_CEnumDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CEnumDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CEnumDeclptr _t19 = Dict_CSym_CEnumDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CEnumDeclptr kids = _t19;
+        DictEntry_CSym_CEnumDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CEnumDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CEnumDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CEnumDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CEnumDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CEnumDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CEnumDeclptr _t26 = Dict_CSym_CEnumDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CEnumDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CEnumDeclptr); _t26; });
+    Dict_CSym_CEnumDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CEnumDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CEnumDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, DictEntry_CSym_i32* child) {
+    int32_t _t0 = Dict_CSym_i32_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_i32_CDictEntry_CSym_i32(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_i32_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_i32_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_i32_CDictEntry_CSym_i32(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_i32_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_i32_CDictEntry_CSym_i32(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_i32_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_i32ptr _t15 = Dict_CSym_i32_d_children(parent);
+        DictEntry_CSym_i32* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_i32* old_child = _t16;
+        DictEntry_CSym_i32_set_d_parent(old_child, 0);
+        DictEntry_CSym_i32_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_i32ptr _t19 = Dict_CSym_i32_d_children(parent);
+        LyricSlice_DictEntry_CSym_i32ptr kids = _t19;
+        DictEntry_CSym_i32_set_d_parent(child, parent);
+        DictEntry_CSym_i32_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_i32_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_i32_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_i32_set_d_parent(child, parent);
+    DictEntry_CSym_i32_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_i32ptr _t26 = Dict_CSym_i32_d_children(parent);
+    LyricSlice_DictEntry_CSym_i32ptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_i32ptr); _t26; });
+    Dict_CSym_i32_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_i32_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_i32_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_i32_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, DictEntry_CSym_slice_CTupleField* child) {
+    int32_t _t0 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_slice_CTupleField_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_slice_CTupleField_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_slice_CTupleField_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t15 = Dict_CSym_slice_CTupleField_d_children(parent);
+        DictEntry_CSym_slice_CTupleField* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_slice_CTupleField* old_child = _t16;
+        DictEntry_CSym_slice_CTupleField_set_d_parent(old_child, 0);
+        DictEntry_CSym_slice_CTupleField_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t19 = Dict_CSym_slice_CTupleField_d_children(parent);
+        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr kids = _t19;
+        DictEntry_CSym_slice_CTupleField_set_d_parent(child, parent);
+        DictEntry_CSym_slice_CTupleField_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_slice_CTupleField_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_slice_CTupleField_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_slice_CTupleField_set_d_parent(child, parent);
+    DictEntry_CSym_slice_CTupleField_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t26 = Dict_CSym_slice_CTupleField_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CTupleFieldptr); _t26; });
+    Dict_CSym_slice_CTupleField_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_slice_CTupleField_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_slice_CTupleField_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_slice_CTupleField_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, DictEntry_CSym_CLInterfaceDecl* child) {
+    int32_t _t0 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CLInterfaceDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CLInterfaceDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t15 = Dict_CSym_CLInterfaceDecl_d_children(parent);
+        DictEntry_CSym_CLInterfaceDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CLInterfaceDecl* old_child = _t16;
+        DictEntry_CSym_CLInterfaceDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CLInterfaceDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t19 = Dict_CSym_CLInterfaceDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr kids = _t19;
+        DictEntry_CSym_CLInterfaceDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CLInterfaceDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CLInterfaceDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CLInterfaceDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CLInterfaceDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CLInterfaceDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t26 = Dict_CSym_CLInterfaceDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLInterfaceDeclptr); _t26; });
+    Dict_CSym_CLInterfaceDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CLInterfaceDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CLInterfaceDecl_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CLInterfaceDecl* hash_lookup_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t4 = Dict_CSym_CLInterfaceDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CLInterfaceDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CLInterfaceDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CLInterfaceDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_slice_CMatchArm* hash_lookup_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t4 = Dict_CSym_slice_CMatchArm_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_slice_CMatchArm* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_slice_CMatchArm_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_slice_CMatchArm* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, DictEntry_CSym_slice_CMatchArm* child) {
+    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_slice_CMatchArm_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t15 = Dict_CSym_slice_CMatchArm_d_children(parent);
+        DictEntry_CSym_slice_CMatchArm* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_slice_CMatchArm* old_child = _t16;
+        DictEntry_CSym_slice_CMatchArm_set_d_parent(old_child, 0);
+        DictEntry_CSym_slice_CMatchArm_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t19 = Dict_CSym_slice_CMatchArm_d_children(parent);
+        LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t19;
+        DictEntry_CSym_slice_CMatchArm_set_d_parent(child, parent);
+        DictEntry_CSym_slice_CMatchArm_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_slice_CMatchArm_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_slice_CMatchArm_set_d_parent(child, parent);
+    DictEntry_CSym_slice_CMatchArm_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t26 = Dict_CSym_slice_CMatchArm_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CMatchArmptr); _t26; });
+    Dict_CSym_slice_CMatchArm_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_slice_CMatchArm_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_CStructDecl* hash_lookup_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CStructDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CStructDeclptr _t4 = Dict_CSym_CStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CStructDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CStructDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CStructDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_i32* hash_lookup_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_i32_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_i32_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_i32_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_i32ptr _t4 = Dict_CSym_i32_d_children(parent);
+    LyricSlice_DictEntry_CSym_i32ptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_i32* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_i32_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_i32* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_slice_CTupleField* hash_lookup_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_slice_CTupleField_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t4 = Dict_CSym_slice_CTupleField_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_slice_CTupleField* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_slice_CTupleField_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_slice_CTupleField* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, DictEntry_CSym_opt_CLType* child) {
+    int32_t _t0 = Dict_CSym_opt_CLType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_opt_CLType_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_opt_CLType_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_opt_CLType_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_opt_CLType_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_opt_CLTypeptr _t15 = Dict_CSym_opt_CLType_d_children(parent);
+        DictEntry_CSym_opt_CLType* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_opt_CLType* old_child = _t16;
+        DictEntry_CSym_opt_CLType_set_d_parent(old_child, 0);
+        DictEntry_CSym_opt_CLType_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_opt_CLTypeptr _t19 = Dict_CSym_opt_CLType_d_children(parent);
+        LyricSlice_DictEntry_CSym_opt_CLTypeptr kids = _t19;
+        DictEntry_CSym_opt_CLType_set_d_parent(child, parent);
+        DictEntry_CSym_opt_CLType_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_opt_CLType_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_opt_CLType_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_opt_CLType_set_d_parent(child, parent);
+    DictEntry_CSym_opt_CLType_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t26 = Dict_CSym_opt_CLType_d_children(parent);
+    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_opt_CLTypeptr); _t26; });
+    Dict_CSym_opt_CLType_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_opt_CLType_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_opt_CLType_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_opt_CLType_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_opt_CLType* hash_lookup_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_opt_CLType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_opt_CLType_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_opt_CLType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t4 = Dict_CSym_opt_CLType_d_children(parent);
+    LyricSlice_DictEntry_CSym_opt_CLTypeptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_opt_CLType* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_opt_CLType_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_opt_CLType* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CLClassDecl* hash_lookup_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CLClassDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CLClassDeclptr _t4 = Dict_CSym_CLClassDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLClassDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CLClassDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CLClassDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CLClassDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CLFuncDecl* hash_lookup_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CLFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t4 = Dict_CSym_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLFuncDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CLFuncDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CLFuncDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CLFuncDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+DictEntry_CSym_CLStructDecl* hash_lookup_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CLStructDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CLStructDeclptr _t4 = Dict_CSym_CLStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLStructDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CLStructDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CLStructDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_CLStructDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, DictEntry_CSym_CLFuncDecl* child) {
+    int32_t _t0 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CLFuncDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CLFuncDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CLFuncDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CLFuncDeclptr _t15 = Dict_CSym_CLFuncDecl_d_children(parent);
+        DictEntry_CSym_CLFuncDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CLFuncDecl* old_child = _t16;
+        DictEntry_CSym_CLFuncDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CLFuncDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CLFuncDeclptr _t19 = Dict_CSym_CLFuncDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CLFuncDeclptr kids = _t19;
+        DictEntry_CSym_CLFuncDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CLFuncDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CLFuncDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CLFuncDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CLFuncDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CLFuncDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t26 = Dict_CSym_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLFuncDeclptr); _t26; });
+    Dict_CSym_CLFuncDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CLFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CLFuncDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CLFuncDecl_set_d_hash_count(parent, _t31);
+}
+
+DictEntry_CSym_slice_CLFuncDecl* hash_lookup_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return NULL;
+    }
+    int32_t _t2 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t4 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return NULL;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_slice_CLFuncDecl* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                DictEntry_CSym_slice_CLFuncDecl* _t16 = kids.data[idx];
+                return _t16;
+            }
+        }
+        int32_t _t17 = (slot + 1);
+        int32_t _t18 = (_t17 % cap);
+        slot = _t18;
+        int32_t _t19 = (i + 1);
+        i = _t19;
+    }
+    return NULL;
+}
+
+void hash_insert_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, DictEntry_CSym_slice_CLFuncDecl* child) {
+    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_slice_CLFuncDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t15 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+        DictEntry_CSym_slice_CLFuncDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_slice_CLFuncDecl* old_child = _t16;
+        DictEntry_CSym_slice_CLFuncDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_slice_CLFuncDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t19 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t19;
+        DictEntry_CSym_slice_CLFuncDecl_set_d_parent(child, parent);
+        DictEntry_CSym_slice_CLFuncDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_slice_CLFuncDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_slice_CLFuncDecl_set_d_parent(child, parent);
+    DictEntry_CSym_slice_CLFuncDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t26 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr); _t26; });
+    Dict_CSym_slice_CLFuncDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_slice_CLFuncDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, DictEntry_CSym_CLClassDecl* child) {
+    int32_t _t0 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CLClassDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CLClassDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CLClassDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CLClassDeclptr _t15 = Dict_CSym_CLClassDecl_d_children(parent);
+        DictEntry_CSym_CLClassDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CLClassDecl* old_child = _t16;
+        DictEntry_CSym_CLClassDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CLClassDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CLClassDeclptr _t19 = Dict_CSym_CLClassDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CLClassDeclptr kids = _t19;
+        DictEntry_CSym_CLClassDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CLClassDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CLClassDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CLClassDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CLClassDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CLClassDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CLClassDeclptr _t26 = Dict_CSym_CLClassDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLClassDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLClassDeclptr); _t26; });
+    Dict_CSym_CLClassDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CLClassDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CLClassDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CLClassDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, DictEntry_CSym_CLStructDecl* child) {
+    int32_t _t0 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_CLStructDecl_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_CLStructDecl_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_CLStructDecl_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_CLStructDeclptr _t15 = Dict_CSym_CLStructDecl_d_children(parent);
+        DictEntry_CSym_CLStructDecl* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_CLStructDecl* old_child = _t16;
+        DictEntry_CSym_CLStructDecl_set_d_parent(old_child, 0);
+        DictEntry_CSym_CLStructDecl_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_CLStructDeclptr _t19 = Dict_CSym_CLStructDecl_d_children(parent);
+        LyricSlice_DictEntry_CSym_CLStructDeclptr kids = _t19;
+        DictEntry_CSym_CLStructDecl_set_d_parent(child, parent);
+        DictEntry_CSym_CLStructDecl_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_CLStructDecl_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_CLStructDecl_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_CLStructDecl_set_d_parent(child, parent);
+    DictEntry_CSym_CLStructDecl_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_CLStructDeclptr _t26 = Dict_CSym_CLStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CLStructDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLStructDeclptr); _t26; });
+    Dict_CSym_CLStructDecl_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_CLStructDecl_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_CLStructDecl_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_CLStructDecl_set_d_hash_count(parent, _t31);
+}
+
+void hash_insert_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, DictEntry_CSym_slice_string* child) {
+    int32_t _t0 = Dict_CSym_slice_string_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        hash_init_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent, 8);
+    }
+    int32_t _t3 = Dict_CSym_slice_string_d_hash_count(parent);
+    int32_t count = _t3;
+    int32_t _t4 = Dict_CSym_slice_string_d_hash_cap(parent);
+    int32_t cap = _t4;
+    int32_t _t5 = (count + 1);
+    int32_t _t6 = (_t5 * 4);
+    int32_t _t7 = (cap * 3);
+    bool _t8 = (_t6 > _t7);
+    if (_t8) {
+        hash_rehash_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent);
+    }
+    uint64_t _t10 = DictEntry_CSym_slice_string_hash_key(child);
+    uint64_t key = _t10;
+    int32_t _t11 = hash_find_slot_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent, key);
+    int32_t slot = _t11;
+    LyricSlice_int32_t _t12 = Dict_CSym_slice_string_d_buckets(parent);
+    int32_t _t13 = _t12.data[slot];
+    int32_t bucket_val = _t13;
+    bool _t14 = (bucket_val >= 0);
+    if (_t14) {
+        LyricSlice_DictEntry_CSym_slice_stringptr _t15 = Dict_CSym_slice_string_d_children(parent);
+        DictEntry_CSym_slice_string* _t16 = _t15.data[bucket_val];
+        DictEntry_CSym_slice_string* old_child = _t16;
+        DictEntry_CSym_slice_string_set_d_parent(old_child, 0);
+        DictEntry_CSym_slice_string_set_d_index(old_child, 0);
+        LyricSlice_DictEntry_CSym_slice_stringptr _t19 = Dict_CSym_slice_string_d_children(parent);
+        LyricSlice_DictEntry_CSym_slice_stringptr kids = _t19;
+        DictEntry_CSym_slice_string_set_d_parent(child, parent);
+        DictEntry_CSym_slice_string_set_d_index(child, bucket_val);
+        kids.data[bucket_val] = child;
+        Dict_CSym_slice_string_set_d_children(parent, kids);
+        return;
+    }
+    int32_t _t23 = Dict_CSym_slice_string_d_hash_count(parent);
+    int32_t idx = _t23;
+    DictEntry_CSym_slice_string_set_d_parent(child, parent);
+    DictEntry_CSym_slice_string_set_d_index(child, idx);
+    LyricSlice_DictEntry_CSym_slice_stringptr _t26 = Dict_CSym_slice_string_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_stringptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_stringptr); _t26; });
+    Dict_CSym_slice_string_set_d_children(parent, _t27);
+    LyricSlice_int32_t _t29 = Dict_CSym_slice_string_d_buckets(parent);
+    LyricSlice_int32_t b = _t29;
+    b.data[slot] = idx;
+    Dict_CSym_slice_string_set_d_buckets(parent, b);
+    int32_t _t31 = (idx + 1);
+    Dict_CSym_slice_string_set_d_hash_count(parent, _t31);
+}
+
+bool hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return false;
+    }
+    int32_t _t2 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_ETokenKind_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_ETokenKindptr _t4 = Dict_CSym_ETokenKind_d_children(parent);
+    LyricSlice_DictEntry_CSym_ETokenKindptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return false;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_ETokenKind* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_ETokenKind_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                int32_t _t16 = Dict_CSym_ETokenKind_d_hash_count(parent);
+                int32_t count = _t16;
+                int32_t _t17 = (count - 1);
+                int32_t last_idx = _t17;
+                DictEntry_CSym_ETokenKind* _t18 = kids.data[idx];
+                DictEntry_CSym_ETokenKind* child = _t18;
+                DictEntry_CSym_ETokenKind_set_d_parent(child, 0);
+                DictEntry_CSym_ETokenKind_set_d_index(child, 0);
+                bool _t21 = (idx < last_idx);
+                if (_t21) {
+                    DictEntry_CSym_ETokenKind* _t22 = kids.data[last_idx];
+                    DictEntry_CSym_ETokenKind* last_child = _t22;
+                    DictEntry_CSym_ETokenKind_set_d_index(last_child, idx);
+                    LyricSlice_DictEntry_CSym_ETokenKindptr _t24 = Dict_CSym_ETokenKind_d_children(parent);
+                    LyricSlice_DictEntry_CSym_ETokenKindptr k = _t24;
+                    k.data[idx] = last_child;
+                    Dict_CSym_ETokenKind_set_d_children(parent, k);
+                    uint64_t _t26 = DictEntry_CSym_ETokenKind_hash_key(last_child);
+                    uint64_t swapped_key = _t26;
+                    uint64_t _t27 = ((uint64_t)cap);
+                    uint64_t _t28 = (swapped_key % _t27);
+                    int32_t _t29 = ((int32_t)_t28);
+                    int32_t s = _t29;
+                    while (1) {
+                        int32_t _t30 = buckets.data[s];
+                        bool _t31 = (_t30 != last_idx);
+                        if (!(_t31)) break;
+                        int32_t _t32 = (s + 1);
+                        int32_t _t33 = (_t32 % cap);
+                        s = _t33;
+                    }
+                    LyricSlice_int32_t _t34 = Dict_CSym_ETokenKind_d_buckets(parent);
+                    LyricSlice_int32_t b2 = _t34;
+                    b2.data[s] = idx;
+                    Dict_CSym_ETokenKind_set_d_buckets(parent, b2);
+                }
+                LyricSlice_int32_t _t36 = Dict_CSym_ETokenKind_d_buckets(parent);
+                LyricSlice_int32_t b = _t36;
+                int32_t _t37 = (-2);
+                b.data[slot] = _t37;
+                Dict_CSym_ETokenKind_set_d_buckets(parent, b);
+                LyricSlice_DictEntry_CSym_ETokenKindptr _t39 = Dict_CSym_ETokenKind_d_children(parent);
+                LyricSlice_DictEntry_CSym_ETokenKindptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_ETokenKindptr);
+                Dict_CSym_ETokenKind_set_d_children(parent, _t40);
+                Dict_CSym_ETokenKind_set_d_hash_count(parent, last_idx);
+                return true;
+            }
+        }
+        int32_t _t43 = (slot + 1);
+        int32_t _t44 = (_t43 % cap);
+        slot = _t44;
+        int32_t _t45 = (i + 1);
+        i = _t45;
+    }
+    return false;
+}
+
+bool hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return false;
+    }
+    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CTypeptr _t4 = Dict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return false;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CType* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CType_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                int32_t _t16 = Dict_CSym_CType_d_hash_count(parent);
+                int32_t count = _t16;
+                int32_t _t17 = (count - 1);
+                int32_t last_idx = _t17;
+                DictEntry_CSym_CType* _t18 = kids.data[idx];
+                DictEntry_CSym_CType* child = _t18;
+                DictEntry_CSym_CType_set_d_parent(child, 0);
+                DictEntry_CSym_CType_set_d_index(child, 0);
+                bool _t21 = (idx < last_idx);
+                if (_t21) {
+                    DictEntry_CSym_CType* _t22 = kids.data[last_idx];
+                    DictEntry_CSym_CType* last_child = _t22;
+                    DictEntry_CSym_CType_set_d_index(last_child, idx);
+                    LyricSlice_DictEntry_CSym_CTypeptr _t24 = Dict_CSym_CType_d_children(parent);
+                    LyricSlice_DictEntry_CSym_CTypeptr k = _t24;
+                    k.data[idx] = last_child;
+                    Dict_CSym_CType_set_d_children(parent, k);
+                    uint64_t _t26 = DictEntry_CSym_CType_hash_key(last_child);
+                    uint64_t swapped_key = _t26;
+                    uint64_t _t27 = ((uint64_t)cap);
+                    uint64_t _t28 = (swapped_key % _t27);
+                    int32_t _t29 = ((int32_t)_t28);
+                    int32_t s = _t29;
+                    while (1) {
+                        int32_t _t30 = buckets.data[s];
+                        bool _t31 = (_t30 != last_idx);
+                        if (!(_t31)) break;
+                        int32_t _t32 = (s + 1);
+                        int32_t _t33 = (_t32 % cap);
+                        s = _t33;
+                    }
+                    LyricSlice_int32_t _t34 = Dict_CSym_CType_d_buckets(parent);
+                    LyricSlice_int32_t b2 = _t34;
+                    b2.data[s] = idx;
+                    Dict_CSym_CType_set_d_buckets(parent, b2);
+                }
+                LyricSlice_int32_t _t36 = Dict_CSym_CType_d_buckets(parent);
+                LyricSlice_int32_t b = _t36;
+                int32_t _t37 = (-2);
+                b.data[slot] = _t37;
+                Dict_CSym_CType_set_d_buckets(parent, b);
+                LyricSlice_DictEntry_CSym_CTypeptr _t39 = Dict_CSym_CType_d_children(parent);
+                LyricSlice_DictEntry_CSym_CTypeptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_CTypeptr);
+                Dict_CSym_CType_set_d_children(parent, _t40);
+                Dict_CSym_CType_set_d_hash_count(parent, last_idx);
+                return true;
+            }
+        }
+        int32_t _t43 = (slot + 1);
+        int32_t _t44 = (_t43 % cap);
+        slot = _t44;
+        int32_t _t45 = (i + 1);
+        i = _t45;
+    }
+    return false;
+}
+
+bool hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    bool _t1 = (_t0 == 0);
+    if (_t1) {
+        return false;
+    }
+    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    int32_t cap = _t2;
+    LyricSlice_int32_t _t3 = Dict_CSym_CVariantInfo_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t3;
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t4 = Dict_CSym_CVariantInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t4;
+    uint64_t _t5 = ((uint64_t)cap);
+    uint64_t _t6 = (key % _t5);
+    int32_t _t7 = ((int32_t)_t6);
+    int32_t slot = _t7;
+    int32_t i = 0;
+    while (1) {
+        bool _t8 = (i < cap);
+        if (!(_t8)) break;
+        int32_t _t9 = buckets.data[slot];
+        int32_t idx = _t9;
+        int32_t _t10 = (-1);
+        bool _t11 = (idx == _t10);
+        if (_t11) {
+            return false;
+        }
+        bool _t12 = (idx >= 0);
+        if (_t12) {
+            DictEntry_CSym_CVariantInfo* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_CVariantInfo_hash_key(_t13);
+            bool _t15 = (_t14 == key);
+            if (_t15) {
+                int32_t _t16 = Dict_CSym_CVariantInfo_d_hash_count(parent);
+                int32_t count = _t16;
+                int32_t _t17 = (count - 1);
+                int32_t last_idx = _t17;
+                DictEntry_CSym_CVariantInfo* _t18 = kids.data[idx];
+                DictEntry_CSym_CVariantInfo* child = _t18;
+                DictEntry_CSym_CVariantInfo_set_d_parent(child, 0);
+                DictEntry_CSym_CVariantInfo_set_d_index(child, 0);
+                bool _t21 = (idx < last_idx);
+                if (_t21) {
+                    DictEntry_CSym_CVariantInfo* _t22 = kids.data[last_idx];
+                    DictEntry_CSym_CVariantInfo* last_child = _t22;
+                    DictEntry_CSym_CVariantInfo_set_d_index(last_child, idx);
+                    LyricSlice_DictEntry_CSym_CVariantInfoptr _t24 = Dict_CSym_CVariantInfo_d_children(parent);
+                    LyricSlice_DictEntry_CSym_CVariantInfoptr k = _t24;
+                    k.data[idx] = last_child;
+                    Dict_CSym_CVariantInfo_set_d_children(parent, k);
+                    uint64_t _t26 = DictEntry_CSym_CVariantInfo_hash_key(last_child);
+                    uint64_t swapped_key = _t26;
+                    uint64_t _t27 = ((uint64_t)cap);
+                    uint64_t _t28 = (swapped_key % _t27);
+                    int32_t _t29 = ((int32_t)_t28);
+                    int32_t s = _t29;
+                    while (1) {
+                        int32_t _t30 = buckets.data[s];
+                        bool _t31 = (_t30 != last_idx);
+                        if (!(_t31)) break;
+                        int32_t _t32 = (s + 1);
+                        int32_t _t33 = (_t32 % cap);
+                        s = _t33;
+                    }
+                    LyricSlice_int32_t _t34 = Dict_CSym_CVariantInfo_d_buckets(parent);
+                    LyricSlice_int32_t b2 = _t34;
+                    b2.data[s] = idx;
+                    Dict_CSym_CVariantInfo_set_d_buckets(parent, b2);
+                }
+                LyricSlice_int32_t _t36 = Dict_CSym_CVariantInfo_d_buckets(parent);
+                LyricSlice_int32_t b = _t36;
+                int32_t _t37 = (-2);
+                b.data[slot] = _t37;
+                Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
+                LyricSlice_DictEntry_CSym_CVariantInfoptr _t39 = Dict_CSym_CVariantInfo_d_children(parent);
+                LyricSlice_DictEntry_CSym_CVariantInfoptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_CVariantInfoptr);
+                Dict_CSym_CVariantInfo_set_d_children(parent, _t40);
+                Dict_CSym_CVariantInfo_set_d_hash_count(parent, last_idx);
+                return true;
+            }
+        }
+        int32_t _t43 = (slot + 1);
+        int32_t _t44 = (_t43 % cap);
+        slot = _t44;
+        int32_t _t45 = (i + 1);
+        i = _t45;
+    }
+    return false;
+}
+
 bool hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CTypeInfo_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -95373,106 +99843,6 @@ bool hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeI
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, DictEntry_CSym_CInterfaceDecl* child) {
-    int32_t _t0 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CInterfaceDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CInterfaceDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t15 = Dict_CSym_CInterfaceDecl_d_children(parent);
-        DictEntry_CSym_CInterfaceDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CInterfaceDecl* old_child = _t16;
-        DictEntry_CSym_CInterfaceDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CInterfaceDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t19 = Dict_CSym_CInterfaceDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CInterfaceDeclptr kids = _t19;
-        DictEntry_CSym_CInterfaceDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CInterfaceDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CInterfaceDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CInterfaceDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CInterfaceDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CInterfaceDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t26 = Dict_CSym_CInterfaceDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CInterfaceDeclptr); _t26; });
-    Dict_CSym_CInterfaceDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CInterfaceDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CInterfaceDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CInterfaceDecl* hash_lookup_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CInterfaceDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CInterfaceDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CInterfaceDeclptr _t4 = Dict_CSym_CInterfaceDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CInterfaceDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CInterfaceDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CInterfaceDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CInterfaceDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_CSym_CInterfaceDecl* parent, uint64_t key) {
@@ -95565,106 +99935,6 @@ bool hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(Dict_C
     return false;
 }
 
-void hash_insert_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, DictEntry_CSym_CDict_CSym_CType* child) {
-    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CDict_CSym_CType_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t15 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-        DictEntry_CSym_CDict_CSym_CType* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CDict_CSym_CType* old_child = _t16;
-        DictEntry_CSym_CDict_CSym_CType_set_d_parent(old_child, 0);
-        DictEntry_CSym_CDict_CSym_CType_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t19 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-        LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t19;
-        DictEntry_CSym_CDict_CSym_CType_set_d_parent(child, parent);
-        DictEntry_CSym_CDict_CSym_CType_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CDict_CSym_CType_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CDict_CSym_CType_set_d_parent(child, parent);
-    DictEntry_CSym_CDict_CSym_CType_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t26 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr); _t26; });
-    Dict_CSym_CDict_CSym_CType_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CDict_CSym_CType_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CDict_CSym_CType* hash_lookup_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t4 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CDict_CSym_CType* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CDict_CSym_CType* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -95755,72 +100025,18 @@ bool hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Di
     return false;
 }
 
-void hash_insert_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, DictEntry_CSym_string* child) {
-    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
+bool hash_remove_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
     if (_t1) {
-        hash_init_CDict_CSym_string_CDictEntry_CSym_string(parent, 8);
+        return false;
     }
-    int32_t _t3 = Dict_CSym_string_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_string_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_string_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_string_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_stringptr _t15 = Dict_CSym_string_d_children(parent);
-        DictEntry_CSym_string* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_string* old_child = _t16;
-        DictEntry_CSym_string_set_d_parent(old_child, 0);
-        DictEntry_CSym_string_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_stringptr _t19 = Dict_CSym_string_d_children(parent);
-        LyricSlice_DictEntry_CSym_stringptr kids = _t19;
-        DictEntry_CSym_string_set_d_parent(child, parent);
-        DictEntry_CSym_string_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_string_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_string_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_string_set_d_parent(child, parent);
-    DictEntry_CSym_string_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_stringptr _t26 = Dict_CSym_string_d_children(parent);
-    LyricSlice_DictEntry_CSym_stringptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_stringptr); _t26; });
-    Dict_CSym_string_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_string_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_string_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_string_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_string* hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_string_d_hash_cap(parent);
+    int32_t _t2 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
     int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_string_d_buckets(parent);
+    LyricSlice_int32_t _t3 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
     LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_stringptr _t4 = Dict_CSym_string_d_children(parent);
-    LyricSlice_DictEntry_CSym_stringptr kids = _t4;
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t4 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr kids = _t4;
     uint64_t _t5 = ((uint64_t)cap);
     uint64_t _t6 = (key % _t5);
     int32_t _t7 = ((int32_t)_t6);
@@ -95834,25 +100050,69 @@ DictEntry_CSym_string* hash_lookup_CDict_CSym_string_CDictEntry_CSym_string(Dict
         int32_t _t10 = (-1);
         bool _t11 = (idx == _t10);
         if (_t11) {
-            return NULL;
+            return false;
         }
         bool _t12 = (idx >= 0);
         if (_t12) {
-            DictEntry_CSym_string* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_string_hash_key(_t13);
+            DictEntry_CSym_slice_CTypeExpr* _t13 = kids.data[idx];
+            uint64_t _t14 = DictEntry_CSym_slice_CTypeExpr_hash_key(_t13);
             bool _t15 = (_t14 == key);
             if (_t15) {
-                DictEntry_CSym_string* _t16 = kids.data[idx];
-                return _t16;
+                int32_t _t16 = Dict_CSym_slice_CTypeExpr_d_hash_count(parent);
+                int32_t count = _t16;
+                int32_t _t17 = (count - 1);
+                int32_t last_idx = _t17;
+                DictEntry_CSym_slice_CTypeExpr* _t18 = kids.data[idx];
+                DictEntry_CSym_slice_CTypeExpr* child = _t18;
+                DictEntry_CSym_slice_CTypeExpr_set_d_parent(child, 0);
+                DictEntry_CSym_slice_CTypeExpr_set_d_index(child, 0);
+                bool _t21 = (idx < last_idx);
+                if (_t21) {
+                    DictEntry_CSym_slice_CTypeExpr* _t22 = kids.data[last_idx];
+                    DictEntry_CSym_slice_CTypeExpr* last_child = _t22;
+                    DictEntry_CSym_slice_CTypeExpr_set_d_index(last_child, idx);
+                    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t24 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+                    LyricSlice_DictEntry_CSym_slice_CTypeExprptr k = _t24;
+                    k.data[idx] = last_child;
+                    Dict_CSym_slice_CTypeExpr_set_d_children(parent, k);
+                    uint64_t _t26 = DictEntry_CSym_slice_CTypeExpr_hash_key(last_child);
+                    uint64_t swapped_key = _t26;
+                    uint64_t _t27 = ((uint64_t)cap);
+                    uint64_t _t28 = (swapped_key % _t27);
+                    int32_t _t29 = ((int32_t)_t28);
+                    int32_t s = _t29;
+                    while (1) {
+                        int32_t _t30 = buckets.data[s];
+                        bool _t31 = (_t30 != last_idx);
+                        if (!(_t31)) break;
+                        int32_t _t32 = (s + 1);
+                        int32_t _t33 = (_t32 % cap);
+                        s = _t33;
+                    }
+                    LyricSlice_int32_t _t34 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+                    LyricSlice_int32_t b2 = _t34;
+                    b2.data[s] = idx;
+                    Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, b2);
+                }
+                LyricSlice_int32_t _t36 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+                LyricSlice_int32_t b = _t36;
+                int32_t _t37 = (-2);
+                b.data[slot] = _t37;
+                Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, b);
+                LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t39 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+                LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t40 = lyric_subslice(_t39, 0, last_idx, LyricSlice_DictEntry_CSym_slice_CTypeExprptr);
+                Dict_CSym_slice_CTypeExpr_set_d_children(parent, _t40);
+                Dict_CSym_slice_CTypeExpr_set_d_hash_count(parent, last_idx);
+                return true;
             }
         }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
+        int32_t _t43 = (slot + 1);
+        int32_t _t44 = (_t43 % cap);
+        slot = _t44;
+        int32_t _t45 = (i + 1);
+        i = _t45;
     }
-    return NULL;
+    return false;
 }
 
 bool hash_remove_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key) {
@@ -95945,106 +100205,6 @@ bool hash_remove_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* pare
     return false;
 }
 
-void hash_insert_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, DictEntry_CSym_CStructDecl* child) {
-    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CStructDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CStructDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CStructDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CStructDeclptr _t15 = Dict_CSym_CStructDecl_d_children(parent);
-        DictEntry_CSym_CStructDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CStructDecl* old_child = _t16;
-        DictEntry_CSym_CStructDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CStructDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CStructDeclptr _t19 = Dict_CSym_CStructDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t19;
-        DictEntry_CSym_CStructDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CStructDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CStructDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CStructDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CStructDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CStructDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CStructDeclptr _t26 = Dict_CSym_CStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CStructDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CStructDeclptr); _t26; });
-    Dict_CSym_CStructDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CStructDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CStructDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CStructDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CStructDecl* hash_lookup_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CStructDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CStructDeclptr _t4 = Dict_CSym_CStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CStructDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CStructDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CStructDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -96135,106 +100295,6 @@ bool hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CS
     return false;
 }
 
-void hash_insert_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, DictEntry_CSym_CClassDecl* child) {
-    int32_t _t0 = Dict_CSym_CClassDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CClassDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CClassDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CClassDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CClassDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CClassDeclptr _t15 = Dict_CSym_CClassDecl_d_children(parent);
-        DictEntry_CSym_CClassDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CClassDecl* old_child = _t16;
-        DictEntry_CSym_CClassDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CClassDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CClassDeclptr _t19 = Dict_CSym_CClassDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CClassDeclptr kids = _t19;
-        DictEntry_CSym_CClassDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CClassDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CClassDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CClassDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CClassDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CClassDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CClassDeclptr _t26 = Dict_CSym_CClassDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CClassDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CClassDeclptr); _t26; });
-    Dict_CSym_CClassDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CClassDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CClassDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CClassDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CClassDecl* hash_lookup_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CClassDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CClassDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CClassDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CClassDeclptr _t4 = Dict_CSym_CClassDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CClassDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CClassDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CClassDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CClassDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CClassDecl_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -96323,60 +100383,6 @@ bool hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CCla
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, DictEntry_CSym_CEnumDecl* child) {
-    int32_t _t0 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CEnumDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CEnumDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CEnumDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CEnumDeclptr _t15 = Dict_CSym_CEnumDecl_d_children(parent);
-        DictEntry_CSym_CEnumDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CEnumDecl* old_child = _t16;
-        DictEntry_CSym_CEnumDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CEnumDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CEnumDeclptr _t19 = Dict_CSym_CEnumDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CEnumDeclptr kids = _t19;
-        DictEntry_CSym_CEnumDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CEnumDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CEnumDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CEnumDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CEnumDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CEnumDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CEnumDeclptr _t26 = Dict_CSym_CEnumDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CEnumDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CEnumDeclptr); _t26; });
-    Dict_CSym_CEnumDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CEnumDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CEnumDecl_set_d_hash_count(parent, _t31);
 }
 
 DictEntry_CSym_CEnumDecl* hash_lookup_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key) {
@@ -96515,106 +100521,6 @@ bool hash_remove_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumD
     return false;
 }
 
-void hash_insert_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, DictEntry_CSym_CTypeExpr* child) {
-    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CTypeExpr_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CTypeExpr_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CTypeExpr_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CTypeExprptr _t15 = Dict_CSym_CTypeExpr_d_children(parent);
-        DictEntry_CSym_CTypeExpr* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CTypeExpr* old_child = _t16;
-        DictEntry_CSym_CTypeExpr_set_d_parent(old_child, 0);
-        DictEntry_CSym_CTypeExpr_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CTypeExprptr _t19 = Dict_CSym_CTypeExpr_d_children(parent);
-        LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t19;
-        DictEntry_CSym_CTypeExpr_set_d_parent(child, parent);
-        DictEntry_CSym_CTypeExpr_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CTypeExpr_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CTypeExpr_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CTypeExpr_set_d_parent(child, parent);
-    DictEntry_CSym_CTypeExpr_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CTypeExprptr _t26 = Dict_CSym_CTypeExpr_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeExprptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CTypeExprptr); _t26; });
-    Dict_CSym_CTypeExpr_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CTypeExpr_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CTypeExpr_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CTypeExpr* hash_lookup_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CTypeExpr_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CTypeExprptr _t4 = Dict_CSym_CTypeExpr_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CTypeExpr* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CTypeExpr_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CTypeExpr* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -96703,106 +100609,6 @@ bool hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeE
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, DictEntry_CSym_CFuncDecl* child) {
-    int32_t _t0 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CFuncDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CFuncDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CFuncDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CFuncDeclptr _t15 = Dict_CSym_CFuncDecl_d_children(parent);
-        DictEntry_CSym_CFuncDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CFuncDecl* old_child = _t16;
-        DictEntry_CSym_CFuncDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CFuncDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CFuncDeclptr _t19 = Dict_CSym_CFuncDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CFuncDeclptr kids = _t19;
-        DictEntry_CSym_CFuncDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CFuncDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CFuncDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CFuncDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CFuncDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CFuncDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CFuncDeclptr _t26 = Dict_CSym_CFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CFuncDeclptr); _t26; });
-    Dict_CSym_CFuncDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CFuncDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CFuncDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CFuncDecl* hash_lookup_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CFuncDeclptr _t4 = Dict_CSym_CFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CFuncDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CFuncDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CFuncDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CFuncDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncDecl* parent, uint64_t key) {
@@ -96895,106 +100701,6 @@ bool hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_CFuncD
     return false;
 }
 
-void hash_insert_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, DictEntry_CSym_CLType* child) {
-    int32_t _t0 = Dict_CSym_CLType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CLType_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CLType_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CLType_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CLType_CDictEntry_CSym_CLType(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CLType_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CLTypeptr _t15 = Dict_CSym_CLType_d_children(parent);
-        DictEntry_CSym_CLType* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CLType* old_child = _t16;
-        DictEntry_CSym_CLType_set_d_parent(old_child, 0);
-        DictEntry_CSym_CLType_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CLTypeptr _t19 = Dict_CSym_CLType_d_children(parent);
-        LyricSlice_DictEntry_CSym_CLTypeptr kids = _t19;
-        DictEntry_CSym_CLType_set_d_parent(child, parent);
-        DictEntry_CSym_CLType_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CLType_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CLType_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CLType_set_d_parent(child, parent);
-    DictEntry_CSym_CLType_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CLTypeptr _t26 = Dict_CSym_CLType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLTypeptr); _t26; });
-    Dict_CSym_CLType_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CLType_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CLType_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CLType_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CLType* hash_lookup_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CLType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CLType_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CLType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CLTypeptr _t4 = Dict_CSym_CLType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLTypeptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CLType* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CLType_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CLType* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CLType_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -97085,60 +100791,6 @@ bool hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* pare
     return false;
 }
 
-void hash_insert_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, DictEntry_CSym_CDict_CSym_CLType* child) {
-    int32_t _t0 = Dict_CSym_CDict_CSym_CLType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CDict_CSym_CLType_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CDict_CSym_CLType_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CDict_CSym_CLType_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CDict_CSym_CLType_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t15 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
-        DictEntry_CSym_CDict_CSym_CLType* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CDict_CSym_CLType* old_child = _t16;
-        DictEntry_CSym_CDict_CSym_CLType_set_d_parent(old_child, 0);
-        DictEntry_CSym_CDict_CSym_CLType_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t19 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
-        LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr kids = _t19;
-        DictEntry_CSym_CDict_CSym_CLType_set_d_parent(child, parent);
-        DictEntry_CSym_CDict_CSym_CLType_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CDict_CSym_CLType_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CDict_CSym_CLType_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CDict_CSym_CLType_set_d_parent(child, parent);
-    DictEntry_CSym_CDict_CSym_CLType_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t26 = Dict_CSym_CDict_CSym_CLType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CDict_CSym_CLTypeptr); _t26; });
-    Dict_CSym_CDict_CSym_CLType_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CDict_CSym_CLType_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CDict_CSym_CLType_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CDict_CSym_CLType_set_d_hash_count(parent, _t31);
-}
-
 DictEntry_CSym_CDict_CSym_CLType* hash_lookup_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CDict_CSym_CLType_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -97183,6 +100835,13 @@ DictEntry_CSym_CDict_CSym_CLType* hash_lookup_CDict_CSym_CDict_CSym_CLType_CDict
         i = _t19;
     }
     return NULL;
+}
+
+DictEntry_CSym_CDict_CSym_CLType* get_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CDict_CSym_CLType* _t1 = hash_lookup_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(self, h);
+    return _t1;
 }
 
 bool hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(Dict_CSym_CDict_CSym_CLType* parent, uint64_t key) {
@@ -97275,60 +100934,6 @@ bool hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(
     return false;
 }
 
-void hash_insert_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, DictEntry_CSym_CExpr* child) {
-    int32_t _t0 = Dict_CSym_CExpr_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CExpr_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CExpr_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CExpr_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CExpr_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CExprptr _t15 = Dict_CSym_CExpr_d_children(parent);
-        DictEntry_CSym_CExpr* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CExpr* old_child = _t16;
-        DictEntry_CSym_CExpr_set_d_parent(old_child, 0);
-        DictEntry_CSym_CExpr_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CExprptr _t19 = Dict_CSym_CExpr_d_children(parent);
-        LyricSlice_DictEntry_CSym_CExprptr kids = _t19;
-        DictEntry_CSym_CExpr_set_d_parent(child, parent);
-        DictEntry_CSym_CExpr_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CExpr_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CExpr_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CExpr_set_d_parent(child, parent);
-    DictEntry_CSym_CExpr_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CExprptr _t26 = Dict_CSym_CExpr_d_children(parent);
-    LyricSlice_DictEntry_CSym_CExprptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CExprptr); _t26; });
-    Dict_CSym_CExpr_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CExpr_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CExpr_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CExpr_set_d_hash_count(parent, _t31);
-}
-
 DictEntry_CSym_CExpr* hash_lookup_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CExpr_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -97373,6 +100978,13 @@ DictEntry_CSym_CExpr* hash_lookup_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CS
         i = _t19;
     }
     return NULL;
+}
+
+DictEntry_CSym_CExpr* get_CSym_CExpr(Dict_CSym_CExpr* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_CExpr* _t1 = hash_lookup_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(self, h);
+    return _t1;
 }
 
 bool hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent, uint64_t key) {
@@ -97465,106 +101077,6 @@ bool hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* parent,
     return false;
 }
 
-void hash_insert_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, DictEntry_CSym_bool* child) {
-    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_bool_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_bool_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_bool_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_bool_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_boolptr _t15 = Dict_CSym_bool_d_children(parent);
-        DictEntry_CSym_bool* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_bool* old_child = _t16;
-        DictEntry_CSym_bool_set_d_parent(old_child, 0);
-        DictEntry_CSym_bool_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_boolptr _t19 = Dict_CSym_bool_d_children(parent);
-        LyricSlice_DictEntry_CSym_boolptr kids = _t19;
-        DictEntry_CSym_bool_set_d_parent(child, parent);
-        DictEntry_CSym_bool_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_bool_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_bool_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_bool_set_d_parent(child, parent);
-    DictEntry_CSym_bool_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_boolptr _t26 = Dict_CSym_bool_d_children(parent);
-    LyricSlice_DictEntry_CSym_boolptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_boolptr); _t26; });
-    Dict_CSym_bool_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_bool_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_bool_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_bool_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_bool* hash_lookup_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_bool_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_bool_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_boolptr _t4 = Dict_CSym_bool_d_children(parent);
-    LyricSlice_DictEntry_CSym_boolptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_bool* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_bool_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_bool* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -97653,106 +101165,6 @@ bool hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, ui
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, DictEntry_CSym_i32* child) {
-    int32_t _t0 = Dict_CSym_i32_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_i32_CDictEntry_CSym_i32(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_i32_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_i32_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_i32_CDictEntry_CSym_i32(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_i32_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_i32_CDictEntry_CSym_i32(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_i32_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_i32ptr _t15 = Dict_CSym_i32_d_children(parent);
-        DictEntry_CSym_i32* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_i32* old_child = _t16;
-        DictEntry_CSym_i32_set_d_parent(old_child, 0);
-        DictEntry_CSym_i32_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_i32ptr _t19 = Dict_CSym_i32_d_children(parent);
-        LyricSlice_DictEntry_CSym_i32ptr kids = _t19;
-        DictEntry_CSym_i32_set_d_parent(child, parent);
-        DictEntry_CSym_i32_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_i32_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_i32_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_i32_set_d_parent(child, parent);
-    DictEntry_CSym_i32_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_i32ptr _t26 = Dict_CSym_i32_d_children(parent);
-    LyricSlice_DictEntry_CSym_i32ptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_i32ptr); _t26; });
-    Dict_CSym_i32_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_i32_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_i32_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_i32_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_i32* hash_lookup_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_i32_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_i32_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_i32_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_i32ptr _t4 = Dict_CSym_i32_d_children(parent);
-    LyricSlice_DictEntry_CSym_i32ptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_i32* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_i32_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_i32* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint64_t key) {
@@ -97845,106 +101257,6 @@ bool hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(Dict_CSym_i32* parent, uint6
     return false;
 }
 
-void hash_insert_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, DictEntry_CSym_slice_CTupleField* child) {
-    int32_t _t0 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_slice_CTupleField_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_slice_CTupleField_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_slice_CTupleField_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t15 = Dict_CSym_slice_CTupleField_d_children(parent);
-        DictEntry_CSym_slice_CTupleField* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_slice_CTupleField* old_child = _t16;
-        DictEntry_CSym_slice_CTupleField_set_d_parent(old_child, 0);
-        DictEntry_CSym_slice_CTupleField_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t19 = Dict_CSym_slice_CTupleField_d_children(parent);
-        LyricSlice_DictEntry_CSym_slice_CTupleFieldptr kids = _t19;
-        DictEntry_CSym_slice_CTupleField_set_d_parent(child, parent);
-        DictEntry_CSym_slice_CTupleField_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_slice_CTupleField_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_slice_CTupleField_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_slice_CTupleField_set_d_parent(child, parent);
-    DictEntry_CSym_slice_CTupleField_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t26 = Dict_CSym_slice_CTupleField_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CTupleFieldptr); _t26; });
-    Dict_CSym_slice_CTupleField_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_slice_CTupleField_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_slice_CTupleField_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_slice_CTupleField_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_slice_CTupleField* hash_lookup_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_slice_CTupleField_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr _t4 = Dict_CSym_slice_CTupleField_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CTupleFieldptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_slice_CTupleField* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_slice_CTupleField_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_slice_CTupleField* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(Dict_CSym_slice_CTupleField* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_slice_CTupleField_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -98033,106 +101345,6 @@ bool hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, DictEntry_CSym_CLInterfaceDecl* child) {
-    int32_t _t0 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CLInterfaceDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CLInterfaceDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t15 = Dict_CSym_CLInterfaceDecl_d_children(parent);
-        DictEntry_CSym_CLInterfaceDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CLInterfaceDecl* old_child = _t16;
-        DictEntry_CSym_CLInterfaceDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CLInterfaceDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t19 = Dict_CSym_CLInterfaceDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CLInterfaceDeclptr kids = _t19;
-        DictEntry_CSym_CLInterfaceDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CLInterfaceDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CLInterfaceDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CLInterfaceDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CLInterfaceDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CLInterfaceDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t26 = Dict_CSym_CLInterfaceDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLInterfaceDeclptr); _t26; });
-    Dict_CSym_CLInterfaceDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CLInterfaceDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CLInterfaceDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CLInterfaceDecl* hash_lookup_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CLInterfaceDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CLInterfaceDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr _t4 = Dict_CSym_CLInterfaceDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLInterfaceDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CLInterfaceDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CLInterfaceDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CLInterfaceDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict_CSym_CLInterfaceDecl* parent, uint64_t key) {
@@ -98225,106 +101437,6 @@ bool hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(Dict
     return false;
 }
 
-void hash_insert_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, DictEntry_CSym_opt_CLType* child) {
-    int32_t _t0 = Dict_CSym_opt_CLType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_opt_CLType_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_opt_CLType_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_opt_CLType_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_opt_CLType_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_opt_CLTypeptr _t15 = Dict_CSym_opt_CLType_d_children(parent);
-        DictEntry_CSym_opt_CLType* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_opt_CLType* old_child = _t16;
-        DictEntry_CSym_opt_CLType_set_d_parent(old_child, 0);
-        DictEntry_CSym_opt_CLType_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_opt_CLTypeptr _t19 = Dict_CSym_opt_CLType_d_children(parent);
-        LyricSlice_DictEntry_CSym_opt_CLTypeptr kids = _t19;
-        DictEntry_CSym_opt_CLType_set_d_parent(child, parent);
-        DictEntry_CSym_opt_CLType_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_opt_CLType_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_opt_CLType_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_opt_CLType_set_d_parent(child, parent);
-    DictEntry_CSym_opt_CLType_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t26 = Dict_CSym_opt_CLType_d_children(parent);
-    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_opt_CLTypeptr); _t26; });
-    Dict_CSym_opt_CLType_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_opt_CLType_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_opt_CLType_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_opt_CLType_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_opt_CLType* hash_lookup_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_opt_CLType_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_opt_CLType_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_opt_CLType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_opt_CLTypeptr _t4 = Dict_CSym_opt_CLType_d_children(parent);
-    LyricSlice_DictEntry_CSym_opt_CLTypeptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_opt_CLType* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_opt_CLType_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_opt_CLType* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_opt_CLType_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -98413,106 +101525,6 @@ bool hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, DictEntry_CSym_CLFuncDecl* child) {
-    int32_t _t0 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CLFuncDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CLFuncDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CLFuncDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CLFuncDeclptr _t15 = Dict_CSym_CLFuncDecl_d_children(parent);
-        DictEntry_CSym_CLFuncDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CLFuncDecl* old_child = _t16;
-        DictEntry_CSym_CLFuncDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CLFuncDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CLFuncDeclptr _t19 = Dict_CSym_CLFuncDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CLFuncDeclptr kids = _t19;
-        DictEntry_CSym_CLFuncDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CLFuncDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CLFuncDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CLFuncDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CLFuncDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CLFuncDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t26 = Dict_CSym_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLFuncDeclptr); _t26; });
-    Dict_CSym_CLFuncDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CLFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CLFuncDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CLFuncDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CLFuncDecl* hash_lookup_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CLFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CLFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CLFuncDeclptr _t4 = Dict_CSym_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLFuncDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CLFuncDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CLFuncDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CLFuncDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFuncDecl* parent, uint64_t key) {
@@ -98605,106 +101617,6 @@ bool hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSym_CLFu
     return false;
 }
 
-void hash_insert_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, DictEntry_CSym_CLClassDecl* child) {
-    int32_t _t0 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CLClassDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CLClassDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CLClassDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CLClassDeclptr _t15 = Dict_CSym_CLClassDecl_d_children(parent);
-        DictEntry_CSym_CLClassDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CLClassDecl* old_child = _t16;
-        DictEntry_CSym_CLClassDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CLClassDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CLClassDeclptr _t19 = Dict_CSym_CLClassDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CLClassDeclptr kids = _t19;
-        DictEntry_CSym_CLClassDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CLClassDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CLClassDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CLClassDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CLClassDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CLClassDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CLClassDeclptr _t26 = Dict_CSym_CLClassDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLClassDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLClassDeclptr); _t26; });
-    Dict_CSym_CLClassDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CLClassDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CLClassDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CLClassDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CLClassDecl* hash_lookup_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CLClassDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CLClassDeclptr _t4 = Dict_CSym_CLClassDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLClassDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CLClassDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CLClassDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CLClassDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CLClassDecl* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CLClassDecl_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -98793,106 +101705,6 @@ bool hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(Dict_CSym_CL
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, DictEntry_CSym_CLStructDecl* child) {
-    int32_t _t0 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CLStructDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CLStructDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CLStructDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CLStructDeclptr _t15 = Dict_CSym_CLStructDecl_d_children(parent);
-        DictEntry_CSym_CLStructDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CLStructDecl* old_child = _t16;
-        DictEntry_CSym_CLStructDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CLStructDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CLStructDeclptr _t19 = Dict_CSym_CLStructDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CLStructDeclptr kids = _t19;
-        DictEntry_CSym_CLStructDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CLStructDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CLStructDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CLStructDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CLStructDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CLStructDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CLStructDeclptr _t26 = Dict_CSym_CLStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLStructDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CLStructDeclptr); _t26; });
-    Dict_CSym_CLStructDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CLStructDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CLStructDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CLStructDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CLStructDecl* hash_lookup_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CLStructDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CLStructDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CLStructDeclptr _t4 = Dict_CSym_CLStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CLStructDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CLStructDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CLStructDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CLStructDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_CLStructDecl* parent, uint64_t key) {
@@ -98985,106 +101797,6 @@ bool hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict_CSym_
     return false;
 }
 
-void hash_insert_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, DictEntry_CSym_slice_CLFuncDecl* child) {
-    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_slice_CLFuncDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t15 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-        DictEntry_CSym_slice_CLFuncDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_slice_CLFuncDecl* old_child = _t16;
-        DictEntry_CSym_slice_CLFuncDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_slice_CLFuncDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t19 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t19;
-        DictEntry_CSym_slice_CLFuncDecl_set_d_parent(child, parent);
-        DictEntry_CSym_slice_CLFuncDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_slice_CLFuncDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_slice_CLFuncDecl_set_d_parent(child, parent);
-    DictEntry_CSym_slice_CLFuncDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t26 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr); _t26; });
-    Dict_CSym_slice_CLFuncDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_slice_CLFuncDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_slice_CLFuncDecl* hash_lookup_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t4 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_slice_CLFuncDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_slice_CLFuncDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -99175,60 +101887,6 @@ bool hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Di
     return false;
 }
 
-void hash_insert_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, DictEntry_CSym_slice_string* child) {
-    int32_t _t0 = Dict_CSym_slice_string_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_slice_string_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_slice_string_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_slice_string_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_slice_string_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_slice_stringptr _t15 = Dict_CSym_slice_string_d_children(parent);
-        DictEntry_CSym_slice_string* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_slice_string* old_child = _t16;
-        DictEntry_CSym_slice_string_set_d_parent(old_child, 0);
-        DictEntry_CSym_slice_string_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_slice_stringptr _t19 = Dict_CSym_slice_string_d_children(parent);
-        LyricSlice_DictEntry_CSym_slice_stringptr kids = _t19;
-        DictEntry_CSym_slice_string_set_d_parent(child, parent);
-        DictEntry_CSym_slice_string_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_slice_string_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_slice_string_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_slice_string_set_d_parent(child, parent);
-    DictEntry_CSym_slice_string_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_slice_stringptr _t26 = Dict_CSym_slice_string_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_stringptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_stringptr); _t26; });
-    Dict_CSym_slice_string_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_slice_string_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_slice_string_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_slice_string_set_d_hash_count(parent, _t31);
-}
-
 DictEntry_CSym_slice_string* hash_lookup_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_slice_string_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -99273,6 +101931,13 @@ DictEntry_CSym_slice_string* hash_lookup_CDict_CSym_slice_string_CDictEntry_CSym
         i = _t19;
     }
     return NULL;
+}
+
+DictEntry_CSym_slice_string* get_CSym_slice_string(Dict_CSym_slice_string* self, Sym* key) {
+    uint64_t _t0 = Sym_get_hash(key);
+    uint64_t h = _t0;
+    DictEntry_CSym_slice_string* _t1 = hash_lookup_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(self, h);
+    return _t1;
 }
 
 bool hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, uint64_t key) {
@@ -99365,106 +102030,6 @@ bool hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_
     return false;
 }
 
-void hash_insert_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, DictEntry_CSym_CConstDecl* child) {
-    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_CConstDecl_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_CConstDecl_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_CConstDecl_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_CConstDeclptr _t15 = Dict_CSym_CConstDecl_d_children(parent);
-        DictEntry_CSym_CConstDecl* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_CConstDecl* old_child = _t16;
-        DictEntry_CSym_CConstDecl_set_d_parent(old_child, 0);
-        DictEntry_CSym_CConstDecl_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_CConstDeclptr _t19 = Dict_CSym_CConstDecl_d_children(parent);
-        LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t19;
-        DictEntry_CSym_CConstDecl_set_d_parent(child, parent);
-        DictEntry_CSym_CConstDecl_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_CConstDecl_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_CConstDecl_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_CConstDecl_set_d_parent(child, parent);
-    DictEntry_CSym_CConstDecl_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_CConstDeclptr _t26 = Dict_CSym_CConstDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CConstDeclptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_CConstDeclptr); _t26; });
-    Dict_CSym_CConstDecl_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_CConstDecl_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_CConstDecl_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_CConstDecl_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_CConstDecl* hash_lookup_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_CConstDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_CConstDeclptr _t4 = Dict_CSym_CConstDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_CConstDecl* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_CConstDecl_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_CConstDecl* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
-}
-
 bool hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key) {
     int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
     bool _t1 = (_t0 == 0);
@@ -99553,106 +102118,6 @@ bool hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CCon
         i = _t45;
     }
     return false;
-}
-
-void hash_insert_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, DictEntry_CSym_slice_CMatchArm* child) {
-    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent, 8);
-    }
-    int32_t _t3 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
-    int32_t count = _t3;
-    int32_t _t4 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    int32_t cap = _t4;
-    int32_t _t5 = (count + 1);
-    int32_t _t6 = (_t5 * 4);
-    int32_t _t7 = (cap * 3);
-    bool _t8 = (_t6 > _t7);
-    if (_t8) {
-        hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent);
-    }
-    uint64_t _t10 = DictEntry_CSym_slice_CMatchArm_hash_key(child);
-    uint64_t key = _t10;
-    int32_t _t11 = hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(parent, key);
-    int32_t slot = _t11;
-    LyricSlice_int32_t _t12 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-    int32_t _t13 = _t12.data[slot];
-    int32_t bucket_val = _t13;
-    bool _t14 = (bucket_val >= 0);
-    if (_t14) {
-        LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t15 = Dict_CSym_slice_CMatchArm_d_children(parent);
-        DictEntry_CSym_slice_CMatchArm* _t16 = _t15.data[bucket_val];
-        DictEntry_CSym_slice_CMatchArm* old_child = _t16;
-        DictEntry_CSym_slice_CMatchArm_set_d_parent(old_child, 0);
-        DictEntry_CSym_slice_CMatchArm_set_d_index(old_child, 0);
-        LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t19 = Dict_CSym_slice_CMatchArm_d_children(parent);
-        LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t19;
-        DictEntry_CSym_slice_CMatchArm_set_d_parent(child, parent);
-        DictEntry_CSym_slice_CMatchArm_set_d_index(child, bucket_val);
-        kids.data[bucket_val] = child;
-        Dict_CSym_slice_CMatchArm_set_d_children(parent, kids);
-        return;
-    }
-    int32_t _t23 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
-    int32_t idx = _t23;
-    DictEntry_CSym_slice_CMatchArm_set_d_parent(child, parent);
-    DictEntry_CSym_slice_CMatchArm_set_d_index(child, idx);
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t26 = Dict_CSym_slice_CMatchArm_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t27 = ({ lyric_push(&_t26, child, LyricSlice_DictEntry_CSym_slice_CMatchArmptr); _t26; });
-    Dict_CSym_slice_CMatchArm_set_d_children(parent, _t27);
-    LyricSlice_int32_t _t29 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-    LyricSlice_int32_t b = _t29;
-    b.data[slot] = idx;
-    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
-    int32_t _t31 = (idx + 1);
-    Dict_CSym_slice_CMatchArm_set_d_hash_count(parent, _t31);
-}
-
-DictEntry_CSym_slice_CMatchArm* hash_lookup_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    bool _t1 = (_t0 == 0);
-    if (_t1) {
-        return NULL;
-    }
-    int32_t _t2 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    int32_t cap = _t2;
-    LyricSlice_int32_t _t3 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t3;
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t4 = Dict_CSym_slice_CMatchArm_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t4;
-    uint64_t _t5 = ((uint64_t)cap);
-    uint64_t _t6 = (key % _t5);
-    int32_t _t7 = ((int32_t)_t6);
-    int32_t slot = _t7;
-    int32_t i = 0;
-    while (1) {
-        bool _t8 = (i < cap);
-        if (!(_t8)) break;
-        int32_t _t9 = buckets.data[slot];
-        int32_t idx = _t9;
-        int32_t _t10 = (-1);
-        bool _t11 = (idx == _t10);
-        if (_t11) {
-            return NULL;
-        }
-        bool _t12 = (idx >= 0);
-        if (_t12) {
-            DictEntry_CSym_slice_CMatchArm* _t13 = kids.data[idx];
-            uint64_t _t14 = DictEntry_CSym_slice_CMatchArm_hash_key(_t13);
-            bool _t15 = (_t14 == key);
-            if (_t15) {
-                DictEntry_CSym_slice_CMatchArm* _t16 = kids.data[idx];
-                return _t16;
-            }
-        }
-        int32_t _t17 = (slot + 1);
-        int32_t _t18 = (_t17 % cap);
-        slot = _t18;
-        int32_t _t19 = (i + 1);
-        i = _t19;
-    }
-    return NULL;
 }
 
 bool hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key) {
@@ -99745,1087 +102210,7 @@ bool hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict
     return false;
 }
 
-uint64_t DictEntry_CSym_ETokenKind_hash_key(DictEntry_CSym_ETokenKind* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_ETokenKind_destroy(DictEntry_CSym_ETokenKind* self) {
-    {
-        Dict_CSym_ETokenKind* _t0 = DictEntry_CSym_ETokenKind_d_parent(self);
-        Dict_CSym_ETokenKind* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_ETokenKind* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_ETokenKind_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_ETokenKind(self);
-}
-
-Dict_CSym_ETokenKind* DictEntry_CSym_ETokenKind_d_parent(DictEntry_CSym_ETokenKind* self) {
-    Dict_CSym_ETokenKind* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_ETokenKind_set_d_parent(DictEntry_CSym_ETokenKind* self, Dict_CSym_ETokenKind* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_ETokenKind_d_index(DictEntry_CSym_ETokenKind* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_ETokenKind_set_d_index(DictEntry_CSym_ETokenKind* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CType_hash_key(DictEntry_CSym_CType* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CType_destroy(DictEntry_CSym_CType* self) {
-    {
-        Dict_CSym_CType* _t0 = DictEntry_CSym_CType_d_parent(self);
-        Dict_CSym_CType* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CType* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CType_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CType_CDictEntry_CSym_CType(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CType(self);
-}
-
-Dict_CSym_CType* DictEntry_CSym_CType_d_parent(DictEntry_CSym_CType* self) {
-    Dict_CSym_CType* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CType_set_d_parent(DictEntry_CSym_CType* self, Dict_CSym_CType* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CType_d_index(DictEntry_CSym_CType* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CType_set_d_index(DictEntry_CSym_CType* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CVariantInfo_hash_key(DictEntry_CSym_CVariantInfo* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CVariantInfo_destroy(DictEntry_CSym_CVariantInfo* self) {
-    {
-        Dict_CSym_CVariantInfo* _t0 = DictEntry_CSym_CVariantInfo_d_parent(self);
-        Dict_CSym_CVariantInfo* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CVariantInfo* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CVariantInfo_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CVariantInfo(self);
-}
-
-Dict_CSym_CVariantInfo* DictEntry_CSym_CVariantInfo_d_parent(DictEntry_CSym_CVariantInfo* self) {
-    Dict_CSym_CVariantInfo* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CVariantInfo_set_d_parent(DictEntry_CSym_CVariantInfo* self, Dict_CSym_CVariantInfo* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CVariantInfo_d_index(DictEntry_CSym_CVariantInfo* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CVariantInfo_set_d_index(DictEntry_CSym_CVariantInfo* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CTypeInfo_hash_key(DictEntry_CSym_CTypeInfo* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CTypeInfo_destroy(DictEntry_CSym_CTypeInfo* self) {
-    {
-        Dict_CSym_CTypeInfo* _t0 = DictEntry_CSym_CTypeInfo_d_parent(self);
-        Dict_CSym_CTypeInfo* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CTypeInfo* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CTypeInfo_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CTypeInfo(self);
-}
-
-Dict_CSym_CTypeInfo* DictEntry_CSym_CTypeInfo_d_parent(DictEntry_CSym_CTypeInfo* self) {
-    Dict_CSym_CTypeInfo* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CTypeInfo_set_d_parent(DictEntry_CSym_CTypeInfo* self, Dict_CSym_CTypeInfo* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CTypeInfo_d_index(DictEntry_CSym_CTypeInfo* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CTypeInfo_set_d_index(DictEntry_CSym_CTypeInfo* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CInterfaceDecl_hash_key(DictEntry_CSym_CInterfaceDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CInterfaceDecl_destroy(DictEntry_CSym_CInterfaceDecl* self) {
-    {
-        Dict_CSym_CInterfaceDecl* _t0 = DictEntry_CSym_CInterfaceDecl_d_parent(self);
-        Dict_CSym_CInterfaceDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CInterfaceDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CInterfaceDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CInterfaceDecl(self);
-}
-
-Dict_CSym_CInterfaceDecl* DictEntry_CSym_CInterfaceDecl_d_parent(DictEntry_CSym_CInterfaceDecl* self) {
-    Dict_CSym_CInterfaceDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CInterfaceDecl_set_d_parent(DictEntry_CSym_CInterfaceDecl* self, Dict_CSym_CInterfaceDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CInterfaceDecl_d_index(DictEntry_CSym_CInterfaceDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CInterfaceDecl_set_d_index(DictEntry_CSym_CInterfaceDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CDict_CSym_CType_hash_key(DictEntry_CSym_CDict_CSym_CType* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CDict_CSym_CType_destroy(DictEntry_CSym_CDict_CSym_CType* self) {
-    {
-        Dict_CSym_CDict_CSym_CType* _t0 = DictEntry_CSym_CDict_CSym_CType_d_parent(self);
-        Dict_CSym_CDict_CSym_CType* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CDict_CSym_CType* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CDict_CSym_CType_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CDict_CSym_CType(self);
-}
-
-Dict_CSym_CDict_CSym_CType* DictEntry_CSym_CDict_CSym_CType_d_parent(DictEntry_CSym_CDict_CSym_CType* self) {
-    Dict_CSym_CDict_CSym_CType* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CDict_CSym_CType_set_d_parent(DictEntry_CSym_CDict_CSym_CType* self, Dict_CSym_CDict_CSym_CType* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CDict_CSym_CType_d_index(DictEntry_CSym_CDict_CSym_CType* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CDict_CSym_CType_set_d_index(DictEntry_CSym_CDict_CSym_CType* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_string_hash_key(DictEntry_CSym_string* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_string_destroy(DictEntry_CSym_string* self) {
-    {
-        Dict_CSym_string* _t0 = DictEntry_CSym_string_d_parent(self);
-        Dict_CSym_string* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_string* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_string_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_string_CDictEntry_CSym_string(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_string(self);
-}
-
-Dict_CSym_string* DictEntry_CSym_string_d_parent(DictEntry_CSym_string* self) {
-    Dict_CSym_string* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_string_set_d_parent(DictEntry_CSym_string* self, Dict_CSym_string* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_string_d_index(DictEntry_CSym_string* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_string_set_d_index(DictEntry_CSym_string* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CStructDecl_hash_key(DictEntry_CSym_CStructDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CStructDecl_destroy(DictEntry_CSym_CStructDecl* self) {
-    {
-        Dict_CSym_CStructDecl* _t0 = DictEntry_CSym_CStructDecl_d_parent(self);
-        Dict_CSym_CStructDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CStructDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CStructDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CStructDecl(self);
-}
-
-Dict_CSym_CStructDecl* DictEntry_CSym_CStructDecl_d_parent(DictEntry_CSym_CStructDecl* self) {
-    Dict_CSym_CStructDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CStructDecl_set_d_parent(DictEntry_CSym_CStructDecl* self, Dict_CSym_CStructDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CStructDecl_d_index(DictEntry_CSym_CStructDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CStructDecl_set_d_index(DictEntry_CSym_CStructDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CClassDecl_hash_key(DictEntry_CSym_CClassDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CClassDecl_destroy(DictEntry_CSym_CClassDecl* self) {
-    {
-        Dict_CSym_CClassDecl* _t0 = DictEntry_CSym_CClassDecl_d_parent(self);
-        Dict_CSym_CClassDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CClassDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CClassDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CClassDecl(self);
-}
-
-Dict_CSym_CClassDecl* DictEntry_CSym_CClassDecl_d_parent(DictEntry_CSym_CClassDecl* self) {
-    Dict_CSym_CClassDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CClassDecl_set_d_parent(DictEntry_CSym_CClassDecl* self, Dict_CSym_CClassDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CClassDecl_d_index(DictEntry_CSym_CClassDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CClassDecl_set_d_index(DictEntry_CSym_CClassDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CEnumDecl_hash_key(DictEntry_CSym_CEnumDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CEnumDecl_destroy(DictEntry_CSym_CEnumDecl* self) {
-    {
-        Dict_CSym_CEnumDecl* _t0 = DictEntry_CSym_CEnumDecl_d_parent(self);
-        Dict_CSym_CEnumDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CEnumDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CEnumDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CEnumDecl(self);
-}
-
-Dict_CSym_CEnumDecl* DictEntry_CSym_CEnumDecl_d_parent(DictEntry_CSym_CEnumDecl* self) {
-    Dict_CSym_CEnumDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CEnumDecl_set_d_parent(DictEntry_CSym_CEnumDecl* self, Dict_CSym_CEnumDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CEnumDecl_d_index(DictEntry_CSym_CEnumDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CEnumDecl_set_d_index(DictEntry_CSym_CEnumDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CTypeExpr_hash_key(DictEntry_CSym_CTypeExpr* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CTypeExpr_destroy(DictEntry_CSym_CTypeExpr* self) {
-    {
-        Dict_CSym_CTypeExpr* _t0 = DictEntry_CSym_CTypeExpr_d_parent(self);
-        Dict_CSym_CTypeExpr* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CTypeExpr* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CTypeExpr_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CTypeExpr(self);
-}
-
-Dict_CSym_CTypeExpr* DictEntry_CSym_CTypeExpr_d_parent(DictEntry_CSym_CTypeExpr* self) {
-    Dict_CSym_CTypeExpr* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CTypeExpr_set_d_parent(DictEntry_CSym_CTypeExpr* self, Dict_CSym_CTypeExpr* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CTypeExpr_d_index(DictEntry_CSym_CTypeExpr* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CTypeExpr_set_d_index(DictEntry_CSym_CTypeExpr* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CFuncDecl_hash_key(DictEntry_CSym_CFuncDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CFuncDecl_destroy(DictEntry_CSym_CFuncDecl* self) {
-    {
-        Dict_CSym_CFuncDecl* _t0 = DictEntry_CSym_CFuncDecl_d_parent(self);
-        Dict_CSym_CFuncDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CFuncDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CFuncDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CFuncDecl(self);
-}
-
-Dict_CSym_CFuncDecl* DictEntry_CSym_CFuncDecl_d_parent(DictEntry_CSym_CFuncDecl* self) {
-    Dict_CSym_CFuncDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CFuncDecl_set_d_parent(DictEntry_CSym_CFuncDecl* self, Dict_CSym_CFuncDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CFuncDecl_d_index(DictEntry_CSym_CFuncDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CFuncDecl_set_d_index(DictEntry_CSym_CFuncDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CLType_hash_key(DictEntry_CSym_CLType* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CLType_destroy(DictEntry_CSym_CLType* self) {
-    {
-        Dict_CSym_CLType* _t0 = DictEntry_CSym_CLType_d_parent(self);
-        Dict_CSym_CLType* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CLType* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CLType_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CLType_CDictEntry_CSym_CLType(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CLType(self);
-}
-
-Dict_CSym_CLType* DictEntry_CSym_CLType_d_parent(DictEntry_CSym_CLType* self) {
-    Dict_CSym_CLType* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CLType_set_d_parent(DictEntry_CSym_CLType* self, Dict_CSym_CLType* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CLType_d_index(DictEntry_CSym_CLType* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CLType_set_d_index(DictEntry_CSym_CLType* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CDict_CSym_CLType_hash_key(DictEntry_CSym_CDict_CSym_CLType* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CDict_CSym_CLType_destroy(DictEntry_CSym_CDict_CSym_CLType* self) {
-    {
-        Dict_CSym_CDict_CSym_CLType* _t0 = DictEntry_CSym_CDict_CSym_CLType_d_parent(self);
-        Dict_CSym_CDict_CSym_CLType* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CDict_CSym_CLType* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CDict_CSym_CLType_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CDict_CSym_CLType_CDictEntry_CSym_CDict_CSym_CLType(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CDict_CSym_CLType(self);
-}
-
-Dict_CSym_CDict_CSym_CLType* DictEntry_CSym_CDict_CSym_CLType_d_parent(DictEntry_CSym_CDict_CSym_CLType* self) {
-    Dict_CSym_CDict_CSym_CLType* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CDict_CSym_CLType_set_d_parent(DictEntry_CSym_CDict_CSym_CLType* self, Dict_CSym_CDict_CSym_CLType* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CDict_CSym_CLType_d_index(DictEntry_CSym_CDict_CSym_CLType* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CDict_CSym_CLType_set_d_index(DictEntry_CSym_CDict_CSym_CLType* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CExpr_hash_key(DictEntry_CSym_CExpr* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CExpr_destroy(DictEntry_CSym_CExpr* self) {
-    {
-        Dict_CSym_CExpr* _t0 = DictEntry_CSym_CExpr_d_parent(self);
-        Dict_CSym_CExpr* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CExpr* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CExpr_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CExpr(self);
-}
-
-Dict_CSym_CExpr* DictEntry_CSym_CExpr_d_parent(DictEntry_CSym_CExpr* self) {
-    Dict_CSym_CExpr* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CExpr_set_d_parent(DictEntry_CSym_CExpr* self, Dict_CSym_CExpr* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CExpr_d_index(DictEntry_CSym_CExpr* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CExpr_set_d_index(DictEntry_CSym_CExpr* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_bool_hash_key(DictEntry_CSym_bool* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_bool_destroy(DictEntry_CSym_bool* self) {
-    {
-        Dict_CSym_bool* _t0 = DictEntry_CSym_bool_d_parent(self);
-        Dict_CSym_bool* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_bool* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_bool_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_bool_CDictEntry_CSym_bool(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_bool(self);
-}
-
-Dict_CSym_bool* DictEntry_CSym_bool_d_parent(DictEntry_CSym_bool* self) {
-    Dict_CSym_bool* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_bool_set_d_parent(DictEntry_CSym_bool* self, Dict_CSym_bool* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_bool_d_index(DictEntry_CSym_bool* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_bool_set_d_index(DictEntry_CSym_bool* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_i32_hash_key(DictEntry_CSym_i32* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_i32_destroy(DictEntry_CSym_i32* self) {
-    {
-        Dict_CSym_i32* _t0 = DictEntry_CSym_i32_d_parent(self);
-        Dict_CSym_i32* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_i32* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_i32_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_i32_CDictEntry_CSym_i32(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_i32(self);
-}
-
-Dict_CSym_i32* DictEntry_CSym_i32_d_parent(DictEntry_CSym_i32* self) {
-    Dict_CSym_i32* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_i32_set_d_parent(DictEntry_CSym_i32* self, Dict_CSym_i32* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_i32_d_index(DictEntry_CSym_i32* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_i32_set_d_index(DictEntry_CSym_i32* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_slice_CTupleField_hash_key(DictEntry_CSym_slice_CTupleField* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_slice_CTupleField_destroy(DictEntry_CSym_slice_CTupleField* self) {
-    {
-        Dict_CSym_slice_CTupleField* _t0 = DictEntry_CSym_slice_CTupleField_d_parent(self);
-        Dict_CSym_slice_CTupleField* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_slice_CTupleField* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_slice_CTupleField_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_slice_CTupleField_CDictEntry_CSym_slice_CTupleField(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_slice_CTupleField(self);
-}
-
-Dict_CSym_slice_CTupleField* DictEntry_CSym_slice_CTupleField_d_parent(DictEntry_CSym_slice_CTupleField* self) {
-    Dict_CSym_slice_CTupleField* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CTupleField_set_d_parent(DictEntry_CSym_slice_CTupleField* self, Dict_CSym_slice_CTupleField* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_slice_CTupleField_d_index(DictEntry_CSym_slice_CTupleField* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CTupleField_set_d_index(DictEntry_CSym_slice_CTupleField* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CLInterfaceDecl_hash_key(DictEntry_CSym_CLInterfaceDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CLInterfaceDecl_destroy(DictEntry_CSym_CLInterfaceDecl* self) {
-    {
-        Dict_CSym_CLInterfaceDecl* _t0 = DictEntry_CSym_CLInterfaceDecl_d_parent(self);
-        Dict_CSym_CLInterfaceDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CLInterfaceDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CLInterfaceDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CLInterfaceDecl(self);
-}
-
-Dict_CSym_CLInterfaceDecl* DictEntry_CSym_CLInterfaceDecl_d_parent(DictEntry_CSym_CLInterfaceDecl* self) {
-    Dict_CSym_CLInterfaceDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CLInterfaceDecl_set_d_parent(DictEntry_CSym_CLInterfaceDecl* self, Dict_CSym_CLInterfaceDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CLInterfaceDecl_d_index(DictEntry_CSym_CLInterfaceDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CLInterfaceDecl_set_d_index(DictEntry_CSym_CLInterfaceDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_opt_CLType_hash_key(DictEntry_CSym_opt_CLType* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_opt_CLType_destroy(DictEntry_CSym_opt_CLType* self) {
-    {
-        Dict_CSym_opt_CLType* _t0 = DictEntry_CSym_opt_CLType_d_parent(self);
-        Dict_CSym_opt_CLType* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_opt_CLType* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_opt_CLType_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_opt_CLType(self);
-}
-
-Dict_CSym_opt_CLType* DictEntry_CSym_opt_CLType_d_parent(DictEntry_CSym_opt_CLType* self) {
-    Dict_CSym_opt_CLType* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_opt_CLType_set_d_parent(DictEntry_CSym_opt_CLType* self, Dict_CSym_opt_CLType* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_opt_CLType_d_index(DictEntry_CSym_opt_CLType* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_opt_CLType_set_d_index(DictEntry_CSym_opt_CLType* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CLFuncDecl_hash_key(DictEntry_CSym_CLFuncDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CLFuncDecl_destroy(DictEntry_CSym_CLFuncDecl* self) {
-    {
-        Dict_CSym_CLFuncDecl* _t0 = DictEntry_CSym_CLFuncDecl_d_parent(self);
-        Dict_CSym_CLFuncDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CLFuncDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CLFuncDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CLFuncDecl(self);
-}
-
-Dict_CSym_CLFuncDecl* DictEntry_CSym_CLFuncDecl_d_parent(DictEntry_CSym_CLFuncDecl* self) {
-    Dict_CSym_CLFuncDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CLFuncDecl_set_d_parent(DictEntry_CSym_CLFuncDecl* self, Dict_CSym_CLFuncDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CLFuncDecl_d_index(DictEntry_CSym_CLFuncDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CLFuncDecl_set_d_index(DictEntry_CSym_CLFuncDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CLClassDecl_hash_key(DictEntry_CSym_CLClassDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CLClassDecl_destroy(DictEntry_CSym_CLClassDecl* self) {
-    {
-        Dict_CSym_CLClassDecl* _t0 = DictEntry_CSym_CLClassDecl_d_parent(self);
-        Dict_CSym_CLClassDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CLClassDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CLClassDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CLClassDecl_CDictEntry_CSym_CLClassDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CLClassDecl(self);
-}
-
-Dict_CSym_CLClassDecl* DictEntry_CSym_CLClassDecl_d_parent(DictEntry_CSym_CLClassDecl* self) {
-    Dict_CSym_CLClassDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CLClassDecl_set_d_parent(DictEntry_CSym_CLClassDecl* self, Dict_CSym_CLClassDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CLClassDecl_d_index(DictEntry_CSym_CLClassDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CLClassDecl_set_d_index(DictEntry_CSym_CLClassDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CLStructDecl_hash_key(DictEntry_CSym_CLStructDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CLStructDecl_destroy(DictEntry_CSym_CLStructDecl* self) {
-    {
-        Dict_CSym_CLStructDecl* _t0 = DictEntry_CSym_CLStructDecl_d_parent(self);
-        Dict_CSym_CLStructDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CLStructDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CLStructDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CLStructDecl(self);
-}
-
-Dict_CSym_CLStructDecl* DictEntry_CSym_CLStructDecl_d_parent(DictEntry_CSym_CLStructDecl* self) {
-    Dict_CSym_CLStructDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CLStructDecl_set_d_parent(DictEntry_CSym_CLStructDecl* self, Dict_CSym_CLStructDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CLStructDecl_d_index(DictEntry_CSym_CLStructDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CLStructDecl_set_d_index(DictEntry_CSym_CLStructDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_slice_CLFuncDecl_hash_key(DictEntry_CSym_slice_CLFuncDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_slice_CLFuncDecl_destroy(DictEntry_CSym_slice_CLFuncDecl* self) {
-    {
-        Dict_CSym_slice_CLFuncDecl* _t0 = DictEntry_CSym_slice_CLFuncDecl_d_parent(self);
-        Dict_CSym_slice_CLFuncDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_slice_CLFuncDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_slice_CLFuncDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_slice_CLFuncDecl(self);
-}
-
-Dict_CSym_slice_CLFuncDecl* DictEntry_CSym_slice_CLFuncDecl_d_parent(DictEntry_CSym_slice_CLFuncDecl* self) {
-    Dict_CSym_slice_CLFuncDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CLFuncDecl_set_d_parent(DictEntry_CSym_slice_CLFuncDecl* self, Dict_CSym_slice_CLFuncDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_slice_CLFuncDecl_d_index(DictEntry_CSym_slice_CLFuncDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CLFuncDecl_set_d_index(DictEntry_CSym_slice_CLFuncDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_slice_string_hash_key(DictEntry_CSym_slice_string* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_slice_string_destroy(DictEntry_CSym_slice_string* self) {
-    {
-        Dict_CSym_slice_string* _t0 = DictEntry_CSym_slice_string_d_parent(self);
-        Dict_CSym_slice_string* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_slice_string* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_slice_string_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_slice_string(self);
-}
-
-Dict_CSym_slice_string* DictEntry_CSym_slice_string_d_parent(DictEntry_CSym_slice_string* self) {
-    Dict_CSym_slice_string* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_string_set_d_parent(DictEntry_CSym_slice_string* self, Dict_CSym_slice_string* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_slice_string_d_index(DictEntry_CSym_slice_string* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_string_set_d_index(DictEntry_CSym_slice_string* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_CConstDecl_hash_key(DictEntry_CSym_CConstDecl* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_CConstDecl_destroy(DictEntry_CSym_CConstDecl* self) {
-    {
-        Dict_CSym_CConstDecl* _t0 = DictEntry_CSym_CConstDecl_d_parent(self);
-        Dict_CSym_CConstDecl* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_CConstDecl* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_CConstDecl_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_CConstDecl(self);
-}
-
-Dict_CSym_CConstDecl* DictEntry_CSym_CConstDecl_d_parent(DictEntry_CSym_CConstDecl* self) {
-    Dict_CSym_CConstDecl* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_CConstDecl_set_d_parent(DictEntry_CSym_CConstDecl* self, Dict_CSym_CConstDecl* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_CConstDecl_d_index(DictEntry_CSym_CConstDecl* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_CConstDecl_set_d_index(DictEntry_CSym_CConstDecl* self, int32_t val) {
-    self->d_index = val;
-}
-
-uint64_t DictEntry_CSym_slice_CMatchArm_hash_key(DictEntry_CSym_slice_CMatchArm* self) {
-    Sym* _t0 = self->key;
-    uint64_t _t1 = Sym_get_hash(_t0);
-    return _t1;
-}
-
-void DictEntry_CSym_slice_CMatchArm_destroy(DictEntry_CSym_slice_CMatchArm* self) {
-    {
-        Dict_CSym_slice_CMatchArm* _t0 = DictEntry_CSym_slice_CMatchArm_d_parent(self);
-        Dict_CSym_slice_CMatchArm* p = _t0;
-        bool _t1 = (p == NULL);
-        bool _t2 = (!_t1);
-        if (_t2) {
-            Dict_CSym_slice_CMatchArm* _t3 = p;
-            uint64_t _t4 = DictEntry_CSym_slice_CMatchArm_hash_key(self);
-            bool _t5 = hash_remove_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(_t3, _t4);
-            _t5;
-        }
-    }
-    _lyric_slab_free_DictEntry_CSym_slice_CMatchArm(self);
-}
-
-Dict_CSym_slice_CMatchArm* DictEntry_CSym_slice_CMatchArm_d_parent(DictEntry_CSym_slice_CMatchArm* self) {
-    Dict_CSym_slice_CMatchArm* _t0 = self->d_parent;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CMatchArm_set_d_parent(DictEntry_CSym_slice_CMatchArm* self, Dict_CSym_slice_CMatchArm* val) {
-    self->d_parent = val;
-}
-
-int32_t DictEntry_CSym_slice_CMatchArm_d_index(DictEntry_CSym_slice_CMatchArm* self) {
-    int32_t _t0 = self->d_index;
-    return _t0;
-}
-
-void DictEntry_CSym_slice_CMatchArm_set_d_index(DictEntry_CSym_slice_CMatchArm* self, int32_t val) {
-    self->d_index = val;
-}
-
-void hash_init_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, int32_t capacity) {
+void hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
     if (_t0) {
@@ -100843,17 +102228,17 @@ void hash_init_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_EToken
         int32_t _t5 = (i + 1);
         i = _t5;
     }
-    Dict_CSym_ETokenKind_set_d_buckets(parent, b);
-    Dict_CSym_ETokenKind_set_d_hash_cap(parent, cap);
-    Dict_CSym_ETokenKind_set_d_hash_count(parent, 0);
+    Dict_CSym_bool_set_d_buckets(parent, b);
+    Dict_CSym_bool_set_d_hash_cap(parent, cap);
+    Dict_CSym_bool_set_d_hash_count(parent, 0);
 }
 
-void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent) {
-    LyricSlice_DictEntry_CSym_ETokenKindptr _t0 = Dict_CSym_ETokenKind_d_children(parent);
-    LyricSlice_DictEntry_CSym_ETokenKindptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_ETokenKind_d_hash_count(parent);
+void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent) {
+    LyricSlice_DictEntry_CSym_boolptr _t0 = Dict_CSym_bool_d_children(parent);
+    LyricSlice_DictEntry_CSym_boolptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_bool_d_hash_count(parent);
     int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    int32_t _t2 = Dict_CSym_bool_d_hash_cap(parent);
     int32_t _t3 = (_t2 * 2);
     int32_t new_cap = _t3;
     LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
@@ -100868,21 +102253,21 @@ void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETok
         int32_t _t8 = (i + 1);
         i = _t8;
     }
-    Dict_CSym_ETokenKind_set_d_buckets(parent, new_buckets);
-    Dict_CSym_ETokenKind_set_d_hash_cap(parent, new_cap);
+    Dict_CSym_bool_set_d_buckets(parent, new_buckets);
+    Dict_CSym_bool_set_d_hash_cap(parent, new_cap);
     i = 0;
     while (1) {
         bool _t11 = (i < old_count);
         if (!(_t11)) break;
-        DictEntry_CSym_ETokenKind* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_ETokenKind_hash_key(_t12);
+        DictEntry_CSym_bool* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_bool_hash_key(_t12);
         uint64_t key = _t13;
         uint64_t _t14 = ((uint64_t)new_cap);
         uint64_t _t15 = (key % _t14);
         int32_t _t16 = ((int32_t)_t15);
         int32_t slot = _t16;
         while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_ETokenKind_d_buckets(parent);
+            LyricSlice_int32_t _t17 = Dict_CSym_bool_d_buckets(parent);
             int32_t _t18 = _t17.data[slot];
             bool _t19 = (_t18 >= 0);
             if (!(_t19)) break;
@@ -100890,22 +102275,22 @@ void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETok
             int32_t _t21 = (_t20 % new_cap);
             slot = _t21;
         }
-        LyricSlice_int32_t _t22 = Dict_CSym_ETokenKind_d_buckets(parent);
+        LyricSlice_int32_t _t22 = Dict_CSym_bool_d_buckets(parent);
         LyricSlice_int32_t b = _t22;
         b.data[slot] = i;
-        Dict_CSym_ETokenKind_set_d_buckets(parent, b);
+        Dict_CSym_bool_set_d_buckets(parent, b);
         int32_t _t24 = (i + 1);
         i = _t24;
     }
 }
 
-int32_t hash_find_slot_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+int32_t hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
     int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_ETokenKind_d_buckets(parent);
+    LyricSlice_int32_t _t1 = Dict_CSym_bool_d_buckets(parent);
     LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_ETokenKindptr _t2 = Dict_CSym_ETokenKind_d_children(parent);
-    LyricSlice_DictEntry_CSym_ETokenKindptr kids = _t2;
+    LyricSlice_DictEntry_CSym_boolptr _t2 = Dict_CSym_bool_d_children(parent);
+    LyricSlice_DictEntry_CSym_boolptr kids = _t2;
     uint64_t _t3 = ((uint64_t)cap);
     uint64_t _t4 = (key % _t3);
     int32_t _t5 = ((int32_t)_t4);
@@ -100923,353 +102308,8 @@ int32_t hash_find_slot_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSy
         }
         bool _t10 = (idx >= 0);
         if (_t10) {
-            DictEntry_CSym_ETokenKind* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_ETokenKind_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CType_set_d_buckets(parent, b);
-    Dict_CSym_CType_set_d_hash_cap(parent, cap);
-    Dict_CSym_CType_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent) {
-    LyricSlice_DictEntry_CSym_CTypeptr _t0 = Dict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CType_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CType_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CType_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CType* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CType_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CType_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CType_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CType_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CTypeptr _t2 = Dict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CType* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CType_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
-    Dict_CSym_CVariantInfo_set_d_hash_cap(parent, cap);
-    Dict_CSym_CVariantInfo_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent) {
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t0 = Dict_CSym_CVariantInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CVariantInfo_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CVariantInfo_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CVariantInfo_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CVariantInfo* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CVariantInfo_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CVariantInfo_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CVariantInfo_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CVariantInfo_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CVariantInfoptr _t2 = Dict_CSym_CVariantInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CVariantInfo* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CVariantInfo_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CTypeInfo_set_d_buckets(parent, b);
-    Dict_CSym_CTypeInfo_set_d_hash_cap(parent, cap);
-    Dict_CSym_CTypeInfo_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent) {
-    LyricSlice_DictEntry_CSym_CTypeInfoptr _t0 = Dict_CSym_CTypeInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeInfoptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CTypeInfo_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CTypeInfo_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CTypeInfo_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CTypeInfo_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CTypeInfo* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CTypeInfo_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CTypeInfo_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CTypeInfo_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CTypeInfo_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CTypeInfo_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CTypeInfo_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CTypeInfoptr _t2 = Dict_CSym_CTypeInfo_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeInfoptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CTypeInfo* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CTypeInfo_hash_key(_t11);
+            DictEntry_CSym_bool* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_bool_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;
@@ -101400,351 +102440,6 @@ int32_t hash_find_slot_CDict_CSym_CInterfaceDecl_CDictEntry_CSym_CInterfaceDecl(
     return _t17;
 }
 
-void hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
-    Dict_CSym_CDict_CSym_CType_set_d_hash_cap(parent, cap);
-    Dict_CSym_CDict_CSym_CType_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent) {
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t0 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CDict_CSym_CType_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CDict_CSym_CType* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t2 = Dict_CSym_CDict_CSym_CType_d_children(parent);
-    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CDict_CSym_CType* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_string_set_d_buckets(parent, b);
-    Dict_CSym_string_set_d_hash_cap(parent, cap);
-    Dict_CSym_string_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent) {
-    LyricSlice_DictEntry_CSym_stringptr _t0 = Dict_CSym_string_d_children(parent);
-    LyricSlice_DictEntry_CSym_stringptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_string_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_string_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_string_set_d_buckets(parent, new_buckets);
-    Dict_CSym_string_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_string* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_string_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_string_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_string_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_string_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_string_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_stringptr _t2 = Dict_CSym_string_d_children(parent);
-    LyricSlice_DictEntry_CSym_stringptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_string* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_string_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CStructDecl_set_d_buckets(parent, b);
-    Dict_CSym_CStructDecl_set_d_hash_cap(parent, cap);
-    Dict_CSym_CStructDecl_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent) {
-    LyricSlice_DictEntry_CSym_CStructDeclptr _t0 = Dict_CSym_CStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CStructDeclptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CStructDecl_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CStructDecl_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CStructDecl_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CStructDecl* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CStructDecl_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CStructDecl_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CStructDecl_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CStructDecl_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CStructDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CStructDeclptr _t2 = Dict_CSym_CStructDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CStructDecl* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CStructDecl_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
 void hash_init_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSym_CClassDecl* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
@@ -101845,236 +102540,6 @@ int32_t hash_find_slot_CDict_CSym_CClassDecl_CDictEntry_CSym_CClassDecl(Dict_CSy
         if (_t10) {
             DictEntry_CSym_CClassDecl* _t11 = kids.data[idx];
             uint64_t _t12 = DictEntry_CSym_CClassDecl_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
-    Dict_CSym_CEnumDecl_set_d_hash_cap(parent, cap);
-    Dict_CSym_CEnumDecl_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent) {
-    LyricSlice_DictEntry_CSym_CEnumDeclptr _t0 = Dict_CSym_CEnumDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CEnumDeclptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CEnumDecl_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CEnumDecl_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CEnumDecl_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CEnumDecl* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CEnumDecl_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CEnumDecl_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CEnumDecl_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CEnumDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CEnumDeclptr _t2 = Dict_CSym_CEnumDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CEnumDeclptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CEnumDecl* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CEnumDecl_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
-    Dict_CSym_CTypeExpr_set_d_hash_cap(parent, cap);
-    Dict_CSym_CTypeExpr_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent) {
-    LyricSlice_DictEntry_CSym_CTypeExprptr _t0 = Dict_CSym_CTypeExpr_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeExprptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CTypeExpr_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CTypeExpr_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CTypeExpr_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CTypeExpr* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CTypeExpr_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CTypeExpr_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CTypeExpr_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CTypeExpr_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CTypeExprptr _t2 = Dict_CSym_CTypeExpr_d_children(parent);
-    LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CTypeExpr* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CTypeExpr_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;
@@ -102205,6 +102670,1041 @@ int32_t hash_find_slot_CDict_CSym_CFuncDecl_CDictEntry_CSym_CFuncDecl(Dict_CSym_
     return _t17;
 }
 
+void hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CConstDecl_set_d_buckets(parent, b);
+    Dict_CSym_CConstDecl_set_d_hash_cap(parent, cap);
+    Dict_CSym_CConstDecl_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent) {
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t0 = Dict_CSym_CConstDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CConstDeclptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CConstDecl_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CConstDecl_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CConstDecl_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CConstDecl* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CConstDecl_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CConstDecl_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CConstDecl_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CConstDecl_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CConstDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CConstDeclptr _t2 = Dict_CSym_CConstDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CConstDecl* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CConstDecl_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_ETokenKind_set_d_buckets(parent, b);
+    Dict_CSym_ETokenKind_set_d_hash_cap(parent, cap);
+    Dict_CSym_ETokenKind_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent) {
+    LyricSlice_DictEntry_CSym_ETokenKindptr _t0 = Dict_CSym_ETokenKind_d_children(parent);
+    LyricSlice_DictEntry_CSym_ETokenKindptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_ETokenKind_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_ETokenKind_set_d_buckets(parent, new_buckets);
+    Dict_CSym_ETokenKind_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_ETokenKind* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_ETokenKind_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_ETokenKind_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_ETokenKind_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_ETokenKind_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_ETokenKind_CDictEntry_CSym_ETokenKind(Dict_CSym_ETokenKind* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_ETokenKind_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_ETokenKind_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_ETokenKindptr _t2 = Dict_CSym_ETokenKind_d_children(parent);
+    LyricSlice_DictEntry_CSym_ETokenKindptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_ETokenKind* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_ETokenKind_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_string_set_d_buckets(parent, b);
+    Dict_CSym_string_set_d_hash_cap(parent, cap);
+    Dict_CSym_string_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent) {
+    LyricSlice_DictEntry_CSym_stringptr _t0 = Dict_CSym_string_d_children(parent);
+    LyricSlice_DictEntry_CSym_stringptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_string_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_string_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_string_set_d_buckets(parent, new_buckets);
+    Dict_CSym_string_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_string* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_string_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_string_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_string_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_string_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_string_CDictEntry_CSym_string(Dict_CSym_string* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_string_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_string_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_stringptr _t2 = Dict_CSym_string_d_children(parent);
+    LyricSlice_DictEntry_CSym_stringptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_string* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_string_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
+    Dict_CSym_CTypeExpr_set_d_hash_cap(parent, cap);
+    Dict_CSym_CTypeExpr_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent) {
+    LyricSlice_DictEntry_CSym_CTypeExprptr _t0 = Dict_CSym_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeExprptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CTypeExpr_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CTypeExpr_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CTypeExpr_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CTypeExpr* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CTypeExpr_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CTypeExpr_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CTypeExpr_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CTypeExpr_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CTypeExpr_CDictEntry_CSym_CTypeExpr(Dict_CSym_CTypeExpr* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CTypeExprptr _t2 = Dict_CSym_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeExprptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CTypeExpr* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CTypeExpr_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CType_set_d_buckets(parent, b);
+    Dict_CSym_CType_set_d_hash_cap(parent, cap);
+    Dict_CSym_CType_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent) {
+    LyricSlice_DictEntry_CSym_CTypeptr _t0 = Dict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CType_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CType_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CType_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CType_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CType* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CType_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CType_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CType_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CType_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CType_CDictEntry_CSym_CType(Dict_CSym_CType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CTypeptr _t2 = Dict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CType* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CType_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CTypeInfo_set_d_buckets(parent, b);
+    Dict_CSym_CTypeInfo_set_d_hash_cap(parent, cap);
+    Dict_CSym_CTypeInfo_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent) {
+    LyricSlice_DictEntry_CSym_CTypeInfoptr _t0 = Dict_CSym_CTypeInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeInfoptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CTypeInfo_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CTypeInfo_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CTypeInfo_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CTypeInfo_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CTypeInfo* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CTypeInfo_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CTypeInfo_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CTypeInfo_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CTypeInfo_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CTypeInfo_CDictEntry_CSym_CTypeInfo(Dict_CSym_CTypeInfo* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CTypeInfo_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CTypeInfo_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CTypeInfoptr _t2 = Dict_CSym_CTypeInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CTypeInfoptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CTypeInfo* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CTypeInfo_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, b);
+    Dict_CSym_slice_CTypeExpr_set_d_hash_cap(parent, cap);
+    Dict_CSym_slice_CTypeExpr_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent) {
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t0 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_slice_CTypeExpr_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, new_buckets);
+    Dict_CSym_slice_CTypeExpr_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_slice_CTypeExpr* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_slice_CTypeExpr_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_slice_CTypeExpr_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_slice_CTypeExpr_CDictEntry_CSym_slice_CTypeExpr(Dict_CSym_slice_CTypeExpr* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CTypeExpr_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_slice_CTypeExpr_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr _t2 = Dict_CSym_slice_CTypeExpr_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CTypeExprptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_slice_CTypeExpr* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_slice_CTypeExpr_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
+    Dict_CSym_CVariantInfo_set_d_hash_cap(parent, cap);
+    Dict_CSym_CVariantInfo_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent) {
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t0 = Dict_CSym_CVariantInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CVariantInfo_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CVariantInfo_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CVariantInfo_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CVariantInfo* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CVariantInfo_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CVariantInfo_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CVariantInfo_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CVariantInfo_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CVariantInfo_CDictEntry_CSym_CVariantInfo(Dict_CSym_CVariantInfo* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CVariantInfo_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CVariantInfo_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CVariantInfoptr _t2 = Dict_CSym_CVariantInfo_d_children(parent);
+    LyricSlice_DictEntry_CSym_CVariantInfoptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CVariantInfo* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CVariantInfo_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
+    Dict_CSym_CDict_CSym_CType_set_d_hash_cap(parent, cap);
+    Dict_CSym_CDict_CSym_CType_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent) {
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t0 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CDict_CSym_CType_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CDict_CSym_CType_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CDict_CSym_CType* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CDict_CSym_CType_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CDict_CSym_CType_CDictEntry_CSym_CDict_CSym_CType(Dict_CSym_CDict_CSym_CType* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CDict_CSym_CType_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CDict_CSym_CType_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr _t2 = Dict_CSym_CDict_CSym_CType_d_children(parent);
+    LyricSlice_DictEntry_CSym_CDict_CSym_CTypeptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CDict_CSym_CType* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CDict_CSym_CType_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
 void hash_init_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
@@ -102305,6 +103805,121 @@ int32_t hash_find_slot_CDict_CSym_CLType_CDictEntry_CSym_CLType(Dict_CSym_CLType
         if (_t10) {
             DictEntry_CSym_CLType* _t11 = kids.data[idx];
             uint64_t _t12 = DictEntry_CSym_CLType_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_CStructDecl_set_d_buckets(parent, b);
+    Dict_CSym_CStructDecl_set_d_hash_cap(parent, cap);
+    Dict_CSym_CStructDecl_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent) {
+    LyricSlice_DictEntry_CSym_CStructDeclptr _t0 = Dict_CSym_CStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CStructDeclptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CStructDecl_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_CStructDecl_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CStructDecl_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_CStructDecl* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CStructDecl_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_CStructDecl_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_CStructDecl_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_CStructDecl_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_CStructDecl_CDictEntry_CSym_CStructDecl(Dict_CSym_CStructDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CStructDecl_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_CStructDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_CStructDeclptr _t2 = Dict_CSym_CStructDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CStructDeclptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_CStructDecl* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CStructDecl_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;
@@ -102550,7 +104165,7 @@ int32_t hash_find_slot_CDict_CSym_CExpr_CDictEntry_CSym_CExpr(Dict_CSym_CExpr* p
     return _t17;
 }
 
-void hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, int32_t capacity) {
+void hash_init_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
     if (_t0) {
@@ -102568,17 +104183,17 @@ void hash_init_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, int3
         int32_t _t5 = (i + 1);
         i = _t5;
     }
-    Dict_CSym_bool_set_d_buckets(parent, b);
-    Dict_CSym_bool_set_d_hash_cap(parent, cap);
-    Dict_CSym_bool_set_d_hash_count(parent, 0);
+    Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
+    Dict_CSym_CEnumDecl_set_d_hash_cap(parent, cap);
+    Dict_CSym_CEnumDecl_set_d_hash_count(parent, 0);
 }
 
-void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent) {
-    LyricSlice_DictEntry_CSym_boolptr _t0 = Dict_CSym_bool_d_children(parent);
-    LyricSlice_DictEntry_CSym_boolptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_bool_d_hash_count(parent);
+void hash_rehash_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent) {
+    LyricSlice_DictEntry_CSym_CEnumDeclptr _t0 = Dict_CSym_CEnumDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CEnumDeclptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_CEnumDecl_d_hash_count(parent);
     int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_bool_d_hash_cap(parent);
+    int32_t _t2 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
     int32_t _t3 = (_t2 * 2);
     int32_t new_cap = _t3;
     LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
@@ -102593,21 +104208,21 @@ void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent) {
         int32_t _t8 = (i + 1);
         i = _t8;
     }
-    Dict_CSym_bool_set_d_buckets(parent, new_buckets);
-    Dict_CSym_bool_set_d_hash_cap(parent, new_cap);
+    Dict_CSym_CEnumDecl_set_d_buckets(parent, new_buckets);
+    Dict_CSym_CEnumDecl_set_d_hash_cap(parent, new_cap);
     i = 0;
     while (1) {
         bool _t11 = (i < old_count);
         if (!(_t11)) break;
-        DictEntry_CSym_bool* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_bool_hash_key(_t12);
+        DictEntry_CSym_CEnumDecl* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_CEnumDecl_hash_key(_t12);
         uint64_t key = _t13;
         uint64_t _t14 = ((uint64_t)new_cap);
         uint64_t _t15 = (key % _t14);
         int32_t _t16 = ((int32_t)_t15);
         int32_t slot = _t16;
         while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_bool_d_buckets(parent);
+            LyricSlice_int32_t _t17 = Dict_CSym_CEnumDecl_d_buckets(parent);
             int32_t _t18 = _t17.data[slot];
             bool _t19 = (_t18 >= 0);
             if (!(_t19)) break;
@@ -102615,22 +104230,22 @@ void hash_rehash_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent) {
             int32_t _t21 = (_t20 % new_cap);
             slot = _t21;
         }
-        LyricSlice_int32_t _t22 = Dict_CSym_bool_d_buckets(parent);
+        LyricSlice_int32_t _t22 = Dict_CSym_CEnumDecl_d_buckets(parent);
         LyricSlice_int32_t b = _t22;
         b.data[slot] = i;
-        Dict_CSym_bool_set_d_buckets(parent, b);
+        Dict_CSym_CEnumDecl_set_d_buckets(parent, b);
         int32_t _t24 = (i + 1);
         i = _t24;
     }
 }
 
-int32_t hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_bool_d_hash_cap(parent);
+int32_t hash_find_slot_CDict_CSym_CEnumDecl_CDictEntry_CSym_CEnumDecl(Dict_CSym_CEnumDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_CEnumDecl_d_hash_cap(parent);
     int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_bool_d_buckets(parent);
+    LyricSlice_int32_t _t1 = Dict_CSym_CEnumDecl_d_buckets(parent);
     LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_boolptr _t2 = Dict_CSym_bool_d_children(parent);
-    LyricSlice_DictEntry_CSym_boolptr kids = _t2;
+    LyricSlice_DictEntry_CSym_CEnumDeclptr _t2 = Dict_CSym_CEnumDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_CEnumDeclptr kids = _t2;
     uint64_t _t3 = ((uint64_t)cap);
     uint64_t _t4 = (key % _t3);
     int32_t _t5 = ((int32_t)_t4);
@@ -102648,8 +104263,8 @@ int32_t hash_find_slot_CDict_CSym_bool_CDictEntry_CSym_bool(Dict_CSym_bool* pare
         }
         bool _t10 = (idx >= 0);
         if (_t10) {
-            DictEntry_CSym_bool* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_bool_hash_key(_t11);
+            DictEntry_CSym_CEnumDecl* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_CEnumDecl_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;
@@ -103010,6 +104625,121 @@ int32_t hash_find_slot_CDict_CSym_CLInterfaceDecl_CDictEntry_CSym_CLInterfaceDec
     return _t17;
 }
 
+void hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
+    Dict_CSym_slice_CMatchArm_set_d_hash_cap(parent, cap);
+    Dict_CSym_slice_CMatchArm_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent) {
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t0 = Dict_CSym_slice_CMatchArm_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, new_buckets);
+    Dict_CSym_slice_CMatchArm_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_slice_CMatchArm* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_slice_CMatchArm_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t2 = Dict_CSym_slice_CMatchArm_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_slice_CMatchArm* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_slice_CMatchArm_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
 void hash_init_CDict_CSym_opt_CLType_CDictEntry_CSym_opt_CLType(Dict_CSym_opt_CLType* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
@@ -103225,6 +104955,121 @@ int32_t hash_find_slot_CDict_CSym_CLFuncDecl_CDictEntry_CSym_CLFuncDecl(Dict_CSy
         if (_t10) {
             DictEntry_CSym_CLFuncDecl* _t11 = kids.data[idx];
             uint64_t _t12 = DictEntry_CSym_CLFuncDecl_hash_key(_t11);
+            bool _t13 = (_t12 == key);
+            if (_t13) {
+                return slot;
+            }
+        }
+        int32_t _t14 = (slot + 1);
+        int32_t _t15 = (_t14 % cap);
+        slot = _t15;
+        int32_t _t16 = (i + 1);
+        i = _t16;
+    }
+    int32_t _t17 = (-1);
+    return _t17;
+}
+
+void hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, int32_t capacity) {
+    int32_t cap = capacity;
+    bool _t0 = (cap < 8);
+    if (_t0) {
+        cap = 8;
+    }
+    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t b = _t1;
+    int32_t i = 0;
+    while (1) {
+        bool _t2 = (i < cap);
+        if (!(_t2)) break;
+        int32_t _t3 = (-1);
+        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
+        b = _t4;
+        int32_t _t5 = (i + 1);
+        i = _t5;
+    }
+    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
+    Dict_CSym_slice_CLFuncDecl_set_d_hash_cap(parent, cap);
+    Dict_CSym_slice_CLFuncDecl_set_d_hash_count(parent, 0);
+}
+
+void hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent) {
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t0 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr old_kids = _t0;
+    int32_t _t1 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
+    int32_t old_count = _t1;
+    int32_t _t2 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    int32_t _t3 = (_t2 * 2);
+    int32_t new_cap = _t3;
+    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
+    LyricSlice_int32_t new_buckets = _t4;
+    int32_t i = 0;
+    while (1) {
+        bool _t5 = (i < new_cap);
+        if (!(_t5)) break;
+        int32_t _t6 = (-1);
+        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
+        new_buckets = _t7;
+        int32_t _t8 = (i + 1);
+        i = _t8;
+    }
+    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, new_buckets);
+    Dict_CSym_slice_CLFuncDecl_set_d_hash_cap(parent, new_cap);
+    i = 0;
+    while (1) {
+        bool _t11 = (i < old_count);
+        if (!(_t11)) break;
+        DictEntry_CSym_slice_CLFuncDecl* _t12 = old_kids.data[i];
+        uint64_t _t13 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t12);
+        uint64_t key = _t13;
+        uint64_t _t14 = ((uint64_t)new_cap);
+        uint64_t _t15 = (key % _t14);
+        int32_t _t16 = ((int32_t)_t15);
+        int32_t slot = _t16;
+        while (1) {
+            LyricSlice_int32_t _t17 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+            int32_t _t18 = _t17.data[slot];
+            bool _t19 = (_t18 >= 0);
+            if (!(_t19)) break;
+            int32_t _t20 = (slot + 1);
+            int32_t _t21 = (_t20 % new_cap);
+            slot = _t21;
+        }
+        LyricSlice_int32_t _t22 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+        LyricSlice_int32_t b = _t22;
+        b.data[slot] = i;
+        Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
+        int32_t _t24 = (i + 1);
+        i = _t24;
+    }
+}
+
+int32_t hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key) {
+    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
+    int32_t cap = _t0;
+    LyricSlice_int32_t _t1 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
+    LyricSlice_int32_t buckets = _t1;
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t2 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
+    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t2;
+    uint64_t _t3 = ((uint64_t)cap);
+    uint64_t _t4 = (key % _t3);
+    int32_t _t5 = ((int32_t)_t4);
+    int32_t slot = _t5;
+    int32_t i = 0;
+    while (1) {
+        bool _t6 = (i < cap);
+        if (!(_t6)) break;
+        int32_t _t7 = buckets.data[slot];
+        int32_t idx = _t7;
+        int32_t _t8 = (-1);
+        bool _t9 = (idx == _t8);
+        if (_t9) {
+            return slot;
+        }
+        bool _t10 = (idx >= 0);
+        if (_t10) {
+            DictEntry_CSym_slice_CLFuncDecl* _t11 = kids.data[idx];
+            uint64_t _t12 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;
@@ -103470,121 +105315,6 @@ int32_t hash_find_slot_CDict_CSym_CLStructDecl_CDictEntry_CSym_CLStructDecl(Dict
     return _t17;
 }
 
-void hash_init_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
-    Dict_CSym_slice_CLFuncDecl_set_d_hash_cap(parent, cap);
-    Dict_CSym_slice_CLFuncDecl_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent) {
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t0 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_slice_CLFuncDecl_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, new_buckets);
-    Dict_CSym_slice_CLFuncDecl_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_slice_CLFuncDecl* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_slice_CLFuncDecl_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_slice_CLFuncDecl_CDictEntry_CSym_slice_CLFuncDecl(Dict_CSym_slice_CLFuncDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_slice_CLFuncDecl_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_slice_CLFuncDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr _t2 = Dict_CSym_slice_CLFuncDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CLFuncDeclptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_slice_CLFuncDecl* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_slice_CLFuncDecl_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
 void hash_init_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict_CSym_slice_string* parent, int32_t capacity) {
     int32_t cap = capacity;
     bool _t0 = (cap < 8);
@@ -103685,236 +105415,6 @@ int32_t hash_find_slot_CDict_CSym_slice_string_CDictEntry_CSym_slice_string(Dict
         if (_t10) {
             DictEntry_CSym_slice_string* _t11 = kids.data[idx];
             uint64_t _t12 = DictEntry_CSym_slice_string_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_CConstDecl_set_d_buckets(parent, b);
-    Dict_CSym_CConstDecl_set_d_hash_cap(parent, cap);
-    Dict_CSym_CConstDecl_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent) {
-    LyricSlice_DictEntry_CSym_CConstDeclptr _t0 = Dict_CSym_CConstDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CConstDeclptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_CConstDecl_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_CConstDecl_set_d_buckets(parent, new_buckets);
-    Dict_CSym_CConstDecl_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_CConstDecl* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_CConstDecl_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_CConstDecl_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_CConstDecl_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_CConstDecl_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_CConstDecl_CDictEntry_CSym_CConstDecl(Dict_CSym_CConstDecl* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_CConstDecl_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_CConstDecl_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_CConstDeclptr _t2 = Dict_CSym_CConstDecl_d_children(parent);
-    LyricSlice_DictEntry_CSym_CConstDeclptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_CConstDecl* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_CConstDecl_hash_key(_t11);
-            bool _t13 = (_t12 == key);
-            if (_t13) {
-                return slot;
-            }
-        }
-        int32_t _t14 = (slot + 1);
-        int32_t _t15 = (_t14 % cap);
-        slot = _t15;
-        int32_t _t16 = (i + 1);
-        i = _t16;
-    }
-    int32_t _t17 = (-1);
-    return _t17;
-}
-
-void hash_init_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, int32_t capacity) {
-    int32_t cap = capacity;
-    bool _t0 = (cap < 8);
-    if (_t0) {
-        cap = 8;
-    }
-    LyricSlice_int32_t _t1 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t b = _t1;
-    int32_t i = 0;
-    while (1) {
-        bool _t2 = (i < cap);
-        if (!(_t2)) break;
-        int32_t _t3 = (-1);
-        LyricSlice_int32_t _t4 = ({ lyric_push(&b, _t3, LyricSlice_int32_t); b; });
-        b = _t4;
-        int32_t _t5 = (i + 1);
-        i = _t5;
-    }
-    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
-    Dict_CSym_slice_CMatchArm_set_d_hash_cap(parent, cap);
-    Dict_CSym_slice_CMatchArm_set_d_hash_count(parent, 0);
-}
-
-void hash_rehash_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent) {
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t0 = Dict_CSym_slice_CMatchArm_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr old_kids = _t0;
-    int32_t _t1 = Dict_CSym_slice_CMatchArm_d_hash_count(parent);
-    int32_t old_count = _t1;
-    int32_t _t2 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    int32_t _t3 = (_t2 * 2);
-    int32_t new_cap = _t3;
-    LyricSlice_int32_t _t4 = lyric_slice_empty(LyricSlice_int32_t);
-    LyricSlice_int32_t new_buckets = _t4;
-    int32_t i = 0;
-    while (1) {
-        bool _t5 = (i < new_cap);
-        if (!(_t5)) break;
-        int32_t _t6 = (-1);
-        LyricSlice_int32_t _t7 = ({ lyric_push(&new_buckets, _t6, LyricSlice_int32_t); new_buckets; });
-        new_buckets = _t7;
-        int32_t _t8 = (i + 1);
-        i = _t8;
-    }
-    Dict_CSym_slice_CMatchArm_set_d_buckets(parent, new_buckets);
-    Dict_CSym_slice_CMatchArm_set_d_hash_cap(parent, new_cap);
-    i = 0;
-    while (1) {
-        bool _t11 = (i < old_count);
-        if (!(_t11)) break;
-        DictEntry_CSym_slice_CMatchArm* _t12 = old_kids.data[i];
-        uint64_t _t13 = DictEntry_CSym_slice_CMatchArm_hash_key(_t12);
-        uint64_t key = _t13;
-        uint64_t _t14 = ((uint64_t)new_cap);
-        uint64_t _t15 = (key % _t14);
-        int32_t _t16 = ((int32_t)_t15);
-        int32_t slot = _t16;
-        while (1) {
-            LyricSlice_int32_t _t17 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-            int32_t _t18 = _t17.data[slot];
-            bool _t19 = (_t18 >= 0);
-            if (!(_t19)) break;
-            int32_t _t20 = (slot + 1);
-            int32_t _t21 = (_t20 % new_cap);
-            slot = _t21;
-        }
-        LyricSlice_int32_t _t22 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-        LyricSlice_int32_t b = _t22;
-        b.data[slot] = i;
-        Dict_CSym_slice_CMatchArm_set_d_buckets(parent, b);
-        int32_t _t24 = (i + 1);
-        i = _t24;
-    }
-}
-
-int32_t hash_find_slot_CDict_CSym_slice_CMatchArm_CDictEntry_CSym_slice_CMatchArm(Dict_CSym_slice_CMatchArm* parent, uint64_t key) {
-    int32_t _t0 = Dict_CSym_slice_CMatchArm_d_hash_cap(parent);
-    int32_t cap = _t0;
-    LyricSlice_int32_t _t1 = Dict_CSym_slice_CMatchArm_d_buckets(parent);
-    LyricSlice_int32_t buckets = _t1;
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr _t2 = Dict_CSym_slice_CMatchArm_d_children(parent);
-    LyricSlice_DictEntry_CSym_slice_CMatchArmptr kids = _t2;
-    uint64_t _t3 = ((uint64_t)cap);
-    uint64_t _t4 = (key % _t3);
-    int32_t _t5 = ((int32_t)_t4);
-    int32_t slot = _t5;
-    int32_t i = 0;
-    while (1) {
-        bool _t6 = (i < cap);
-        if (!(_t6)) break;
-        int32_t _t7 = buckets.data[slot];
-        int32_t idx = _t7;
-        int32_t _t8 = (-1);
-        bool _t9 = (idx == _t8);
-        if (_t9) {
-            return slot;
-        }
-        bool _t10 = (idx >= 0);
-        if (_t10) {
-            DictEntry_CSym_slice_CMatchArm* _t11 = kids.data[idx];
-            uint64_t _t12 = DictEntry_CSym_slice_CMatchArm_hash_key(_t11);
             bool _t13 = (_t12 == key);
             if (_t13) {
                 return slot;

@@ -483,13 +483,33 @@ func MonoPass.collect_from_expr(self, e: LExpr) {
         if !isnull(mc.receiver) {
           if !isnull(mc.receiver!.typ) {
             if mc.receiver!.typ!.kind is TyClassHandle {
-              let cls_entry = self.class_by_name!.get(sym(mc.receiver!.typ!.name))
+              let recv_name = mc.receiver!.typ!.name
+              let cls_entry = self.class_by_name!.get(sym(recv_name))
               if !isnull(cls_entry) {
                 if len(cls_entry!.value.type_params) > 0 {
                   if len(mc.type_args) > 0 {
                     if !has_type_vars(mc.type_args) {
-                      self.record_class_instance(mc.receiver!.typ!.name, mc.type_args)
+                      self.record_class_instance(recv_name, mc.type_args)
                     }
+                  }
+                }
+              }
+              // Check for generic function specialization via type args
+              if len(mc.type_args) > 0 && !has_type_vars(mc.type_args) {
+                let direct_key = recv_name + "." + mc.method
+                let direct_entry = self.func_by_name!.get(sym(direct_key))
+                if !isnull(direct_entry) && len(direct_entry!.value.type_params) > 0 {
+                  self.record_func_instance(direct_key, mc.type_args)
+                } else {
+                  // Search for generic functions with type-param receivers
+                  let mut fi2 = 0
+                  while fi2 < len(self.prog!.functions) {
+                    let f = self.prog!.functions[fi2]
+                    if f.name == mc.method && len(f.type_params) > 0 && len(f.relational_constraints) > 0 {
+                      let fkey = self.func_key(f)
+                      self.record_func_instance(fkey, mc.type_args)
+                    }
+                    fi2 = fi2 + 1
                   }
                 }
               }
@@ -1128,6 +1148,11 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
                     mc.type_args = []
                   }
                 }
+              } else {
+                // Interface method on concrete class — just clear type args
+                if len(mc.type_args) > 0 {
+                  mc.type_args = []
+                }
               }
             }
           }
@@ -1391,6 +1416,13 @@ func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType? {
       return concrete!.value
     }
     return t
+  }
+  // Also substitute class/struct handles that are type param names
+  if t!.kind is TyClassHandle || t!.kind is TyStruct {
+    let concrete = subst!.get(sym(t!.name))
+    if !isnull(concrete) {
+      return concrete!.value
+    }
   }
   // Deep copy with substitution
   let mut new_fields: [LField] = []
@@ -2807,9 +2839,7 @@ func filter_funcs(funcs: [LFuncDecl], class_instances: Dict<Sym, string>?, class
     let f = funcs[i]
     let mut skip = false
     if len(f.type_params) > 0 {
-      if f.receiver == "" {
-        skip = true
-      }
+      skip = true
     }
     if f.receiver != "" {
       // Check if receiver is a generic class with instances
@@ -3439,8 +3469,16 @@ func monomorphize(prog: LProgram?) {
         subst.set(sym(orig.type_params[ti].name), types[ti])
         ti = ti + 1
       }
-      let mangled = mangle_name(orig.name, types)
-      let spec = m.specialize_func(orig, subst, mangled, "")
+      // For interface methods with type-param receivers, use concrete receiver name
+      let mut new_receiver = ""
+      if orig.receiver != "" {
+        let recv_type = subst.get(sym(orig.receiver))
+        if !isnull(recv_type) && !isnull(recv_type!.value) {
+          new_receiver = recv_type!.value!.name
+        }
+      }
+      let mangled = if new_receiver != "" { orig.name } else { mangle_name(orig.name, types) }
+      let spec = m.specialize_func(orig, subst, mangled, new_receiver)
       m.collect_from_stmts(spec.body)
       append(new_funcs, spec)
       fi = fi + 1

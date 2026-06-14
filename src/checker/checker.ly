@@ -152,6 +152,7 @@ lyric checker {
     current_func_name: string
     iface_decls: Dict<Sym, InterfaceDecl>  // for checkImplements
     type_var_methods: Dict<Sym, Dict<Sym, Type>>?  // type var name → (method name → method type)
+    method_type_args: Dict<Sym, [TypeExpr]>  // "Type.method" → concrete type args for interface methods
   }
 
   func new_checker() -> Checker {
@@ -162,6 +163,7 @@ lyric checker {
       current_func_return: nil,
       current_func_name: "",
       iface_decls: Dict<Sym, InterfaceDecl>(),
+      method_type_args: Dict<Sym, [TypeExpr]>(),
     }
     c.register_builtins()
     return c
@@ -1468,8 +1470,36 @@ lyric checker {
 
           let ft = self.func_decl_to_type(f)
           let substituted = substitute_type(ft, subst)
-          cinfo!.methods.set(sym(fname), substituted)
-          self.scope.define(concrete_name + "." + fname, substituted)
+          // Strip resolved type params and store concrete type args for the call site
+          let mut final_type = substituted
+          match substituted.kind {
+            Func(sp, sr, stpn) => {
+              let mut remaining: [string] = []
+              for tpn in stpn {
+                if subst.get(sym(tpn)) == nil {
+                  append(remaining, tpn)
+                }
+              }
+              final_type = make_func_type(sp, sr, remaining)
+            }
+            _ => {}
+          }
+          // Build inferred_type_args from the original function's type params
+          let mut ta: [TypeExpr] = []
+          let orig_tps = f.fp_children()
+          for tp in orig_tps {
+            if tp.name != nil {
+              let tpname = sym_to_string(tp.name!)
+              let bound = subst.get(sym(tpname))
+              if bound != nil {
+                append(ta, type_to_type_expr(bound!.value))
+              }
+            }
+          }
+          let method_key = concrete_name + "." + fname
+          self.method_type_args.set(sym(method_key), ta)
+          cinfo!.methods.set(sym(fname), final_type)
+          self.scope.define(method_key, final_type)
         }
       }
     }
@@ -3532,6 +3562,13 @@ lyric checker {
                     }
                   }
                   call_expr.inferred_type_args = inferred_ta
+                }
+              } else {
+                // Check for pre-computed type args from interface method registration
+                let mta_key = tname + "." + method_str
+                let mta = self.method_type_args.get(sym(mta_key))
+                if mta != nil {
+                  call_expr.inferred_type_args = mta!.value
                 }
               }
               // Substitute params for argument checking
