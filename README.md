@@ -219,8 +219,11 @@ ok  github.com/waywardgeek/lyric/pkg/verifier     0.004s
 
 ## Documentation
 
-- [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language) — full type system, syntax, and examples
-- [Lyric-Driven Development](https://coderhapsody.ai/docs/lyric-driven-development) — the methodology
+- [The Lyric Book](https://coderhapsody.ai/docs/the-lyric-book) — a K&R-style guide to the language (15 chapters + appendices)
+- [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language-spec) — full type system, syntax, and semantics
+- [Lyric Language Reference](https://coderhapsody.ai/docs/lyric-language-reference) — quick reference card
+- [Understanding-Driven Development](https://coderhapsody.ai/docs/understanding-driven-development) — the methodology behind `.lyric` files
+- [Two Weeks](https://coderhapsody.ai/docs/two-weeks) — the story of how Lyric was built in 14 days
 
 ---
 
