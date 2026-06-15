@@ -402,6 +402,20 @@ func TestStructLiteralBadField(t *testing.T) {
 	expectErrors(t, c, 1) // no field Z
 }
 
+func TestExternalQualifiedStructLiteral(t *testing.T) {
+	c := parseAndCheck(t, `forge test {
+		import sync from "sync"
+
+		func test() {
+			let mut mu = sync.Mutex{}
+			lock(mu) {
+				println("ok")
+			}
+		}
+	}`)
+	expectNoErrors(t, c)
+}
+
 func TestReturnTypeCheck(t *testing.T) {
 	c := parseAndCheck(t, `forge test {
 		func add(x: i32, y: i32) -> i32 {

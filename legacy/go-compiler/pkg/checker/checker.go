@@ -3993,6 +3993,7 @@ func (c *Checker) checkFuncBody(fn *ast.FuncDecl) {
 func (c *Checker) checkStructLit(expr *ast.Expr) *Type {
 	sl := expr.Data.(*ast.StructLitExpr)
 	info := c.registry.Lookup(sl.TypeName)
+	opaqueExternal := false
 	// If not found and contains a dot, try module-qualified lookup
 	if info == nil && strings.Contains(sl.TypeName, ".") {
 		parts := strings.SplitN(sl.TypeName, ".", 2)
@@ -4018,6 +4019,12 @@ func (c *Checker) checkStructLit(expr *ast.Expr) *Type {
 					}
 				}
 			}
+		} else if modType := c.scope.Lookup(modAlias); modType != nil && modType.Kind == TyModule && modType.Name != "" {
+			info = &TypeInfo{
+				Type:   &Type{Kind: TyStruct, Name: sl.TypeName},
+				Fields: make(map[string]*Type),
+			}
+			opaqueExternal = true
 		}
 	}
 	if info == nil {
@@ -4027,6 +4034,12 @@ func (c *Checker) checkStructLit(expr *ast.Expr) *Type {
 	if info.Type.Kind != TyStruct && info.Type.Kind != TyClass {
 		c.error(expr.Span, "%q is not a struct or class type", sl.TypeName)
 		return TypeError
+	}
+	if opaqueExternal {
+		for i := range sl.Fields {
+			c.checkExpr(&sl.Fields[i].Value)
+		}
+		return info.Type
 	}
 	// Resolve positional fields to named fields using FieldOrder
 	posIdx := 0
