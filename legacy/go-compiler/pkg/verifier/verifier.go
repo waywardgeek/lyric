@@ -39,10 +39,10 @@ func (s Severity) String() string {
 
 // Finding is a single drift report.
 type Finding struct {
-	Severity Severity
+	Severity  Severity
 	ForgeFile string
-	GoFile   string
-	Message  string
+	GoFile    string
+	Message   string
 }
 
 func (f Finding) String() string {
@@ -60,10 +60,10 @@ type Result struct {
 
 func (r *Result) add(sev Severity, forgeFile, goFile, msg string) {
 	r.Findings = append(r.Findings, Finding{
-		Severity: sev,
+		Severity:  sev,
 		ForgeFile: forgeFile,
-		GoFile:   goFile,
-		Message:  msg,
+		GoFile:    goFile,
+		Message:   msg,
 	})
 }
 
@@ -599,11 +599,7 @@ func forgeNameToGo(name string) string {
 }
 
 // typesMatch compares a forge type string against a Go type string.
-// Returns true if they match or if the forge type is "?" (unknown/unconvertible).
 func typesMatch(forgeStr, goStr string) bool {
-	if forgeStr == "?" || forgeStr == "" {
-		return true // can't compare, don't report false positive
-	}
 	if forgeStr == goStr {
 		return true
 	}
@@ -622,6 +618,25 @@ func typesMatch(forgeStr, goStr string) bool {
 		return true
 	}
 	return false
+}
+
+func typeComparisonUnavailable(forgeStr string) bool {
+	return forgeStr == "" || strings.Contains(forgeStr, "?")
+}
+
+func verifyTypeMatch(context, forgeStr, goStr, forgeFile, goFile string, result *Result) bool {
+	if typeComparisonUnavailable(forgeStr) {
+		result.add(Warning, forgeFile, goFile, fmt.Sprintf("%s: type comparison skipped: .forge type cannot be represented for comparison (.forge=%s, Go=%s)", context, displayType(forgeStr), goStr))
+		return true
+	}
+	return typesMatch(forgeStr, goStr)
+}
+
+func displayType(s string) string {
+	if s == "" {
+		return "<empty>"
+	}
+	return s
 }
 
 // stripPackagePrefix removes Go package qualifiers from a type string.
@@ -691,7 +706,7 @@ func verifyStruct(s forgeast.StructDecl, goInfo *goTypeInfo, forgeFile, goFile s
 			continue
 		}
 		forgeType := forgeTypeToGoString(forgeField.Type)
-		if !typesMatch(forgeType, goType) {
+		if !verifyTypeMatch(fmt.Sprintf("struct %s field %s", s.Name, forgeField.Name), forgeType, goType, forgeFile, goFile, result) {
 			result.add(Error, forgeFile, goFile, fmt.Sprintf("struct %s: field %s type mismatch: .forge=%s, Go=%s", s.Name, forgeField.Name, forgeType, goType))
 		}
 	}
@@ -728,7 +743,7 @@ func verifyClass(c forgeast.ClassDecl, goInfo *goTypeInfo, forgeFile, goFile str
 			continue
 		}
 		forgeType := forgeTypeToGoString(forgeField.Type)
-		if !typesMatch(forgeType, goType) {
+		if !verifyTypeMatch(fmt.Sprintf("class %s field %s", c.Name, forgeField.Name), forgeType, goType, forgeFile, goFile, result) {
 			result.add(Error, forgeFile, goFile, fmt.Sprintf("class %s: field %s type mismatch: .forge=%s, Go=%s", c.Name, forgeField.Name, forgeType, goType))
 		}
 	}
@@ -878,11 +893,11 @@ func verifyFuncSignature(context string, forgeFunc forgeast.FuncDecl, goFunc *go
 			if gi < len(goFunc.Params) {
 				forgeType := forgeTypeToGoString(forgeParam.Type)
 				goType := goFunc.Params[gi].Type
-				if !typesMatch(forgeType, goType) {
-					paramName := forgeParam.Name
-					if paramName == "" {
-						paramName = fmt.Sprintf("#%d", gi+1)
-					}
+				paramName := forgeParam.Name
+				if paramName == "" {
+					paramName = fmt.Sprintf("#%d", gi+1)
+				}
+				if !verifyTypeMatch(fmt.Sprintf("%s param %s", context, paramName), forgeType, goType, forgeFile, goFile, result) {
 					result.add(Error, forgeFile, goFile, fmt.Sprintf("%s: param %s type mismatch: .forge=%s, Go=%s", context, paramName, forgeType, goType))
 				}
 			}
@@ -911,7 +926,7 @@ func verifyFuncSignature(context string, forgeFunc forgeast.FuncDecl, goFunc *go
 	if forgeReturnCount != goReturnCount {
 		result.add(Error, forgeFile, goFile, fmt.Sprintf("%s: return count mismatch: .forge=%d, Go=%d", context, forgeReturnCount, goReturnCount))
 	} else if forgeReturnCount == 1 && goReturnCount == 1 {
-		if !typesMatch(forgeReturnStr, goFunc.Returns[0]) {
+		if !verifyTypeMatch(fmt.Sprintf("%s return", context), forgeReturnStr, goFunc.Returns[0], forgeFile, goFile, result) {
 			result.add(Error, forgeFile, goFile, fmt.Sprintf("%s: return type mismatch: .forge=%s, Go=%s", context, forgeReturnStr, goFunc.Returns[0]))
 		}
 	} else if forgeReturnCount > 1 && forgeFunc.ReturnType != nil && forgeFunc.ReturnType.Kind == forgeast.TypeTuple {
@@ -920,7 +935,7 @@ func verifyFuncSignature(context string, forgeFunc forgeast.FuncDecl, goFunc *go
 		for i, field := range tt.Fields {
 			if i < len(goFunc.Returns) {
 				forgeElemStr := forgeTypeToGoString(field.Type)
-				if !typesMatch(forgeElemStr, goFunc.Returns[i]) {
+				if !verifyTypeMatch(fmt.Sprintf("%s return #%d", context, i+1), forgeElemStr, goFunc.Returns[i], forgeFile, goFile, result) {
 					result.add(Error, forgeFile, goFile, fmt.Sprintf("%s: return #%d type mismatch: .forge=%s, Go=%s", context, i+1, forgeElemStr, goFunc.Returns[i]))
 				}
 			}
