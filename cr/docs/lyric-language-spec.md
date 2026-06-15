@@ -68,7 +68,7 @@ is selective.
 - `string`, `bool`
 - `T?` for optional values
 - `T | U` for typed unions
-- `[T]` for sequences, `map[K]V` for associative containers
+- `[T]` for sequences, `Dict<K,V>` for associative containers (stdlib, not built-in)
 - `enum`, `struct`, `class`
 - `relation` for ownership/reference structure, with `owns`/`refs`, labels, and hints
 
@@ -211,6 +211,7 @@ f32   f64   f128
 // Other primitives
 string    // UTF-8 text; indexing returns u8 (byte)
 bool      // true | false
+unit      // void/no-value type (for functions with no return value)
 
 // Platform-width integers (Go interop only)
 int   uint    // NOT part of the Lyric numeric tower
@@ -221,8 +222,8 @@ int   uint    // NOT part of the Lyric numeric tower
 **Character literals:** `'A'` → `u8` constant (value 65). Supports escape sequences:
 `\n`, `\r`, `\t`, `\\`, `\'`, `\"`, `\0`, `\x##` (hex byte).
 
-`null` is the nil literal for optional types. `let x = null` without a type annotation
-is a checker error; use `let x: T? = null`.
+`null` (or `nil` — both accepted) is the nil literal for optional types. `let x = null`
+without a type annotation is a checker error; use `let x: T? = null`.
 
 `error` is a built-in interface, not a primitive — see the Interfaces section.
 
@@ -231,44 +232,40 @@ is a checker error; use `let x: T? = null`.
 ## Composite Types
 
 ```
-T?            // optional: T or null
+T?            // optional: T or null (nil)
 T | U         // union: T or U (exhaustively typed)
 [T]           // slice of T (fat pointer: data + len + cap)
-map[K]V       // associative map from K to V
 (T, U)        // anonymous tuple (positional)
 (T, U, V)     // triple, etc.
-chan T         // CSP channel
+channel<T>    // CSP channel (created via make_channel<T>())
 fn(T, U) -> V // function type
 ```
 
 **String as byte slice:** `string` is `[u8]` internally. String indexing (`s[i]`)
-returns `u8`. C interop via `lyric_str_to_cstr()` null-terminates on demand.
+returns `u8`. String concatenation uses the `+` operator: `"hello" + " world"`.
+Slice concatenation also uses `+`: `[1,2] + [3,4]` returns `[1,2,3,4]`.
+In-place slice extension: `xs.extend(ys)`. C interop via `lyric_str_to_cstr()`
+null-terminates on demand.
 
-**Maps:** `map[K]V` is a built-in associative container. Keys must be comparable
-(primitives, `string`, `Sym`, structs with all-comparable fields). Maps are
-heap-allocated and passed by reference.
+**Maps:** Lyric does not have a built-in `map[K]V` type. Use `Dict<K,V>` from the
+standard library, which provides a generic hash table with `Hashable` key constraint.
+See the Standard Library Reference section for the Dict API.
+
+**Tuples:** Anonymous tuples `(T, U)` are positional. Access fields with `._0`, `._1`
+notation (underscore-prefixed indices):
 
 ```lyric
-let empty: map[string]i32 = {:}
-let keywords = {"if": TIf, "else": TElse, "for": TFor}
-let mixed = {"name": "lyric", "version": "0.1"}
+let t = (42, "hello")
+println(t._0)    // 42
+println(t._1)    // "hello"
+
+let (a, b) = make_pair()   // destructuring also works
 ```
 
-**Map operations:**
-```lyric
-m[key]              // lookup — returns V? (null if key absent)
-m[key] = value      // insert or update
-delete(m, key)      // remove key
-len(m)              // number of entries
-for key, value in m { ... }   // iteration (unordered)
-```
-
-**Tuples:** Anonymous tuples `(T, U)` are positional. Access fields with `.0`, `.1`
-notation (not yet implemented — use destructuring `let (a, b) = expr`).
-
-**Function type syntax:** `fn(T, U) -> V` is the canonical form. `func` is the
-keyword for function declarations; `fn` is for type syntax only. `fn` is a contextual
-keyword and can be used as a variable name.
+**Function type syntax:** `fn(T, U) -> V` is the canonical form for type syntax.
+`func(T, U) -> V` is also accepted in parameter type positions. `func` is the
+keyword for function declarations; `fn` is preferred for type syntax. Both `fn`
+and `func` can be used as contextual keywords in type positions.
 
 ---
 
@@ -402,9 +399,18 @@ The lowerer passes `fn.ReceiverType`; the checker defines `self` in scope.
 
 ### Lambdas
 
+Two syntactic forms:
+
 ```lyric
+// Paren-style (Kotlin/Swift-like)
 let double = (x: i32) -> i32 { return x * 2 }
-let greet = (name: string) -> string { return "hello " + name }
+
+// Pipe-style (Rust-like)
+let triple = |x: i32| -> i32 { x * 3 }
+
+// Higher-order usage
+let result = apply(7, |x: i32| -> i32 { x + 3 })
+let doubled = transform(nums, |x: i32| -> string { f"n={x}" })
 ```
 
 Lambda parameters must have explicit types. Lambdas capture variables from their
@@ -631,8 +637,17 @@ Execution order on `.destroy()`: `final` → auto-destructor (cascade + unlink) 
 ### No Inheritance
 
 Lyric does not support classical inheritance. Subtype relationships are expressed
-through interface satisfaction only. Shared behavior belongs in interfaces or
-in separate classes held as dependencies.
+through interface satisfaction. Classes can declare `implements` to signal intent:
+
+```lyric
+class Task implements Displayable, Prioritizable {
+    // ...
+}
+```
+
+The `implements` declaration is checked by the compiler — all required methods
+must be present. Shared behavior belongs in interfaces or in separate classes
+held as dependencies.
 
 ---
 
@@ -845,7 +860,7 @@ if cond { ... } else if cond2 { ... } else { ... }
 while cond { ... }
 
 for item in collection { ... }
-for item, idx in collection { ... }
+for item, idx in collection { ... }    // idx is the 0-based index
 
 match expr {
     Pattern => { ... }
@@ -904,8 +919,8 @@ if expr.kind is ExprCall {
     // expr.kind is the Call variant
 }
 
-// Negation
-if not (node is Leaf) { ... }
+// Negation — use ! operator (no `not` keyword)
+if !(node is Leaf) { ... }
 ```
 
 `is` returns `bool`. It does not bind any variables — use `if let` for
@@ -1042,18 +1057,34 @@ let sql = """
 
 ---
 
-## Concurrency (Go Backend)
+## Concurrency
 
 ```lyric
-spawn { ... }                          // goroutine
-let ch: chan i32 = make_chan()          // channel
-ch <- value                            // send
-let v = <- ch                          // receive
-select {                               // multiplex
-    case v = <- ch => { ... }
+spawn { ... }                               // goroutine
+let ch = make_channel<i32>(10)              // buffered channel
+let ch2 = make_channel<bool>()              // unbuffered channel
+ch.send(value)                              // send
+let v = ch.receive()                        // receive
+ch.close()                                  // close channel
+select {                                    // multiplex
+    case v = ch.receive() => { ... }
+    case ch2.send(true) => { ... }
     default => { ... }
 }
-lock(mutex) { ... }                    // scoped mutex
+lock(mutex) { ... }                         // scoped mutex
+```
+
+**Channel type:** `channel<T>` is the generic channel type. Created via `make_channel<T>()`
+(unbuffered) or `make_channel<T>(capacity)` (buffered). Operations use method syntax:
+`.send(value)`, `.receive() -> T`, `.close()`.
+
+**Lock type:** `Lock` is the mutex type. Used with the `lock(mu) { ... }` statement
+for scoped locking:
+```lyric
+let mut mu: Lock
+lock(mu) {
+    // critical section — mu auto-unlocked at block exit
+}
 ```
 
 **C backend:** Channels use pthreads macros (`LYRIC_CHAN_DEF/IMPL`), spawn uses
@@ -1080,6 +1111,13 @@ for val in range(0, 10) {
 **Go backend:** goroutine + channel. `for..in` desugars to poll loop.
 **C backend:** Duff's device state machine with `_init/_next/_free`.
 
+The stdlib provides `range(start, end) -> gen i32` for common iteration:
+```lyric
+for i in range(0, 10) {
+    println(i)
+}
+```
+
 ---
 
 ## Built-in Functions
@@ -1090,17 +1128,17 @@ for val in range(0, 10) {
 | `print(...)` | `any... -> unit` | Print without newline |
 | `eprintln(...)` | `any... -> unit` | Print to stderr with newline |
 | `eprint(...)` | `any... -> unit` | Print to stderr |
-| `len(x)` | `[T] \| string \| map[K]V -> i32` | Length / entry count |
-| `append(xs, elem)` | `([T], T) -> [T]` | Append element |
-| `delete(m, key)` | `(map[K]V, K) -> unit` | Remove map entry |
+| `len(x)` | `[T] \| string -> i32` | Length |
+| `append(xs, elem)` | `([T], T) -> [T]` | Append element (returns new slice) |
 | `isnull(x)` | `T? -> bool` | Check if optional is null |
 | `hash_string(s)` | `string -> u64` | FNV-1a hash |
-| `itoa(n)` | `int -> string` | Integer to string |
+| `itoa(n)` | `i32 -> string` | Integer to string |
 | `atoi(s)` | `string -> (i64, bool)` | String to integer |
 | `char_to_string(b)` | `u8 -> string` | Byte to string |
 | `assert(cond, msg)` | `(bool, string) -> unit` | Fail test if false (see [Testing](#testing)) |
-| `assert_eq(a, b, msg)` | `(T, T, string) -> unit` | Fail test if not equal (see [Testing](#testing)) |
-| `push_bytes(slice, bytes)` | `([u8], [u8]) -> [u8]` | Append byte slice to byte slice (avoids byte-by-byte append) |
+| `assert_eq(a, b, msg?)` | `(T, T, string?) -> unit` | Fail test if not equal; message optional (see [Testing](#testing)) |
+| `make_channel<T>()` | `-> channel<T>` | Create unbuffered channel |
+| `make_channel<T>(n)` | `i32 -> channel<T>` | Create buffered channel |
 
 ### IO/OS Built-ins
 
@@ -1127,9 +1165,9 @@ for val in range(0, 10) {
 `s.replace(old, new)`, `s.split(sep)`, `s.index_of(sub)`, `s.repeat(n)`.
 
 **List methods:** `xs.len()`, `xs.push(item)`, `xs.pop()`, `xs.contains(item)`,
-`xs.reverse()`, `xs.join(sep)`.
+`xs.reverse()`, `xs.join(sep)`, `xs.extend(other)`.
 
-**Map methods:** `m.len()`, `m.contains_key(k)`, `m.keys()`, `m.values()`.
+**Channel methods:** `ch.send(value)`, `ch.receive() -> T`, `ch.close()`.
 
 ---
 
@@ -1179,14 +1217,14 @@ FAIL  test_lexer_basic
     lexer should produce at least one token
 ```
 
-#### `assert_eq(actual: T, expected: T, message: string)`
+#### `assert_eq(actual: T, expected: T, message?: string)`
 
-If `actual != expected`, prints the failure message along with both values, then terminates the test:
+If `actual != expected`, prints the failure message along with both values, then terminates the test. The `message` parameter is optional:
 
 ```lyric
 assert_eq(tok.kind, TLet, "first token kind")
 assert_eq(result.name, "main", "parsed function name")
-assert_eq(count, 42, "element count")
+assert_eq(count, 42)    // message omitted — still prints expected/got values
 ```
 
 Output on failure:
@@ -1270,16 +1308,18 @@ The testing system can grow, but the baseline is intentionally small. Two builti
 
 ---
 
-- **`Sym`** — interned symbol wrapping string + hash. Create via `sym("name")`.
+- **`Sym`** — interned symbol wrapping string + hash. Create via `sym("name")` or
+  backtick syntax `` `name` `` (desugared to `sym("name")` at parse time).
   Methods: `get_name() -> string`, `get_hash() -> u64`. Hash once, compare by
-  integer ("integer war" — avoid repeated string hashing).
+  integer ("integer war" — avoid repeated string hashing). Implements `Hashable`.
 - **`Error`** — standard error class. `message() -> string`.
   Create via `Error { msg: "..." }`.
 - **`StringBuilder`** — mutable string builder. `write(s)`, `write_byte(b)`,
   `to_string()`, `len()`. Create via `new_string_builder()`.
-- **`Dict<V>`** — generic string-keyed hash table using Sym keys and HashedList.
-  API: `dict_new()`, `dict_set(d, key, value)`, `dict_get(d, key)`,
-  `dict_has(d, key)`, `dict_remove(d, key)`.
+- **`Dict<K,V>`** — generic hash table where K implements `Hashable`. Constructor:
+  `Dict<K,V>()`. Method API: `.set(key, value)`, `.get(key) -> DictEntry<K,V>?`,
+  `.has(key) -> bool`, `.remove(key) -> bool`, `.keys() -> [K]`, `.len() -> i32`.
+  Most common instantiation: `Dict<Sym, V>` (string-keyed via Sym).
 
 ---
 
@@ -1297,9 +1337,8 @@ The testing system can grow, but the baseline is intentionally small. Two builti
 
 ## The .lyric File Layer
 
-`.lyric` files use Lyric syntax with one additional top-level construct: the
-`lyric` block. Everything inside is valid Lyric plus declarations specific to
-the design artifact.
+`.lyric` files use Lyric syntax with additional design-specific declarations
+(`why:`, `doc`, `invariant:`, etc.).
 
 ### The `lyric` Block
 
@@ -1309,8 +1348,12 @@ lyric ModuleName {
 }
 ```
 
-Each `.lyric` file has one `lyric` block. `.ly` files also use `lyric` blocks
-(one or more per file).
+The `lyric` block wrapper is **optional** in both `.lyric` and `.ly` files.
+When present, it provides a logical grouping name. When absent, bare top-level
+declarations are valid — the package name comes from the directory name.
+`.lyric` files traditionally use the block for clarity; `.ly` files increasingly
+use bare declarations.
+
 
 ### `why:` — One-Line Purpose
 
@@ -1392,7 +1435,8 @@ the `lyric update` tool.
 The following keywords are **contextual** — they lex as identifiers and are only
 interpreted as keywords in specific parser contexts:
 
-`doc`, `why`, `source`, `fake`, `field`, `lock`, `implements`, `fn`
+`doc`, `why`, `source`, `fake`, `field`, `lock`, `implements`, `fn`, `from`, `in`,
+`as`, `is`
 
 They CAN be used as variable names, field names, or function names:
 ```lyric
@@ -1410,13 +1454,29 @@ NO keyword rewrite — expressions always see identifiers.
 
 ### File Structure
 
+Top-level declarations can appear bare or inside a `lyric` block:
+
 ```lyric
-lyric BlockName {
-    // types, functions, relations, impls, constants
+// Bare declarations (preferred for .ly files)
+func main() {
+    println("hello")
+}
+
+struct Point { x: f64, y: f64 }
+```
+
+```lyric
+// Wrapped in lyric block (optional — provides logical grouping)
+lyric MyModule {
+    func main() {
+        println("hello")
+    }
 }
 ```
 
-The `lyric` wrapper is **optional**. Bare `.ly` files with top-level declarations are valid — the package name comes from the directory name (see Modules and Packages).
+The `lyric` wrapper is **optional**. When absent, the parser creates an implicit
+block with a name derived from the filename. The package name always comes from
+the directory name (see Modules and Packages), not from the block name.
 
 **Newlines**: Newlines are statement terminators. Inside `()` and `[]` brackets, newlines are treated as whitespace, enabling multi-line function calls, list literals, and tuple expressions. `{}` braces do NOT suppress newlines (they delimit statement blocks).
 
@@ -1448,7 +1508,9 @@ Parse → ResolveImports → MergeStdlib → DesugarAll → Check → Lower → 
 
 ### Go Backend
 
-Deleted. The C backend is the sole backend.
+Deleted (commit 8221e5a). The C backend is the sole backend. The Go backend was
+used during initial development and retired when the bootstrap compiler became
+self-hosting.
 
 ### C Backend
 
@@ -1479,12 +1541,18 @@ specialized bodies for transitive instantiations.
 - **Struct literal ambiguity** — `Ident {` is ambiguous between struct literal
   and variable + block in statement context. Parser uses `exprDepth` counter:
   inside parens/brackets/arg lists (`exprDepth > 0`), always struct literal.
-  At statement level, uses `isStructLitAhead()` lookahead.
-- **`append` vs `array_append`** — `append(slice, item)` for plain slices;
-  `array_append<P,C>(parent, child)` for relation-owned lists.
+  At statement level, uses `isStructLitAhead()` lookahead. Additionally,
+  `for`/`while`/`if`/`match` use a `noStructLit` flag to suppress struct literal
+  parsing in conditions (Rust approach).
+- **`append` vs `array_append`** — `append(slice, item)` or `slice.push(item)`
+  for plain slices; `array_append<P,C>(parent, child)` for relation-owned lists.
+- **`nil` and `null` are synonyms** — both accepted as the null literal. Convention:
+  use `null` in new code.
+- **Number literal underscores** — `1_000_000` is valid; underscores are silently
+  stripped by the lexer.
+- **Platform `int`/`uint`** — only for Go interop, not part of numeric tower.
 - **`lyric fmt` bug** — keywords inside string literals tokenized as keywords.
   Fix planned.
-- **Platform `int`/`uint`** — only for Go interop, not part of numeric tower.
 
 ---
 
@@ -1539,7 +1607,7 @@ This single line:
 - Generates cascade destructor: destroying a Team destroys all its Players
 - Generates child destructor: destroying a Player removes it from its Team
 
-No manual destructor code. No lyrictting to clean up. No use-after-free from
+No manual destructor code. No forgetting to clean up. No use-after-free from
 stale pointers — the relation system manages the back-pointers.
 
 The `owns` vs `refs` distinction makes lifetime semantics explicit:

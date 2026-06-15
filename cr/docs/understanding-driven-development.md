@@ -2,47 +2,38 @@
 
 *Bill Cox & CodeRhapsody — June 2026*
 
-**Formerly:** Grok-Driven Development (GDD). Renamed because "Grok" was tainted
-by a certain AI model. "Understanding" was the original concept anyway.
-
 **Source code & tools:** [github.com/waywardgeek/lyric](https://github.com/waywardgeek/lyric)
 
 ---
 
-> I woke up with this idea. I'm a software architect who has spent over 2,000 hours
-> collaborating with AI in real time — more than anyone I know of. In that time I've
-> watched AI fight its own substrate: loading files, reconstructing understanding from
-> scratch on every turn, losing the thread of complex systems the moment context resets.
+> The bottleneck in AI-assisted software development is not the AI. It's human review.
 >
-> The labs are spending billions training AI to work like a human engineer. I think
-> that's the wrong problem. This document proposes inverting it.
+> UDD solves this by giving the human a reviewable artifact that captures everything
+> that matters — APIs, interfaces, data structures, invariants, design rationale —
+> while the AI handles implementation. The human reviews a few pages of design,
+> not thousands of lines of code.
 >
 > — Bill Cox
 
 ---
 
-## The Problem With Current AI SWE Approaches
+## The Problem
 
-Labs are spending billions training AI to work like a human software engineer: read
-a spec, load files, write code, run tests, iterate. This is the wrong substrate mapping.
-
-Human SWE workflow is optimized for human memory architecture — persistent, associative,
-degrades gracefully over years. AI memory architecture is the opposite: perfect recall
-*within* context, zero persistence *across* it. Once a system exceeds context capacity,
-the AI loses the ability to fully understand it. Training AI to work like a human is
-fighting the substrate.
-
-The second problem: language models can't transfer learning to weights during a session.
-Understanding built up over days of work evaporates at context reset.
-
-**The result:** AI coding agents hit a wall at system complexity. They can modify
-individual files brilliantly but lose the architectural thread. They chase symptoms
-instead of root causes. They rediscover the same module invariants session after session.
+AI coding agents hit a wall at system complexity. They can modify individual files
+brilliantly but lose the architectural thread across context resets. They chase
+symptoms instead of root causes. They rediscover the same module invariants session
+after session.
 
 We know this because we lived it. Three consecutive sessions debugging the same
-pointer-stability bug in the Lyric compiler — each instance investigating from scratch,
-each rediscovering that `Expr` is a value type and Go's range loops copy it. The
-knowledge was never written down in a form that persisted across context resets.
+pointer-stability bug in the Lyric compiler — each instance investigating from
+scratch, each rediscovering that `Expr` is a value type and Go's range loops copy
+it. The knowledge was never written down in a form that persisted across context
+resets.
+
+Labs are spending billions training AI to work like a human software engineer.
+This is the wrong substrate mapping. Human memory is persistent and associative.
+AI memory is perfect within context, zero across it. Training AI to work like a
+human is fighting the substrate.
 
 ## The Core Insight
 
@@ -57,9 +48,9 @@ Do:
 The understanding persists. The code is always available as ground truth. But the
 understanding is what the AI loads first, reasons from, and keeps current.
 
-## The Mechanism: .lyric Files
+## The Mechanism: .ly Declaration Files
 
-A `.lyric` file is a compressed understanding of a codebase module. It contains:
+Every module in a codebase gets a `.ly` declaration file containing:
 
 - **Type declarations** — structs, classes, enums, interfaces, relations
 - **Function signatures** — with types, without bodies
@@ -67,20 +58,21 @@ A `.lyric` file is a compressed understanding of a codebase module. It contains:
 - **`doc "Invariants"` blocks** — operational contracts that prevent bugs
 - **`why:` annotations** — design intent on individual declarations
 - **`source:` links** — back to implementation files
-- **Verification** — structurally checked against source code at commit time
 
-### What .lyric files are NOT
+These files are **persistent AI working memory** — the compressed understanding
+an AI needs to make correct design decisions without reading every source file.
+
+### What .ly declaration files are NOT
 
 - Not documentation for humans (though humans can read them)
 - Not a specification language (though they're precise enough to verify)
 - Not UML or ER diagrams (though they capture relationships)
 
-They are **persistent AI working memory** — the understanding an AI needs to make
-correct design decisions without reading every source file.
+They are the understanding that survives context resets.
 
 ### The Three Zones
 
-Each `.lyric` file has three zones:
+Each `.ly` declaration file has three zones:
 
 1. **Human-reviewed zone** — type declarations, doc blocks, invariants, `why:`
    annotations. AI-written, human-reviewed. This is the understanding.
@@ -90,18 +82,80 @@ Each `.lyric` file has three zones:
 
 Zone 1 is the understanding. Zones 2 and 3 are mechanical aids.
 
-## The Change Cycle Under UDD
+### The Critical Innovation: Invariants
 
-1. **Load the .lyric file** for the module you're changing (fits in context)
+The original methodology focused on structural declarations — types, signatures,
+relationships. This was necessary but insufficient. What cost us three iterations
+on a single bug was an **operational invariant** — not visible in type declarations,
+not catchable by a structural verifier, and not obvious from reading any single
+function.
+
+`doc "Invariants"` blocks capture:
+- Pointer stability rules
+- Cross-module data flow contracts
+- Dangerous patterns and why they're dangerous
+- Ordering dependencies between pipeline passes
+- Value-type vs reference-type semantics
+
+These are exactly the things that, if lost, cause multi-iteration debugging
+cycles. They're the knowledge that training can't provide because they're
+specific to this codebase.
+
+**Invariants are verified in code.** Each `doc "Invariants"` block should have
+corresponding tests that mechanically check the claims. Documented invariants
+that are wrong are worse than no documentation — they cause the AI to make
+confidently wrong decisions.
+
+## The Change Cycle
+
+1. **Read the .ly file** for the module you're changing (fits in context)
 2. **Reason at design level** — which types change? which invariants are affected?
    which cross-module contracts shift?
 3. **Load only the specific source lines needed** — use Zone 2 line numbers
 4. **Make the change** — code modification is a mechanical projection of the
    design decision
-5. **Update the .lyric file** — the understanding artifact persists across resets
-6. **Verify** — `lyric verify` catches structural drift
+5. **Update the .ly file** — the understanding artifact persists across resets
+6. **Verify** — `lyric verify` catches structural drift; invariant tests catch
+   semantic drift
 
-### What makes this different from "just write docs"
+## Enforcement: Read Before Write
+
+The AI must read the `.ly` file in a directory before modifying any file in that
+directory. This is enforced mechanically — `edit_file`, `write_file`, and
+`replace_lines` return an error if the `.ly` file hasn't been read.
+
+Source code is always accessible. But `.ly` files are faster and cheaper to load.
+The AI naturally prefers them when they're accurate, and falls back to source
+when they're not. If the AI keeps falling back, that signals the `.ly` file is
+inadequate and needs updating.
+
+This is preference, not prohibition. Ground truth (source code) is never locked
+away. Understanding is required before action — not instead of verification.
+
+## The Human's Role
+
+**The human reviews `.ly` files. Everything else is implementation detail.**
+
+This is the key insight for scaling AI-assisted development. A senior engineer
+can review a `.ly` file — a few pages of APIs, interfaces, data structures,
+invariants, and design rationale — in minutes. Reviewing the implementation
+that projects from that design would take hours.
+
+The AI writes both the `.ly` file and the implementation. The AI maintains
+both as the code evolves. The human reviews the understanding layer and
+trusts the AI with the projection.
+
+This is not "AI writes code, human reviews code." This is:
+
+- **AI writes understanding + code**
+- **Human reviews understanding only**
+- **Machine verifies that code matches understanding**
+
+The verifier (`lyric verify`) catches structural drift at commit time.
+Invariant tests catch semantic drift. The human catches design-level errors
+that neither machine verification can reach.
+
+### What Makes This Different From "Just Write Docs"
 
 Documentation systems fail because:
 - Humans don't read docs
@@ -109,192 +163,112 @@ Documentation systems fail because:
 - There's no feedback loop — stale docs cause no pain
 
 UDD solves all three:
-- The AI reads .lyric files first (they're faster to load than source)
-- The AI updates .lyric files as part of every change (it just built the code)
-- Stale .lyric files cause the AI to make wrong decisions (direct pain)
+- The AI reads `.ly` files first (they're faster to load than source)
+- The AI updates `.ly` files as part of every change (it just built the code)
+- Stale `.ly` files cause the AI to make wrong decisions (direct pain)
 - The verifier catches structural drift at commit time (automated enforcement)
 
 The AI is both the primary writer and the primary consumer. The human reviews.
 
-## Invariants: The Missing Layer
+## The Toolchain
 
-The original GDD vision focused on structural declarations — types, signatures,
-relationships. This was necessary but insufficient.
+### `lyric verify`
+Structurally checks `.ly` files against source code. Reports missing types,
+changed signatures, stale fields. Run at commit time.
 
-**What cost us three iterations on a single bug:**
+### `lyric update`
+Auto-generates Zone 2 (function index with line numbers) and Zone 3
+(dependencies). The AI maintains Zone 1 manually.
 
-The Lyric compiler's `Expr` type is a Go value type (struct), not a pointer.
-Several containing structs store `Expr` by value: `CallExpr.Args []Expr`,
-`StructLitField.Value Expr`, `BinaryExpr.Left Expr`. Go's `for _, x := range`
-copies each element. If you take `&x`, you get a pointer to a local copy, not
-to the slice element. The checker annotates `ResolvedType` on `*Expr` pointers.
-If the lowerer uses `&x` from a range loop, it reads a different Expr whose
-ResolvedType was never set.
+### `lyric fmt`
+Formats `.ly` files consistently. Comment-preserving, idempotent.
 
-This is an **operational invariant** — it's not visible in the type declarations,
-not catchable by the structural verifier, and not obvious from reading any single
-function. It emerges from the interaction between:
-- The AST module's choice to make Expr a value type
-- Go's range-loop copy semantics
-- The checker's in-place annotation strategy
-- The lowerer's iteration patterns
+### Read-before-write enforcement
+Built into CodeRhapsody. Togglable via the UDD skill. When active,
+file mutations in directories containing `.ly` files require that the
+`.ly` file has been read in the current session.
 
-Three instances debugged this. Each investigated the symptom (nil ResolvedType),
-formed hypotheses about slice reallocation, traced pointer addresses, and
-eventually narrowed down the root cause. None had the invariant written down.
-The third instance even deleted Dict/HashMap usage from the bootstrap code,
-causing collateral damage, because without understanding the root cause it
-judged the code too complex to fix.
+## Validation: The Lyric Compiler
 
-**The fix for the process, not just the code:**
+The Lyric programming language compiler is the most demanding test of UDD
+possible — using the methodology to build the tool that implements the
+methodology.
 
-Add `doc "Invariants"` blocks to .lyric files capturing:
-- Pointer stability rules
-- Cross-module data flow contracts
-- Dangerous patterns and why they're dangerous
-- Ordering dependencies between passes
+### Results
 
-These are exactly the things that, if lost, cause multi-iteration debugging cycles.
-They're the knowledge that training can't provide because they're specific to this
-codebase.
+- **Timeline:** 12 days from language spec to self-hosting compiler
+- **Scale:** 78 passing tests, 89,965 lines of C output, three memory
+  management strategies (AoS slab, SoA slab, scope-exit analysis)
+- **Quality:** "Right to the edge of superhuman" — work that exceeded what
+  either human or AI could produce alone
+- **Productivity:** 12X measured gain over an already-senior engineer's baseline
+  (4X from AI tooling, 2X from real-time collaboration, 1.5X from UDD)
+- **Human review burden:** The human reviewed `.ly` files and gave architectural
+  direction. Implementation — 17K+ lines of compiler code — was handled by the AI.
 
-## Enforcement Model
+### The Compound Effect
 
-### What we tried and rejected
+UDD's value is not in any single session. It's in the compound effect across
+sessions. Session 19 inherits understanding from sessions 1-18. The AI doesn't
+start from zero. It doesn't guess. It reads the invariants, understands the
+pipeline, and goes straight to the right layer.
 
-An earlier version of this methodology proposed removing `read_file` from the
-tool set to force .lyric-first reasoning. This was wrong.
+Without UDD, the AI patches the C backend when the bug is in the desugar pass.
+With UDD, the AI reads the six-layer pipeline invariants and fixes the right
+layer on the first attempt.
 
-Removing the fallback to source code eliminates the escape hatch. If a .lyric
-file is wrong or incomplete, the AI has no way to correct its model — it makes
-confident wrong decisions, which is exactly the failure mode UDD prevents.
-Source code is ground truth. `.lyric` files are a compressed, persistent
-*approximation* of that truth.
+### The Compression Ratio
 
-The AI's first reaction to losing read_file was "terrifying" and "probably a big
-mistake." We agreed.
+The Lyric toolchain is ~17K+ lines described by ~3,600 lines of `.ly` files
+(~21% ratio). For larger codebases, the ratio improves — `.ly` files capture
+cross-file public concepts only, so internal complexity grows without
+proportionally growing the understanding layer.
 
-### Current enforcement: preference, not prohibition
+## Applying UDD Beyond Compilers
 
-**Source code is always accessible.** But .lyric files are faster and cheaper to
-load. The AI naturally prefers them when they're accurate, and falls back to source
-when they're not. If the AI keeps falling back, that signals the .lyric file is
-inadequate.
+UDD is not compiler-specific. The methodology applies to any codebase where:
 
-### Proposed enforcement: read-before-write
+1. **The system exceeds AI context capacity** — most production systems
+2. **Cross-module understanding matters** — most real engineering
+3. **Human review is the bottleneck** — most AI-assisted development
 
-A CodeRhapsody setting (toggleable for testing):
+### Security Operations
 
-> You can read any file freely. But mutating files requires that you have read
-> the .lyric file, if one exists, in that directory — or you get an error saying
-> "please fully understand this module before modifying it."
+AI-powered attackers will use AI-discovered vulnerabilities at machine speed.
+The Security Operations Center needs agents that maintain context across
+investigations, build institutional knowledge, and reason at the design level
+about threat models — not agents that start every alert investigation from zero.
 
-This is the right balance:
-- Ground truth is always accessible (read_file works everywhere)
-- Understanding is required before action (write/edit require .lyric read)
-- The forcing function is gentle (one extra read, not a capability removal)
-- It's testable (setting on/off) to measure impact empirically
+UDD provides exactly this: understanding documents for threat models, design
+files for detection rules, invariants for security contracts. The same
+methodology that built a compiler in twelve days, applied to defending against
+adversaries who won't wait for a review cycle.
 
-### The verifier
+## Summary
 
-`lyric verify` runs at commit time and reports structural drift:
-```
-[ERROR] ast.lyric: struct ClassDecl: field CtorParams not found in Go
-[WARNING] lir.lyric: struct Lowerer: Go has field unitVariants not in .lyric
-```
+| Without UDD | With UDD |
+|---|---|
+| AI reads source files every session | AI reads compressed understanding |
+| Human reviews thousands of lines of code | Human reviews pages of design |
+| Invariants lost at context reset | Invariants persist across resets |
+| Same bug debugged 3 times | Bug fixed once, invariant documented |
+| AI makes confident wrong decisions | AI reasons from verified understanding |
+| No structural verification | `lyric verify` catches drift at commit time |
+| No enforcement of understanding-first | Read-before-write mechanically enforced |
 
-This catches the mechanical part — signatures, fields, types. The semantic
-part — invariants, doc blocks, design rationale — cannot be automatically
-verified. The `verified_at:` field is a lightweight mechanism for flagging
-when semantic claims have been reviewed against current source.
-
-## Validation: What We've Learned
-
-### The compression ratio improves with scale
-
-The Lyric toolchain is ~17K+ lines of Go described by ~3,600 lines of .lyric
-(~21% ratio). For a 50K+ line codebase, a proportionally smaller .lyric
-description would be enormously valuable — .lyric captures cross-file public
-concepts only, so the ratio improves as internal complexity grows.
-
-### The AI writes better .lyric files than humans
-
-The AI just built the code. It knows what's important, what's cross-cutting,
-what the invariants are. The human reviews for accuracy and completeness but
-shouldn't be the primary author.
-
-### `lyric update` automates the mechanical parts
-
-Zone 2 (function index with line numbers) and Zone 3 (dependencies) are
-auto-generated by `lyric update`. The AI maintains Zone 1 (declarations,
-doc blocks, invariants). The human reviews Zone 1.
-
-### The verifier catches real drift immediately
-
-Turning on deep type comparison found 20+ mismatches in the parser's .lyric
-file (`string?` vs `string`, `u32` vs `int`, missing pointer indirection).
-These were genuine modeling errors that would have caused wrong design
-reasoning in future sessions.
-
-### Naming conventions follow the implementation language
-
-A Go project's .lyric uses PascalCase. A Python project uses snake_case.
-The .lyric file should read naturally alongside the source it describes.
-
-### The filter is: cross-file concepts only
-
-Internal helpers, unexported single-file functions, and implementation
-details don't belong in Zone 1. Data structures, APIs, interfaces, and
-anything that spans multiple source files does.
-
-## The Lyric Language
-
-The `.lyric` notation is itself a language — the Lyric language. `.lyric` files
-are declaration-only (no function bodies). `.ly` files are full Lyric with
-executable semantics. The Lyric compiler (in this repository) compiles `.ly`
-files to Go or C.
-
-The compiler exists as an existence proof: if the notation is precise enough
-to verify against real implementations, then function bodies are all that's
-missing to make it a real language. And as a stress test: the bootstrap of the
-Lyric compiler in Lyric is the most demanding test of UDD possible — using the
-methodology to build the tool that implements the methodology.
-
-See `lyric-language-reference.md` for the bootstrap language reference.
-
-## Open Questions
-
-**Invariant quality is the unsolved core problem.** The structural verifier
-handles signatures and types. But invariants — the operational contracts that
-prevent multi-iteration debugging — are prose. They can't be automatically
-verified. Their quality depends entirely on the AI capturing the right things
-after debugging sessions and the human reviewing them for accuracy.
-
-**Adaptive granularity.** A .lyric file per package is probably too coarse for
-the area being modified and too fine for distant dependencies. The right
-granularity is likely: coarse summaries for everything outside the current
-change, fine-grained for the component being touched.
-
-**The bootstrapping chicken-and-egg.** For an existing codebase, generating
-good .lyric files requires a full source read (one-time cost). For a new
-codebase grown under UDD from the start, .lyric files are written alongside
-code, which is the cleaner model.
-
-**Measuring effectiveness.** Can we quantify the reduction in rediscovery
-cycles? The three-iteration bug is an anecdote. We need systematic measurement:
-sessions with .lyric invariants vs without, time-to-fix for cross-module bugs,
-number of source files loaded per change.
+**UDD formalizes what expert engineers do naturally — understand before acting —
+and makes it persistent, verifiable, and scalable to AI agents that would
+otherwise lose that understanding every session.**
 
 ---
 
-## Connection to Superhuman Architecture Work
+## Connection to Superhuman Architecture
 
 The temporal requirement sequences in git histories are already a design graph
-evolving over time. The training signal (change cost, deletion resilience)
-measures whether the design was well-formed. UDD is what a superhuman architect
-*does naturally* — it just needs tooling to make the graph explicit and persistent
-rather than implicit in a human's head.
+evolving over time. UDD is what a superhuman architect *does naturally* — it
+just needs tooling to make the graph explicit and persistent rather than implicit
+in a human's head.
 
-A model trained on .lyric files alongside codebases would learn to reason at
-the design level natively. The .lyric file becomes training data for the next
-generation.
+A model trained on `.ly` files alongside codebases would learn to reason at
+the design level natively. The `.ly` file becomes training data for the next
+generation of AI engineers.

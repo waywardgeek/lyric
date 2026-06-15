@@ -106,6 +106,9 @@ AST/LIR/C backend support exists for spawn/channels/select/lock. Needs hardening
 - [ ] External methods not registered in global scope
 - [ ] `LTyError` → `const char*` wrong (should be `lyric_string`)
 - [ ] Several bootstrap TODOs in checker/parser (see `grep TODO src/`)
+- [ ] **Selective stdlib merge misses class literals in function bodies** — `ast_collect_used_type_names` only walks type annotations, not expression bodies. `Error { msg: "..." }` or `StringBuilder {}` in function bodies never get pulled from stdlib. Fix: add `type_name` to collected names in StructLit arm of `ast_collect_call_names_expr`. (Found 2026-06-14 via book verification)
+- [ ] **Lock field emits incompatible C** — `pthread_mutex_t` struct assigned from `void*` in generated C. Any class with a `Lock` field fails at GCC stage. (Found 2026-06-14)
+- [ ] **Interface method mangling last-writer-wins** — monomorphizer uses `orig.name` instead of `mangle_name(orig.name, types)` for interface methods; C backend also needs child type in emitted name. Multi-class interface methods (e.g. `MyList.add()`) don't get properly emitted. (Known, confirmed 2026-06-14)
 
 ---
 
