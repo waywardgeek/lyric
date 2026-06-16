@@ -56,7 +56,7 @@ lyric calculator {
 
     func pop_value(mut self) -> f64? {
       if self.values.len() == 0 {
-        return nil
+        return null
       }
       let idx = self.values.len() - 1
       let v = self.values[idx]
@@ -66,7 +66,7 @@ lyric calculator {
 
     func pop_op(mut self) -> string? {
       if self.ops.len() == 0 {
-        return nil
+        return null
       }
       let idx = self.ops.len() - 1
       let op = self.ops[idx]
@@ -91,7 +91,7 @@ lyric calculator {
 
     func result(self) -> f64? {
       if self.values.len() == 0 {
-        return nil
+        return null
       }
       return self.values[0]
     }

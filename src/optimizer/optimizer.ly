@@ -368,7 +368,7 @@ func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?] {
 }
 
 // ---------------------------------------------------------------------------
-// Pass 2c: Fix nil zero values
+// Pass 2c: Fix null zero values
 // ---------------------------------------------------------------------------
 
 func fix_nil_zero_values(stmts: [LStmt?]) -> [LStmt?] {

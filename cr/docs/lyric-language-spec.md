@@ -28,7 +28,7 @@ Both modes are designed to be:
 - **Verified** — `.lyric` files are structurally checked against implementations;
   `.ly` files are type-checked and compiled
 - **Language-agnostic in intent** — `.lyric` files describe design regardless of
-  implementation language; `.ly` files compile to Go or C
+  implementation language; `.ly` files compile to C
 
 ---
 
@@ -222,7 +222,7 @@ int   uint    // NOT part of the Lyric numeric tower
 **Character literals:** `'A'` → `u8` constant (value 65). Supports escape sequences:
 `\n`, `\r`, `\t`, `\\`, `\'`, `\"`, `\0`, `\x##` (hex byte).
 
-`null` (or `nil` — both accepted) is the nil literal for optional types. `let x = null`
+`null` is the null literal for optional types. `let x = null`
 without a type annotation is a checker error; use `let x: T? = null`.
 
 `error` is a built-in interface, not a primitive — see the Interfaces section.
@@ -232,7 +232,7 @@ without a type annotation is a checker error; use `let x: T? = null`.
 ## Composite Types
 
 ```
-T?            // optional: T or null (nil)
+T?            // optional: T or null
 T | U         // union: T or U (exhaustively typed)
 [T]           // slice of T (fat pointer: data + len + cap)
 (T, U)        // anonymous tuple (positional)
@@ -331,7 +331,7 @@ func count<P, C>(p: P) -> i32 where DoublyLinked<P, C>
 |---|---|---|
 | `Comparable` | numeric, string, bool | `cmp.Ordered` |
 | `Equatable` | numeric, string, bool | `comparable` |
-| `Hashable` | numeric, string, bool | `comparable` |
+| `Hashable` | `Sym`, numeric, bool (NOT `string` — use `sym()`) | `comparable` |
 
 **User-defined constraints:** Any interface can be used as a constraint. The checker
 validates via structural subtyping.
@@ -1007,7 +1007,7 @@ func compute(x: i32) -> (i32, error) {
 - Enclosing function must also return `(..., error)`
 - Statement-level only
 - `?` unwraps the success value: after `let x = foo()?`, `x` is `T` (not `T?`).
-  If the error is non-nil, the function returns immediately with the error.
+  If the error is non-null, the function returns immediately with the error.
 
 **Implementation:** The lowerer desugars `?` via `hoistNestedTry()` which introduces
 SSA temps for nested try expressions.
@@ -1078,10 +1078,10 @@ lock(mutex) { ... }                         // scoped mutex
 (unbuffered) or `make_channel<T>(capacity)` (buffered). Operations use method syntax:
 `.send(value)`, `.receive() -> T`, `.close()`.
 
-**Lock type:** `Lock` is the mutex type. Used with the `lock(mu) { ... }` statement
+**Lock type:** `lock` is the mutex type. Used with the `lock(mu) { ... }` statement
 for scoped locking:
 ```lyric
-let mut mu: Lock
+let mut mu: lock
 lock(mu) {
     // critical section — mu auto-unlocked at block exit
 }
@@ -1150,7 +1150,7 @@ for i in range(0, 10) {
 | `os_exit(code)` | `i32 -> unit` | Exit process |
 | `os_getwd()` | `-> string` | Current working directory |
 | `exec_command(name, args)` | `(string, [string]) -> (string, bool)` | Run command |
-| `path_join(a, b)` | `(string, string) -> string` | Join paths |
+| `path_join(parts)` | `([string]) -> string` | Join path components |
 | `path_dir(p)` | `string -> string` | Directory of path |
 | `path_base(p)` | `string -> string` | Base name of path |
 | `path_ext(p)` | `string -> string` | File extension |
@@ -1331,7 +1331,8 @@ The testing system can grow, but the baseline is intentionally small. Two builti
   backing array
 - **Relations** — ownership graph; `.destroy()` cascades through `owns` relations
 - **No GC** — deterministic destruction via ownership. Ref-counting for unowned
-  classes (deferred). C backend uses `malloc`/`free` for class handles.
+  classes (deferred). C backend uses slab allocation (AoS with pointers by default,
+  SoA with u32 handles via `--soa` flag). Scope-exit freeing via escape analysis.
 
 ---
 
@@ -1546,8 +1547,7 @@ specialized bodies for transitive instantiations.
   parsing in conditions (Rust approach).
 - **`append` vs `array_append`** — `append(slice, item)` or `slice.push(item)`
   for plain slices; `array_append<P,C>(parent, child)` for relation-owned lists.
-- **`nil` and `null` are synonyms** — both accepted as the null literal. Convention:
-  use `null` in new code.
+- **`null` is the only null literal** — `nil` is not accepted by the compiler.
 - **Number literal underscores** — `1_000_000` is valid; underscores are silently
   stripped by the lexer.
 - **Platform `int`/`uint`** — only for Go interop, not part of numeric tower.
@@ -1976,7 +1976,7 @@ in the lowerer and backends:
 | `os_exit(code: i32)` | Exit process |
 | `os_getwd() -> string` | Current working directory |
 | `exec_command(name, args) -> (string, bool)` | Run external command |
-| `path_join(a, b) -> string` | Join path components |
+| `path_join(parts: [string]) -> string` | Join path components |
 | `path_dir(p) -> string` | Directory portion |
 | `path_base(p) -> string` | Base filename |
 | `path_ext(p) -> string` | File extension |

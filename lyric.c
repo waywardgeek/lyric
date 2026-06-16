@@ -13163,193 +13163,194 @@ void ast_collect_call_names_expr(Expr* expr, Dict_CSym_bool* names) {
         LyricSlice_TypeExprptr type_args = _t41;
         LyricSlice_StructLitField _t42 = _t2.data.structlit.fields;
         LyricSlice_StructLitField fields = _t42;
-        int32_t _t43 = fields.len;
-        void* /* generator */ _t44 = range_init(0, _t43);
-        range_gen_t* _gen_iter_20 = _t44;
+        Dict_CSym_bool_set(names, type_name, true);
+        int32_t _t44 = fields.len;
+        void* /* generator */ _t45 = range_init(0, _t44);
+        range_gen_t* _gen_iter_20 = _t45;
         while (range_next(_gen_iter_20)) {
             int32_t i = _gen_iter_20->_value;
-            StructLitField _t45 = fields.data[i];
-            Expr* _t46 = _t45.value;
-            ast_collect_call_names_expr(_t46, names);
+            StructLitField _t46 = fields.data[i];
+            Expr* _t47 = _t46.value;
+            ast_collect_call_names_expr(_t47, names);
         }
         free(_gen_iter_20);
         break;
     }
     case 18: {
-        LyricSlice_Paramptr _t48 = _t2.data.lambda.params;
-        LyricSlice_Paramptr params = _t48;
-        TypeExpr* _t49 = _t2.data.lambda.return_type;
-        TypeExpr* return_type = _t49;
-        Block* _t50 = _t2.data.lambda.body;
-        Block* body = _t50;
+        LyricSlice_Paramptr _t49 = _t2.data.lambda.params;
+        LyricSlice_Paramptr params = _t49;
+        TypeExpr* _t50 = _t2.data.lambda.return_type;
+        TypeExpr* return_type = _t50;
+        Block* _t51 = _t2.data.lambda.body;
+        Block* body = _t51;
         ast_collect_call_names_block(body, names);
         break;
     }
     case 10: {
-        Expr* _t52 = _t2.data.index.receiver;
-        Expr* receiver = _t52;
-        Expr* _t53 = _t2.data.index.index;
-        Expr* index = _t53;
+        Expr* _t53 = _t2.data.index.receiver;
+        Expr* receiver = _t53;
+        Expr* _t54 = _t2.data.index.index;
+        Expr* index = _t54;
         ast_collect_call_names_expr(receiver, names);
         ast_collect_call_names_expr(index, names);
         break;
     }
     case 11: {
-        Expr* _t56 = _t2.data.slice.receiver;
-        Expr* receiver = _t56;
-        Expr* _t57 = _t2.data.slice.low;
-        Expr* low = _t57;
-        Expr* _t58 = _t2.data.slice.high;
-        Expr* high = _t58;
+        Expr* _t57 = _t2.data.slice.receiver;
+        Expr* receiver = _t57;
+        Expr* _t58 = _t2.data.slice.low;
+        Expr* low = _t58;
+        Expr* _t59 = _t2.data.slice.high;
+        Expr* high = _t59;
         ast_collect_call_names_expr(receiver, names);
         ast_collect_call_names_expr(low, names);
         ast_collect_call_names_expr(high, names);
         break;
     }
     case 15: {
-        LyricSlice_Exprptr _t62 = _t2.data.listlit.elems;
-        LyricSlice_Exprptr elems = _t62;
-        int32_t _t63 = elems.len;
-        void* /* generator */ _t64 = range_init(0, _t63);
-        range_gen_t* _gen_iter_21 = _t64;
+        LyricSlice_Exprptr _t63 = _t2.data.listlit.elems;
+        LyricSlice_Exprptr elems = _t63;
+        int32_t _t64 = elems.len;
+        void* /* generator */ _t65 = range_init(0, _t64);
+        range_gen_t* _gen_iter_21 = _t65;
         while (range_next(_gen_iter_21)) {
             int32_t i = _gen_iter_21->_value;
-            Expr* _t65 = elems.data[i];
-            ast_collect_call_names_expr(_t65, names);
+            Expr* _t66 = elems.data[i];
+            ast_collect_call_names_expr(_t66, names);
         }
         free(_gen_iter_21);
         break;
     }
     case 16: {
-        LyricSlice_Exprptr _t67 = _t2.data.maplit.keys;
-        LyricSlice_Exprptr keys = _t67;
-        LyricSlice_Exprptr _t68 = _t2.data.maplit.values;
-        LyricSlice_Exprptr values = _t68;
-        int32_t _t69 = keys.len;
-        void* /* generator */ _t70 = range_init(0, _t69);
-        range_gen_t* _gen_iter_22 = _t70;
+        LyricSlice_Exprptr _t68 = _t2.data.maplit.keys;
+        LyricSlice_Exprptr keys = _t68;
+        LyricSlice_Exprptr _t69 = _t2.data.maplit.values;
+        LyricSlice_Exprptr values = _t69;
+        int32_t _t70 = keys.len;
+        void* /* generator */ _t71 = range_init(0, _t70);
+        range_gen_t* _gen_iter_22 = _t71;
         while (range_next(_gen_iter_22)) {
             int32_t i = _gen_iter_22->_value;
-            Expr* _t71 = keys.data[i];
-            ast_collect_call_names_expr(_t71, names);
-            Expr* _t73 = values.data[i];
-            ast_collect_call_names_expr(_t73, names);
+            Expr* _t72 = keys.data[i];
+            ast_collect_call_names_expr(_t72, names);
+            Expr* _t74 = values.data[i];
+            ast_collect_call_names_expr(_t74, names);
         }
         free(_gen_iter_22);
         break;
     }
     case 14: {
-        LyricSlice_Exprptr _t75 = _t2.data.tuplelit.elems;
-        LyricSlice_Exprptr elems = _t75;
-        int32_t _t76 = elems.len;
-        void* /* generator */ _t77 = range_init(0, _t76);
-        range_gen_t* _gen_iter_23 = _t77;
+        LyricSlice_Exprptr _t76 = _t2.data.tuplelit.elems;
+        LyricSlice_Exprptr elems = _t76;
+        int32_t _t77 = elems.len;
+        void* /* generator */ _t78 = range_init(0, _t77);
+        range_gen_t* _gen_iter_23 = _t78;
         while (range_next(_gen_iter_23)) {
             int32_t i = _gen_iter_23->_value;
-            Expr* _t78 = elems.data[i];
-            ast_collect_call_names_expr(_t78, names);
+            Expr* _t79 = elems.data[i];
+            ast_collect_call_names_expr(_t79, names);
         }
         free(_gen_iter_23);
         break;
     }
     case 20: {
-        TypeExpr* _t80 = _t2.data.cast.target_type;
-        TypeExpr* target_type = _t80;
-        Expr* _t81 = _t2.data.cast.operand;
-        Expr* operand = _t81;
+        TypeExpr* _t81 = _t2.data.cast.target_type;
+        TypeExpr* target_type = _t81;
+        Expr* _t82 = _t2.data.cast.operand;
+        Expr* operand = _t82;
         ast_collect_call_names_expr(operand, names);
         break;
     }
     case 21: {
-        Expr* _t83 = _t2.data.unwrap.operand;
-        Expr* operand = _t83;
+        Expr* _t84 = _t2.data.unwrap.operand;
+        Expr* operand = _t84;
         ast_collect_call_names_expr(operand, names);
         break;
     }
     case 22: {
-        Expr* _t85 = _t2.data.try.operand;
-        Expr* operand = _t85;
+        Expr* _t86 = _t2.data.try.operand;
+        Expr* operand = _t86;
         ast_collect_call_names_expr(operand, names);
         break;
     }
     case 23: {
-        Expr* _t87 = _t2.data.is.operand;
-        Expr* operand = _t87;
-        Sym* _t88 = _t2.data.is.variant;
-        Sym* variant = _t88;
+        Expr* _t88 = _t2.data.is.operand;
+        Expr* operand = _t88;
+        Sym* _t89 = _t2.data.is.variant;
+        Sym* variant = _t89;
         ast_collect_call_names_expr(operand, names);
         break;
     }
     case 24: {
-        Expr* _t90 = _t2.data.ifelse.cond;
-        Expr* cond = _t90;
-        Block* _t91 = _t2.data.ifelse.then_block;
-        Block* then_block = _t91;
-        LyricSlice_ElseIfptr _t92 = _t2.data.ifelse.else_ifs;
-        LyricSlice_ElseIfptr else_ifs = _t92;
-        Block* _t93 = _t2.data.ifelse.else_block;
-        Block* else_block = _t93;
+        Expr* _t91 = _t2.data.ifelse.cond;
+        Expr* cond = _t91;
+        Block* _t92 = _t2.data.ifelse.then_block;
+        Block* then_block = _t92;
+        LyricSlice_ElseIfptr _t93 = _t2.data.ifelse.else_ifs;
+        LyricSlice_ElseIfptr else_ifs = _t93;
+        Block* _t94 = _t2.data.ifelse.else_block;
+        Block* else_block = _t94;
         ast_collect_call_names_expr(cond, names);
         ast_collect_call_names_block(then_block, names);
         ast_collect_call_names_block(else_block, names);
-        int32_t _t97 = else_ifs.len;
-        void* /* generator */ _t98 = range_init(0, _t97);
-        range_gen_t* _gen_iter_24 = _t98;
+        int32_t _t98 = else_ifs.len;
+        void* /* generator */ _t99 = range_init(0, _t98);
+        range_gen_t* _gen_iter_24 = _t99;
         while (range_next(_gen_iter_24)) {
             int32_t i = _gen_iter_24->_value;
-            ElseIf* _t99 = else_ifs.data[i];
-            Expr* _t100 = _t99->condition;
-            ast_collect_call_names_expr(_t100, names);
-            ElseIf* _t102 = else_ifs.data[i];
-            Block* _t103 = _t102->body;
-            bool _t104 = (_t103 != 0);
-            if (_t104) {
-                ElseIf* _t105 = else_ifs.data[i];
-                Block* _t106 = _t105->body;
-                Block* _t107 = _t106;
-                ast_collect_call_names_block(_t107, names);
+            ElseIf* _t100 = else_ifs.data[i];
+            Expr* _t101 = _t100->condition;
+            ast_collect_call_names_expr(_t101, names);
+            ElseIf* _t103 = else_ifs.data[i];
+            Block* _t104 = _t103->body;
+            bool _t105 = (_t104 != 0);
+            if (_t105) {
+                ElseIf* _t106 = else_ifs.data[i];
+                Block* _t107 = _t106->body;
+                Block* _t108 = _t107;
+                ast_collect_call_names_block(_t108, names);
             }
         }
         free(_gen_iter_24);
         break;
     }
     case 4: {
-        LyricSlice_Exprptr _t109 = _t2.data.stringinterp.parts;
-        LyricSlice_Exprptr parts = _t109;
-        int32_t _t110 = parts.len;
-        void* /* generator */ _t111 = range_init(0, _t110);
-        range_gen_t* _gen_iter_25 = _t111;
+        LyricSlice_Exprptr _t110 = _t2.data.stringinterp.parts;
+        LyricSlice_Exprptr parts = _t110;
+        int32_t _t111 = parts.len;
+        void* /* generator */ _t112 = range_init(0, _t111);
+        range_gen_t* _gen_iter_25 = _t112;
         while (range_next(_gen_iter_25)) {
             int32_t i = _gen_iter_25->_value;
-            Expr* _t112 = parts.data[i];
-            ast_collect_call_names_expr(_t112, names);
+            Expr* _t113 = parts.data[i];
+            ast_collect_call_names_expr(_t113, names);
         }
         free(_gen_iter_25);
         break;
     }
     case 19: {
-        Expr* _t114 = _t2.data.match.value;
-        Expr* value = _t114;
-        LyricSlice_MatchArmptr _t115 = _t2.data.match.arms;
-        LyricSlice_MatchArmptr arms = _t115;
+        Expr* _t115 = _t2.data.match.value;
+        Expr* value = _t115;
+        LyricSlice_MatchArmptr _t116 = _t2.data.match.arms;
+        LyricSlice_MatchArmptr arms = _t116;
         ast_collect_call_names_expr(value, names);
-        int32_t _t117 = arms.len;
-        void* /* generator */ _t118 = range_init(0, _t117);
-        range_gen_t* _gen_iter_26 = _t118;
+        int32_t _t118 = arms.len;
+        void* /* generator */ _t119 = range_init(0, _t118);
+        range_gen_t* _gen_iter_26 = _t119;
         while (range_next(_gen_iter_26)) {
             int32_t i = _gen_iter_26->_value;
-            MatchArm* _t119 = arms.data[i];
-            Block* _t120 = _t119->body;
-            bool _t121 = (_t120 != 0);
-            if (_t121) {
-                MatchArm* _t122 = arms.data[i];
-                Block* _t123 = _t122->body;
-                Block* _t124 = _t123;
-                ast_collect_call_names_block(_t124, names);
+            MatchArm* _t120 = arms.data[i];
+            Block* _t121 = _t120->body;
+            bool _t122 = (_t121 != 0);
+            if (_t122) {
+                MatchArm* _t123 = arms.data[i];
+                Block* _t124 = _t123->body;
+                Block* _t125 = _t124;
+                ast_collect_call_names_block(_t125, names);
             }
-            MatchArm* _t126 = arms.data[i];
-            Expr* _t127 = _t126->guard;
-            ast_collect_call_names_expr(_t127, names);
+            MatchArm* _t127 = arms.data[i];
+            Expr* _t128 = _t127->guard;
+            ast_collect_call_names_expr(_t128, names);
         }
         free(_gen_iter_26);
         break;
@@ -19964,60 +19965,57 @@ Dict_CSym_ETokenKind* init_keywords(void) {
     Sym* _t64 = sym(LYRIC_STR("false"));
     TokenKind _t65 = TokenKind_KFalse;
     Dict_CSym_ETokenKind_set(d, _t64, _t65);
-    Sym* _t67 = sym(LYRIC_STR("nil"));
+    Sym* _t67 = sym(LYRIC_STR("null"));
     TokenKind _t68 = TokenKind_KNil;
     Dict_CSym_ETokenKind_set(d, _t67, _t68);
-    Sym* _t70 = sym(LYRIC_STR("null"));
-    TokenKind _t71 = TokenKind_KNil;
+    Sym* _t70 = sym(LYRIC_STR("let"));
+    TokenKind _t71 = TokenKind_KLet;
     Dict_CSym_ETokenKind_set(d, _t70, _t71);
-    Sym* _t73 = sym(LYRIC_STR("let"));
-    TokenKind _t74 = TokenKind_KLet;
+    Sym* _t73 = sym(LYRIC_STR("if"));
+    TokenKind _t74 = TokenKind_KIf;
     Dict_CSym_ETokenKind_set(d, _t73, _t74);
-    Sym* _t76 = sym(LYRIC_STR("if"));
-    TokenKind _t77 = TokenKind_KIf;
+    Sym* _t76 = sym(LYRIC_STR("else"));
+    TokenKind _t77 = TokenKind_KElse;
     Dict_CSym_ETokenKind_set(d, _t76, _t77);
-    Sym* _t79 = sym(LYRIC_STR("else"));
-    TokenKind _t80 = TokenKind_KElse;
+    Sym* _t79 = sym(LYRIC_STR("for"));
+    TokenKind _t80 = TokenKind_KFor;
     Dict_CSym_ETokenKind_set(d, _t79, _t80);
-    Sym* _t82 = sym(LYRIC_STR("for"));
-    TokenKind _t83 = TokenKind_KFor;
+    Sym* _t82 = sym(LYRIC_STR("in"));
+    TokenKind _t83 = TokenKind_KIn;
     Dict_CSym_ETokenKind_set(d, _t82, _t83);
-    Sym* _t85 = sym(LYRIC_STR("in"));
-    TokenKind _t86 = TokenKind_KIn;
+    Sym* _t85 = sym(LYRIC_STR("while"));
+    TokenKind _t86 = TokenKind_KWhile;
     Dict_CSym_ETokenKind_set(d, _t85, _t86);
-    Sym* _t88 = sym(LYRIC_STR("while"));
-    TokenKind _t89 = TokenKind_KWhile;
+    Sym* _t88 = sym(LYRIC_STR("match"));
+    TokenKind _t89 = TokenKind_KMatch;
     Dict_CSym_ETokenKind_set(d, _t88, _t89);
-    Sym* _t91 = sym(LYRIC_STR("match"));
-    TokenKind _t92 = TokenKind_KMatch;
+    Sym* _t91 = sym(LYRIC_STR("return"));
+    TokenKind _t92 = TokenKind_KReturn;
     Dict_CSym_ETokenKind_set(d, _t91, _t92);
-    Sym* _t94 = sym(LYRIC_STR("return"));
-    TokenKind _t95 = TokenKind_KReturn;
+    Sym* _t94 = sym(LYRIC_STR("break"));
+    TokenKind _t95 = TokenKind_KBreak;
     Dict_CSym_ETokenKind_set(d, _t94, _t95);
-    Sym* _t97 = sym(LYRIC_STR("break"));
-    TokenKind _t98 = TokenKind_KBreak;
+    Sym* _t97 = sym(LYRIC_STR("continue"));
+    TokenKind _t98 = TokenKind_KContinue;
     Dict_CSym_ETokenKind_set(d, _t97, _t98);
-    Sym* _t100 = sym(LYRIC_STR("continue"));
-    TokenKind _t101 = TokenKind_KContinue;
+    Sym* _t100 = sym(LYRIC_STR("cascade"));
+    TokenKind _t101 = TokenKind_KCascade;
     Dict_CSym_ETokenKind_set(d, _t100, _t101);
-    Sym* _t103 = sym(LYRIC_STR("cascade"));
-    TokenKind _t104 = TokenKind_KCascade;
+    Sym* _t103 = sym(LYRIC_STR("spawn"));
+    TokenKind _t104 = TokenKind_KSpawn;
     Dict_CSym_ETokenKind_set(d, _t103, _t104);
-    Sym* _t106 = sym(LYRIC_STR("spawn"));
-    TokenKind _t107 = TokenKind_KSpawn;
+    Sym* _t106 = sym(LYRIC_STR("select"));
+    TokenKind _t107 = TokenKind_KSelect;
     Dict_CSym_ETokenKind_set(d, _t106, _t107);
-    Sym* _t109 = sym(LYRIC_STR("select"));
-    TokenKind _t110 = TokenKind_KSelect;
+    Sym* _t109 = sym(LYRIC_STR("case"));
+    TokenKind _t110 = TokenKind_KCase;
     Dict_CSym_ETokenKind_set(d, _t109, _t110);
-    Sym* _t112 = sym(LYRIC_STR("case"));
-    TokenKind _t113 = TokenKind_KCase;
+    Sym* _t112 = sym(LYRIC_STR("yield"));
+    TokenKind _t113 = TokenKind_KYield;
     Dict_CSym_ETokenKind_set(d, _t112, _t113);
-    Sym* _t115 = sym(LYRIC_STR("yield"));
-    TokenKind _t116 = TokenKind_KYield;
+    Sym* _t115 = sym(LYRIC_STR("pub"));
+    TokenKind _t116 = TokenKind_KPub;
     Dict_CSym_ETokenKind_set(d, _t115, _t116);
-    Sym* _t118 = sym(LYRIC_STR("pub"));
-    TokenKind _t119 = TokenKind_KPub;
-    Dict_CSym_ETokenKind_set(d, _t118, _t119);
     return d;
 }
 
@@ -22923,19 +22921,27 @@ LyricResult_StructDeclptr Parser_parse_struct(Parser* self) {
             Field* _t56 = field;
             array_append_CStructDecl_CField(s, _t56);
         }
+        Token* _t58 = Parser_peek(self);
+        TokenKind _t59 = _t58->kind;
+        TokenKind _t60 = TokenKind_PComma;
+        bool _t61 = (_t59 == _t60);
+        if (_t61) {
+            Token* _t62 = Parser_next(self);
+            _t62;
+        }
         Parser_skip_newlines(self);
     }
-    TokenKind _t59 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9037 = Parser_expect(self, _t59);
-    const char* _t60_err = _multi_9037.error;
-    const char* _t61 = _t60_err;
-    bool _t62 = (_t61 == NULL);
-    bool _t63 = (!_t62);
-    if (_t63) {
-        return lyric_err(_t61, LyricResult_StructDeclptr);
+    TokenKind _t64 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9037 = Parser_expect(self, _t64);
+    const char* _t65_err = _multi_9037.error;
+    const char* _t66 = _t65_err;
+    bool _t67 = (_t66 == NULL);
+    bool _t68 = (!_t67);
+    if (_t68) {
+        return lyric_err(_t66, LyricResult_StructDeclptr);
     }
-    Span _t65 = Parser_make_span(self, start);
-    s->span = _t65;
+    Span _t70 = Parser_make_span(self, start);
+    s->span = _t70;
     return lyric_ok(s, LyricResult_StructDeclptr);
 }
 
@@ -24536,19 +24542,27 @@ LyricResult_ClassDeclptr Parser_parse_class(Parser* self) {
             break;
         }
         }
+        Token* _t146 = Parser_peek(self);
+        TokenKind _t147 = _t146->kind;
+        TokenKind _t148 = TokenKind_PComma;
+        bool _t149 = (_t147 == _t148);
+        if (_t149) {
+            Token* _t150 = Parser_next(self);
+            _t150;
+        }
         Parser_skip_newlines(self);
     }
-    TokenKind _t147 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9083 = Parser_expect(self, _t147);
-    const char* _t148_err = _multi_9083.error;
-    const char* _t149 = _t148_err;
-    bool _t150 = (_t149 == NULL);
-    bool _t151 = (!_t150);
-    if (_t151) {
-        return lyric_err(_t149, LyricResult_ClassDeclptr);
+    TokenKind _t152 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9083 = Parser_expect(self, _t152);
+    const char* _t153_err = _multi_9083.error;
+    const char* _t154 = _t153_err;
+    bool _t155 = (_t154 == NULL);
+    bool _t156 = (!_t155);
+    if (_t156) {
+        return lyric_err(_t154, LyricResult_ClassDeclptr);
     }
-    Span _t153 = Parser_make_span(self, start);
-    cls->span = _t153;
+    Span _t158 = Parser_make_span(self, start);
+    cls->span = _t158;
     return lyric_ok(cls, LyricResult_ClassDeclptr);
 }
 
@@ -30302,11 +30316,99 @@ bool Parser_is_struct_lit_ahead(Parser* self) {
             if (_t19) {
                 result = true;
             }
+        } else {
+            Token* _t20 = Parser_peek(self);
+            TokenKind _t21 = _t20->kind;
+            TokenKind _t22 = TokenKind_LIntLit;
+            bool _t23 = (_t21 == _t22);
+            bool _sc24 = false;
+            _sc24 = _t23;
+            bool _t25 = (!_sc24);
+            if (_t25) {
+                Token* _t26 = Parser_peek(self);
+                TokenKind _t27 = _t26->kind;
+                TokenKind _t28 = TokenKind_LFloatLit;
+                bool _t29 = (_t27 == _t28);
+                _sc24 = _t29;
+            }
+            bool _sc30 = false;
+            _sc30 = _sc24;
+            bool _t31 = (!_sc30);
+            if (_t31) {
+                Token* _t32 = Parser_peek(self);
+                TokenKind _t33 = _t32->kind;
+                TokenKind _t34 = TokenKind_LStringLit;
+                bool _t35 = (_t33 == _t34);
+                _sc30 = _t35;
+            }
+            bool _sc36 = false;
+            _sc36 = _sc30;
+            bool _t37 = (!_sc36);
+            if (_t37) {
+                Token* _t38 = Parser_peek(self);
+                TokenKind _t39 = _t38->kind;
+                TokenKind _t40 = TokenKind_KTrue;
+                bool _t41 = (_t39 == _t40);
+                _sc36 = _t41;
+            }
+            bool _sc42 = false;
+            _sc42 = _sc36;
+            bool _t43 = (!_sc42);
+            if (_t43) {
+                Token* _t44 = Parser_peek(self);
+                TokenKind _t45 = _t44->kind;
+                TokenKind _t46 = TokenKind_KFalse;
+                bool _t47 = (_t45 == _t46);
+                _sc42 = _t47;
+            }
+            bool _sc48 = false;
+            _sc48 = _sc42;
+            bool _t49 = (!_sc48);
+            if (_t49) {
+                Token* _t50 = Parser_peek(self);
+                TokenKind _t51 = _t50->kind;
+                TokenKind _t52 = TokenKind_KNil;
+                bool _t53 = (_t51 == _t52);
+                _sc48 = _t53;
+            }
+            bool _sc54 = false;
+            _sc54 = _sc48;
+            bool _t55 = (!_sc54);
+            if (_t55) {
+                Token* _t56 = Parser_peek(self);
+                TokenKind _t57 = _t56->kind;
+                TokenKind _t58 = TokenKind_OMinus;
+                bool _t59 = (_t57 == _t58);
+                _sc54 = _t59;
+            }
+            bool _sc60 = false;
+            _sc60 = _sc54;
+            bool _t61 = (!_sc60);
+            if (_t61) {
+                Token* _t62 = Parser_peek(self);
+                TokenKind _t63 = _t62->kind;
+                TokenKind _t64 = TokenKind_PLParen;
+                bool _t65 = (_t63 == _t64);
+                _sc60 = _t65;
+            }
+            bool _sc66 = false;
+            _sc66 = _sc60;
+            bool _t67 = (!_sc66);
+            if (_t67) {
+                Token* _t68 = Parser_peek(self);
+                TokenKind _t69 = _t68->kind;
+                TokenKind _t70 = TokenKind_PLBracket;
+                bool _t71 = (_t69 == _t70);
+                _sc66 = _t71;
+            }
+            if (_sc66) {
+                result = true;
+            }
         }
     }
-    Lexer* _t20 = self->lex;
-    Lexer* _t21 = _t20;
-    Lexer_restore_state(_t21, saved);
+    Lexer* _t72 = self->lex;
+    Lexer* _t73 = _t72;
+    Lexer_restore_state(_t73, saved);
     self->pushed = pushed_saved;
     return result;
 }
@@ -40342,136 +40444,141 @@ Type* Checker_check_map_lit(Checker* self, LyricSlice_Exprptr keys, LyricSlice_E
 Type* Checker_check_struct_lit(Checker* self, Sym* type_name_sym, LyricSlice_TypeExprptr type_args, LyricSlice_StructLitField fields) {
     lyric_string _t0 = sym_to_string(type_name_sym);
     lyric_string name_str = _t0;
-    Registry* _t1 = self->registry;
-    TypeInfo* _t2 = Registry_lookup(_t1, name_str);
-    TypeInfo* info = _t2;
-    bool _t3 = (info != 0);
-    if (_t3) {
+    bool _t1 = lyric_str_eq(name_str, LYRIC_STR("lock"));
+    if (_t1) {
+        Type* _t2 = make_lock_type();
+        return _t2;
+    }
+    Registry* _t3 = self->registry;
+    TypeInfo* _t4 = Registry_lookup(_t3, name_str);
+    TypeInfo* info = _t4;
+    bool _t5 = (info != 0);
+    if (_t5) {
         int32_t pos_idx = 0;
         int32_t fi = 0;
         while (1) {
-            int32_t _t4 = fields.len;
-            bool _t5 = (fi < _t4);
-            if (!(_t5)) break;
-            StructLitField _t6 = fields.data[fi];
-            StructLitField f = _t6;
+            int32_t _t6 = fields.len;
+            bool _t7 = (fi < _t6);
+            if (!(_t7)) break;
+            StructLitField _t8 = fields.data[fi];
+            StructLitField f = _t8;
             lyric_string fname = LYRIC_STR("");
-            Sym* _t7 = f.name;
-            bool _t8 = (_t7 != 0);
-            bool _sc9 = false;
-            _sc9 = _t8;
-            if (_sc9) {
-                Sym* _t10 = f.name;
-                Sym* _t11 = _t10;
-                lyric_string _t12 = sym_to_string(_t11);
-                bool _t13 = (!lyric_str_eq(_t12, LYRIC_STR("")));
-                _sc9 = _t13;
+            Sym* _t9 = f.name;
+            bool _t10 = (_t9 != 0);
+            bool _sc11 = false;
+            _sc11 = _t10;
+            if (_sc11) {
+                Sym* _t12 = f.name;
+                Sym* _t13 = _t12;
+                lyric_string _t14 = sym_to_string(_t13);
+                bool _t15 = (!lyric_str_eq(_t14, LYRIC_STR("")));
+                _sc11 = _t15;
             }
-            if (_sc9) {
-                Sym* _t14 = f.name;
-                Sym* _t15 = _t14;
-                lyric_string _t16 = sym_to_string(_t15);
-                fname = _t16;
-                TypeInfo* _t17 = info;
-                LyricSlice_lyric_string _t18 = _t17->field_order;
-                int32_t _t19 = _t18.len;
-                pos_idx = _t19;
+            if (_sc11) {
+                Sym* _t16 = f.name;
+                Sym* _t17 = _t16;
+                lyric_string _t18 = sym_to_string(_t17);
+                fname = _t18;
+                TypeInfo* _t19 = info;
+                LyricSlice_lyric_string _t20 = _t19->field_order;
+                int32_t _t21 = _t20.len;
+                pos_idx = _t21;
             } else {
-                TypeInfo* _t20 = info;
-                LyricSlice_lyric_string _t21 = _t20->field_order;
-                int32_t _t22 = _t21.len;
-                bool _t23 = (pos_idx < _t22);
-                if (_t23) {
-                    TypeInfo* _t24 = info;
-                    LyricSlice_lyric_string _t25 = _t24->field_order;
-                    lyric_string _t26 = _t25.data[pos_idx];
-                    fname = _t26;
-                    int32_t _t27 = (pos_idx + 1);
-                    pos_idx = _t27;
+                TypeInfo* _t22 = info;
+                LyricSlice_lyric_string _t23 = _t22->field_order;
+                int32_t _t24 = _t23.len;
+                bool _t25 = (pos_idx < _t24);
+                if (_t25) {
+                    TypeInfo* _t26 = info;
+                    LyricSlice_lyric_string _t27 = _t26->field_order;
+                    lyric_string _t28 = _t27.data[pos_idx];
+                    fname = _t28;
+                    int32_t _t29 = (pos_idx + 1);
+                    pos_idx = _t29;
                 }
             }
-            Expr* _t28 = f.value;
-            bool _t29 = (_t28 != 0);
-            if (_t29) {
+            Expr* _t30 = f.value;
+            bool _t31 = (_t30 != 0);
+            if (_t31) {
                 bool scope_pushed = false;
-                bool _t30 = (!lyric_str_eq(fname, LYRIC_STR("")));
-                if (_t30) {
-                    TypeInfo* _t31 = info;
-                    Dict_CSym_CType* _t32 = _t31->fields;
-                    Sym* _t33 = sym(fname);
-                    DictEntry_CSym_CType* _t34 = Dict_CSym_CType_get(_t32, _t33);
-                    DictEntry_CSym_CType* field_entry = _t34;
-                    bool _t35 = (field_entry != 0);
-                    if (_t35) {
-                        DictEntry_CSym_CType* _t36 = field_entry;
-                        Type* _t37 = _t36->value;
-                        Type* field_type = _t37;
-                        TypeKind _t38 = field_type->kind;
-                        int32_t _t39 = _t38.tag;
-                        switch (_t39) {
+                bool _t32 = (!lyric_str_eq(fname, LYRIC_STR("")));
+                if (_t32) {
+                    TypeInfo* _t33 = info;
+                    Dict_CSym_CType* _t34 = _t33->fields;
+                    Sym* _t35 = sym(fname);
+                    DictEntry_CSym_CType* _t36 = Dict_CSym_CType_get(_t34, _t35);
+                    DictEntry_CSym_CType* field_entry = _t36;
+                    bool _t37 = (field_entry != 0);
+                    if (_t37) {
+                        DictEntry_CSym_CType* _t38 = field_entry;
+                        Type* _t39 = _t38->value;
+                        Type* field_type = _t39;
+                        TypeKind _t40 = field_type->kind;
+                        int32_t _t41 = _t40.tag;
+                        switch (_t41) {
                         case 17: {
-                            lyric_string _t40 = _t38.data.enum_.name;
-                            lyric_string enum_name = _t40;
-                            Registry* _t41 = self->registry;
-                            TypeInfo* _t42 = Registry_lookup(_t41, enum_name);
-                            TypeInfo* enum_info = _t42;
-                            bool _t43 = (enum_info != 0);
-                            bool _sc44 = false;
-                            _sc44 = _t43;
-                            if (_sc44) {
-                                TypeInfo* _t45 = enum_info;
-                                Dict_CSym_CVariantInfo* _t46 = _t45->variants;
-                                LyricSlice_Symptr _t47 = Dict_CSym_CVariantInfo_keys(_t46);
-                                int32_t _t48 = _t47.len;
-                                bool _t49 = (_t48 > 0);
-                                _sc44 = _t49;
+                            lyric_string _t42 = _t40.data.enum_.name;
+                            lyric_string enum_name = _t42;
+                            Registry* _t43 = self->registry;
+                            TypeInfo* _t44 = Registry_lookup(_t43, enum_name);
+                            TypeInfo* enum_info = _t44;
+                            bool _t45 = (enum_info != 0);
+                            bool _sc46 = false;
+                            _sc46 = _t45;
+                            if (_sc46) {
+                                TypeInfo* _t47 = enum_info;
+                                Dict_CSym_CVariantInfo* _t48 = _t47->variants;
+                                LyricSlice_Symptr _t49 = Dict_CSym_CVariantInfo_keys(_t48);
+                                int32_t _t50 = _t49.len;
+                                bool _t51 = (_t50 > 0);
+                                _sc46 = _t51;
                             }
-                            if (_sc44) {
+                            if (_sc46) {
                                 Checker_push_scope(self);
                                 scope_pushed = true;
-                                TypeInfo* _t51 = enum_info;
-                                Dict_CSym_CVariantInfo* _t52 = _t51->variants;
-                                LyricSlice_Symptr _t53 = Dict_CSym_CVariantInfo_keys(_t52);
-                                LyricSlice_Symptr vkeys = _t53;
+                                TypeInfo* _t53 = enum_info;
+                                Dict_CSym_CVariantInfo* _t54 = _t53->variants;
+                                LyricSlice_Symptr _t55 = Dict_CSym_CVariantInfo_keys(_t54);
+                                LyricSlice_Symptr vkeys = _t55;
                                 for (int32_t _idx = 0; _idx < vkeys.len; _idx++) {
                                     Sym* vk = vkeys.data[_idx];
-                                    lyric_string _t54 = sym_to_string(vk);
-                                    lyric_string vname = _t54;
-                                    TypeInfo* _t55 = enum_info;
-                                    Dict_CSym_CVariantInfo* _t56 = _t55->variants;
-                                    DictEntry_CSym_CVariantInfo* _t57 = Dict_CSym_CVariantInfo_get(_t56, vk);
-                                    DictEntry_CSym_CVariantInfo* vi = _t57;
-                                    bool _t58 = (vi != 0);
-                                    if (_t58) {
-                                        DictEntry_CSym_CVariantInfo* _t59 = vi;
-                                        VariantInfo* _t60 = _t59->value;
-                                        LyricSlice_VariantField _t61 = _t60->fields;
-                                        int32_t _t62 = _t61.len;
-                                        bool _t63 = (_t62 == 0);
-                                        if (_t63) {
-                                            Scope* _t64 = self->scope;
-                                            Scope_define(_t64, vname, field_type);
+                                    lyric_string _t56 = sym_to_string(vk);
+                                    lyric_string vname = _t56;
+                                    TypeInfo* _t57 = enum_info;
+                                    Dict_CSym_CVariantInfo* _t58 = _t57->variants;
+                                    DictEntry_CSym_CVariantInfo* _t59 = Dict_CSym_CVariantInfo_get(_t58, vk);
+                                    DictEntry_CSym_CVariantInfo* vi = _t59;
+                                    bool _t60 = (vi != 0);
+                                    if (_t60) {
+                                        DictEntry_CSym_CVariantInfo* _t61 = vi;
+                                        VariantInfo* _t62 = _t61->value;
+                                        LyricSlice_VariantField _t63 = _t62->fields;
+                                        int32_t _t64 = _t63.len;
+                                        bool _t65 = (_t64 == 0);
+                                        if (_t65) {
+                                            Scope* _t66 = self->scope;
+                                            Scope_define(_t66, vname, field_type);
                                         } else {
-                                            LyricSlice_Typeptr _t66 = lyric_slice_empty(LyricSlice_Typeptr);
-                                            LyricSlice_Typeptr param_types = _t66;
-                                            DictEntry_CSym_CVariantInfo* _t67 = vi;
-                                            VariantInfo* _t68 = _t67->value;
-                                            LyricSlice_VariantField _t69 = _t68->fields;
-                                            for (int32_t _idx = 0; _idx < _t69.len; _idx++) {
-                                                VariantField vf = _t69.data[_idx];
-                                                Type* _t70 = vf.type_val;
-                                                LyricSlice_Typeptr _t71 = ({ lyric_push(&param_types, _t70, LyricSlice_Typeptr); param_types; });
-                                                _t71;
+                                            LyricSlice_Typeptr _t68 = lyric_slice_empty(LyricSlice_Typeptr);
+                                            LyricSlice_Typeptr param_types = _t68;
+                                            DictEntry_CSym_CVariantInfo* _t69 = vi;
+                                            VariantInfo* _t70 = _t69->value;
+                                            LyricSlice_VariantField _t71 = _t70->fields;
+                                            for (int32_t _idx = 0; _idx < _t71.len; _idx++) {
+                                                VariantField vf = _t71.data[_idx];
+                                                Type* _t72 = vf.type_val;
+                                                LyricSlice_Typeptr _t73 = ({ lyric_push(&param_types, _t72, LyricSlice_Typeptr); param_types; });
+                                                _t73;
                                             }
-                                            LyricSlice_lyric_string _t72 = lyric_slice_empty(LyricSlice_lyric_string);
-                                            LyricSlice_lyric_string tpnames = _t72;
-                                            TypeKind _t73 = (TypeKind){.tag = TypeKind_Func, .data.func = {param_types, field_type, tpnames}};
-                                            Type* _t74 = _lyric_slab_alloc_Type();
-                                            _t74->kind = _t73;
-                                            _t74->bits = 0;
-                                            Type* ctor_type = _t74;
-                                            Scope* _t75 = self->scope;
-                                            Scope_define(_t75, vname, ctor_type);
+                                            LyricSlice_lyric_string _t74 = lyric_slice_empty(LyricSlice_lyric_string);
+                                            LyricSlice_lyric_string tpnames = _t74;
+                                            TypeKind _t75 = (TypeKind){.tag = TypeKind_Func, .data.func = {param_types, field_type, tpnames}};
+                                            Type* _t76 = _lyric_slab_alloc_Type();
+                                            _t76->kind = _t75;
+                                            _t76->bits = 0;
+                                            Type* ctor_type = _t76;
+                                            Scope* _t77 = self->scope;
+                                            Scope_define(_t77, vname, ctor_type);
                                         }
                                     }
                                 }
@@ -40484,61 +40591,61 @@ Type* Checker_check_struct_lit(Checker* self, Sym* type_name_sym, LyricSlice_Typ
                         }
                     }
                 }
-                Expr* _t77 = f.value;
-                Expr* _t78 = _t77;
-                Type* _t79 = Checker_check_expr(self, _t78);
-                _t79;
+                Expr* _t79 = f.value;
+                Expr* _t80 = _t79;
+                Type* _t81 = Checker_check_expr(self, _t80);
+                _t81;
                 if (scope_pushed) {
                     Checker_pop_scope(self);
                 }
-                bool _t81 = (!lyric_str_eq(fname, LYRIC_STR("")));
-                if (_t81) {
-                    TypeInfo* _t82 = info;
-                    Dict_CSym_CType* _t83 = _t82->fields;
-                    Sym* _t84 = sym(fname);
-                    DictEntry_CSym_CType* _t85 = Dict_CSym_CType_get(_t83, _t84);
-                    DictEntry_CSym_CType* field_entry = _t85;
-                    bool _t86 = (field_entry != 0);
-                    if (_t86) {
-                        DictEntry_CSym_CType* _t87 = field_entry;
-                        Type* _t88 = _t87->value;
-                        Type* field_type = _t88;
-                        Expr* _t89 = f.value;
-                        Expr* _t90 = _t89;
-                        ExprKind _t91 = _t90->kind;
-                        int32_t _t92 = _t91.tag;
-                        switch (_t92) {
+                bool _t83 = (!lyric_str_eq(fname, LYRIC_STR("")));
+                if (_t83) {
+                    TypeInfo* _t84 = info;
+                    Dict_CSym_CType* _t85 = _t84->fields;
+                    Sym* _t86 = sym(fname);
+                    DictEntry_CSym_CType* _t87 = Dict_CSym_CType_get(_t85, _t86);
+                    DictEntry_CSym_CType* field_entry = _t87;
+                    bool _t88 = (field_entry != 0);
+                    if (_t88) {
+                        DictEntry_CSym_CType* _t89 = field_entry;
+                        Type* _t90 = _t89->value;
+                        Type* field_type = _t90;
+                        Expr* _t91 = f.value;
+                        Expr* _t92 = _t91;
+                        ExprKind _t93 = _t92->kind;
+                        int32_t _t94 = _t93.tag;
+                        switch (_t94) {
                         case 15: {
-                            LyricSlice_Exprptr _t93 = _t91.data.listlit.elems;
-                            LyricSlice_Exprptr elems = _t93;
-                            int32_t _t94 = elems.len;
-                            bool _t95 = (_t94 == 0);
-                            if (_t95) {
-                                TypeExpr* _t96 = type_to_type_expr(field_type);
-                                Expr* _t97 = f.value;
-                                Expr* _t98 = _t97;
-                                _t98->resolved_type = _t96;
+                            LyricSlice_Exprptr _t95 = _t93.data.listlit.elems;
+                            LyricSlice_Exprptr elems = _t95;
+                            int32_t _t96 = elems.len;
+                            bool _t97 = (_t96 == 0);
+                            if (_t97) {
+                                TypeExpr* _t98 = type_to_type_expr(field_type);
+                                Expr* _t99 = f.value;
+                                Expr* _t100 = _t99;
+                                _t100->resolved_type = _t98;
                             }
                             break;
                         }
                         case 16: {
-                            LyricSlice_Exprptr _t99 = _t91.data.maplit.keys;
-                            LyricSlice_Exprptr keys = _t99;
-                            int32_t _t100 = keys.len;
-                            bool _t101 = (_t100 == 0);
-                            if (_t101) {
-                                TypeExpr* _t102 = type_to_type_expr(field_type);
-                                Expr* _t103 = f.value;
-                                Expr* _t104 = _t103;
-                                _t104->resolved_type = _t102;
+                            LyricSlice_Exprptr _t101 = _t93.data.maplit.keys;
+                            LyricSlice_Exprptr keys = _t101;
+                            int32_t _t102 = keys.len;
+                            bool _t103 = (_t102 == 0);
+                            if (_t103) {
+                                TypeExpr* _t104 = type_to_type_expr(field_type);
+                                Expr* _t105 = f.value;
+                                Expr* _t106 = _t105;
+                                _t106->resolved_type = _t104;
                             }
                             break;
                         }
                         case 6: {
-                            TypeExpr* _t105 = type_to_type_expr(field_type);
-                            Expr* _t106 = f.value;
-                            Expr* _t107 = _t106;
-                            _t107->resolved_type = _t105;
+                            TypeExpr* _t107 = type_to_type_expr(field_type);
+                            Expr* _t108 = f.value;
+                            Expr* _t109 = _t108;
+                            _t109->resolved_type = _t107;
                             break;
                         }
                         default: {
@@ -40548,63 +40655,63 @@ Type* Checker_check_struct_lit(Checker* self, Sym* type_name_sym, LyricSlice_Typ
                     }
                 }
             }
-            int32_t _t108 = (fi + 1);
-            fi = _t108;
+            int32_t _t110 = (fi + 1);
+            fi = _t110;
         }
-        int32_t _t109 = type_args.len;
-        bool _t110 = (_t109 > 0);
-        bool _sc111 = false;
-        _sc111 = _t110;
-        if (_sc111) {
-            TypeInfo* _t112 = info;
-            LyricSlice_lyric_string _t113 = _t112->type_param_names;
-            int32_t _t114 = _t113.len;
-            bool _t115 = (_t114 > 0);
-            _sc111 = _t115;
+        int32_t _t111 = type_args.len;
+        bool _t112 = (_t111 > 0);
+        bool _sc113 = false;
+        _sc113 = _t112;
+        if (_sc113) {
+            TypeInfo* _t114 = info;
+            LyricSlice_lyric_string _t115 = _t114->type_param_names;
+            int32_t _t116 = _t115.len;
+            bool _t117 = (_t116 > 0);
+            _sc113 = _t117;
         }
-        if (_sc111) {
-            LyricSlice_Typeptr _t116 = lyric_slice_empty(LyricSlice_Typeptr);
-            LyricSlice_Typeptr resolved_args = _t116;
-            TypeInfo* _t117 = info;
-            LyricSlice_lyric_string _t118 = _t117->type_param_names;
-            int32_t _t119 = _t118.len;
-            int32_t limit = _t119;
-            int32_t _t120 = type_args.len;
-            bool _t121 = (_t120 < limit);
-            if (_t121) {
-                int32_t _t122 = type_args.len;
-                limit = _t122;
+        if (_sc113) {
+            LyricSlice_Typeptr _t118 = lyric_slice_empty(LyricSlice_Typeptr);
+            LyricSlice_Typeptr resolved_args = _t118;
+            TypeInfo* _t119 = info;
+            LyricSlice_lyric_string _t120 = _t119->type_param_names;
+            int32_t _t121 = _t120.len;
+            int32_t limit = _t121;
+            int32_t _t122 = type_args.len;
+            bool _t123 = (_t122 < limit);
+            if (_t123) {
+                int32_t _t124 = type_args.len;
+                limit = _t124;
             }
-            void* /* generator */ _t123 = range_init(0, limit);
-            range_gen_t* _gen_iter_188 = _t123;
+            void* /* generator */ _t125 = range_init(0, limit);
+            range_gen_t* _gen_iter_188 = _t125;
             while (range_next(_gen_iter_188)) {
                 int32_t i = _gen_iter_188->_value;
-                TypeExpr* _t124 = type_args.data[i];
-                Type* _t125 = Checker_resolve_type_expr(self, _t124);
-                LyricSlice_Typeptr _t126 = ({ lyric_push(&resolved_args, _t125, LyricSlice_Typeptr); resolved_args; });
-                _t126;
+                TypeExpr* _t126 = type_args.data[i];
+                Type* _t127 = Checker_resolve_type_expr(self, _t126);
+                LyricSlice_Typeptr _t128 = ({ lyric_push(&resolved_args, _t127, LyricSlice_Typeptr); resolved_args; });
+                _t128;
             }
             free(_gen_iter_188);
-            TypeInfo* _t127 = info;
-            Type* _t128 = _t127->type_val;
-            TypeKind _t129 = _t128->kind;
-            TypeInfo* _t130 = info;
-            Type* _t131 = _t130->type_val;
-            int32_t _t132 = _t131->bits;
-            Type* _t133 = _lyric_slab_alloc_Type();
-            _t133->kind = _t129;
-            _t133->bits = _t132;
-            _t133->type_args = resolved_args;
-            return _t133;
+            TypeInfo* _t129 = info;
+            Type* _t130 = _t129->type_val;
+            TypeKind _t131 = _t130->kind;
+            TypeInfo* _t132 = info;
+            Type* _t133 = _t132->type_val;
+            int32_t _t134 = _t133->bits;
+            Type* _t135 = _lyric_slab_alloc_Type();
+            _t135->kind = _t131;
+            _t135->bits = _t134;
+            _t135->type_args = resolved_args;
+            return _t135;
         }
-        TypeInfo* _t134 = info;
-        Type* _t135 = _t134->type_val;
-        return _t135;
+        TypeInfo* _t136 = info;
+        Type* _t137 = _t136->type_val;
+        return _t137;
     }
-    lyric_string _t136 = lyric_sprintf("checker: unknown struct/class: %.*s", (int)name_str.len, (const char*)name_str.data);
-    fprintf(stderr, "%.*s\n", (int)_t136.len, (const char*)_t136.data);
-    Type* _t139 = make_error_type();
-    return _t139;
+    lyric_string _t138 = lyric_sprintf("checker: unknown struct/class: %.*s", (int)name_str.len, (const char*)name_str.data);
+    fprintf(stderr, "%.*s\n", (int)_t138.len, (const char*)_t138.data);
+    Type* _t141 = make_error_type();
+    return _t141;
 }
 
 Type* Checker_check_lambda(Checker* self, LyricSlice_Paramptr params, TypeExpr* return_type, Block* body) {
@@ -43995,7 +44102,7 @@ void Checker_vwalk_expr(Checker* self, Expr* expr, lyric_string ctx) {
         int32_t _t12 = _t11.column;
         int64_t _t13 = ((int64_t)_t12);
         lyric_string _t14 = lyric_itoa(_t13);
-        lyric_string _t15 = lyric_sprintf("checker: validateAllExprsResolved: nil resolved_type in %.*s at %d:%.*s:%.*s", (int)ctx.len, (const char*)ctx.data, _t4, (int)_t9.len, (const char*)_t9.data, (int)_t14.len, (const char*)_t14.data);
+        lyric_string _t15 = lyric_sprintf("checker: validateAllExprsResolved: null resolved_type in %.*s at %d:%.*s:%.*s", (int)ctx.len, (const char*)ctx.data, _t4, (int)_t9.len, (const char*)_t9.data, (int)_t14.len, (const char*)_t14.data);
         fprintf(stderr, "%.*s\n", (int)_t15.len, (const char*)_t15.data);
         exit(1);
     }
@@ -53844,7 +53951,7 @@ LValue* Lowerer_lower_is(Lowerer* self, Expr* orig, Expr* operand, Sym* variant)
         _t13->is_null = lyric_some(_t12, LyricOpt_LIsNullData);
         LExpr* check = _t13;
         lyric_string _t14 = variant->name;
-        bool _t15 = lyric_str_eq(_t14, LYRIC_STR("nil"));
+        bool _t15 = lyric_str_eq(_t14, LYRIC_STR("null"));
         bool _sc16 = false;
         _sc16 = _t15;
         bool _t17 = (!_sc16);
@@ -65653,7 +65760,7 @@ lyric_string mangle_name(lyric_string base, LyricSlice_LTypeptr type_args) {
 lyric_string type_to_mangle(LType* t) {
     bool _t0 = (t == NULL);
     if (_t0) {
-        return LYRIC_STR("nil");
+        return LYRIC_STR("null");
     }
     LType* _t1 = t;
     LTypeKind _t2 = _t1->kind;

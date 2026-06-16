@@ -50,7 +50,7 @@ lyric lexer {
   }
 
   func test_keywords_other() {
-    let lex = make_lex("import where owns refs mut self pub true false nil as is")
+    let lex = make_lex("import where owns refs mut self pub true false null as is")
     assert_eq(next_skip_nl(lex).kind, KImport, "import")
     assert_eq(next_skip_nl(lex).kind, KWhere, "where")
     assert_eq(next_skip_nl(lex).kind, KOwns, "owns")
@@ -60,7 +60,7 @@ lyric lexer {
     assert_eq(next_skip_nl(lex).kind, KPub, "pub")
     assert_eq(next_skip_nl(lex).kind, KTrue, "true")
     assert_eq(next_skip_nl(lex).kind, KFalse, "false")
-    assert_eq(next_skip_nl(lex).kind, KNil, "nil")
+    assert_eq(next_skip_nl(lex).kind, KNil, "null")
     assert_eq(next_skip_nl(lex).kind, KAs, "as")
     assert_eq(next_skip_nl(lex).kind, KIs, "is")
   }

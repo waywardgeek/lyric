@@ -95,7 +95,7 @@ lyric lowerer {
   func Lowerer.lookup_var(self, name: string) -> LType? {
     let entry = self.scope!.get(sym(name))
     if !isnull(entry) { return entry!.value }
-    return nil
+    return null
   }
 
   func Lowerer.save_stmts(self) -> [LStmt?] {
@@ -845,7 +845,7 @@ lyric lowerer {
             append(result, LFuncDecl {
               name: concrete_name,
               params: [self_param, LParam { name: "val", typ: val_type, mutable: false }],
-              return_type: nil,
+              return_type: null,
               body: body,
               is_exported: true,
               receiver: class_name
@@ -925,7 +925,7 @@ lyric lowerer {
   }
 
   func Lowerer.lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl? {
-    if isnull(fd) || isnull(fd!.name) { return nil }
+    if isnull(fd) || isnull(fd!.name) { return null }
 
     let fname = fd!.name!.name
 
@@ -1008,7 +1008,7 @@ lyric lowerer {
     let mut recv_tps: [LTypeParam] = []
     if receiver != "" && self.classes!.has(sym(receiver)) {
       let cd_entry = self.classes!.get(sym(receiver))
-      let cd = if !isnull(cd_entry) { cd_entry!.value } else { nil }
+      let cd = if !isnull(cd_entry) { cd_entry!.value } else { null }
       if !isnull(cd) {
         for tp in cd!.ctp_children() {
           if !isnull(tp.name) {
@@ -1097,7 +1097,7 @@ lyric lowerer {
         self.lower_select(cases)
       }
       Yield(value) => {
-        let v = if !isnull(value) { self.lower_expr(value) } else { nil }
+        let v = if !isnull(value) { self.lower_expr(value) } else { null }
         self.emit(LStmt { kind: StYield, yield_data: LYieldData { value: v } })
       }
       Lock(mutex, body) => {
@@ -1123,7 +1123,7 @@ lyric lowerer {
   func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?) {
     // Multi-var destructuring
     if len(names) > 0 {
-      let v = if !isnull(value) { self.lower_expr(value) } else { nil }
+      let v = if !isnull(value) { self.lower_expr(value) } else { null }
       let mut i = 0
       for n in names {
         let ft = if !isnull(v) && v!.typ!.kind is TyTuple && i < len(v!.typ!.fields) {
@@ -1679,10 +1679,10 @@ lyric lowerer {
     if !isnull(val_type) && val_type!.kind is TyTaggedUnion {
       self.lower_enum_match(v, val_type!.name, arms)
     } else if self.is_union_match(val_type, arms) {
-      self.emit_union_type_switch(v, val_type, arms, "", nil)
+      self.emit_union_type_switch(v, val_type, arms, "", null)
     } else {
       // Non-enum match: lower as if-else chain
-      self.lower_match_as_if_else(v, val_type, arms, "", nil)
+      self.lower_match_as_if_else(v, val_type, arms, "", null)
     }
   }
 
@@ -1717,7 +1717,7 @@ lyric lowerer {
           }
           let body = self.stmts
           self.restore_stmts(saved)
-          append(cases, LTypeSwitchCase { typ: nil, binding: "", body: body })
+          append(cases, LTypeSwitchCase { typ: null, binding: "", body: body })
         }
         Ident(name) => {
           let case_type = self.lyric_name_to_ltype(name.name)
@@ -1759,7 +1759,7 @@ lyric lowerer {
   func Lowerer.lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm]) {
     // Check for nested variant patterns like Some(Circle(r))
     if self.has_nested_variant_patterns(arms) {
-      self.emit_nested_enum_match(val, enum_name, arms, "", nil)
+      self.emit_nested_enum_match(val, enum_name, arms, "", null)
       return
     }
 
@@ -1918,7 +1918,7 @@ lyric lowerer {
         }
       }
       let existing = group_arms.get(sym(key))
-      if existing != nil {
+      if existing != null {
         append(existing!.value, arm)
         group_arms.set(sym(key), existing!.value)
       } else {
@@ -2207,7 +2207,7 @@ lyric lowerer {
   // ---------- Expression lowering ----------
 
   func Lowerer.lower_expr(self, e: Expr?) -> LValue? {
-    if isnull(e) { return nil }
+    if isnull(e) { return null }
 
     match e!.kind {
       Ident(name) => { return self.lower_ident(e, name) }
@@ -2394,7 +2394,7 @@ lyric lowerer {
     if func_name != "" && self.classes!.has(sym(func_name)) {
       // This is actually a class allocation — lower args as positional fields
       let cd_entry2 = self.classes!.get(sym(func_name))
-      if isnull(cd_entry2) { return nil }
+      if isnull(cd_entry2) { return null }
       let cd = cd_entry2!.value
       let mut finits: [LFieldInit] = []
       let cf = cd.cf_children()
@@ -2421,7 +2421,7 @@ lyric lowerer {
     // make_channel<T>(bufSize)
     if func_name == "make_channel" {
       let result_type = self.expr_type(orig)
-      let mut elem_type: LType? = nil
+      let mut elem_type: LType? = null
       if !isnull(result_type) && result_type!.kind is TyChannel {
         elem_type = result_type!.elem
       }
@@ -2431,7 +2431,7 @@ lyric lowerer {
       if isnull(elem_type) {
         elem_type = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
       }
-      let mut buf_size: LValue? = nil
+      let mut buf_size: LValue? = null
       if len(args) > 0 {
         buf_size = self.lower_expr(args[0])
       }
@@ -2452,7 +2452,7 @@ lyric lowerer {
           FieldAccess(fa_recv, fa_field) => {
             let recv_val = self.lower_expr(fa_recv)
             let result_type = self.expr_type(first_arg)
-            let mut slice_val: LValue? = nil
+            let mut slice_val: LValue? = null
             let mut is_class_field = false
             if !isnull(recv_val) && !isnull(recv_val!.typ) && recv_val!.typ!.kind is TyClassHandle {
               is_class_field = true
@@ -2770,7 +2770,7 @@ lyric lowerer {
   // For index expressions, produces an LValIndexRef so the C backend can emit
   // &collection.data[index]. For other expressions, falls back to lower_expr.
   func Lowerer.lower_mut_arg(self, e: Expr?) -> LValue? {
-    if isnull(e) { return nil }
+    if isnull(e) { return null }
     match e!.kind {
       Index(receiver, index) => {
         let recv = self.lower_expr(receiver)
@@ -2805,8 +2805,8 @@ lyric lowerer {
 
   func Lowerer.lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue? {
     let recv = self.lower_expr(receiver)
-    let lv = if !isnull(low) { self.lower_expr(low) } else { nil }
-    let hv = if !isnull(high) { self.lower_expr(high) } else { nil }
+    let lv = if !isnull(low) { self.lower_expr(low) } else { null }
+    let hv = if !isnull(high) { self.lower_expr(high) } else { null }
     let rt = self.expr_type(orig)
     let se = LExpr {
       kind: ExSlice,
@@ -2842,18 +2842,18 @@ lyric lowerer {
     let is_and = match op { And => { true } _ => { false } }
     let is_or = match op { Or => { true } _ => { false } }
     if is_and || is_or {
-      let bool_type = LType { kind: TyBool, name: "", elem: nil, key: nil, fields: [], params: [], ret: nil, variants: [], type_args: [], bits: 0, is_exported: false }
+      let bool_type = LType { kind: TyBool, name: "", elem: null, key: null, fields: [], params: [], ret: null, variants: [], type_args: [], bits: 0, is_exported: false }
       let lv = self.lower_expr(left)
 
       // Allocate result variable
       let result_var = f"_sc{self.temp_id}"
       self.temp_id = self.temp_id + 1
-      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: nil, mutable: false } })
+      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: null, mutable: false } })
       self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: lv } })
 
       // Condition: for &&, enter if-block when left is true; for ||, when left is false
       let cond_val = LValue { kind: ValVar, name: result_var, typ: bool_type, temp_id: 0, int_val: 0 as i64, uint_val: 0 as u64, float_val: 0.0, str_val: "", bool_val: false }
-      let mut final_cond: LValue? = nil
+      let mut final_cond: LValue? = null
       if is_or {
         let not_expr = LExpr { kind: ExUnOp, typ: bool_type, un_op: LUnOpData { op: UnNot, operand: cond_val } }
         final_cond = self.emit_temp(not_expr)
@@ -3431,13 +3431,13 @@ lyric lowerer {
 
     // Check optional (is null check)
     if !isnull(val_type) && val_type!.kind is TyOptional {
-      // `x is nil` → isnull(x)
+      // `x is null` → isnull(x)
       let check = LExpr {
         kind: ExIsNull,
         typ: LType { kind: TyBool, name: "", bits: 0, is_exported: false },
         is_null: LIsNullData { value: v }
       }
-      if variant.name == "nil" || variant.name == "null" {
+      if variant.name == "null" || variant.name == "null" {
         return self.emit_temp(check)
       }
       // Otherwise it's a non-null check

@@ -8,7 +8,7 @@ lyric optionals {
         return x
       }
     }
-    return nil
+    return null
   }
 
   // len and append builtins
@@ -27,7 +27,7 @@ lyric optionals {
         return name
       }
     }
-    return nil
+    return null
   }
 
   func main() {

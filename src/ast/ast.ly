@@ -418,8 +418,8 @@ func merge_files(files: [File?]) -> File? {
         let empty = File {
             filename: "",
             span: Span {
-                start: Pos { file: nil, line: 0, column: 0 },
-                end: Pos { file: nil, line: 0, column: 0 }
+                start: Pos { file: null, line: 0, column: 0 },
+                end: Pos { file: null, line: 0, column: 0 }
             }
         }
         return empty
@@ -433,7 +433,7 @@ func merge_files(files: [File?]) -> File? {
     }
     for i in range(0, len(files)) {
         let f = files[i]
-        if f != nil {
+        if f != null {
             let blocks = f!.fb_children()
             for j in range(0, len(blocks)) {
                 let b = blocks[j]
@@ -462,7 +462,7 @@ func find_stdlib_dir() -> string {
 // load_stdlib loads and parses all .ly files from the stdlib directory.
 func load_stdlib(dir: string) -> File? {
     let entries = list_dir(dir)
-    let mut combined: File? = nil
+    let mut combined: File? = null
     for i in range(0, len(entries)) {
         let entry = entries[i]
         if str_has_suffix(entry, ".ly") {
@@ -472,11 +472,11 @@ func load_stdlib(dir: string) -> File? {
             let result = parse_file(src, path)
             let file = result._0
             let err = result._1
-            if file == nil {
+            if file == null {
                 eprintln(f"warning: failed to parse stdlib file {path}")
                 continue
             }
-            if combined == nil {
+            if combined == null {
                 combined = file
             } else {
                 let blocks = file!.fb_children()
@@ -520,7 +520,7 @@ func is_primitive_type(name: string) -> bool {
 // --- collect type names from TypeExpr ---
 
 func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>) {
-    if te == nil {
+    if te == null {
         return
     }
     match te!.kind {
@@ -561,7 +561,7 @@ func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>) {
 
 func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool> {
     let names = Dict<Sym, bool>()
-    if file == nil {
+    if file == null {
         return names
     }
     let blocks = file!.fb_children()
@@ -611,7 +611,7 @@ func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool> {
 // --- collect function call names from expressions/statements ---
 
 func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
-    if expr == nil {
+    if expr == null {
         return
     }
     match expr!.kind {
@@ -644,6 +644,7 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
             }
         }
         StructLit(type_name, type_args, fields) => {
+            names.set(type_name, true)
             for i in range(0, len(fields)) {
                 ast_collect_call_names_expr(fields[i].value, names)
             }
@@ -694,7 +695,7 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
             ast_collect_call_names_block(else_block, names)
             for i in range(0, len(else_ifs)) {
                 ast_collect_call_names_expr(else_ifs[i].condition, names)
-                if else_ifs[i].body != nil {
+                if else_ifs[i].body != null {
                     ast_collect_call_names_block(else_ifs[i].body!, names)
                 }
             }
@@ -707,7 +708,7 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
         Match(value, arms) => {
             ast_collect_call_names_expr(value, names)
             for i in range(0, len(arms)) {
-                if arms[i].body != nil {
+                if arms[i].body != null {
                     ast_collect_call_names_block(arms[i].body!, names)
                 }
                 ast_collect_call_names_expr(arms[i].guard, names)
@@ -735,12 +736,12 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         If(condition, then_block, else_ifs, else_block) => {
             ast_collect_call_names_expr(condition, names)
             ast_collect_call_names_block(then_block, names)
-            if else_block != nil {
+            if else_block != null {
                 ast_collect_call_names_block(else_block!, names)
             }
             for i in range(0, len(else_ifs)) {
                 ast_collect_call_names_expr(else_ifs[i].condition, names)
-                if else_ifs[i].body != nil {
+                if else_ifs[i].body != null {
                     ast_collect_call_names_block(else_ifs[i].body!, names)
                 }
             }
@@ -756,7 +757,7 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         Match(value, arms) => {
             ast_collect_call_names_expr(value, names)
             for i in range(0, len(arms)) {
-                if arms[i].body != nil {
+                if arms[i].body != null {
                     ast_collect_call_names_block(arms[i].body!, names)
                 }
                 ast_collect_call_names_expr(arms[i].guard, names)
@@ -777,7 +778,7 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         IfLet(pattern, value, then_block, else_block) => {
             ast_collect_call_names_expr(value, names)
             ast_collect_call_names_block(then_block, names)
-            if else_block != nil {
+            if else_block != null {
                 ast_collect_call_names_block(else_block!, names)
             }
         }
@@ -792,7 +793,7 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         Select(cases) => {
             for i in range(0, len(cases)) {
                 ast_collect_call_names_expr(cases[i].expr, names)
-                if cases[i].body != nil {
+                if cases[i].body != null {
                     ast_collect_call_names_block(cases[i].body!, names)
                 }
             }
@@ -811,7 +812,7 @@ func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>) {
 // --- collect variable references (for constant merging) ---
 
 func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>) {
-    if expr == nil {
+    if expr == null {
         return
     }
     match expr!.kind {
@@ -891,7 +892,7 @@ func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>) {
             ast_collect_var_refs_in_block(else_block, names)
             for i in range(0, len(else_ifs)) {
                 ast_collect_var_refs_in_expr(else_ifs[i].condition, names)
-                if else_ifs[i].body != nil {
+                if else_ifs[i].body != null {
                     ast_collect_var_refs_in_block(else_ifs[i].body!, names)
                 }
             }
@@ -904,7 +905,7 @@ func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>) {
         Match(value, arms) => {
             ast_collect_var_refs_in_expr(value, names)
             for i in range(0, len(arms)) {
-                if arms[i].body != nil {
+                if arms[i].body != null {
                     ast_collect_var_refs_in_block(arms[i].body!, names)
                 }
                 ast_collect_var_refs_in_expr(arms[i].guard, names)
@@ -917,7 +918,7 @@ func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>) {
 func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
     match stmt.kind {
         VarDecl(name, names_list, type_expr, is_mut, value) => {
-            if value != nil {
+            if value != null {
                 ast_collect_var_refs_in_expr(value, names)
             }
         }
@@ -926,7 +927,7 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
             ast_collect_var_refs_in_expr(value, names)
         }
         Return(value) => {
-            if value != nil {
+            if value != null {
                 ast_collect_var_refs_in_expr(value, names)
             }
         }
@@ -936,12 +937,12 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         If(condition, then_block, else_ifs, else_block) => {
             ast_collect_var_refs_in_expr(condition, names)
             ast_collect_var_refs_in_block(then_block, names)
-            if else_block != nil {
+            if else_block != null {
                 ast_collect_var_refs_in_block(else_block!, names)
             }
             for i in range(0, len(else_ifs)) {
                 ast_collect_var_refs_in_expr(else_ifs[i].condition, names)
-                if else_ifs[i].body != nil {
+                if else_ifs[i].body != null {
                     ast_collect_var_refs_in_block(else_ifs[i].body!, names)
                 }
             }
@@ -957,7 +958,7 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         Match(value, arms) => {
             ast_collect_var_refs_in_expr(value, names)
             for i in range(0, len(arms)) {
-                if arms[i].body != nil {
+                if arms[i].body != null {
                     ast_collect_var_refs_in_block(arms[i].body!, names)
                 }
                 ast_collect_var_refs_in_expr(arms[i].guard, names)
@@ -978,7 +979,7 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         IfLet(pattern, value, then_block, else_block) => {
             ast_collect_var_refs_in_expr(value, names)
             ast_collect_var_refs_in_block(then_block, names)
-            if else_block != nil {
+            if else_block != null {
                 ast_collect_var_refs_in_block(else_block!, names)
             }
         }
@@ -993,7 +994,7 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         Select(cases) => {
             for i in range(0, len(cases)) {
                 ast_collect_var_refs_in_expr(cases[i].expr, names)
-                if cases[i].body != nil {
+                if cases[i].body != null {
                     ast_collect_var_refs_in_block(cases[i].body!, names)
                 }
             }
@@ -1013,7 +1014,7 @@ func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>) {
 
 func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool> {
     let names = Dict<Sym, bool>()
-    if file == nil {
+    if file == null {
         return names
     }
     let blocks = file!.fb_children()
@@ -1021,7 +1022,7 @@ func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool> {
         let block = blocks[bi]
         let fns = block.fd_children()
         for fi in range(0, len(fns)) {
-            if fns[fi].body != nil {
+            if fns[fi].body != null {
                 ast_collect_call_names_block(fns[fi].body!, names)
             }
         }
@@ -1029,7 +1030,7 @@ func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool> {
         for ci in range(0, len(classes)) {
             let methods = classes[ci].cm_children()
             for mi in range(0, len(methods)) {
-                if methods[mi].body != nil {
+                if methods[mi].body != null {
                     ast_collect_call_names_block(methods[mi].body!, names)
                 }
             }
@@ -1041,13 +1042,13 @@ func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool> {
 // --- func_references_types ---
 
 func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bool {
-    if fn_.return_type != nil {
+    if fn_.return_type != null {
         let ret_names = Dict<Sym, bool>()
         ast_collect_type_names(fn_.return_type, ret_names)
         let keys = ret_names.keys()
         for i in range(0, len(keys)) {
             let entry = used_types.get(keys[i])
-            if entry != nil {
+            if entry != null {
                 return true
             }
         }
@@ -1058,8 +1059,8 @@ func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bo
 // --- merge_stdlib ---
 
 func merge_stdlib(file: File?, std_file: File?) {
-    if file == nil { return }
-    if std_file == nil { return }
+    if file == null { return }
+    if std_file == null { return }
 
     // Collect relation hints (interface names used in relations)
     let used_ifaces = Dict<Sym, bool>()
@@ -1067,7 +1068,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     for bi in range(0, len(blocks)) {
         let rels = blocks[bi].rd_children()
         for ri in range(0, len(rels)) {
-            if rels[ri].hint != nil {
+            if rels[ri].hint != null {
                 used_ifaces.set(sym(rels[ri].hint!.name), true)
             }
         }
@@ -1087,19 +1088,19 @@ func merge_stdlib(file: File?, std_file: File?) {
         let sb = std_blocks[bi]
         let ifaces = sb.id_children()
         for i in range(0, len(ifaces)) {
-            if ifaces[i].name != nil {
+            if ifaces[i].name != null {
                 std_iface_map.set(sym(ifaces[i].name!.name), ifaces[i])
             }
         }
         let classes = sb.cd_children()
         for i in range(0, len(classes)) {
-            if classes[i].name != nil {
+            if classes[i].name != null {
                 std_class_map.set(sym(classes[i].name!.name), classes[i])
             }
         }
         let fns = sb.fd_children()
         for i in range(0, len(fns)) {
-            if fns[i].name != nil {
+            if fns[i].name != null {
                 std_func_map.set(sym(fns[i].name!.name), fns[i])
             }
         }
@@ -1116,14 +1117,14 @@ func merge_stdlib(file: File?, std_file: File?) {
         let iname = queue[qi]
         qi = qi + 1
         let entry = std_iface_map.get(iname)
-        if entry != nil {
+        if entry != null {
             let iface = entry!.value
             let embeds = iface.ie_children()
             for ei in range(0, len(embeds)) {
-                if embeds[ei].name != nil {
+                if embeds[ei].name != null {
                     let emb_name = embeds[ei].name!
                     let already = used_ifaces.get(emb_name)
-                    if already == nil {
+                    if already == null {
                         used_ifaces.set(emb_name, true)
                         queue = append(queue, emb_name)
                     }
@@ -1139,7 +1140,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     for bi in range(0, len(blocks)) {
         let user_ifaces = blocks[bi].id_children()
         for i in range(0, len(user_ifaces)) {
-            if user_ifaces[i].name != nil {
+            if user_ifaces[i].name != null {
                 user_iface_names.set(sym(user_ifaces[i].name!.name), true)
             }
         }
@@ -1148,9 +1149,9 @@ func merge_stdlib(file: File?, std_file: File?) {
     for i in range(0, len(all_iface_keys)) {
         // Skip if user already defines this interface
         let user_has = user_iface_names.get(all_iface_keys[i])
-        if user_has != nil { continue }
+        if user_has != null { continue }
         let entry = std_iface_map.get(all_iface_keys[i])
-        if entry != nil {
+        if entry != null {
             std_ifaces = append(std_ifaces, entry!.value)
         }
     }
@@ -1160,7 +1161,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     let type_keys = used_types.keys()
     for i in range(0, len(type_keys)) {
         let entry = std_class_map.get(type_keys[i])
-        if entry != nil {
+        if entry != null {
             std_classes = append(std_classes, entry!.value)
         }
     }
@@ -1171,9 +1172,9 @@ func merge_stdlib(file: File?, std_file: File?) {
     for i in range(0, len(func_name_keys)) {
         let fname = func_name_keys[i]
         let cls_entry = std_class_map.get(fname)
-        if cls_entry != nil {
+        if cls_entry != null {
             let already = used_types.get(fname)
-            if already == nil {
+            if already == null {
                 used_types.set(fname, true)
                 std_classes = append(std_classes, cls_entry!.value)
             }
@@ -1186,7 +1187,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     for bi in range(0, len(blocks)) {
         let user_fns = blocks[bi].fd_children()
         for i in range(0, len(user_fns)) {
-            if user_fns[i].name != nil {
+            if user_fns[i].name != null {
                 user_defined_funcs.set(sym(user_fns[i].name!.name), true)
             }
         }
@@ -1200,25 +1201,25 @@ func merge_stdlib(file: File?, std_file: File?) {
         let fname = func_keys[i]
         // Skip stdlib functions that would shadow user-defined functions
         let user_has_func = user_defined_funcs.get(fname)
-        if user_has_func != nil { continue }
+        if user_has_func != null { continue }
         let fentry = std_func_map.get(fname)
-        if fentry == nil { continue }
+        if fentry == null { continue }
         let fn_ = fentry!.value
         let called = used_func_names.get(fname)
         let refs_types = ast_func_references_types(fn_, used_types)
-        if called != nil || refs_types {
+        if called != null || refs_types {
             std_funcs = append(std_funcs, fn_)
             merged_funcs.set(fname, true)
             // If function returns a stdlib class, merge that class too
-            if fn_.return_type != nil {
+            if fn_.return_type != null {
                 let ret_names = Dict<Sym, bool>()
                 ast_collect_type_names(fn_.return_type, ret_names)
                 let rkeys = ret_names.keys()
                 for ri in range(0, len(rkeys)) {
                     let cls_entry = std_class_map.get(rkeys[ri])
-                    if cls_entry != nil {
+                    if cls_entry != null {
                         let already_type = used_types.get(rkeys[ri])
-                        if already_type == nil {
+                        if already_type == null {
                             used_types.set(rkeys[ri], true)
                             std_classes = append(std_classes, cls_entry!.value)
                         }
@@ -1231,7 +1232,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // Collect stdlib relations whose participant types are being merged
     let merged_classes = Dict<Sym, bool>()
     for i in range(0, len(std_classes)) {
-        if std_classes[i].name != nil {
+        if std_classes[i].name != null {
             merged_classes.set(sym(std_classes[i].name!.name), true)
         }
     }
@@ -1243,7 +1244,7 @@ func merge_stdlib(file: File?, std_file: File?) {
         for ri in range(0, len(rels)) {
             let r = rels[ri]
             let mut key = ""
-            if r.hint != nil {
+            if r.hint != null {
                 key = r.hint!.name
             }
             key = f"{key}:{r.parent.type_name!.name}:{r.child.type_name!.name}"
@@ -1260,35 +1261,35 @@ func merge_stdlib(file: File?, std_file: File?) {
             let child_name = r.child.type_name!.name
 
             let mut key = ""
-            if r.hint != nil {
+            if r.hint != null {
                 key = r.hint!.name
             }
             key = f"{key}:{parent_name}:{child_name}"
             let exists = existing_rels.get(sym(key))
-            if exists != nil { continue }
+            if exists != null { continue }
 
             let parent_merged = merged_classes.get(sym(parent_name))
             let child_merged = merged_classes.get(sym(child_name))
-            if parent_merged != nil || child_merged != nil {
+            if parent_merged != null || child_merged != null {
                 std_relations = append(std_relations, r)
                 // Ensure the interface hint is merged
-                if r.hint != nil {
+                if r.hint != null {
                     let hint_name = r.hint!.name
                     let hint_used = used_ifaces.get(sym(hint_name))
-                    if hint_used == nil {
+                    if hint_used == null {
                         used_ifaces.set(sym(hint_name), true)
                         let hint_entry = std_iface_map.get(sym(hint_name))
-                        if hint_entry != nil {
+                        if hint_entry != null {
                             std_ifaces = append(std_ifaces, hint_entry!.value)
                             let embeds = hint_entry!.value.ie_children()
                             for ei in range(0, len(embeds)) {
-                                if embeds[ei].name != nil {
+                                if embeds[ei].name != null {
                                     let emb_n = embeds[ei].name!.name
                                     let emb_used = used_ifaces.get(sym(emb_n))
-                                    if emb_used == nil {
+                                    if emb_used == null {
                                         used_ifaces.set(sym(emb_n), true)
                                         let emb_entry = std_iface_map.get(sym(emb_n))
-                                        if emb_entry != nil {
+                                        if emb_entry != null {
                                             std_ifaces = append(std_ifaces, emb_entry!.value)
                                         }
                                     }
@@ -1298,16 +1299,16 @@ func merge_stdlib(file: File?, std_file: File?) {
                     }
                 }
                 // Ensure both participant types are merged
-                if parent_merged == nil {
+                if parent_merged == null {
                     let cls_entry = std_class_map.get(sym(parent_name))
-                    if cls_entry != nil {
+                    if cls_entry != null {
                         merged_classes.set(sym(parent_name), true)
                         std_classes = append(std_classes, cls_entry!.value)
                     }
                 }
-                if child_merged == nil {
+                if child_merged == null {
                     let cls_entry = std_class_map.get(sym(child_name))
-                    if cls_entry != nil {
+                    if cls_entry != null {
                         merged_classes.set(sym(child_name), true)
                         std_classes = append(std_classes, cls_entry!.value)
                     }
@@ -1324,14 +1325,14 @@ func merge_stdlib(file: File?, std_file: File?) {
         for i in range(0, len(all_func_keys)) {
             let fname = all_func_keys[i]
             let already = merged_funcs.get(fname)
-            if already != nil { continue }
+            if already != null { continue }
             let mut found = false
             for j in range(0, len(std_funcs)) {
-                if std_funcs[j].body != nil {
+                if std_funcs[j].body != null {
                     let calls = Dict<Sym, bool>()
                     ast_collect_call_names_block(std_funcs[j].body!, calls)
                     let call_entry = calls.get(fname)
-                    if call_entry != nil {
+                    if call_entry != null {
                         found = true
                         break
                     }
@@ -1339,20 +1340,20 @@ func merge_stdlib(file: File?, std_file: File?) {
             }
             if found {
                 let fentry = std_func_map.get(fname)
-                if fentry != nil {
+                if fentry != null {
                     let fn_ = fentry!.value
                     merged_funcs.set(fname, true)
                     std_funcs = append(std_funcs, fn_)
                     changed = true
-                    if fn_.return_type != nil {
+                    if fn_.return_type != null {
                         let ret_names = Dict<Sym, bool>()
                         ast_collect_type_names(fn_.return_type, ret_names)
                         let rkeys = ret_names.keys()
                         for ri in range(0, len(rkeys)) {
                             let cls_entry = std_class_map.get(rkeys[ri])
-                            if cls_entry != nil {
+                            if cls_entry != null {
                                 let cls_merged = merged_classes.get(rkeys[ri])
-                                if cls_merged == nil {
+                                if cls_merged == null {
                                     merged_classes.set(rkeys[ri], true)
                                     std_classes = append(std_classes, cls_entry!.value)
                                 }
@@ -1368,13 +1369,13 @@ func merge_stdlib(file: File?, std_file: File?) {
     for bi in range(0, len(std_blocks)) {
         let fns = std_blocks[bi].fd_children()
         for i in range(0, len(fns)) {
-            if fns[i].receiver_type != nil {
+            if fns[i].receiver_type != null {
                 let recv_name = fns[i].receiver_type!.name
                 let recv_merged = merged_classes.get(sym(recv_name))
-                if recv_merged != nil {
+                if recv_merged != null {
                     let fn_name = fns[i].name!.name
                     let already = merged_funcs.get(sym(fn_name))
-                    if already == nil {
+                    if already == null {
                         merged_funcs.set(sym(fn_name), true)
                         std_funcs = append(std_funcs, fns[i])
                     }
@@ -1387,13 +1388,13 @@ func merge_stdlib(file: File?, std_file: File?) {
     for i in range(0, len(std_classes)) {
         let wheres = std_classes[i].cwc_children()
         for wi in range(0, len(wheres)) {
-            if wheres[wi].constraint != nil {
+            if wheres[wi].constraint != null {
                 let cname = wheres[wi].constraint!.name
                 let already = used_ifaces.get(sym(cname))
-                if already == nil {
+                if already == null {
                     used_ifaces.set(sym(cname), true)
                     let iface_entry = std_iface_map.get(sym(cname))
-                    if iface_entry != nil {
+                    if iface_entry != null {
                         std_ifaces = append(std_ifaces, iface_entry!.value)
                     }
                 }
@@ -1403,13 +1404,13 @@ func merge_stdlib(file: File?, std_file: File?) {
     for i in range(0, len(std_funcs)) {
         let wheres = std_funcs[i].where_children()
         for wi in range(0, len(wheres)) {
-            if wheres[wi].constraint != nil {
+            if wheres[wi].constraint != null {
                 let cname = wheres[wi].constraint!.name
                 let already = used_ifaces.get(sym(cname))
-                if already == nil {
+                if already == null {
                     used_ifaces.set(sym(cname), true)
                     let iface_entry = std_iface_map.get(sym(cname))
-                    if iface_entry != nil {
+                    if iface_entry != null {
                         std_ifaces = append(std_ifaces, iface_entry!.value)
                     }
                 }
@@ -1422,14 +1423,14 @@ func merge_stdlib(file: File?, std_file: File?) {
     for bi in range(0, len(std_blocks)) {
         let consts = std_blocks[bi].con_children()
         for i in range(0, len(consts)) {
-            if consts[i].name != nil {
+            if consts[i].name != null {
                 std_const_map.set(sym(consts[i].name!.name), consts[i])
             }
         }
     }
     let merged_var_refs = Dict<Sym, bool>()
     for i in range(0, len(std_funcs)) {
-        if std_funcs[i].body != nil {
+        if std_funcs[i].body != null {
             ast_collect_var_refs_in_block(std_funcs[i].body!, merged_var_refs)
         }
     }
@@ -1437,9 +1438,9 @@ func merge_stdlib(file: File?, std_file: File?) {
     let const_keys = std_const_map.keys()
     for i in range(0, len(const_keys)) {
         let ref_entry = merged_var_refs.get(const_keys[i])
-        if ref_entry != nil {
+        if ref_entry != null {
             let c_entry = std_const_map.get(const_keys[i])
-            if c_entry != nil {
+            if c_entry != null {
                 std_constants = append(std_constants, c_entry!.value)
             }
         }

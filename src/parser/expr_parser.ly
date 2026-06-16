@@ -1278,6 +1278,13 @@ lyric parser {
       if self.peek().kind == PColon {
         result = true
       }
+    } else if (self.peek().kind == LIntLit || self.peek().kind == LFloatLit ||
+               self.peek().kind == LStringLit || self.peek().kind == KTrue ||
+               self.peek().kind == KFalse || self.peek().kind == KNil ||
+               self.peek().kind == OMinus || self.peek().kind == PLParen ||
+               self.peek().kind == PLBracket) {
+      // Positional struct literal: starts with a literal value or expression
+      result = true
     }
     self.lex!.restore_state(saved)
     self.pushed = pushed_saved

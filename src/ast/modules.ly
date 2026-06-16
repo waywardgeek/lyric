@@ -39,13 +39,13 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
     let pkg_dir = path_join([module_root, imp.path])
 
     if !file_exists(pkg_dir) {
-      return (nil, f"import \"{alias}\": directory {pkg_dir} not found")
+      return (null, f"import \"{alias}\": directory {pkg_dir} not found")
     }
 
     // List .ly files in pkg directory
     let entries = list_dir(pkg_dir)
     if len(entries) == 0 {
-      return (nil, f"import \"{alias}\": cannot read directory {pkg_dir}")
+      return (null, f"import \"{alias}\": cannot read directory {pkg_dir}")
     }
 
     let mut pkg_files: [File?] = []
@@ -55,18 +55,18 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
         let file_path = path_join([pkg_dir, entry])
         let read_result = read_file(file_path)
         if !read_result._1 {
-          return (nil, f"import \"{alias}\": cannot read {file_path}")
+          return (null, f"import \"{alias}\": cannot read {file_path}")
         }
         let parse_result = parse_file(read_result._0, file_path)
         if isnull(parse_result._0) {
-          return (nil, f"import \"{alias}\": parse error in {file_path}: {parse_result._1}")
+          return (null, f"import \"{alias}\": parse error in {file_path}: {parse_result._1}")
         }
         pkg_files = append(pkg_files, parse_result._0)
       }
     }
 
     if len(pkg_files) == 0 {
-      return (nil, f"import \"{alias}\": no .ly files in {pkg_dir}")
+      return (null, f"import \"{alias}\": no .ly files in {pkg_dir}")
     }
 
     // Merge package files
@@ -134,7 +134,7 @@ func lookup_name(name: string, orig: [string], prefixed: [string]) -> string {
 
 // prefix_sym creates a new Sym with prefix + original name.
 func prefix_sym(s: Sym?, prefix: string) -> Sym? {
-  if isnull(s) { return nil }
+  if isnull(s) { return null }
   return sym(prefix + s!.get_name())
 }
 

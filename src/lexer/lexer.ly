@@ -74,7 +74,6 @@ lyric lexer {
     d.set(`from`, KFrom)
     d.set(`true`, KTrue)
     d.set(`false`, KFalse)
-    d.set(`nil`, KNil)
     d.set(`null`, KNil)
     d.set(`let`, KLet)
     d.set(`if`, KIf)

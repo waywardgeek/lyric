@@ -11,7 +11,7 @@ lyric collections {
 
     func pop(mut self) -> T? {
       if len(self.items) == 0 {
-        return nil
+        return null
       }
       let last = self.items[len(self.items) - 1]
       self.items = self.items[:len(self.items) - 1]
@@ -24,7 +24,7 @@ lyric collections {
 
     func peek(self) -> T? {
       if len(self.items) == 0 {
-        return nil
+        return null
       }
       return self.items[len(self.items) - 1]
     }

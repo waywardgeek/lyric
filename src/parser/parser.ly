@@ -360,7 +360,7 @@ lyric parser {
     self.next()  // consume 'import'
 
     // Three forms:
-    //   import "path"              → alias=nil, path="path"
+    //   import "path"              → alias=null, path="path"
     //   import ident               → alias=ident, path=ident
     //   import ident from "path"   → alias=ident, path="path"
     if self.peek().kind == LStringLit {
@@ -536,6 +536,9 @@ lyric parser {
       } else {
         let field = self.parse_field()?
         array_append<StructDecl, Field>(s, field!)
+      }
+      if self.peek().kind == PComma {
+        self.next()  // allow optional comma between fields
       }
       self.skip_newlines()
     }
@@ -996,6 +999,9 @@ lyric parser {
           let field = self.parse_field()?
           array_append<ClassDecl, Field>(cls, field!)
         }
+      }
+      if self.peek().kind == PComma {
+        self.next()  // allow optional comma between class members
       }
       self.skip_newlines()
     }

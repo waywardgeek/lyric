@@ -7,7 +7,7 @@ lyric inference_demo {
 
   func first<T>(xs: [T]) -> T? {
     if len(xs) == 0 {
-      return nil
+      return null
     }
     return xs[0]
   }

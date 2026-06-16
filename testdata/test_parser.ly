@@ -380,7 +380,7 @@ lyric parser_tests {
   }
 
   func test_nil_literal() {
-    let b = tp_parse("lyric t { func f() { let x = nil } }")
+    let b = tp_parse("lyric t { func f() { let x = null } }")
     let s = tp_first_stmt(b)
     match s.kind {
       VarDecl(_, _, _, _, value) => {

@@ -79,7 +79,7 @@ The optimizer runs after lowering to refine the LIR. One of its most critical ta
 
 Another vital optimization is **multi-return destructuring**. Forge allows functions to return multiple values, such as `(T, error)`. The lowerer initially represents this as a single temporary of type `LTyErrorResult`. The optimizer identifies patterns where this temporary is immediately destructured into separate variables and replaces them with a single `LStmtMultiAssign`. This simplifies target code generation for multi-return values.
 
-Additional passes include **destructuring extract pairs** for the try operator, **fixing nil/zero values** for backend compatibility, **coercing for-range index types**, and **wrapping optional returns**.
+Additional passes include **destructuring extract pairs** for the try operator, **fixing null/zero values** for backend compatibility, **coercing for-range index types**, and **wrapping optional returns**.
 
 ### Monomorphization
 

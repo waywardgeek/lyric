@@ -632,14 +632,14 @@ class ExprEval {
 
     func pop_value(self) -> f64? {
         if self.values.len() == 0 {
-            return nil
+            return null
         }
         return self.values.pop()
     }
 
     func pop_op(self) -> Op? {
         if self.ops.len() == 0 {
-            return nil
+            return null
         }
         return self.ops.pop()
     }
@@ -661,7 +661,7 @@ class ExprEval {
 
     func result(self) -> f64? {
         if self.values.len() == 0 {
-            return nil
+            return null
         }
         return self.values[0]
     }
@@ -674,7 +674,7 @@ Several things are new here. Let's take them in order.
 
 **Methods take `self`.** A method declared inside a class body receives the instance as `self`. Since classes are references, `self` is always mutable — you can assign to `self.values` without any special annotation. (Structs are different, as we'll see in §3.7.)
 
-**The `?` in return types.** `pop_value` returns `f64?` — a value that might be `nil`. This is Lyric's optional type, and it's how the evaluator handles the case where you try to pop from an empty stack. We'll cover optionals properly in §3.4.
+**The `?` in return types.** `pop_value` returns `f64?` — a value that might be `null`. This is Lyric's optional type, and it's how the evaluator handles the case where you try to pop from an empty stack. We'll cover optionals properly in §3.4.
 
 ## 3.2 Using the Evaluator
 
@@ -727,7 +727,7 @@ The rule of thumb: if it's data, use a struct. If it's a thing with behavior and
 
 ## 3.4 Optionals
 
-`pop_value` returns `f64?` — an `f64` that might be absent. The `?` suffix makes any type optional. An optional value is either the underlying type or `nil`:
+`pop_value` returns `f64?` — an `f64` that might be absent. The `?` suffix makes any type optional. An optional value is either the underlying type or `null`:
 
 ```lyric
 func find(xs: [i32], target: i32) -> i32? {
@@ -736,7 +736,7 @@ func find(xs: [i32], target: i32) -> i32? {
             return x
         }
     }
-    return nil
+    return null
 }
 
 func main() {
@@ -766,9 +766,9 @@ direct unwrap: 20
 
 Three operations on optionals:
 
-- **`isnull(x)`** — returns `true` if `x` is `nil`
-- **`x!`** — unwraps the value, crashes if `nil` (the "I know it's there" operator)
-- **`nil`** — the absent value (Lyric also accepts `null` — they're interchangeable, this book uses `nil`)
+- **`isnull(x)`** — returns `true` if `x` is `null`
+- **`x!`** — unwraps the value, crashes if `null` (the "I know it's there" operator)
+- **`null`** — the absent value
 
 You might wonder why we use `isnull(x)` + `x!` instead of the `match` from Chapter 2. Both work. Use `match` when you need to destructure or bind the inner value to a new name. Use `isnull`/`!` for simple presence checks — it's more concise and the idiomatic choice for most Lyric code.
 
@@ -904,7 +904,7 @@ class Stack {
 
     func pop(self) -> f64? {
         if self.items.len() == 0 {
-            return nil
+            return null
         }
         let last = self.items[self.items.len() - 1]
         self.items = self.items[:self.items.len() - 1]
@@ -1341,7 +1341,7 @@ Expected error: division by zero
 
 This is the entire error model. No exceptions, no stack unwinding, no `try`/`catch`. The error is in the return type, visible in the signature, and the caller decides what to do. If you've written Go, this is familiar. If you're coming from Rust, think of `Result<T, E>` but without needing to name the error type — `error` is always the interface.
 
-Both `null` and `nil` work for the no-error case. I use `null` in this book; the compiler accepts either.
+Use `null` for the no-error case.
 
 ## 5.2 The ? Operator
 
@@ -1680,7 +1680,7 @@ This extends to collection types:
 ```lyric
 func first<T>(xs: [T]) -> T? {
     if len(xs) == 0 {
-        return nil
+        return null
     }
     return xs[0]
 }
@@ -1827,14 +1827,14 @@ class Stack<T> {
 
     pub func pop(self) -> T? {
         if self.items.len() == 0 {
-            return nil
+            return null
         }
         return self.items.pop()
     }
 
     pub func peek(self) -> T? {
         if self.items.len() == 0 {
-            return nil
+            return null
         }
         return self.items[self.items.len() - 1]
     }
@@ -2673,6 +2673,24 @@ pub interface MyList<P, C> {
 `func P.add(self, child: C)` — a method on `P`, with `self` as the receiver. When `MyList` is bound to concrete types, `P.add` becomes a real method on the concrete parent class:
 
 ```lyric
+pub interface MyList<P, C> {
+    field P.items: [C]
+    field C.owner: P?
+    field C.pos: i32
+
+    pub func P.add(self, child: C) {
+        let kids = self.items()
+        let num: i32 = len(kids)
+        child.set_pos(num)
+        child.set_owner(self)
+        self.set_items(append(kids, child))
+    }
+
+    pub func P.count(self) -> i32 {
+        return len(self.items()) as i32
+    }
+}
+
 class Widget { label: string }
 class Panel {}
 
@@ -3560,7 +3578,7 @@ For shared mutable state that doesn't fit the channel model, Lyric provides scop
 
 ```lyric
 func main() {
-    let mut mu: Lock
+    let mut mu: lock
     let mut count: i32 = 0
 
     lock(mu) {
@@ -3576,7 +3594,7 @@ func main() {
 
 Output: `final count: 11`.
 
-`Lock` is a type that zero-initializes — `let mut mu: Lock` is valid without a constructor call. The C backend generates `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER`. `lock(mu) { ... }` acquires the mutex, runs the block, and releases it — even if the block returns early. In C, this compiles to `pthread_mutex_lock` and `pthread_mutex_unlock` bracketing the block body. The scoped syntax makes it impossible to forget the unlock.
+`lock` is a built-in type that zero-initializes — `let mut mu: lock` is valid without a constructor call. The C backend generates `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER`. `lock(mu) { ... }` acquires the mutex, runs the block, and releases it — even if the block returns early. In C, this compiles to `pthread_mutex_lock` and `pthread_mutex_unlock` bracketing the block body. The scoped syntax makes it impossible to forget the unlock.
 
 ### 12.6 Guarded Fields
 
@@ -3585,7 +3603,7 @@ Locks protect critical sections, but nothing stops you from accessing a guarded 
 ```lyric
 class Counter {
     count: i32 guarded_by(mu)
-    mu: Lock
+    mu: lock
     label: string
 
     pub func increment(self) {
@@ -4157,7 +4175,7 @@ The compiler is the language's most comprehensive test. If a feature works in th
 | Keyword | Purpose |
 |---------|---------|
 | `true` / `false` | Boolean literals |
-| `nil` / `null` | Null literal (both accepted, identical) |
+| `null` | Null literal |
 
 **Contextual keywords** — these are identifiers in most positions, keywords only in specific contexts:
 
@@ -4860,7 +4878,7 @@ This appendix maps concepts you already know to their Lyric equivalents. It's a 
 | Immutable binding | — | `let x = 5;` | `const int x = 5;` | `let x = 5` |
 | Mutable binding | `x := 5` | `let mut x = 5;` | `int x = 5;` | `let mut x = 5` |
 | Pass struct by mutable ref | pointer `f(&p)` | `f(&mut p)` | `f(p)` (reference) | `f(mut p)` — `mut` at both call and declaration site |
-| Null/nil | `nil` | `None` | `nullptr` | `null` or `nil` (both accepted) |
+| Null | `null` | `None` | `nullptr` | `null` |
 | Optional type | pointer `*T` | `Option<T>` | `std::optional<T>` | `T?` |
 | Unwrap optional | `*p` (no safety) | `.unwrap()` | `.value()` | `x!` |
 

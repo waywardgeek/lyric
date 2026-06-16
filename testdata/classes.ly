@@ -34,7 +34,7 @@ class Stack<T> {
 
     func pop(self) -> T? {
         if len(self.items) == 0 {
-            return nil
+            return null
         }
         let last = self.items[len(self.items) - 1]
         self.items = self.items[:len(self.items) - 1]

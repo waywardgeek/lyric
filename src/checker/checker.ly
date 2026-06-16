@@ -23,7 +23,7 @@ lyric checker {
     Bool
     String
     Void     // unit type (no value)
-    Nil      // nil literal — assignable to optional, class, interface, error
+    Nil      // null literal — assignable to optional, class, interface, error
     Any
     Error    // error interface
     Lock
@@ -92,13 +92,13 @@ lyric checker {
 
   func Scope.lookup(self, name: string) -> Type? {
     let entry = self.vars.get(sym(name))
-    if entry != nil {
+    if entry != null {
       return entry!.value
     }
-    if self.parent != nil {
+    if self.parent != null {
       return self.parent!.lookup(name)
     }
-    return nil
+    return null
   }
 
   func Scope.define(self, name: string, t: Type) {
@@ -121,7 +121,7 @@ lyric checker {
     // Panic if overwriting a fully-registered type (has methods or fields).
     // Phase 0 stubs have empty methods/fields, so Phase 1 overwrites are OK.
     let existing = self.lookup(name)
-    if existing != nil {
+    if existing != null {
       let eem = existing!.methods.keys()
       let eef = existing!.fields.keys()
       if len(eem) > 0 || len(eef) > 0 {
@@ -134,10 +134,10 @@ lyric checker {
 
   func Registry.lookup(self, name: string) -> TypeInfo? {
     let entry = self.types.get(sym(name))
-    if entry != nil {
+    if entry != null {
       return entry!.value
     }
-    return nil
+    return null
   }
 
   // =====================================================================
@@ -158,9 +158,9 @@ lyric checker {
   func new_checker() -> Checker {
     let c = Checker {
       registry: new_registry(),
-      scope: new_scope(nil),
+      scope: new_scope(null),
       errors: [],
-      current_func_return: nil,
+      current_func_return: null,
       current_func_name: "",
       iface_decls: Dict<Sym, InterfaceDecl>(),
       method_type_args: Dict<Sym, [TypeExpr]>(),
@@ -174,7 +174,7 @@ lyric checker {
   }
 
   func Checker.pop_scope(self) {
-    if self.scope.parent != nil {
+    if self.scope.parent != null {
       self.scope = self.scope.parent!
     }
   }
@@ -425,7 +425,7 @@ lyric checker {
           Tuple(fields_b) => {
             if len(fields_a) != len(fields_b) { return false }
             for i in range(0, len(fields_a)) {
-              if fields_a[i].type_val != nil && fields_b[i].type_val != nil {
+              if fields_a[i].type_val != null && fields_b[i].type_val != null {
                 if !types_equal(fields_a[i].type_val!, fields_b[i].type_val!) { return false }
               }
             }
@@ -532,7 +532,7 @@ lyric checker {
       Nil => {
         match to.kind {
           Optional(_) | Class(_) | Interface(_) | Error | Any => { return true }
-          _ => { return true }  // Lyric currently allows nil for all types
+          _ => { return true }  // Lyric currently allows null for all types
         }
       }
       _ => {}
@@ -621,7 +621,7 @@ lyric checker {
         let src_name = type_name(src)
         if src_name != "" {
           let info = self.registry.lookup(src_name)
-          if info != nil {
+          if info != null {
             for iname in info!.implements_list {
               if iname == iface_name { return true }
             }
@@ -690,7 +690,7 @@ lyric checker {
     match pattern.kind {
       TypeVar(name) => {
         let existing = bindings.get(sym(name))
-        if existing != nil {
+        if existing != null {
           // Already bound — check compatibility
           return types_equal(existing!.value, concrete)
         }
@@ -759,7 +759,7 @@ lyric checker {
           Tuple(fields_c) => {
             if len(fields_p) != len(fields_c) { return false }
             for i in range(0, len(fields_p)) {
-              if fields_p[i].type_val != nil && fields_c[i].type_val != nil {
+              if fields_p[i].type_val != null && fields_c[i].type_val != null {
                 if !match_type_vars(fields_p[i].type_val!, fields_c[i].type_val!, bindings) {
                   return false
                 }
@@ -793,7 +793,7 @@ lyric checker {
     match t.kind {
       TypeVar(name) => {
         let bound = bindings.get(sym(name))
-        if bound != nil { return bound!.value }
+        if bound != null { return bound!.value }
         return t
       }
       Optional(inner) => {
@@ -821,8 +821,8 @@ lyric checker {
       Tuple(fields) => {
         let mut new_fields: [TupleFieldType] = []
         for f in fields {
-          let mut nft: Type? = nil
-          if f.type_val != nil {
+          let mut nft: Type? = null
+          if f.type_val != null {
             nft = substitute_type(f.type_val!, bindings)
           }
           append(new_fields, TupleFieldType { name: f.name, type_val: nft })
@@ -906,8 +906,8 @@ lyric checker {
 
   func type_to_type_expr(t: Type) -> TypeExpr {
     let zero_span = Span {
-      start: Pos { file: nil, line: 0, column: 0 },
-      end: Pos { file: nil, line: 0, column: 0 },
+      start: Pos { file: null, line: 0, column: 0 },
+      end: Pos { file: null, line: 0, column: 0 },
     }
     match t.kind {
       Int => {
@@ -973,11 +973,11 @@ lyric checker {
       Tuple(fields) => {
         let mut tfields: [TupleField] = []
         for f in fields {
-          let mut te: TypeExpr? = nil
-          if f.type_val != nil {
+          let mut te: TypeExpr? = null
+          if f.type_val != null {
             te = type_to_type_expr(f.type_val!)
           }
-          append(tfields, TupleField { name: nil, type_expr: te })
+          append(tfields, TupleField { name: null, type_expr: te })
         }
         return TypeExpr { kind: TypeExprKind.Tuple(tfields), span: zero_span }
       }
@@ -1006,8 +1006,8 @@ lyric checker {
       }
       ErrorResult(ok, err) => {
         let fields = [
-          TupleField { name: nil, type_expr: type_to_type_expr(ok) },
-          TupleField { name: nil, type_expr: type_to_type_expr(err) },
+          TupleField { name: null, type_expr: type_to_type_expr(ok) },
+          TupleField { name: null, type_expr: type_to_type_expr(err) },
         ]
         return TypeExpr { kind: TypeExprKind.Tuple(fields), span: zero_span }
       }
@@ -1054,7 +1054,7 @@ lyric checker {
       }
       Tuple(fields) => {
         for f in fields {
-          if f.type_val != nil && type_contains_var(f.type_val!) { return true }
+          if f.type_val != null && type_contains_var(f.type_val!) { return true }
         }
         return false
       }
@@ -1084,12 +1084,12 @@ lyric checker {
       Tuple(fields) => {
         let mut tfields: [TupleFieldType] = []
         for f in fields {
-          let mut ft: Type? = nil
-          if f.type_expr != nil {
+          let mut ft: Type? = null
+          if f.type_expr != null {
             ft = self.resolve_type_expr(f.type_expr!)
           }
           let mut fname = ""
-          if f.name != nil { fname = sym_to_string(f.name!) }
+          if f.name != null { fname = sym_to_string(f.name!) }
           append(tfields, TupleFieldType { name: fname, type_val: ft })
         }
         return make_tuple_type(tfields)
@@ -1137,7 +1137,7 @@ lyric checker {
 
     // Check scope first (type vars, aliases, modules)
     let sv = self.scope.lookup(name)
-    if sv != nil {
+    if sv != null {
       match sv!.kind {
         TypeVar(_) | Module(_) => { return sv! }
         _ => {}
@@ -1146,7 +1146,7 @@ lyric checker {
 
     // Check registry
     let info = self.registry.lookup(name)
-    if info != nil {
+    if info != null {
       // If generic type with args, substitute
       if len(args) > 0 && len(info!.type_param_names) > 0 {
         let bindings = Dict<Sym, Type>()
@@ -1186,7 +1186,7 @@ lyric checker {
     let mut tpnames: [string] = []
     let tps = f.fp_children()
     for tp in tps {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         append(tpnames, tpname)
       }
@@ -1203,7 +1203,7 @@ lyric checker {
     let params = f.param_children()
     for p in params {
       if !p.is_self {
-        if p.type_expr != nil {
+        if p.type_expr != null {
           append(param_types, self.resolve_type_expr(p.type_expr!))
         } else {
           append(param_types, make_any_type())
@@ -1211,7 +1211,7 @@ lyric checker {
       }
     }
     let mut ret = make_void_type()
-    if f.return_type != nil {
+    if f.return_type != null {
       ret = self.resolve_type_expr(f.return_type!)
     }
 
@@ -1231,7 +1231,7 @@ lyric checker {
     // Register imports as module types
     let imports = block.imp_children()
     for imp in imports {
-      if imp.alias != nil {
+      if imp.alias != null {
         let alias = sym_to_string(imp.alias!)
         self.scope.define(alias, make_module_type(alias))
       }
@@ -1239,7 +1239,7 @@ lyric checker {
 
     let ifaces = block.id_children()
     for iface in ifaces {
-      if iface.name != nil {
+      if iface.name != null {
         let iname = sym_to_string(iface.name!)
         let stub = TypeInfo {
           type_val: make_interface_type(iname),
@@ -1256,7 +1256,7 @@ lyric checker {
     }
     let structs = block.sd_children()
     for s in structs {
-      if s.name != nil {
+      if s.name != null {
         let sname = sym_to_string(s.name!)
         let stub = TypeInfo {
           type_val: make_struct_type(sname),
@@ -1273,7 +1273,7 @@ lyric checker {
     }
     let classes = block.cd_children()
     for c in classes {
-      if c.name != nil {
+      if c.name != null {
         let cname = sym_to_string(c.name!)
         let stub = TypeInfo {
           type_val: make_class_type(cname),
@@ -1290,7 +1290,7 @@ lyric checker {
     }
     let enums = block.ed_children()
     for e in enums {
-      if e.name != nil {
+      if e.name != null {
         let ename = sym_to_string(e.name!)
         let stub = TypeInfo {
           type_val: make_enum_type(ename),
@@ -1319,7 +1319,7 @@ lyric checker {
 
     // Register interfaces first (classes may implement them)
     for iface in ifaces {
-      let dn = if iface.name != nil { sym_to_string(iface.name!) } else { "?" }
+      let dn = if iface.name != null { sym_to_string(iface.name!) } else { "?" }
       self.register_interface(iface)
     }
 
@@ -1352,7 +1352,7 @@ lyric checker {
     // Register type aliases
     let aliases = block.ta_children()
     for a in aliases {
-      if a.name != nil && a.type_expr != nil {
+      if a.name != null && a.type_expr != null {
         let t = self.resolve_type_expr(a.type_expr!)
         let aname = sym_to_string(a.name!)
         let info = TypeInfo {
@@ -1373,15 +1373,15 @@ lyric checker {
     // Register constants
     let consts = block.con_children()
     for c in consts {
-      if c.name != nil {
+      if c.name != null {
         let cname = sym_to_string(c.name!)
         let mut ct = make_any_type()
-        if c.type_expr != nil {
+        if c.type_expr != null {
           ct = self.resolve_type_expr(c.type_expr!)
-          if c.value != nil {
+          if c.value != null {
             self.check_expr(c.value!)
           }
-        } else if c.value != nil {
+        } else if c.value != null {
           ct = self.check_expr(c.value!)
         }
         self.scope.define(cname, ct)
@@ -1414,19 +1414,19 @@ lyric checker {
     for blk in all_blocks {
       let funcs = blk.fd_children()
       for f in funcs {
-        if f.name == nil { continue }
-        if f.receiver_type == nil { continue }
+        if f.name == null { continue }
+        if f.receiver_type == null { continue }
         let rname = sym_to_string(f.receiver_type!)
 
         let type_info = self.registry.lookup(rname)
-        if type_info != nil { continue }
+        if type_info != null { continue }
 
         let where_clauses = f.where_children()
         for wc in where_clauses {
-          if wc.constraint == nil { continue }
+          if wc.constraint == null { continue }
           let iface_name = sym_to_string(wc.constraint!)
           let iface_entry = self.iface_decls.get(sym(iface_name))
-          if iface_entry == nil { continue }
+          if iface_entry == null { continue }
           let iface_decl = iface_entry!.value
           let itp = iface_decl.itp_children()
 
@@ -1447,7 +1447,7 @@ lyric checker {
           if recv_param_idx < 0 { continue }
 
           for ib in all_impls {
-            if ib.interface_name == nil { continue }
+            if ib.interface_name == null { continue }
             if sym_to_string(ib.interface_name!) != iface_name { continue }
 
             let impl_args = ib.ib_arg_children()
@@ -1458,7 +1458,7 @@ lyric checker {
             let mut limit = len(itp)
             if len(impl_args) < limit { limit = len(impl_args) }
             while k < limit as i32 {
-              if itp[k].name != nil {
+              if itp[k].name != null {
                 subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k]))
               }
               k = k + 1
@@ -1469,11 +1469,11 @@ lyric checker {
             if concrete_name == "" { continue }
 
             let cinfo = self.registry.lookup(concrete_name)
-            if cinfo == nil { continue }
+            if cinfo == null { continue }
 
             let fname = sym_to_string(f.name!)
             let existing = cinfo!.methods.get(sym(fname))
-            if existing != nil { continue }
+            if existing != null { continue }
 
             let ft = self.func_decl_to_type(f)
             let substituted = substitute_type(ft, subst)
@@ -1482,7 +1482,7 @@ lyric checker {
               Func(sp, sr, stpn) => {
                 let mut remaining: [string] = []
                 for tpn in stpn {
-                  if subst.get(sym(tpn)) == nil {
+                  if subst.get(sym(tpn)) == null {
                     append(remaining, tpn)
                   }
                 }
@@ -1493,10 +1493,10 @@ lyric checker {
             let mut ta: [TypeExpr] = []
             let orig_tps = f.fp_children()
             for tp in orig_tps {
-              if tp.name != nil {
+              if tp.name != null {
                 let tpname = sym_to_string(tp.name!)
                 let bound = subst.get(sym(tpname))
-                if bound != nil {
+                if bound != null {
                   append(ta, type_to_type_expr(bound!.value))
                 }
               }
@@ -1512,7 +1512,7 @@ lyric checker {
   }
 
   func Checker.register_interface(self, iface: InterfaceDecl) {
-    if iface.name == nil { return }
+    if iface.name == null { return }
     let iname = sym_to_string(iface.name!)
 
     // Save for checkImplements
@@ -1520,7 +1520,7 @@ lyric checker {
 
     // Use existing TypeInfo if present (e.g. from Phase 0)
     let mut info_opt = self.registry.lookup(iname)
-    if info_opt == nil {
+    if info_opt == null {
       let info = TypeInfo {
         type_val: make_interface_type(iname),
         fields: Dict<Sym, Type>(),
@@ -1539,7 +1539,7 @@ lyric checker {
     // Register type params
     let itparams = iface.itp_children()
     for tp in itparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         // Avoid duplicates if already registered
         let mut found = false
@@ -1548,7 +1548,7 @@ lyric checker {
         }
         if !found {
           append(info.type_param_names, tpname)
-          if tp.constraint != nil {
+          if tp.constraint != null {
             append(info.type_param_constraints, sym_to_string(tp.constraint!))
           } else {
             append(info.type_param_constraints, "")
@@ -1560,7 +1560,7 @@ lyric checker {
     // Register type params in temporary scope for resolving method signatures
     self.push_scope()
     for tp in itparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         self.scope.define(tpname, make_typevar_type(tpname))
       }
@@ -1570,7 +1570,7 @@ lyric checker {
     let imethods = iface.im_children()
     for m in imethods {
       let ft = self.func_decl_to_type(m)
-      if m.name != nil {
+      if m.name != null {
         let mn = sym_to_string(m.name!)
         info.methods.set(sym(mn), ft)
       }
@@ -1581,12 +1581,12 @@ lyric checker {
   }
 
   func Checker.register_struct(self, s: StructDecl) {
-    if s.name == nil { return }
+    if s.name == null { return }
     let sname = sym_to_string(s.name!)
 
     // Use existing TypeInfo if present (e.g. from Phase 0)
     let mut info_opt = self.registry.lookup(sname)
-    if info_opt == nil {
+    if info_opt == null {
       let info = TypeInfo {
         type_val: make_struct_type(sname),
         fields: Dict<Sym, Type>(),
@@ -1604,7 +1604,7 @@ lyric checker {
 
     let stparams = s.stp_children()
     for tp in stparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         let mut found = false
         for existing_tp in info.type_param_names {
@@ -1619,7 +1619,7 @@ lyric checker {
     // Push scope for type params
     self.push_scope()
     for tp in stparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         self.scope.define(tpname, make_typevar_type(tpname))
       }
@@ -1627,16 +1627,16 @@ lyric checker {
 
     let sfields = s.sf_children()
     for f in sfields {
-      if f.name != nil {
+      if f.name != null {
         let fname = sym_to_string(f.name!)
         let mut ft = make_any_type()
-        if f.type_expr != nil {
+        if f.type_expr != null {
           ft = self.resolve_type_expr(f.type_expr!)
         }
         info.fields.set(sym(fname), ft)
         append(info.field_order, fname)
         // Check default expression
-        if f.default_value != nil {
+        if f.default_value != null {
           self.check_expr(f.default_value!)
         }
       }
@@ -1647,12 +1647,12 @@ lyric checker {
   }
 
   func Checker.register_class(self, cls: ClassDecl) {
-    if cls.name == nil { return }
+    if cls.name == null { return }
     let cname = sym_to_string(cls.name!)
 
     // Use existing TypeInfo if present (e.g. from Phase 0 or earlier impl blocks)
     let mut info_opt = self.registry.lookup(cname)
-    if info_opt == nil {
+    if info_opt == null {
       let info = TypeInfo {
         type_val: make_class_type(cname),
         fields: Dict<Sym, Type>(),
@@ -1671,7 +1671,7 @@ lyric checker {
     let ctparams = cls.ctp_children()
     let mut type_var_args: [Type] = []
     for tp in ctparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         append(info.type_param_names, tpname)
         append(type_var_args, make_typevar_type(tpname))
@@ -1687,7 +1687,7 @@ lyric checker {
     // Push scope for type params during field/method resolution
     self.push_scope()
     for tp in ctparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         self.scope.define(tpname, make_typevar_type(tpname))
       }
@@ -1695,15 +1695,15 @@ lyric checker {
 
     let cfields = cls.cf_children()
     for f in cfields {
-      if f.name != nil {
+      if f.name != null {
         let fname = sym_to_string(f.name!)
         let mut ft = make_any_type()
-        if f.type_expr != nil {
+        if f.type_expr != null {
           ft = self.resolve_type_expr(f.type_expr!)
         }
         info.fields.set(sym(fname), ft)
         append(info.field_order, fname)
-        if f.default_value != nil {
+        if f.default_value != null {
           self.check_expr(f.default_value!)
         }
       }
@@ -1712,7 +1712,7 @@ lyric checker {
     // Register methods
     let cmethods = cls.cm_children()
     for m in cmethods {
-      if m.name != nil {
+      if m.name != null {
         let ft = self.func_decl_to_type(m)
         info.methods.set(sym(sym_to_string(m.name!)), ft)
       }
@@ -1727,12 +1727,12 @@ lyric checker {
 
     // Check for explicit constructor
     for m in cmethods {
-      if m.name != nil && sym_to_string(m.name!) == cname {
+      if m.name != null && sym_to_string(m.name!) == cname {
         has_explicit_ctor = true
         let cparams = m.param_children()
         for p in cparams {
           if !p.is_self {
-            if p.type_expr != nil {
+            if p.type_expr != null {
               append(ctor_params, self.resolve_type_expr(p.type_expr!))
             } else {
               append(ctor_params, make_any_type())
@@ -1745,9 +1745,9 @@ lyric checker {
     let mut tpnames: [string] = []
     let mut tpconstraints: [string] = []
     for tp in ctparams {
-      if tp.name != nil {
+      if tp.name != null {
         append(tpnames, sym_to_string(tp.name!))
-        if tp.constraint != nil {
+        if tp.constraint != null {
           append(tpconstraints, sym_to_string(tp.constraint!))
         } else {
           append(tpconstraints, "")
@@ -1764,13 +1764,13 @@ lyric checker {
   }
 
   func Checker.register_enum(self, e: EnumDecl) {
-    if e.name == nil { return }
+    if e.name == null { return }
     let ename = sym_to_string(e.name!)
     let enum_type = make_enum_type(ename)
 
     // Use existing TypeInfo if present (e.g. from Phase 0)
     let mut info_opt = self.registry.lookup(ename)
-    if info_opt == nil {
+    if info_opt == null {
       let info = TypeInfo {
         type_val: enum_type,
         fields: Dict<Sym, Type>(),
@@ -1788,7 +1788,7 @@ lyric checker {
 
     let etparams = e.etp_children()
     for tp in etparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         let mut found = false
         for existing_tp in info.type_param_names {
@@ -1802,7 +1802,7 @@ lyric checker {
 
     let evs = e.ev_children()
     for v in evs {
-      if v.name == nil { continue }
+      if v.name == null { continue }
       let vname = sym_to_string(v.name!)
       let vi = VariantInfo { enum_name: ename, fields: [] }
 
@@ -1810,11 +1810,11 @@ lyric checker {
       let mut param_types: [Type] = []
       for f in evfs {
         let mut ft = make_any_type()
-        if f.type_expr != nil {
+        if f.type_expr != null {
           ft = self.resolve_type_expr(f.type_expr!)
         }
         let mut fname = ""
-        if f.name != nil { fname = sym_to_string(f.name!) }
+        if f.name != null { fname = sym_to_string(f.name!) }
         append(vi.fields, VariantField { name: fname, type_val: ft })
         append(param_types, ft)
       }
@@ -1833,10 +1833,10 @@ lyric checker {
   }
 
   func Checker.check_implements(self, cls: ClassDecl) {
-    if cls.name == nil { return }
+    if cls.name == null { return }
     let cname = sym_to_string(cls.name!)
     let class_info = self.registry.lookup(cname)
-    if class_info == nil { return }
+    if class_info == null { return }
 
     let impl_list = cls.implements
     for impl_sym in impl_list {
@@ -1847,22 +1847,22 @@ lyric checker {
 
   func Checker.register_impl_methods(self, ib: ImplBlock) {
     // Look up interface info
-    if ib.interface_name == nil { return }
+    if ib.interface_name == null { return }
     let iname = sym_to_string(ib.interface_name!)
     let iface_info = self.registry.lookup(iname)
-    if iface_info == nil { return }
+    if iface_info == null { return }
 
     // Build substitution map from interface type params to impl type args
     let iface_decl_entry = self.iface_decls.get(sym(iname))
     let subst = Dict<Sym, Type>()
-    if iface_decl_entry != nil {
+    if iface_decl_entry != null {
       let iface_decl = iface_decl_entry!.value
       let itp = iface_decl.itp_children()
       let impl_args = ib.ib_arg_children()
       let mut limit = len(itp)
       if len(impl_args) < limit { limit = len(impl_args) }
       for i in range(0, limit) {
-        if itp[i].name != nil {
+        if itp[i].name != null {
           subst.set(sym(sym_to_string(itp[i].name!)), self.resolve_type_expr(impl_args[i]))
         }
       }
@@ -1871,19 +1871,19 @@ lyric checker {
     // Process each mapping
     let mappings = ib.ibm_children()
     for m in mappings {
-      if m.method_name == nil { continue }
+      if m.method_name == null { continue }
       let method_name = sym_to_string(m.method_name!)
 
       // Find interface method type
       let iface_method = iface_info!.methods.get(sym(method_name))
-      if iface_method == nil { continue }
+      if iface_method == null { continue }
 
       // Determine which concrete class this maps to
       let mut class_name = ""
-      if m.type_param != nil {
+      if m.type_param != null {
         let tp_name = sym_to_string(m.type_param!)
         let bound = subst.get(sym(tp_name))
-        if bound != nil {
+        if bound != null {
           class_name = type_name(bound!.value)
         }
         if class_name == "" {
@@ -1893,33 +1893,33 @@ lyric checker {
       if class_name == "" { continue }
 
       let class_info = self.registry.lookup(class_name)
-      if class_info == nil { continue }
+      if class_info == null { continue }
 
       let substituted = substitute_type(iface_method!.value, subst)
 
       // Register the method on the class (don't override existing)
       let existing = class_info!.methods.get(sym(method_name))
-      if existing == nil {
+      if existing == null {
         class_info!.methods.set(sym(method_name), substituted)
       }
 
       // For field-bind mappings, also register the label-prefixed name
       match m.kind {
         FieldBind => {
-          if m.target_member != nil {
+          if m.target_member != null {
             let target = sym_to_string(m.target_member!)
             if target != method_name {
               if str_has_prefix(method_name, "set_") {
                 // Setter: set_next → set_from_next
                 let prefixed = "set_" + target
                 let existing2 = class_info!.methods.get(sym(prefixed))
-                if existing2 == nil {
+                if existing2 == null {
                   class_info!.methods.set(sym(prefixed), substituted)
                 }
               } else {
                 // Getter: next → from_next
                 let existing2 = class_info!.methods.get(sym(target))
-                if existing2 == nil {
+                if existing2 == null {
                   class_info!.methods.set(sym(target), substituted)
                 }
               }
@@ -1927,7 +1927,7 @@ lyric checker {
           }
         }
         Inline => {
-          if m.inline_func != nil {
+          if m.inline_func != null {
             let ft = self.func_decl_to_type(m.inline_func!)
             class_info!.methods.set(sym(method_name), ft)
           }
@@ -1938,18 +1938,18 @@ lyric checker {
   }
 
   func Checker.register_func(self, f: FuncDecl) {
-    if f.name == nil { return }
+    if f.name == null { return }
     let fname = sym_to_string(f.name!)
     let ft = self.func_decl_to_type(f)
 
-    if f.receiver_type != nil {
+    if f.receiver_type != null {
       // External method: func T.method(self, ...)
       let rname = sym_to_string(f.receiver_type!)
       let key = rname + "." + fname
 
       // Register in methods dict AND in registry for the type
       let type_info = self.registry.lookup(rname)
-      if type_info != nil {
+      if type_info != null {
         type_info!.methods.set(sym(fname), ft)
       }
       // Also define as "T.method" in scope for lookup
@@ -1977,7 +1977,7 @@ lyric checker {
     let param_map = Dict<Sym, string>()  // iface param name → func type var name
     let mut i = 0
     while i < len(itp) && i < len(type_args) {
-      if itp[i].name != nil {
+      if itp[i].name != null {
         match type_args[i].kind {
           Named(name, _) => {
             let src_name = sym_to_string(itp[i].name!)
@@ -1990,22 +1990,22 @@ lyric checker {
       i = i + 1
     }
 
-    if self.type_var_methods == nil {
+    if self.type_var_methods == null {
       self.type_var_methods = Dict<Sym, Dict<Sym, Type>>()
     }
 
     let ifuncs = iface.im_children()   // actual FuncDecl methods
     for m in ifuncs {
-      let mname = if m.name != nil { sym_to_string(m.name!) } else { "<no-name>" }
-      let rtype = if m.receiver_type != nil { sym_to_string(m.receiver_type!) } else { "<no-recv>" }
-      if m.receiver_type == nil { continue }
+      let mname = if m.name != null { sym_to_string(m.name!) } else { "<no-name>" }
+      let rtype = if m.receiver_type != null { sym_to_string(m.receiver_type!) } else { "<no-recv>" }
+      if m.receiver_type == null { continue }
       let recv_param = sym_to_string(m.receiver_type!)
       let mapping = param_map.get(sym(recv_param))
-      if mapping == nil { continue }
+      if mapping == null { continue }
       let type_var_name = mapping!.value
 
       let methods_for_tv = self.type_var_methods!.get(sym(type_var_name))
-      let method_dict: Dict<Sym, Type> = if methods_for_tv != nil {
+      let method_dict: Dict<Sym, Type> = if methods_for_tv != null {
         methods_for_tv!.value
       } else {
         let d = Dict<Sym, Type>()
@@ -2013,7 +2013,7 @@ lyric checker {
         d
       }
 
-      if m.name != nil {
+      if m.name != null {
         // Build method type with substituted names
         let ft = self.func_decl_to_type_with_subst(m, param_map)
         method_dict.set(sym(sym_to_string(m.name!)), ft)
@@ -2026,14 +2026,14 @@ lyric checker {
     let fp = f.param_children()
     for p in fp {
       if p.is_self { continue }
-      if p.type_expr != nil {
+      if p.type_expr != null {
         let mut t = self.resolve_type_expr(p.type_expr!)
         t = subst_type_var_names(t, subst)
         params = append(params, t)
       }
     }
     let mut ret = make_void_type()
-    if f.return_type != nil {
+    if f.return_type != null {
       ret = self.resolve_type_expr(f.return_type!)
       ret = subst_type_var_names(ret, subst)
     }
@@ -2044,7 +2044,7 @@ lyric checker {
     match t.kind {
       TypeVar(name) => {
         let mapped = subst.get(sym(name))
-        if mapped != nil {
+        if mapped != null {
           return make_typevar_type(mapped!.value)
         }
         return t
@@ -2068,14 +2068,14 @@ lyric checker {
     // Check free functions
     let funcs = block.fd_children()
     for f in funcs {
-      if f.body == nil { continue }
+      if f.body == null { continue }
 
-      if f.receiver_type != nil {
+      if f.receiver_type != null {
         // External method: define 'self' as receiver type
         self.push_scope()
         let rname = sym_to_string(f.receiver_type!)
         let recv_info = self.registry.lookup(rname)
-        if recv_info != nil {
+        if recv_info != null {
           // Build self type with TypeVar type_args for generic classes
           let mut self_type = recv_info!.type_val
           if len(recv_info!.type_param_names) > 0 {
@@ -2092,7 +2092,7 @@ lyric checker {
           self.scope.define("self", make_typevar_type(rname))
           let where_clauses = f.where_children()
           for wc in where_clauses {
-            if wc.constraint != nil {
+            if wc.constraint != null {
               let iface_name = sym_to_string(wc.constraint!)
               let wc_args = wc.wc_arg_children()
               self.grant_relational_methods(iface_name, wc_args)
@@ -2109,7 +2109,7 @@ lyric checker {
     // Check class method bodies
     let classes = block.cd_children()
     for c in classes {
-      if c.name == nil { continue }
+      if c.name == null { continue }
       let cname = sym_to_string(c.name!)
       let class_info = self.registry.lookup(cname)
 
@@ -2119,19 +2119,19 @@ lyric checker {
       self.type_var_methods = null
       let cwcs = c.cwc_children()
       for wc in cwcs {
-        if wc.variable != nil && wc.constraint != nil {
+        if wc.variable != null && wc.constraint != null {
           let iface_name = sym_to_string(wc.constraint!)
           let iface_entry = self.iface_decls.get(sym(iface_name))
-          if iface_entry != nil {
-            if self.type_var_methods == nil {
+          if iface_entry != null {
+            if self.type_var_methods == null {
               self.type_var_methods = Dict<Sym, Dict<Sym, Type>>()
             }
             let tv_name = sym_to_string(wc.variable!)
             let existing = self.type_var_methods!.get(sym(tv_name))
-            let mut methods_dict = if existing != nil { existing!.value } else { Dict<Sym, Type>() }
+            let mut methods_dict = if existing != null { existing!.value } else { Dict<Sym, Type>() }
             let iface_methods = iface_entry!.value.im_children()
             for im in iface_methods {
-              if im.name != nil {
+              if im.name != null {
                 let mtype = self.func_decl_to_type(im)
                 methods_dict.set(im.name!, mtype)
               }
@@ -2143,9 +2143,9 @@ lyric checker {
 
       let cmethods = c.cm_children()
       for m in cmethods {
-        if m.body == nil { continue }
+        if m.body == null { continue }
         self.push_scope()
-        if class_info != nil {
+        if class_info != null {
           // Build self type with TypeVar type_args for generic classes
           let mut self_type = class_info!.type_val
           if len(class_info!.type_param_names) > 0 {
@@ -2160,7 +2160,7 @@ lyric checker {
         // Register class type params
         let ctparams = c.ctp_children()
         for tp in ctparams {
-          if tp.name != nil {
+          if tp.name != null {
             let tpname = sym_to_string(tp.name!)
             self.scope.define(tpname, make_typevar_type(tpname))
           }
@@ -2173,20 +2173,20 @@ lyric checker {
   }
 
   func Checker.check_func_body(self, f: FuncDecl) {
-    if f.body == nil { return }
+    if f.body == null { return }
     self.push_scope()
 
     let prev_ret = self.current_func_return
     let prev_name = self.current_func_name
 
-    if f.name != nil {
+    if f.name != null {
       self.current_func_name = sym_to_string(f.name!)
     }
 
     // Bind type params
     let tparams = f.fp_children()
     for tp in tparams {
-      if tp.name != nil {
+      if tp.name != null {
         let tpname = sym_to_string(tp.name!)
         self.scope.define(tpname, make_typevar_type(tpname))
       }
@@ -2198,26 +2198,26 @@ lyric checker {
     self.type_var_methods = null
     let wheres = f.where_children()
     for wc in wheres {
-      if wc.variable == nil && wc.constraint != nil {
+      if wc.variable == null && wc.constraint != null {
         // Bare relational constraint: where Graph<G, N, E>
         let args = wc.wc_arg_children()
         if len(args) > 0 {
           self.grant_relational_methods(sym_to_string(wc.constraint!), args)
         }
-      } else if wc.variable != nil && wc.constraint != nil {
+      } else if wc.variable != null && wc.constraint != null {
         // Single-type constraint: where K: Hashable
         let iface_name = sym_to_string(wc.constraint!)
         let iface_entry = self.iface_decls.get(sym(iface_name))
-        if iface_entry != nil {
-          if self.type_var_methods == nil {
+        if iface_entry != null {
+          if self.type_var_methods == null {
             self.type_var_methods = Dict<Sym, Dict<Sym, Type>>()
           }
           let tv_name = sym_to_string(wc.variable!)
           let existing = self.type_var_methods!.get(sym(tv_name))
-          let mut methods_dict = if existing != nil { existing!.value } else { Dict<Sym, Type>() }
+          let mut methods_dict = if existing != null { existing!.value } else { Dict<Sym, Type>() }
           let iface_methods = iface_entry!.value.im_children()
           for im in iface_methods {
-            if im.name != nil {
+            if im.name != null {
               let mtype = self.func_decl_to_type(im)
               methods_dict.set(im.name!, mtype)
             }
@@ -2227,8 +2227,8 @@ lyric checker {
       }
     }
     // Merge inherited type var methods (from class-level where clauses)
-    if inherited != nil {
-      if self.type_var_methods == nil {
+    if inherited != null {
+      if self.type_var_methods == null {
         self.type_var_methods = Dict<Sym, Dict<Sym, Type>>()
       }
       let inh_keys = inherited!.keys()
@@ -2236,16 +2236,16 @@ lyric checker {
       while ki < len(inh_keys) {
         let tv_sym = inh_keys[ki]
         let inh_entry = inherited!.get(tv_sym)
-        if inh_entry != nil {
+        if inh_entry != null {
           let inh_methods = inh_entry!.value
           let cur_entry = self.type_var_methods!.get(tv_sym)
-          let mut cur_methods = if cur_entry != nil { cur_entry!.value } else { Dict<Sym, Type>() }
+          let mut cur_methods = if cur_entry != null { cur_entry!.value } else { Dict<Sym, Type>() }
           let mk = inh_methods.keys()
           let mut mi = 0
           while mi < len(mk) {
-            if cur_methods.get(mk[mi]) == nil {
+            if cur_methods.get(mk[mi]) == null {
               let inh_m_entry = inh_methods.get(mk[mi])
-              if inh_m_entry != nil {
+              if inh_m_entry != null {
                 cur_methods.set(mk[mi], inh_m_entry!.value)
               }
             }
@@ -2261,9 +2261,9 @@ lyric checker {
     let params = f.param_children()
     for p in params {
       if p.is_self { continue }
-      if p.name != nil {
+      if p.name != null {
         let mut pt = make_any_type()
-        if p.type_expr != nil {
+        if p.type_expr != null {
           pt = self.resolve_type_expr(p.type_expr!)
         }
         self.scope.define(sym_to_string(p.name!), pt)
@@ -2271,7 +2271,7 @@ lyric checker {
     }
 
     // Set return type
-    if f.return_type != nil {
+    if f.return_type != null {
       self.current_func_return = self.resolve_type_expr(f.return_type!)
     } else {
       self.current_func_return = make_void_type()
@@ -2340,9 +2340,9 @@ lyric checker {
       Select(cases) => {
         for c in cases {
           self.push_scope()
-          if c.expr != nil {
+          if c.expr != null {
             let ct = self.check_expr(c.expr!)
-            if c.bind_var != nil {
+            if c.bind_var != null {
               match ct.kind {
                 Channel(elem) => {
                   self.scope.define(sym_to_string(c.bind_var!), elem)
@@ -2353,14 +2353,14 @@ lyric checker {
               }
             }
           }
-          if c.body != nil {
+          if c.body != null {
             self.check_block(c.body!)
           }
           self.pop_scope()
         }
       }
       Yield(value) => {
-        if value != nil { self.check_expr(value!) }
+        if value != null { self.check_expr(value!) }
       }
       Lock(mutex, body) => {
         self.check_expr(mutex)
@@ -2383,7 +2383,7 @@ lyric checker {
         self.bind_pattern(pattern, bind_type)
         self.check_block(then_block)
         self.pop_scope()
-        if else_block != nil {
+        if else_block != null {
           self.push_scope()
           self.check_block(else_block!)
           self.pop_scope()
@@ -2410,12 +2410,12 @@ lyric checker {
   }
 
   func Checker.check_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?) {
-    let mut declared_type: Type? = nil
-    if type_expr != nil {
+    let mut declared_type: Type? = null
+    if type_expr != null {
       declared_type = self.resolve_type_expr(type_expr!)
     }
 
-    if value != nil {
+    if value != null {
       let val_type = self.check_expr(value!)
 
       // Tuple destructuring: let (a, b) = expr
@@ -2423,7 +2423,7 @@ lyric checker {
         match val_type.kind {
           Tuple(fields) => {
             for i in range(0, len(names)) {
-              if i < len(fields) && fields[i].type_val != nil {
+              if i < len(fields) && fields[i].type_val != null {
                 self.scope.define(sym_to_string(names[i]), fields[i].type_val!)
               } else {
                 self.scope.define(sym_to_string(names[i]), make_any_type())
@@ -2443,8 +2443,8 @@ lyric checker {
         return
       }
 
-      // Propagate expected type to empty list/map/nil literals
-      if declared_type != nil {
+      // Propagate expected type to empty list/map/null literals
+      if declared_type != null {
         match value!.kind {
           ListLit(elems) => {
             if len(elems) == 0 {
@@ -2463,7 +2463,7 @@ lyric checker {
         }
       }
 
-      if declared_type != nil {
+      if declared_type != null {
         if !self.is_assignable(val_type, declared_type!) {
           self.error("type mismatch in variable declaration for " + sym_to_string(name))
         }
@@ -2471,7 +2471,7 @@ lyric checker {
       } else {
         self.scope.define(sym_to_string(name), val_type)
       }
-    } else if declared_type != nil {
+    } else if declared_type != null {
       self.scope.define(sym_to_string(name), declared_type!)
     } else {
       self.scope.define(sym_to_string(name), make_any_type())
@@ -2487,7 +2487,7 @@ lyric checker {
         _ => {}
       }
     }
-    // Propagate target type to empty list/nil literals
+    // Propagate target type to empty list/null literals
     match target_type.kind {
       Error => {}
       _ => {
@@ -2507,10 +2507,10 @@ lyric checker {
   }
 
   func Checker.check_return(self, value: Expr?) {
-    if value != nil {
+    if value != null {
       self.check_expr(value!)
-      // Propagate return type to empty list/nil literals
-      if self.current_func_return != nil {
+      // Propagate return type to empty list/null literals
+      if self.current_func_return != null {
         match value!.kind {
           ListLit(elems) => {
             if len(elems) == 0 {
@@ -2532,16 +2532,16 @@ lyric checker {
     self.check_block(then_block)
     self.pop_scope()
     for ei in else_ifs {
-      if ei.condition != nil {
+      if ei.condition != null {
         self.check_expr(ei.condition!)
       }
-      if ei.body != nil {
+      if ei.body != null {
         self.push_scope()
         self.check_block(ei.body!)
         self.pop_scope()
       }
     }
-    if else_block != nil {
+    if else_block != null {
       self.push_scope()
       self.check_block(else_block!)
       self.pop_scope()
@@ -2554,7 +2554,7 @@ lyric checker {
 
     match coll_type.kind {
       Sequence(elem) => {
-        if index_var != nil {
+        if index_var != null {
           // Go-style: for index, value in collection
           self.scope.define(sym_to_string(var_name), make_int_type(32))
           self.scope.define(sym_to_string(index_var!), elem)
@@ -2563,7 +2563,7 @@ lyric checker {
         }
       }
       String => {
-        if index_var != nil {
+        if index_var != null {
           self.scope.define(sym_to_string(var_name), make_int_type(32))
           self.scope.define(sym_to_string(index_var!), make_string_type())
         } else {
@@ -2578,13 +2578,13 @@ lyric checker {
       }
       Map(key, value) => {
         self.scope.define(sym_to_string(var_name), key)
-        if index_var != nil {
+        if index_var != null {
           self.scope.define(sym_to_string(index_var!), value)
         }
       }
       _ => {
         self.scope.define(sym_to_string(var_name), make_any_type())
-        if index_var != nil {
+        if index_var != null {
           self.scope.define(sym_to_string(index_var!), make_any_type())
         }
       }
@@ -2605,16 +2605,16 @@ lyric checker {
     let val_type = self.check_expr(value)
     for arm in arms {
       self.push_scope()
-      if arm.pattern != nil {
+      if arm.pattern != null {
         self.bind_pattern(arm.pattern!, val_type)
       }
       for p in arm.patterns {
         self.bind_pattern(p, val_type)
       }
-      if arm.guard != nil {
+      if arm.guard != null {
         self.check_expr(arm.guard!)
       }
-      if arm.body != nil {
+      if arm.body != null {
         self.check_block(arm.body!)
       }
       self.pop_scope()
@@ -2640,9 +2640,9 @@ lyric checker {
         let ename = type_name(val_type)
         if ename != "" {
           let enum_info = self.registry.lookup(ename)
-          if enum_info != nil {
+          if enum_info != null {
             let vi = enum_info!.variants.get(sym(vname))
-            if vi != nil {
+            if vi != null {
               for i in range(0, len(bindings)) {
                 if i < len(vi!.value.fields) {
                   self.bind_pattern(bindings[i], vi!.value.fields[i].type_val)
@@ -2664,7 +2664,7 @@ lyric checker {
         match val_type.kind {
           Tuple(fields) => {
             for i in range(0, len(elems)) {
-              if i < len(fields) && fields[i].type_val != nil {
+              if i < len(fields) && fields[i].type_val != null {
                 self.bind_pattern(elems[i], fields[i].type_val!)
               } else {
                 self.bind_pattern(elems[i], make_any_type())
@@ -2695,18 +2695,18 @@ lyric checker {
       Ident(name) => {
         let name_str = sym_to_string(name)
         let vt = self.scope.lookup(name_str)
-        if vt != nil { return vt! }
+        if vt != null { return vt! }
         // Check registry for type names (for module access etc.)
         let info = self.registry.lookup(name_str)
-        if info != nil { return info!.type_val }
+        if info != null { return info!.type_val }
         self.error_at(expr.span, "undefined variable: " + name_str)
         return make_error_type()
       }
       IntLit(_, type_hint) => {
-        if type_hint != nil {
+        if type_hint != null {
           let hint = sym_to_string(type_hint!)
           let info = self.registry.lookup(hint)
-          if info != nil { return info!.type_val }
+          if info != null { return info!.type_val }
         }
         return make_int_type(32)
       }
@@ -2796,7 +2796,7 @@ lyric checker {
 
     match op {
       Eq | Neq => {
-        // nil comparison: propagate type to the nil operand
+        // null comparison: propagate type to the null operand
         match lt.kind {
           Nil => { return make_bool_type() }
           _ => {}
@@ -2845,8 +2845,8 @@ lyric checker {
 
   func Checker.check_slice(self, receiver: Expr, low: Expr?, high: Expr?) -> Type {
     let recv_type = self.check_expr(receiver)
-    if low != nil { self.check_expr(low!) }
-    if high != nil { self.check_expr(high!) }
+    if low != null { self.check_expr(low!) }
+    if high != null { self.check_expr(high!) }
     return recv_type
   }
 
@@ -2869,11 +2869,11 @@ lyric checker {
     match ot.kind {
       ErrorResult(ok, _) => { return ok }
       Tuple(fields) => {
-        if len(fields) >= 2 && fields[0].type_val != nil {
+        if len(fields) >= 2 && fields[0].type_val != null {
           // Check if second element is error type
           return fields[0].type_val!
         }
-        if len(fields) >= 1 && fields[0].type_val != nil {
+        if len(fields) >= 1 && fields[0].type_val != null {
           return fields[0].type_val!
         }
         self.error_at(operand.span, "cannot apply ? to this tuple type")
@@ -2896,10 +2896,10 @@ lyric checker {
     self.pop_scope()
 
     for ei in else_ifs {
-      if ei.condition != nil {
+      if ei.condition != null {
         self.check_expr(ei.condition!)
       }
-      if ei.body != nil {
+      if ei.body != null {
         self.push_scope()
         self.check_block(ei.body!)
         self.pop_scope()
@@ -2920,7 +2920,7 @@ lyric checker {
       let last = stmts[len(stmts) - 1]
       match last.kind {
         ExprStmt(expr) => {
-          if expr.resolved_type != nil {
+          if expr.resolved_type != null {
             return self.resolve_type_expr(expr.resolved_type!)
           }
         }
@@ -2965,9 +2965,15 @@ lyric checker {
 
   func Checker.check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type {
     let name_str = sym_to_string(type_name_sym)
+
+    // Handle `lock` as a builtin mutex type — not registered in the struct registry
+    if name_str == "lock" {
+      return make_lock_type()
+    }
+
     let info = self.registry.lookup(name_str)
 
-    if info != nil {
+    if info != null {
       // Use indexed while-loop because StructLitField is a value type —
       // `for f in fields` copies each element, so mutations don't propagate.
       // We compute the effective field name from position when the AST name is null.
@@ -2978,7 +2984,7 @@ lyric checker {
 
         // Determine the effective field name: use AST name if present, else positional
         let mut fname = ""
-        if f.name != nil && sym_to_string(f.name!) != "" {
+        if f.name != null && sym_to_string(f.name!) != "" {
           fname = sym_to_string(f.name!)
           pos_idx = len(info!.field_order)  // stop positional tracking
         } else {
@@ -2988,25 +2994,25 @@ lyric checker {
           }
         }
 
-        if f.value != nil {
+        if f.value != null {
           // If the expected field type is an enum, temporarily shadow variant
           // constructors in scope so ambiguous variant names resolve correctly.
           let mut scope_pushed = false
           if fname != "" {
             let field_entry = info!.fields.get(sym(fname))
-            if field_entry != nil {
+            if field_entry != null {
               let field_type = field_entry!.value
               match field_type.kind {
                 Enum(enum_name) => {
                   let enum_info = self.registry.lookup(enum_name)
-                  if enum_info != nil && len(enum_info!.variants.keys()) > 0 {
+                  if enum_info != null && len(enum_info!.variants.keys()) > 0 {
                     self.push_scope()
                     scope_pushed = true
                     let vkeys = enum_info!.variants.keys()
                     for vk in vkeys {
                       let vname = sym_to_string(vk)
                       let vi = enum_info!.variants.get(vk)
-                      if vi != nil {
+                      if vi != null {
                         if len(vi!.value.fields) == 0 {
                           self.scope.define(vname, field_type)
                         } else {
@@ -3036,10 +3042,10 @@ lyric checker {
             self.pop_scope()
           }
 
-          // Propagate expected type to empty list/map/nil literals
+          // Propagate expected type to empty list/map/null literals
           if fname != "" {
             let field_entry = info!.fields.get(sym(fname))
-            if field_entry != nil {
+            if field_entry != null {
               let field_type = field_entry!.value
               match f.value!.kind {
                 ListLit(elems) => {
@@ -3085,16 +3091,16 @@ lyric checker {
     let mut param_types: [Type] = []
     for p in params {
       let mut pt = make_any_type()
-      if p.type_expr != nil {
+      if p.type_expr != null {
         pt = self.resolve_type_expr(p.type_expr!)
       }
-      if p.name != nil {
+      if p.name != null {
         self.scope.define(sym_to_string(p.name!), pt)
       }
       append(param_types, pt)
     }
     let mut ret = make_void_type()
-    if return_type != nil {
+    if return_type != null {
       ret = self.resolve_type_expr(return_type!)
     }
     self.check_block(body)
@@ -3108,16 +3114,16 @@ lyric checker {
     let mut first = true
     for arm in arms {
       self.push_scope()
-      if arm.pattern != nil {
+      if arm.pattern != null {
         self.bind_pattern(arm.pattern!, val_type)
       }
       for p in arm.patterns {
         self.bind_pattern(p, val_type)
       }
-      if arm.guard != nil {
+      if arm.guard != null {
         self.check_expr(arm.guard!)
       }
-      if arm.body != nil {
+      if arm.body != null {
         self.check_block(arm.body!)
         if first {
           result_type = self.check_block_expr_type(arm.body!)
@@ -3133,7 +3139,7 @@ lyric checker {
   // Call checking
   // =====================================================================
 
-  // Propagate expected types from function params to empty list/nil arg literals.
+  // Propagate expected types from function params to empty list/null arg literals.
   // Must use indexed access — Expr is a class but we need to match Go checker's
   // behavior of annotating the actual arg expressions.
   func propagate_arg_types(args: [Expr], param_types: [Type]) {
@@ -3172,7 +3178,7 @@ lyric checker {
 
         // === Builtins ===
         let builtin_result = self.check_builtin_call(name_str, type_args, arg_types)
-        if builtin_result != nil {
+        if builtin_result != null {
           // Annotate the func_expr as a function
           annotate(func_expr, make_func_type(arg_types, builtin_result!, []))
           return builtin_result!
@@ -3180,7 +3186,7 @@ lyric checker {
 
         // Look up in scope
         let ft = self.scope.lookup(name_str)
-        if ft != nil {
+        if ft != null {
           annotate(func_expr, ft!)
           annotate(func_expr, ft!)
           match ft!.kind {
@@ -3199,13 +3205,13 @@ lyric checker {
                   let mut inferred: [TypeExpr] = []
                   for tpn in tpnames {
                     let bound = bindings.get(sym(tpn))
-                    if bound != nil {
+                    if bound != null {
                       append(inferred, type_to_type_expr(bound!.value))
                     }
                   }
                   call_expr.inferred_type_args = inferred
                 }
-                // Propagate expected types to empty list/nil args
+                // Propagate expected types to empty list/null args
                 let mut sub_params: [Type] = []
                 for p in params {
                   append(sub_params, substitute_type(p, bindings))
@@ -3226,7 +3232,7 @@ lyric checker {
 
         // Check registry for type constructors
         let info = self.registry.lookup(name_str)
-        if info != nil {
+        if info != null {
           annotate(func_expr, info!.type_val)
           return info!.type_val
         }
@@ -3315,7 +3321,7 @@ lyric checker {
     return make_error_type()
   }
 
-  // check_builtin_call handles built-in functions. Returns nil if not a builtin.
+  // check_builtin_call handles built-in functions. Returns null if not a builtin.
   func Checker.check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type? {
     if name == "len" { return make_int_type(32) }
     if name == "append" {
@@ -3354,7 +3360,7 @@ lyric checker {
     }
     if name == "sym" {
       let info = self.registry.lookup("Sym")
-      if info != nil { return info!.type_val }
+      if info != null { return info!.type_val }
       eprintln("checker: stdlib type Sym not found")
       os_exit(1)
       return make_error_type()
@@ -3373,7 +3379,7 @@ lyric checker {
     if name == "to_string" { return make_string_type() }
     if name == "new_string_builder" {
       let info = self.registry.lookup("StringBuilder")
-      if info != nil { return info!.type_val }
+      if info != null { return info!.type_val }
       eprintln("checker: stdlib type StringBuilder not found")
       os_exit(1)
       return make_error_type()
@@ -3425,7 +3431,7 @@ lyric checker {
     // (NOT as a builtin — its return type depends on type params, not arg types)
 
     // Not a builtin
-    return nil
+    return null
   }
 
   // =====================================================================
@@ -3433,13 +3439,13 @@ lyric checker {
   // =====================================================================
 
   // build_type_arg_subst creates a substitution map from a type's type_args
-  // and the class/struct's type_param_names. Returns nil if no substitution needed.
+  // and the class/struct's type_param_names. Returns null if no substitution needed.
   func Checker.build_type_arg_subst(self, recv_type: Type) -> Dict<Sym, Type>? {
-    if len(recv_type.type_args) == 0 { return nil }
+    if len(recv_type.type_args) == 0 { return null }
     let tname = type_name(recv_type)
-    if tname == "" { return nil }
+    if tname == "" { return null }
     let info = self.registry.lookup(tname)
-    if info == nil || len(info!.type_param_names) == 0 { return nil }
+    if info == null || len(info!.type_param_names) == 0 { return null }
     let subst = Dict<Sym, Type>()
     let mut limit = len(info!.type_param_names)
     if len(recv_type.type_args) < limit { limit = len(recv_type.type_args) }
@@ -3461,10 +3467,10 @@ lyric checker {
       ExprKind.Ident(ident_name) => {
         let enum_name = sym_to_string(ident_name)
         let enum_info = self.registry.lookup(enum_name)
-        if enum_info != nil && enum_info!.type_val.kind is Enum {
+        if enum_info != null && enum_info!.type_val.kind is Enum {
           let method_str = sym_to_string(method)
           let vi = enum_info!.variants.get(sym(method_str))
-          if vi == nil {
+          if vi == null {
             eprintln(f"checker: enum {enum_name} has no variant '{method_str}'")
             return make_error_type()
           }
@@ -3484,7 +3490,7 @@ lyric checker {
           let func_expr = Expr {
             kind: ExprKind.Ident(method),
             span: receiver.span,
-            resolved_type: nil
+            resolved_type: null
           }
           // Set resolved_type on func expr
           if len(variant.fields) > 0 {
@@ -3518,7 +3524,7 @@ lyric checker {
 
     // Built-in methods by receiver type
     let builtin = self.check_builtin_method(recv_type, method_str, arg_types)
-    if builtin != nil { return builtin! }
+    if builtin != null { return builtin! }
 
     // Module function calls (e.g. fmt.Println)
     match recv_type.kind {
@@ -3536,23 +3542,23 @@ lyric checker {
     let tname = type_name(recv_type)
     if tname != "" {
       let info = self.registry.lookup(tname)
-      if info != nil {
+      if info != null {
         let mt = info!.methods.get(sym(method_str))
-        if mt != nil {
+        if mt != null {
           match mt!.value.kind {
             Func(params, ret, tpnames) => {
               // Build substitution: class type args first, then infer method-specific
               let class_subst = self.build_type_arg_subst(recv_type)
-              let mut bindings = if class_subst != nil { class_subst! } else { Dict<Sym, Type>() }
+              let mut bindings = if class_subst != null { class_subst! } else { Dict<Sym, Type>() }
               if len(tpnames) > 0 {
                 let inferred = self.infer_type_args(mt!.value, arg_types)
                 // Merge inferred bindings (don't override class-provided ones)
                 let ikeys = inferred.keys()
                 let mut ik = 0
                 while ik < len(ikeys) {
-                  if bindings.get(ikeys[ik]) == nil {
+                  if bindings.get(ikeys[ik]) == null {
                     let ie = inferred.get(ikeys[ik])
-                    if ie != nil {
+                    if ie != null {
                       bindings.set(ikeys[ik], ie!.value)
                     }
                   }
@@ -3563,7 +3569,7 @@ lyric checker {
                   let mut inferred_ta: [TypeExpr] = []
                   for tpn in tpnames {
                     let bound = bindings.get(sym(tpn))
-                    if bound != nil {
+                    if bound != null {
                       append(inferred_ta, type_to_type_expr(bound!.value))
                     }
                   }
@@ -3573,7 +3579,7 @@ lyric checker {
                 // Check for pre-computed type args from interface method registration
                 let mta_key = tname + "." + method_str
                 let mta = self.method_type_args.get(sym(mta_key))
-                if mta != nil {
+                if mta != null {
                   call_expr.inferred_type_args = mta!.value
                 }
               }
@@ -3593,7 +3599,7 @@ lyric checker {
       // Also check scope for "T.method" pattern (external methods)
       let key = tname + "." + method_str
       let ext = self.scope.lookup(key)
-      if ext != nil {
+      if ext != null {
         match ext!.kind {
           Func(_, ret, _) => { return ret }
           _ => { return ext! }
@@ -3605,13 +3611,13 @@ lyric checker {
     match recv_type.kind {
       Optional(inner) => {
         let inner_result = self.check_builtin_method(inner, method_str, arg_types)
-        if inner_result != nil { return inner_result! }
+        if inner_result != null { return inner_result! }
         let inner_name = type_name(inner)
         if inner_name != "" {
           let info = self.registry.lookup(inner_name)
-          if info != nil {
+          if info != null {
             let mt = info!.methods.get(sym(method_str))
-            if mt != nil {
+            if mt != null {
               match mt!.value.kind {
                 Func(_, ret, _) => { return ret }
                 _ => { return mt!.value }
@@ -3629,11 +3635,11 @@ lyric checker {
     // Type variable methods from relational constraints (where Graph<G, N, E>)
     match recv_type.kind {
       TypeVar(tv_name) => {
-        if self.type_var_methods != nil {
+        if self.type_var_methods != null {
           let tv_methods = self.type_var_methods!.get(sym(tv_name))
-          if tv_methods != nil {
+          if tv_methods != null {
             let meth = tv_methods!.value.get(sym(method_str))
-            if meth != nil {
+            if meth != null {
               match meth!.value.kind {
                 Func(params, ret, _) => { return ret }
                 _ => { return meth!.value }
@@ -3664,9 +3670,9 @@ lyric checker {
       Map(key, value) => {
         return self.check_map_method(key, value, method)
       }
-      _ => { return nil }
+      _ => { return null }
     }
-    return nil
+    return null
   }
 
   func Checker.check_list_method(self, elem: Type, method: string) -> Type? {
@@ -3681,7 +3687,7 @@ lyric checker {
     if method == "first" || method == "last" { return make_optional_type(elem) }
     if method == "is_empty" { return make_bool_type() }
     if method == "join" { return make_string_type() }
-    return nil
+    return null
   }
 
   func Checker.check_string_method(self, method: string) -> Type? {
@@ -3694,14 +3700,14 @@ lyric checker {
     if method == "index_of" { return make_int_type(32) }
     if method == "is_empty" { return make_bool_type() }
     if method == "join" { return make_string_type() }
-    return nil
+    return null
   }
 
   func Checker.check_channel_method(self, elem: Type, method: string) -> Type? {
     if method == "send" { return make_void_type() }
     if method == "recv" || method == "receive" { return elem }
     if method == "close" { return make_void_type() }
-    return nil
+    return null
   }
 
   func Checker.check_map_method(self, key: Type, value: Type, method: string) -> Type? {
@@ -3714,7 +3720,7 @@ lyric checker {
     if method == "values" { return make_sequence_type(value) }
     if method == "len" || method == "length" { return make_int_type(32) }
     if method == "len" || method == "length" { return make_int_type(32) }
-    return nil
+    return null
   }
 
   // =====================================================================
@@ -3727,10 +3733,10 @@ lyric checker {
       ExprKind.Ident(ident_name) => {
         let enum_name = sym_to_string(ident_name)
         let enum_info = self.registry.lookup(enum_name)
-        if enum_info != nil && enum_info!.type_val.kind is Enum {
+        if enum_info != null && enum_info!.type_val.kind is Enum {
           let field_str = sym_to_string(field_name)
           let vi = enum_info!.variants.get(sym(field_str))
-          if vi == nil {
+          if vi == null {
             eprintln(f"checker: enum {enum_name} has no variant '{field_str}'")
             return make_error_type()
           }
@@ -3765,19 +3771,19 @@ lyric checker {
     let tname = type_name(recv_type)
     if tname != "" {
       let info = self.registry.lookup(tname)
-      if info != nil {
+      if info != null {
         // Check fields first
         let ft = info!.fields.get(sym(field_str))
-        if ft != nil {
+        if ft != null {
           let subst = self.build_type_arg_subst(recv_type)
-          if subst != nil { return substitute_type(ft!.value, subst!) }
+          if subst != null { return substitute_type(ft!.value, subst!) }
           return ft!.value
         }
         // Then check methods (for method-as-value)
         let mt = info!.methods.get(sym(field_str))
-        if mt != nil {
+        if mt != null {
           let subst = self.build_type_arg_subst(recv_type)
-          if subst != nil { return substitute_type(mt!.value, subst!) }
+          if subst != null { return substitute_type(mt!.value, subst!) }
           return mt!.value
         }
       }
@@ -3791,13 +3797,13 @@ lyric checker {
           let idx_result = atoi(idx_str)
           let idx = idx_result._0
           let ok = idx_result._1
-          if ok && idx >= 0 && idx < len(fields) && fields[idx].type_val != nil {
+          if ok && idx >= 0 && idx < len(fields) && fields[idx].type_val != null {
             return fields[idx].type_val!
           }
         }
         // Named fields
         for f in fields {
-          if f.name == field_str && f.type_val != nil {
+          if f.name == field_str && f.type_val != null {
             return f.type_val!
           }
         }
@@ -3869,8 +3875,8 @@ lyric checker {
       }
       Slice(receiver, low, high) => {
         self.walk_expr(receiver, callback)
-        if low != nil { self.walk_expr(low!, callback) }
-        if high != nil { self.walk_expr(high!, callback) }
+        if low != null { self.walk_expr(low!, callback) }
+        if high != null { self.walk_expr(high!, callback) }
       }
       Unary(_, operand) => {
         self.walk_expr(operand, callback)
@@ -3891,7 +3897,7 @@ lyric checker {
       }
       StructLit(_, _, fields) => {
         for f in fields {
-          if f.value != nil { self.walk_expr(f.value!, callback) }
+          if f.value != null { self.walk_expr(f.value!, callback) }
         }
       }
       Lambda(_, _, body) => {
@@ -3900,10 +3906,10 @@ lyric checker {
       Match(value, arms) => {
         self.walk_expr(value, callback)
         for arm in arms {
-          if arm.pattern != nil { self.walk_pattern(arm.pattern!, callback) }
+          if arm.pattern != null { self.walk_pattern(arm.pattern!, callback) }
           for p in arm.patterns { self.walk_pattern(p, callback) }
-          if arm.guard != nil { self.walk_expr(arm.guard!, callback) }
-          if arm.body != nil { self.walk_block(arm.body!, callback) }
+          if arm.guard != null { self.walk_expr(arm.guard!, callback) }
+          if arm.body != null { self.walk_block(arm.body!, callback) }
         }
       }
       Cast(_, operand) => {
@@ -3922,8 +3928,8 @@ lyric checker {
         self.walk_expr(cond, callback)
         self.walk_block(then_block, callback)
         for ei in else_ifs {
-          if ei.condition != nil { self.walk_expr(ei.condition!, callback) }
-          if ei.body != nil { self.walk_block(ei.body!, callback) }
+          if ei.condition != null { self.walk_expr(ei.condition!, callback) }
+          if ei.body != null { self.walk_block(ei.body!, callback) }
         }
         self.walk_block(else_block, callback)
       }
@@ -3933,14 +3939,14 @@ lyric checker {
   func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> ()) {
     match stmt.kind {
       VarDecl(_, _, _, _, value) => {
-        if value != nil { self.walk_expr(value!, callback) }
+        if value != null { self.walk_expr(value!, callback) }
       }
       Assign(target, value) => {
         self.walk_expr(target, callback)
         self.walk_expr(value, callback)
       }
       Return(value) => {
-        if value != nil { self.walk_expr(value!, callback) }
+        if value != null { self.walk_expr(value!, callback) }
       }
       ExprStmt(expr) => {
         self.walk_expr(expr, callback)
@@ -3949,10 +3955,10 @@ lyric checker {
         self.walk_expr(condition, callback)
         self.walk_block(then_block, callback)
         for ei in else_ifs {
-          if ei.condition != nil { self.walk_expr(ei.condition!, callback) }
-          if ei.body != nil { self.walk_block(ei.body!, callback) }
+          if ei.condition != null { self.walk_expr(ei.condition!, callback) }
+          if ei.body != null { self.walk_block(ei.body!, callback) }
         }
-        if else_block != nil { self.walk_block(else_block!, callback) }
+        if else_block != null { self.walk_block(else_block!, callback) }
       }
       For(_, _, collection, body) => {
         self.walk_expr(collection, callback)
@@ -3965,10 +3971,10 @@ lyric checker {
       Match(value, arms) => {
         self.walk_expr(value, callback)
         for arm in arms {
-          if arm.pattern != nil { self.walk_pattern(arm.pattern!, callback) }
+          if arm.pattern != null { self.walk_pattern(arm.pattern!, callback) }
           for p in arm.patterns { self.walk_pattern(p, callback) }
-          if arm.guard != nil { self.walk_expr(arm.guard!, callback) }
-          if arm.body != nil { self.walk_block(arm.body!, callback) }
+          if arm.guard != null { self.walk_expr(arm.guard!, callback) }
+          if arm.body != null { self.walk_block(arm.body!, callback) }
         }
       }
       BlockStmt(block) | Cascade(block) | Spawn(block) => {
@@ -3976,12 +3982,12 @@ lyric checker {
       }
       Select(cases) => {
         for c in cases {
-          if c.expr != nil { self.walk_expr(c.expr!, callback) }
-          if c.body != nil { self.walk_block(c.body!, callback) }
+          if c.expr != null { self.walk_expr(c.expr!, callback) }
+          if c.body != null { self.walk_block(c.body!, callback) }
         }
       }
       Yield(value) => {
-        if value != nil { self.walk_expr(value!, callback) }
+        if value != null { self.walk_expr(value!, callback) }
       }
       Lock(mutex, body) => {
         self.walk_expr(mutex, callback)
@@ -3991,7 +3997,7 @@ lyric checker {
         self.walk_pattern(pattern, callback)
         self.walk_expr(value, callback)
         self.walk_block(then_block, callback)
-        if else_block != nil { self.walk_block(else_block!, callback) }
+        if else_block != null { self.walk_block(else_block!, callback) }
       }
       LetElse(pattern, value, else_block) => {
         self.walk_pattern(pattern, callback)
@@ -4055,10 +4061,10 @@ lyric checker {
         if is_primitive_name(n) { return false }
         // Check if it's in the registry (struct/class/enum/interface)
         let info = self.registry.lookup(n)
-        if info == nil {
+        if info == null {
           // Check if it's a known module/import (not a type variable)
           let scope_val = self.scope.lookup(n)
-          if scope_val != nil {
+          if scope_val != null {
             match scope_val!.kind {
               Module(_) => { return false }
               _ => {}
@@ -4080,7 +4086,7 @@ lyric checker {
       }
       Tuple(fields) => {
         for f in fields {
-          if f.type_expr != nil && self.type_expr_has_typevar(f.type_expr!) { return true }
+          if f.type_expr != null && self.type_expr_has_typevar(f.type_expr!) { return true }
         }
         return false
       }
@@ -4108,7 +4114,7 @@ lyric checker {
         let n = name.name
         if !is_primitive_name(n) {
           let info = self.registry.lookup(n)
-          if info == nil { return n }
+          if info == null { return n }
         }
         for a in args {
           let found = self.find_typevar_name(a)
@@ -4127,7 +4133,7 @@ lyric checker {
       }
       Tuple(fields) => {
         for f in fields {
-          if f.type_expr != nil {
+          if f.type_expr != null {
             let found = self.find_typevar_name(f.type_expr!)
             if found != "" { return found }
           }
@@ -4147,7 +4153,7 @@ lyric checker {
   }
 
   // validateAllExprsResolved walks every Expr in the file and panics if
-  // any has a nil resolved_type. Only runs when checker has zero errors.
+  // any has a null resolved_type. Only runs when checker has zero errors.
   func Checker.validate_all_exprs_resolved(self, file: File) {
     if len(self.errors) > 0 { return }
 
@@ -4155,7 +4161,7 @@ lyric checker {
     for block in blocks {
       let funcs = block.fd_children()
       for f in funcs {
-        if f.body == nil { continue }
+        if f.body == null { continue }
         // Skip generic functions — they aren't fully resolved
         let tps = f.fp_children()
         if len(tps) > 0 { continue }
@@ -4172,7 +4178,7 @@ lyric checker {
 
         let cmethods = cls.cm_children()
         for m in cmethods {
-          if m.body == nil { continue }
+          if m.body == null { continue }
           let tps = m.fp_children()
           if len(tps) > 0 { continue }
 
@@ -4193,14 +4199,14 @@ lyric checker {
   func Checker.vwalk_stmt(self, stmt: Stmt, ctx: string) {
     match stmt.kind {
       VarDecl(_, _, _, _, value) => {
-        if value != nil { self.vwalk_expr(value!, ctx) }
+        if value != null { self.vwalk_expr(value!, ctx) }
       }
       Assign(target, value) => {
         self.vwalk_expr(target, ctx)
         self.vwalk_expr(value, ctx)
       }
       Return(value) => {
-        if value != nil { self.vwalk_expr(value!, ctx) }
+        if value != null { self.vwalk_expr(value!, ctx) }
       }
       ExprStmt(expr) => {
         self.vwalk_expr(expr, ctx)
@@ -4209,10 +4215,10 @@ lyric checker {
         self.vwalk_expr(condition, ctx)
         self.vwalk_block(then_block, ctx)
         for ei in else_ifs {
-          if ei.condition != nil { self.vwalk_expr(ei.condition!, ctx) }
-          if ei.body != nil { self.vwalk_block(ei.body!, ctx) }
+          if ei.condition != null { self.vwalk_expr(ei.condition!, ctx) }
+          if ei.body != null { self.vwalk_block(ei.body!, ctx) }
         }
-        if else_block != nil { self.vwalk_block(else_block!, ctx) }
+        if else_block != null { self.vwalk_block(else_block!, ctx) }
       }
       For(_, _, collection, body) => {
         self.vwalk_expr(collection, ctx)
@@ -4225,10 +4231,10 @@ lyric checker {
       Match(value, arms) => {
         self.vwalk_expr(value, ctx)
         for arm in arms {
-          if arm.pattern != nil { self.vwalk_pattern(arm.pattern!, ctx) }
+          if arm.pattern != null { self.vwalk_pattern(arm.pattern!, ctx) }
           for p in arm.patterns { self.vwalk_pattern(p, ctx) }
-          if arm.guard != nil { self.vwalk_expr(arm.guard!, ctx) }
-          if arm.body != nil { self.vwalk_block(arm.body!, ctx) }
+          if arm.guard != null { self.vwalk_expr(arm.guard!, ctx) }
+          if arm.body != null { self.vwalk_block(arm.body!, ctx) }
         }
       }
       BlockStmt(block) => {
@@ -4242,12 +4248,12 @@ lyric checker {
       }
       Select(cases) => {
         for c in cases {
-          if c.expr != nil { self.vwalk_expr(c.expr!, ctx) }
-          if c.body != nil { self.vwalk_block(c.body!, ctx) }
+          if c.expr != null { self.vwalk_expr(c.expr!, ctx) }
+          if c.body != null { self.vwalk_block(c.body!, ctx) }
         }
       }
       Yield(value) => {
-        if value != nil { self.vwalk_expr(value!, ctx) }
+        if value != null { self.vwalk_expr(value!, ctx) }
       }
       Lock(mutex, body) => {
         self.vwalk_expr(mutex, ctx)
@@ -4257,7 +4263,7 @@ lyric checker {
         self.vwalk_expr(value, ctx)
         self.vwalk_pattern(pattern, ctx)
         self.vwalk_block(then_block, ctx)
-        if else_block != nil { self.vwalk_block(else_block!, ctx) }
+        if else_block != null { self.vwalk_block(else_block!, ctx) }
       }
       LetElse(pattern, value, else_block) => {
         self.vwalk_expr(value, ctx)
@@ -4285,11 +4291,11 @@ lyric checker {
 
   func Checker.vwalk_expr(self, expr: Expr, ctx: string) {
     if isnull(expr.resolved_type) {
-      eprintln(f"checker: validateAllExprsResolved: nil resolved_type in {ctx} at {expr.span.start.file}:{itoa(expr.span.start.line as i64)}:{itoa(expr.span.start.column as i64)}")
+      eprintln(f"checker: validateAllExprsResolved: null resolved_type in {ctx} at {expr.span.start.file}:{itoa(expr.span.start.line as i64)}:{itoa(expr.span.start.column as i64)}")
       os_exit(1)
     }
     // Note: we do NOT reject 'any' here — it's a legitimate type.
-    // The Go checker only rejects nil resolved_type, not any.
+    // The Go checker only rejects null resolved_type, not any.
     // Note: Go checker does NOT reject Sequence(Unit) or Map(Unit,...) — they produce
     // valid void* slices/maps in C. Removed strict checks to match Go behavior.
     // Detect TypeVar leaks — type variables should be fully resolved in non-generic functions
@@ -4323,8 +4329,8 @@ lyric checker {
       }
       Slice(receiver, low, high) => {
         self.vwalk_expr(receiver, ctx)
-        if low != nil { self.vwalk_expr(low!, ctx) }
-        if high != nil { self.vwalk_expr(high!, ctx) }
+        if low != null { self.vwalk_expr(low!, ctx) }
+        if high != null { self.vwalk_expr(high!, ctx) }
       }
       Unary(_, operand) => {
         self.vwalk_expr(operand, ctx)
@@ -4345,7 +4351,7 @@ lyric checker {
       }
       StructLit(_, _, fields) => {
         for f in fields {
-          if f.value != nil { self.vwalk_expr(f.value!, ctx) }
+          if f.value != null { self.vwalk_expr(f.value!, ctx) }
         }
       }
       Lambda(_, _, body) => {
@@ -4357,10 +4363,10 @@ lyric checker {
       Match(value, arms) => {
         self.vwalk_expr(value, ctx)
         for arm in arms {
-          if arm.pattern != nil { self.vwalk_pattern(arm.pattern!, ctx) }
+          if arm.pattern != null { self.vwalk_pattern(arm.pattern!, ctx) }
           for p in arm.patterns { self.vwalk_pattern(p, ctx) }
-          if arm.guard != nil { self.vwalk_expr(arm.guard!, ctx) }
-          if arm.body != nil { self.vwalk_block(arm.body!, ctx) }
+          if arm.guard != null { self.vwalk_expr(arm.guard!, ctx) }
+          if arm.body != null { self.vwalk_block(arm.body!, ctx) }
         }
       }
       Cast(_, operand) => {
@@ -4379,8 +4385,8 @@ lyric checker {
         self.vwalk_expr(cond, ctx)
         self.vwalk_block(then_block, ctx)
         for ei in else_ifs {
-          if ei.condition != nil { self.vwalk_expr(ei.condition!, ctx) }
-          if ei.body != nil { self.vwalk_block(ei.body!, ctx) }
+          if ei.condition != null { self.vwalk_expr(ei.condition!, ctx) }
+          if ei.body != null { self.vwalk_block(ei.body!, ctx) }
         }
         self.vwalk_block(else_block, ctx)
       }
@@ -4396,7 +4402,7 @@ lyric checker {
     for block in blocks {
       let funcs = block.fd_children()
       for f in funcs {
-        if f.body == nil { continue }
+        if f.body == null { continue }
         let tps = f.fp_children()
         if len(tps) > 0 { continue }
 
@@ -4407,7 +4413,7 @@ lyric checker {
       for cls in classes {
         let cmethods = cls.cm_children()
         for m in cmethods {
-          if m.body == nil { continue }
+          if m.body == null { continue }
           let tps = m.fp_children()
           if len(tps) > 0 { continue }
 
@@ -4427,14 +4433,14 @@ lyric checker {
   func Checker.validate_access_stmt(self, stmt: Stmt) {
     match stmt.kind {
       VarDecl(_, _, _, _, value) => {
-        if value != nil { self.validate_access_expr(value!) }
+        if value != null { self.validate_access_expr(value!) }
       }
       Assign(target, value) => {
         self.validate_access_expr(target)
         self.validate_access_expr(value)
       }
       Return(value) => {
-        if value != nil { self.validate_access_expr(value!) }
+        if value != null { self.validate_access_expr(value!) }
       }
       ExprStmt(expr) => {
         self.validate_access_expr(expr)
@@ -4443,10 +4449,10 @@ lyric checker {
         self.validate_access_expr(condition)
         self.validate_access_block(then_block)
         for ei in else_ifs {
-          if ei.condition != nil { self.validate_access_expr(ei.condition!) }
-          if ei.body != nil { self.validate_access_block(ei.body!) }
+          if ei.condition != null { self.validate_access_expr(ei.condition!) }
+          if ei.body != null { self.validate_access_block(ei.body!) }
         }
-        if else_block != nil { self.validate_access_block(else_block!) }
+        if else_block != null { self.validate_access_block(else_block!) }
       }
       For(_, _, collection, body) => {
         self.validate_access_expr(collection)
@@ -4459,8 +4465,8 @@ lyric checker {
       Match(value, arms) => {
         self.validate_access_expr(value)
         for arm in arms {
-          if arm.guard != nil { self.validate_access_expr(arm.guard!) }
-          if arm.body != nil { self.validate_access_block(arm.body!) }
+          if arm.guard != null { self.validate_access_expr(arm.guard!) }
+          if arm.body != null { self.validate_access_block(arm.body!) }
         }
       }
       BlockStmt(block) | Cascade(block) | Spawn(block) => {
@@ -4473,7 +4479,7 @@ lyric checker {
       IfLet(_, value, then_block, else_block) => {
         self.validate_access_expr(value)
         self.validate_access_block(then_block)
-        if else_block != nil { self.validate_access_block(else_block!) }
+        if else_block != null { self.validate_access_block(else_block!) }
       }
       LetElse(_, value, else_block) => {
         self.validate_access_expr(value)
@@ -4481,12 +4487,12 @@ lyric checker {
       }
       Select(cases) => {
         for c in cases {
-          if c.expr != nil { self.validate_access_expr(c.expr!) }
-          if c.body != nil { self.validate_access_block(c.body!) }
+          if c.expr != null { self.validate_access_expr(c.expr!) }
+          if c.body != null { self.validate_access_block(c.body!) }
         }
       }
       Yield(value) => {
-        if value != nil { self.validate_access_expr(value!) }
+        if value != null { self.validate_access_expr(value!) }
       }
       _ => {}
     }
@@ -4520,8 +4526,8 @@ lyric checker {
       }
       Slice(receiver, low, high) => {
         self.validate_access_expr(receiver)
-        if low != nil { self.validate_access_expr(low!) }
-        if high != nil { self.validate_access_expr(high!) }
+        if low != null { self.validate_access_expr(low!) }
+        if high != null { self.validate_access_expr(high!) }
       }
       Cast(_, operand) => {
         self.validate_access_expr(operand)
@@ -4538,7 +4544,7 @@ lyric checker {
       }
       StructLit(_, _, fields) => {
         for f in fields {
-          if f.value != nil { self.validate_access_expr(f.value!) }
+          if f.value != null { self.validate_access_expr(f.value!) }
         }
       }
       StringInterp(parts) => {
@@ -4550,16 +4556,16 @@ lyric checker {
       Match(value, arms) => {
         self.validate_access_expr(value)
         for arm in arms {
-          if arm.guard != nil { self.validate_access_expr(arm.guard!) }
-          if arm.body != nil { self.validate_access_block(arm.body!) }
+          if arm.guard != null { self.validate_access_expr(arm.guard!) }
+          if arm.body != null { self.validate_access_block(arm.body!) }
         }
       }
       IfElse(cond, then_block, else_ifs, else_block) => {
         self.validate_access_expr(cond)
         self.validate_access_block(then_block)
         for ei in else_ifs {
-          if ei.condition != nil { self.validate_access_expr(ei.condition!) }
-          if ei.body != nil { self.validate_access_block(ei.body!) }
+          if ei.condition != null { self.validate_access_expr(ei.condition!) }
+          if ei.body != null { self.validate_access_block(ei.body!) }
         }
         self.validate_access_block(else_block)
       }
@@ -4568,7 +4574,7 @@ lyric checker {
   }
 
   func Checker.validate_field_access(self, receiver: Expr, field_name: Sym) {
-    if receiver.resolved_type == nil { return }
+    if receiver.resolved_type == null { return }
     let recv_type = self.resolve_type_expr(receiver.resolved_type!)
     let field_str = sym_to_string(field_name)
 
@@ -4582,12 +4588,12 @@ lyric checker {
     if tname == "" { return }
 
     let info = self.registry.lookup(tname)
-    if info == nil { return }
+    if info == null { return }
 
     let ft = info!.fields.get(sym(field_str))
-    if ft != nil { return }
+    if ft != null { return }
     let mt = info!.methods.get(sym(field_str))
-    if mt != nil { return }
+    if mt != null { return }
 
     // Check tuple numeric access
     match recv_type.kind {
@@ -4600,7 +4606,7 @@ lyric checker {
   }
 
   func Checker.validate_method_access(self, receiver: Expr, method: Sym) {
-    if receiver.resolved_type == nil { return }
+    if receiver.resolved_type == null { return }
     let recv_type = self.resolve_type_expr(receiver.resolved_type!)
     let method_str = sym_to_string(method)
 
@@ -4623,15 +4629,15 @@ lyric checker {
     if tname == "" { return }
 
     let info = self.registry.lookup(tname)
-    if info == nil { return }
+    if info == null { return }
 
     let mt = info!.methods.get(sym(method_str))
-    if mt != nil { return }
+    if mt != null { return }
 
     // Check "T.method" in scope
     let key = tname + "." + method_str
     let ext = self.scope.lookup(key)
-    if ext != nil { return }
+    if ext != null { return }
 
     // Not found — soft warning
     // self.error("method " + method_str + " not found on type " + tname)

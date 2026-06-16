@@ -87,11 +87,11 @@ func validate_post_mono(prog: LProgram?) {
       os_exit(1)
     }
     for p in f.params {
-      if p.typ != nil {
+      if p.typ != null {
         check_no_typevar(f.name, f"param {p.name}", p.typ!)
       }
     }
-    if f.return_type != nil {
+    if f.return_type != null {
       check_no_typevar(f.name, "return", f.return_type!)
     }
     check_stmts_no_typevar(f.name, f.body)
@@ -121,27 +121,27 @@ func check_no_typevar(func_name: string, context: string, t: LType) {
       os_exit(1)
     }
     TyOptional | TySlice | TyChannel | TyGenerator | TyErrorResult => {
-      if t.elem != nil { check_no_typevar(func_name, context, t.elem!) }
+      if t.elem != null { check_no_typevar(func_name, context, t.elem!) }
     }
     TyMap => {
-      if t.key != nil { check_no_typevar(func_name, context, t.key!) }
-      if t.elem != nil { check_no_typevar(func_name, context, t.elem!) }
+      if t.key != null { check_no_typevar(func_name, context, t.key!) }
+      if t.elem != null { check_no_typevar(func_name, context, t.elem!) }
     }
     TyFuncPtr => {
-      if t.ret != nil { check_no_typevar(func_name, context, t.ret!) }
+      if t.ret != null { check_no_typevar(func_name, context, t.ret!) }
       for p in t.params {
-        if p != nil { check_no_typevar(func_name, context, p!) }
+        if p != null { check_no_typevar(func_name, context, p!) }
       }
     }
     TyTuple => {
       for field in t.fields {
-        if field.typ != nil { check_no_typevar(func_name, context, field.typ!) }
+        if field.typ != null { check_no_typevar(func_name, context, field.typ!) }
       }
     }
     _ => {}
   }
   for ta in t.type_args {
-    if ta != nil { check_no_typevar(func_name, context, ta!) }
+    if ta != null { check_no_typevar(func_name, context, ta!) }
   }
 }
 
@@ -150,40 +150,40 @@ func check_stmts_no_typevar(func_name: string, stmts: [LStmt?]) {
     if isnull(s) { continue }
     match s!.kind {
       StTempDef => {
-        if s!.temp_def != nil && s!.temp_def!.expr != nil {
-          if s!.temp_def!.expr!.typ != nil {
+        if s!.temp_def != null && s!.temp_def!.expr != null {
+          if s!.temp_def!.expr!.typ != null {
             check_no_typevar(func_name, f"_t{itoa(s!.temp_def!.id as i64)}", s!.temp_def!.expr!.typ!)
           }
         }
       }
       StVarDecl => {
-        if s!.var_decl != nil && s!.var_decl!.typ != nil {
+        if s!.var_decl != null && s!.var_decl!.typ != null {
           check_no_typevar(func_name, s!.var_decl!.name, s!.var_decl!.typ!)
         }
       }
       StIf => {
-        if s!.if_data != nil {
+        if s!.if_data != null {
           check_stmts_no_typevar(func_name, s!.if_data!.then_body)
           check_stmts_no_typevar(func_name, s!.if_data!.else_body)
         }
       }
       StWhile => {
-        if s!.while_data != nil {
+        if s!.while_data != null {
           check_stmts_no_typevar(func_name, s!.while_data!.body)
         }
       }
       StFor => {
-        if s!.for_data != nil {
+        if s!.for_data != null {
           check_stmts_no_typevar(func_name, s!.for_data!.body)
         }
       }
       StBlock => {
-        if s!.block != nil {
+        if s!.block != null {
           check_stmts_no_typevar(func_name, s!.block!.stmts)
         }
       }
       StSwitch => {
-        if s!.switch_data != nil {
+        if s!.switch_data != null {
           for c in s!.switch_data!.cases {
             check_stmts_no_typevar(func_name, c.body)
           }
@@ -1135,11 +1135,11 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
                     mc.receiver!.typ = LType {
                       kind: TyClassHandle,
                       name: mangled_class,
-                      elem: nil,
-                      key: nil,
+                      elem: null,
+                      key: null,
                       fields: [],
                       params: [],
-                      ret: nil,
+                      ret: null,
                       variants: [],
                       type_args: [],
                       bits: 0,
@@ -1175,11 +1175,11 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
             e.typ = LType {
               kind: TyClassHandle,
               name: mangled,
-              elem: nil,
-              key: nil,
+              elem: null,
+              key: null,
               fields: [],
               params: [],
-              ret: nil,
+              ret: null,
               variants: [],
               type_args: [],
               bits: 0,
@@ -1405,7 +1405,7 @@ func MonoPass.rewrite_expr(self, e: LExpr) {
 
 func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType? {
   if isnull(t) {
-    return nil
+    return null
   }
   if isnull(subst) {
     return t
@@ -1472,7 +1472,7 @@ func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType? {
 
 func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType? {
   if isnull(t) {
-    return nil
+    return null
   }
   // Rewrite generic class/struct handles with TypeArgs into mangled names
   let is_class_or_struct = (
@@ -1540,7 +1540,7 @@ func clone_stmts(stmts: [LStmt?], subst: Dict<Sym, LType?>?) -> [LStmt?] {
   let mut i = 0
   while i < len(stmts) {
     if isnull(stmts[i]) {
-      append(out, nil)
+      append(out, null)
     } else {
       append(out, clone_stmt(stmts[i]!, subst))
     }
@@ -1557,18 +1557,18 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StTempDef,
           temp_def: LTempDef { id: s.temp_def!.id, expr: cloned_expr },
-          var_decl: nil, assign: nil, struct_set: nil, class_set: nil,
-          index_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          var_decl: null, assign: null, struct_set: null, class_set: null,
+          index_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StVarDecl => {
       if !isnull(s.var_decl) {
-        let mut init_val: LValue? = nil
+        let mut init_val: LValue? = null
         if !isnull(s.var_decl!.init) {
           init_val = clone_value(s.var_decl!.init!, subst)
         }
@@ -1580,30 +1580,30 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             init: init_val,
             mutable: s.var_decl!.mutable,
           },
-          temp_def: nil, assign: nil, struct_set: nil, class_set: nil,
-          index_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, assign: null, struct_set: null, class_set: null,
+          index_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StAssign => {
       if !isnull(s.assign) {
-        let mut val: LValue? = nil
+        let mut val: LValue? = null
         if !isnull(s.assign!.value) {
           val = clone_value(s.assign!.value!, subst)
         }
         return LStmt {
           kind: StAssign,
           assign: LAssignData { target: s.assign!.target, value: val },
-          temp_def: nil, var_decl: nil, struct_set: nil, class_set: nil,
-          index_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, struct_set: null, class_set: null,
+          index_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1615,25 +1615,25 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
           if !isnull(s.ret!.values[i]) {
             append(vals, clone_value(s.ret!.values[i]!, subst))
           } else {
-            append(vals, nil)
+            append(vals, null)
           }
           i = i + 1
         }
         return LStmt {
           kind: StReturn,
           ret: LReturnData { values: vals },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StIf => {
       if !isnull(s.if_data) {
-        let mut cond: LValue? = nil
+        let mut cond: LValue? = null
         if !isnull(s.if_data!.cond) {
           cond = clone_value(s.if_data!.cond!, subst)
         }
@@ -1644,18 +1644,18 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             then_body: clone_stmts(s.if_data!.then_body, subst),
             else_body: clone_stmts(s.if_data!.else_body, subst),
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StWhile => {
       if !isnull(s.while_data) {
-        let mut cv: LValue? = nil
+        let mut cv: LValue? = null
         if !isnull(s.while_data!.cond_var) {
           cv = clone_value(s.while_data!.cond_var!, subst)
         }
@@ -1666,18 +1666,18 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             cond_var: cv,
             body: clone_stmts(s.while_data!.body, subst),
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StFor => {
       if !isnull(s.for_data) {
-        let mut col: LValue? = nil
+        let mut col: LValue? = null
         if !isnull(s.for_data!.collection) {
           col = clone_value(s.for_data!.collection!, subst)
         }
@@ -1690,12 +1690,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             collection: col,
             body: clone_stmts(s.for_data!.body, subst),
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1712,7 +1712,7 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
           })
           i = i + 1
         }
-        let mut tag: LValue? = nil
+        let mut tag: LValue? = null
         if !isnull(s.switch_data!.tag) {
           tag = clone_value(s.switch_data!.tag!, subst)
         }
@@ -1723,12 +1723,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             cases: cases,
             enum_name: s.switch_data!.enum_name,
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1737,12 +1737,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StBlock,
           block: LBlockData { stmts: clone_stmts(s.block!.stmts, subst) },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1751,12 +1751,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StSideEffect,
           side_effect: LSideEffectData { expr: clone_expr(s.side_effect!.expr, subst) },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, defer_data: nil, spawn_data: nil, lock_data: nil,
-          send_data: nil, select_data: nil, yield_data: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, defer_data: null, spawn_data: null, lock_data: null,
+          send_data: null, select_data: null, yield_data: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1765,44 +1765,44 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StExpr,
           expr_stmt: LExprStmtData { temp_id: s.expr_stmt!.temp_id },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StStructSet => {
       if !isnull(s.struct_set) {
-        let mut r: LValue? = nil
+        let mut r: LValue? = null
         if !isnull(s.struct_set!.receiver) {
           r = clone_value(s.struct_set!.receiver!, subst)
         }
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(s.struct_set!.value) {
           v = clone_value(s.struct_set!.value!, subst)
         }
         return LStmt {
           kind: StStructSet,
           struct_set: LStructSetData { receiver: r, field: s.struct_set!.field, value: v },
-          temp_def: nil, var_decl: nil, assign: nil, class_set: nil,
-          index_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, class_set: null,
+          index_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StClassSet => {
       if !isnull(s.class_set) {
-        let mut h: LValue? = nil
+        let mut h: LValue? = null
         if !isnull(s.class_set!.handle) {
           h = clone_value(s.class_set!.handle!, subst)
         }
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(s.class_set!.value) {
           v = clone_value(s.class_set!.value!, subst)
         }
@@ -1819,38 +1819,38 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StClassSet,
           class_set: LClassSetData { handle: h, class_name: cname, field: s.class_set!.field, value: v },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          index_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          index_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StIndexSet => {
       if !isnull(s.index_set) {
-        let mut c: LValue? = nil
+        let mut c: LValue? = null
         if !isnull(s.index_set!.collection) {
           c = clone_value(s.index_set!.collection!, subst)
         }
-        let mut idx: LValue? = nil
+        let mut idx: LValue? = null
         if !isnull(s.index_set!.index) {
           idx = clone_value(s.index_set!.index!, subst)
         }
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(s.index_set!.value) {
           v = clone_value(s.index_set!.value!, subst)
         }
         return LStmt {
           kind: StIndexSet,
           index_set: LIndexSetData { collection: c, index: idx, value: v, field: s.index_set!.field },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, if_data: nil, while_data: nil, for_data: nil,
-          switch_data: nil, block: nil, ret: nil, expr_stmt: nil,
-          defer_data: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, if_data: null, while_data: null, for_data: null,
+          switch_data: null, block: null, ret: null, expr_stmt: null,
+          defer_data: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1869,12 +1869,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             types: types,
             expr: clone_expr(s.multi_assign!.expr, subst),
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, defer_data: nil, spawn_data: nil, lock_data: nil,
-          send_data: nil, select_data: nil, yield_data: nil,
-          side_effect: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, defer_data: null, spawn_data: null, lock_data: null,
+          send_data: null, select_data: null, yield_data: null,
+          side_effect: null, type_switch: null,
         }
       }
     }
@@ -1886,12 +1886,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             body: clone_stmts(s.spawn_data!.body, subst),
             captures: s.spawn_data!.captures,
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, defer_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, defer_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1900,18 +1900,18 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StDefer,
           defer_data: LDeferData { body: clone_stmts(s.defer_data!.body, subst) },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, spawn_data: nil, lock_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, spawn_data: null, lock_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StLock => {
       if !isnull(s.lock_data) {
-        let mut mx: LValue? = nil
+        let mut mx: LValue? = null
         if !isnull(s.lock_data!.mutex) {
           mx = clone_value(s.lock_data!.mutex!, subst)
         }
@@ -1921,34 +1921,34 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             mutex: mx,
             body: clone_stmts(s.lock_data!.body, subst),
           },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, spawn_data: nil, defer_data: nil, send_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, spawn_data: null, defer_data: null, send_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
     StSend => {
       if !isnull(s.send_data) {
-        let mut ch: LValue? = nil
+        let mut ch: LValue? = null
         if !isnull(s.send_data!.channel) {
           ch = clone_value(s.send_data!.channel!, subst)
         }
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(s.send_data!.value) {
           v = clone_value(s.send_data!.value!, subst)
         }
         return LStmt {
           kind: StSend,
           send_data: LSendData { channel: ch, value: v },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, spawn_data: nil, lock_data: nil, defer_data: nil,
-          select_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, spawn_data: null, lock_data: null, defer_data: null,
+          select_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -1958,11 +1958,11 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         let mut i = 0
         while i < len(s.select_data!.cases) {
           let c = s.select_data!.cases[i]
-          let mut ch: LValue? = nil
+          let mut ch: LValue? = null
           if !isnull(c.channel) {
             ch = clone_value(c.channel!, subst)
           }
-          let mut v: LValue? = nil
+          let mut v: LValue? = null
           if !isnull(c.value) {
             v = clone_value(c.value!, subst)
           }
@@ -1978,12 +1978,12 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
         return LStmt {
           kind: StSelect,
           select_data: LSelectData { cases: cases },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, spawn_data: nil, lock_data: nil, defer_data: nil,
-          send_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil, type_switch: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, spawn_data: null, lock_data: null, defer_data: null,
+          send_data: null, yield_data: null, side_effect: null,
+          multi_assign: null, type_switch: null,
         }
       }
     }
@@ -2000,19 +2000,19 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
           })
           i = i + 1
         }
-        let mut val: LValue? = nil
+        let mut val: LValue? = null
         if !isnull(s.type_switch!.value) {
           val = clone_value(s.type_switch!.value!, subst)
         }
         return LStmt {
           kind: StTypeSwitch,
           type_switch: LTypeSwitchData { value: val, cases: cases },
-          temp_def: nil, var_decl: nil, assign: nil, struct_set: nil,
-          class_set: nil, index_set: nil, if_data: nil, while_data: nil,
-          for_data: nil, switch_data: nil, block: nil, ret: nil,
-          expr_stmt: nil, spawn_data: nil, lock_data: nil, defer_data: nil,
-          send_data: nil, yield_data: nil, side_effect: nil,
-          multi_assign: nil,
+          temp_def: null, var_decl: null, assign: null, struct_set: null,
+          class_set: null, index_set: null, if_data: null, while_data: null,
+          for_data: null, switch_data: null, block: null, ret: null,
+          expr_stmt: null, spawn_data: null, lock_data: null, defer_data: null,
+          send_data: null, yield_data: null, side_effect: null,
+          multi_assign: null,
         }
       }
     }
@@ -2038,7 +2038,7 @@ func clone_value(v: LValue, subst: Dict<Sym, LType?>?) -> LValue? {
 
 func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
   if isnull(e) {
-    return nil
+    return null
   }
   let typ = subst_type(e!.typ, subst)
   match e!.kind {
@@ -2050,7 +2050,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           if !isnull(e!.call!.args[i]) {
             append(args, clone_value(e!.call!.args[i]!, subst))
           } else {
-            append(args, nil)
+            append(args, null)
           }
           i = i + 1
         }
@@ -2064,19 +2064,19 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExCall,
           typ: typ,
           call: LCallData { func_name: e!.call!.func_name, args: args, mut_args: e!.call!.mut_args, type_args: ta, is_exported: e!.call!.is_exported },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExMethodCall => {
       if !isnull(e!.method_call) {
         let mc = e!.method_call!
-        let mut recv: LValue? = nil
+        let mut recv: LValue? = null
         if !isnull(mc.receiver) {
           recv = clone_value(mc.receiver!, subst)
         }
@@ -2086,7 +2086,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           if !isnull(mc.args[i]) {
             append(args, clone_value(mc.args[i]!, subst))
           } else {
-            append(args, nil)
+            append(args, null)
           }
           i = i + 1
         }
@@ -2103,12 +2103,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
             receiver: recv, method: mc.method, args: args, mut_args: mc.mut_args, type_args: ta,
             is_exported: mc.is_exported, param_types: mc.param_types,
           },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2118,7 +2118,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
         let mut i = 0
         while i < len(e!.class_alloc!.fields) {
           let f = e!.class_alloc!.fields[i]
-          let mut v: LValue? = nil
+          let mut v: LValue? = null
           if !isnull(f.value) {
             v = clone_value(f.value!, subst)
           }
@@ -2135,22 +2135,22 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExClassAlloc,
           typ: typ,
           class_alloc: LClassAllocData { class_name: e!.class_alloc!.class_name, fields: fields, type_args: ta },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, make_channel: nil, wrap_opt: nil, unwrap_opt: nil,
-          is_null: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, make_channel: null, wrap_opt: null, unwrap_opt: null,
+          is_null: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExBinOp => {
       if !isnull(e!.bin_op) {
-        let mut l: LValue? = nil
+        let mut l: LValue? = null
         if !isnull(e!.bin_op!.left) {
           l = clone_value(e!.bin_op!.left!, subst)
         }
-        let mut r: LValue? = nil
+        let mut r: LValue? = null
         if !isnull(e!.bin_op!.right) {
           r = clone_value(e!.bin_op!.right!, subst)
         }
@@ -2158,18 +2158,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExBinOp,
           typ: typ,
           bin_op: LBinOpData { op: e!.bin_op!.op, left: l, right: r },
-          un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExUnOp => {
       if !isnull(e!.un_op) {
-        let mut op: LValue? = nil
+        let mut op: LValue? = null
         if !isnull(e!.un_op!.operand) {
           op = clone_value(e!.un_op!.operand!, subst)
         }
@@ -2177,18 +2177,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExUnOp,
           typ: typ,
           un_op: LUnOpData { op: e!.un_op!.op, operand: op },
-          bin_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExCast => {
       if !isnull(e!.cast) {
-        let mut op: LValue? = nil
+        let mut op: LValue? = null
         if !isnull(e!.cast!.operand) {
           op = clone_value(e!.cast!.operand!, subst)
         }
@@ -2196,12 +2196,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExCast,
           typ: typ,
           cast: LCastData { target: subst_type(e!.cast!.target, subst), operand: op },
-          bin_op: nil, un_op: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2213,7 +2213,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           if !isnull(e!.builtin!.args[i]) {
             append(args, clone_value(e!.builtin!.args[i]!, subst))
           } else {
-            append(args, nil)
+            append(args, null)
           }
           i = i + 1
         }
@@ -2221,12 +2221,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExBuiltin,
           typ: typ,
           builtin: LBuiltinData { name: e!.builtin!.name, args: args },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2236,7 +2236,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
         let mut i = 0
         while i < len(e!.struct_lit!.fields) {
           let f = e!.struct_lit!.fields[i]
-          let mut v: LValue? = nil
+          let mut v: LValue? = null
           if !isnull(f.value) {
             v = clone_value(f.value!, subst)
           }
@@ -2247,18 +2247,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExStructLit,
           typ: typ,
           struct_lit: LStructLitData { fields: fields },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          class_alloc: nil, make_channel: nil, wrap_opt: nil, unwrap_opt: nil,
-          is_null: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          class_alloc: null, make_channel: null, wrap_opt: null, unwrap_opt: null,
+          is_null: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExStructField => {
       if !isnull(e!.struct_field) {
-        let mut r: LValue? = nil
+        let mut r: LValue? = null
         if !isnull(e!.struct_field!.receiver) {
           r = clone_value(e!.struct_field!.receiver!, subst)
         }
@@ -2266,18 +2266,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExStructField,
           typ: typ,
           struct_field: LStructFieldData { receiver: r, field: e!.struct_field!.field },
-          bin_op: nil, un_op: nil, cast: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExClassGet => {
       if !isnull(e!.class_get) {
-        let mut h: LValue? = nil
+        let mut h: LValue? = null
         if !isnull(e!.class_get!.handle) {
           h = clone_value(e!.class_get!.handle!, subst)
         }
@@ -2296,22 +2296,22 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExClassGet,
           typ: typ,
           class_get: LClassGetData { handle: h, class_name: cname, field: e!.class_get!.field },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExIndexGet => {
       if !isnull(e!.index_get) {
-        let mut c: LValue? = nil
+        let mut c: LValue? = null
         if !isnull(e!.index_get!.collection) {
           c = clone_value(e!.index_get!.collection!, subst)
         }
-        let mut idx: LValue? = nil
+        let mut idx: LValue? = null
         if !isnull(e!.index_get!.index) {
           idx = clone_value(e!.index_get!.index!, subst)
         }
@@ -2319,26 +2319,26 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExIndexGet,
           typ: typ,
           index_get: LIndexGetData { collection: c, index: idx },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExSlice => {
       if !isnull(e!.slice_data) {
-        let mut c: LValue? = nil
+        let mut c: LValue? = null
         if !isnull(e!.slice_data!.collection) {
           c = clone_value(e!.slice_data!.collection!, subst)
         }
-        let mut lo: LValue? = nil
+        let mut lo: LValue? = null
         if !isnull(e!.slice_data!.low) {
           lo = clone_value(e!.slice_data!.low!, subst)
         }
-        let mut hi: LValue? = nil
+        let mut hi: LValue? = null
         if !isnull(e!.slice_data!.high) {
           hi = clone_value(e!.slice_data!.high!, subst)
         }
@@ -2346,18 +2346,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExSlice,
           typ: typ,
           slice_data: LSliceData { collection: c, low: lo, high: hi },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExWrapOptional => {
       if !isnull(e!.wrap_opt) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.wrap_opt!.value) {
           v = clone_value(e!.wrap_opt!.value!, subst)
         }
@@ -2365,18 +2365,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExWrapOptional,
           typ: typ,
           wrap_opt: LWrapOptionalData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, unwrap_opt: nil,
-          is_null: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, unwrap_opt: null,
+          is_null: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExUnwrapOptional => {
       if !isnull(e!.unwrap_opt) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.unwrap_opt!.value) {
           v = clone_value(e!.unwrap_opt!.value!, subst)
         }
@@ -2384,18 +2384,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExUnwrapOptional,
           typ: typ,
           unwrap_opt: LUnwrapOptionalData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          is_null: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          is_null: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExIsNull => {
       if !isnull(e!.is_null) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.is_null!.value) {
           v = clone_value(e!.is_null!.value!, subst)
         }
@@ -2403,12 +2403,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExIsNull,
           typ: typ,
           is_null: LIsNullData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2420,7 +2420,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           if !isnull(e!.variant_construct!.fields[i]) {
             append(fields, clone_value(e!.variant_construct!.fields[i]!, subst))
           } else {
-            append(fields, nil)
+            append(fields, null)
           }
           i = i + 1
         }
@@ -2433,18 +2433,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
             tag: e!.variant_construct!.tag,
             fields: fields,
           },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExVariantTag => {
       if !isnull(e!.variant_tag) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.variant_tag!.value) {
           v = clone_value(e!.variant_tag!.value!, subst)
         }
@@ -2452,18 +2452,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExVariantTag,
           typ: typ,
           variant_tag: LVariantTagData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExVariantData => {
       if !isnull(e!.variant_data) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.variant_data!.value) {
           v = clone_value(e!.variant_data!.value!, subst)
         }
@@ -2476,18 +2476,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
             variant: e!.variant_data!.variant,
             field: e!.variant_data!.field,
           },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExExtractValue => {
       if !isnull(e!.extract_value) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.extract_value!.value) {
           v = clone_value(e!.extract_value!.value!, subst)
         }
@@ -2495,18 +2495,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExExtractValue,
           typ: typ,
           extract_value: LExtractValueData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExExtractError => {
       if !isnull(e!.extract_error) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.extract_error!.value) {
           v = clone_value(e!.extract_error!.value!, subst)
         }
@@ -2514,22 +2514,22 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExExtractError,
           typ: typ,
           extract_error: LExtractErrorData { value: v },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExMakeResult => {
       if !isnull(e!.make_result) {
-        let mut v: LValue? = nil
+        let mut v: LValue? = null
         if !isnull(e!.make_result!.value) {
           v = clone_value(e!.make_result!.value!, subst)
         }
-        let mut er: LValue? = nil
+        let mut er: LValue? = null
         if !isnull(e!.make_result!.err) {
           er = clone_value(e!.make_result!.err!, subst)
         }
@@ -2537,12 +2537,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExMakeResult,
           typ: typ,
           make_result: LMakeResultData { value: v, err: er },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2555,7 +2555,7 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           if p.is_literal {
             append(parts, p)
           } else {
-            let mut v: LValue? = nil
+            let mut v: LValue? = null
             if !isnull(p.value) {
               v = clone_value(p.value!, subst)
             }
@@ -2567,12 +2567,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExFormat,
           typ: typ,
           format: LFormatData { parts: parts },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, func_lit: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, func_lit: null,
         }
       }
     }
@@ -2592,18 +2592,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
             return_type: subst_type(e!.func_lit!.return_type, subst),
             body: clone_stmts(e!.func_lit!.body, subst),
           },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_ref: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_ref: null, format: null,
         }
       }
     }
     ExEnvGet => {
       if !isnull(e!.env_get) {
-        let mut env: LValue? = nil
+        let mut env: LValue? = null
         if !isnull(e!.env_get!.env) {
           env = clone_value(e!.env_get!.env!, subst)
         }
@@ -2611,18 +2611,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExEnvGet,
           typ: typ,
           env_get: LEnvGetData { env: env, field: e!.env_get!.field },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
     ExFuncRef => {
       if !isnull(e!.func_ref) {
-        let mut env: LValue? = nil
+        let mut env: LValue? = null
         if !isnull(e!.func_ref!.env) {
           env = clone_value(e!.func_ref!.env!, subst)
         }
@@ -2630,18 +2630,18 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExFuncRef,
           typ: typ,
           func_ref: LFuncRefData { name: e!.func_ref!.name, env: env },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, make_channel: nil, wrap_opt: nil,
-          unwrap_opt: nil, is_null: nil, variant_construct: nil, variant_tag: nil,
-          variant_data: nil, extract_value: nil, extract_error: nil, make_result: nil,
-          env_get: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, make_channel: null, wrap_opt: null,
+          unwrap_opt: null, is_null: null, variant_construct: null, variant_tag: null,
+          variant_data: null, extract_value: null, extract_error: null, make_result: null,
+          env_get: null, func_lit: null, format: null,
         }
       }
     }
     ExMakeChannel => {
       if !isnull(e!.make_channel) {
-        let mut buf: LValue? = nil
+        let mut buf: LValue? = null
         if !isnull(e!.make_channel!.buf_size) {
           buf = clone_value(e!.make_channel!.buf_size!, subst)
         }
@@ -2649,12 +2649,12 @@ func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr? {
           kind: ExMakeChannel,
           typ: typ,
           make_channel: LMakeChannelData { elem_type: subst_type(e!.make_channel!.elem_type, subst), buf_size: buf },
-          bin_op: nil, un_op: nil, cast: nil, struct_field: nil, class_get: nil,
-          index_get: nil, slice_data: nil, call: nil, method_call: nil, builtin: nil,
-          struct_lit: nil, class_alloc: nil, wrap_opt: nil, unwrap_opt: nil,
-          is_null: nil, variant_construct: nil, variant_tag: nil, variant_data: nil,
-          extract_value: nil, extract_error: nil, make_result: nil, env_get: nil,
-          func_ref: nil, func_lit: nil, format: nil,
+          bin_op: null, un_op: null, cast: null, struct_field: null, class_get: null,
+          index_get: null, slice_data: null, call: null, method_call: null, builtin: null,
+          struct_lit: null, class_alloc: null, wrap_opt: null, unwrap_opt: null,
+          is_null: null, variant_construct: null, variant_tag: null, variant_data: null,
+          extract_value: null, extract_error: null, make_result: null, env_get: null,
+          func_ref: null, func_lit: null, format: null,
         }
       }
     }
@@ -2703,7 +2703,7 @@ func mangle_name(base: string, type_args: [LType?]) -> string {
 
 func type_to_mangle(t: LType?) -> string {
   if isnull(t) {
-    return "nil"
+    return "null"
   }
   match t!.kind {
     TyI8 => { return "i8" }

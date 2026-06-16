@@ -89,7 +89,7 @@ Postfix operators, including member access, function calls, indexing, unwrap (`!
 
 ### Contextual Keywords
 
-Forge treats many keywords (such as `why`, `doc`, `source`, `field`, `lock`, `implements`) as contextual. The lexer emits them as `TIdent`, and the parser rewrites their kind only when they appear in valid annotation or declaration positions. The `expectIdentLike` method allows these tokens to be used as identifiers in positions where they are not ambiguous, such as field or parameter names. Additionally, `null` is treated as a keyword alias for `nil`, both mapping to the same `TNil` token.
+Forge treats many keywords (such as `why`, `doc`, `source`, `field`, `lock`, `implements`) as contextual. The lexer emits them as `TIdent`, and the parser rewrites their kind only when they appear in valid annotation or declaration positions. The `expectIdentLike` method allows these tokens to be used as identifiers in positions where they are not ambiguous, such as field or parameter names. Additionally, `null` is treated as a keyword alias for `null`, both mapping to the same `TNil` token.
 
 ### F-String Interpolation
 
