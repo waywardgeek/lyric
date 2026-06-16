@@ -446,6 +446,16 @@ lyric std {
     return self == other
   }
 
+  // Integer types implement Hashable
+  pub func i8.get_hash(self) -> u64 { return self as u64 }
+  pub func i16.get_hash(self) -> u64 { return self as u64 }
+  pub func i32.get_hash(self) -> u64 { return self as u64 }
+  pub func i64.get_hash(self) -> u64 { return self as u64 }
+  pub func u8.get_hash(self) -> u64 { return self as u64 }
+  pub func u16.get_hash(self) -> u64 { return self as u64 }
+  pub func u32.get_hash(self) -> u64 { return self as u64 }
+  pub func u64.get_hash(self) -> u64 { return self }
+
   // --- Dict: generic hash table with clean method API ---
 
   // DictEntry<K, V>: key-value pair stored in a Dict.

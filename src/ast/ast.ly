@@ -639,9 +639,8 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
             }
         }
         MapLit(keys, values) => {
-            // Dict literals desugar to Dict<Sym, V> — ensure stdlib pulls in both.
+            // Dict literals desugar to Dict<K, V> — ensure stdlib pulls in Dict.
             names.set(`Dict`, true)
-            names.set(`Sym`, true)
             for i in range(0, len(keys)) {
                 ast_collect_call_names_expr(keys[i], names)
                 ast_collect_call_names_expr(values[i], names)
@@ -1201,6 +1200,25 @@ func merge_stdlib(file: File?, std_file: File?) {
                     }
                 }
             }
+        }
+    }
+
+    // Collect primitive extension methods (e.g. i32.get_hash, u64.get_hash) —
+    // needed when generic code (Dict, etc.) calls methods on primitive type args.
+    // Can't use std_func_map for these because multiple functions share the same
+    // bare name (get_hash) and only the last one survives in the map.
+    for bi in range(0, len(std_blocks)) {
+        let sb = std_blocks[bi]
+        let fns = sb.fd_children()
+        for i in range(0, len(fns)) {
+            if fns[i].name == null { continue }
+            if fns[i].receiver_type == null { continue }
+            if !is_primitive_type(fns[i].receiver_type!.name) { continue }
+            let qname = fns[i].receiver_type!.name + "." + fns[i].name!.name
+            let already = merged_funcs.get(sym(qname))
+            if already != null { continue }
+            std_funcs = append(std_funcs, fns[i])
+            merged_funcs.set(sym(qname), true)
         }
     }
 

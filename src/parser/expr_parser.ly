@@ -482,13 +482,13 @@ lyric parser {
             span: Span { start: tok.span.start, end: end.span.end }
           }, null)
         }
-        if next.kind == LStringLit {
+        if next.kind == LStringLit || next.kind == LBacktickSym || next.kind == LIntLit {
           let saved2 = self.lex!.save_state()
-          self.next()  // consume string to peek at token after it
+          self.next()  // consume key token to peek at token after it
           let after = self.peek()
           self.lex!.restore_state(saved2)
           if after.kind == PColon {
-            // String literal followed by : → dict literal
+            // Key literal followed by : → dict literal
             return self.parse_dict_lit(tok)
           }
         }

@@ -155,12 +155,33 @@ lyric lowerer {
 
   func lir_int_type(bits: i32) -> LType? {
     let kind = if bits == 8 { TyI8 } else if bits == 16 { TyI16 } else if bits == 64 { TyI64 } else { TyI32 }
-    return LType { kind: kind, name: "", bits: bits, is_exported: false }
+    let n = if bits == 8 { "i8" } else if bits == 16 { "i16" } else if bits == 64 { "i64" } else { "i32" }
+    return LType { kind: kind, name: n, bits: bits, is_exported: false }
   }
 
   func lir_uint_type(bits: i32) -> LType? {
     let kind = if bits == 8 { TyU8 } else if bits == 16 { TyU16 } else if bits == 64 { TyU64 } else { TyU32 }
-    return LType { kind: kind, name: "", bits: bits, is_exported: false }
+    let n = if bits == 8 { "u8" } else if bits == 16 { "u16" } else if bits == 64 { "u64" } else { "u32" }
+    return LType { kind: kind, name: n, bits: bits, is_exported: false }
+  }
+
+  // Map a primitive type name (e.g. "i32", "u64") to its LType, or null if not primitive.
+  func Lowerer.primitive_type_for_name(self, name: string) -> LType? {
+    if name == "i8" { return LType { kind: TyI8, name: "i8", bits: 8, is_exported: false } }
+    if name == "i16" { return LType { kind: TyI16, name: "i16", bits: 16, is_exported: false } }
+    if name == "i32" { return LType { kind: TyI32, name: "i32", bits: 32, is_exported: false } }
+    if name == "i64" { return LType { kind: TyI64, name: "i64", bits: 64, is_exported: false } }
+    if name == "int" { return LType { kind: TyPlatformInt, name: "int", bits: -1, is_exported: false } }
+    if name == "u8" { return LType { kind: TyU8, name: "u8", bits: 8, is_exported: false } }
+    if name == "u16" { return LType { kind: TyU16, name: "u16", bits: 16, is_exported: false } }
+    if name == "u32" { return LType { kind: TyU32, name: "u32", bits: 32, is_exported: false } }
+    if name == "u64" { return LType { kind: TyU64, name: "u64", bits: 64, is_exported: false } }
+    if name == "uint" { return LType { kind: TyPlatformUint, name: "uint", bits: -1, is_exported: false } }
+    if name == "f32" { return LType { kind: TyF32, name: "f32", bits: 32, is_exported: false } }
+    if name == "f64" { return LType { kind: TyF64, name: "f64", bits: 64, is_exported: false } }
+    if name == "bool" { return LType { kind: TyBool, name: "bool", bits: 0, is_exported: false } }
+    if name == "string" { return LType { kind: TyString, name: "string", bits: 0, is_exported: false } }
+    return null
   }
 
   func Lowerer.lower_type(self, te: TypeExpr?) -> LType? {
@@ -257,10 +278,10 @@ lyric lowerer {
     if n == "u16" { return lir_uint_type(16) }
     if n == "u32" { return lir_uint_type(32) }
     if n == "u64" { return lir_uint_type(64) }
-    if n == "f32" { return LType { kind: TyF32, name: "", bits: 32, is_exported: false } }
-    if n == "f64" { return LType { kind: TyF64, name: "", bits: 64, is_exported: false } }
-    if n == "bool" { return LType { kind: TyBool, name: "", bits: 0, is_exported: false } }
-    if n == "string" { return LType { kind: TyString, name: "", bits: 0, is_exported: false } }
+    if n == "f32" { return LType { kind: TyF32, name: "f32", bits: 32, is_exported: false } }
+    if n == "f64" { return LType { kind: TyF64, name: "f64", bits: 64, is_exported: false } }
+    if n == "bool" { return LType { kind: TyBool, name: "bool", bits: 0, is_exported: false } }
+    if n == "string" { return LType { kind: TyString, name: "string", bits: 0, is_exported: false } }
     if n == "error" { return LType { kind: TyError, name: "error", bits: 0, is_exported: false } }
     if n == "any" { return LType { kind: TyAny, name: "", bits: 0, is_exported: false } }
     if n == "int" { return LType { kind: TyPlatformInt, name: "", bits: -1, is_exported: false } }
@@ -946,17 +967,22 @@ lyric lowerer {
 
     // Add self param for methods
     if receiver != "" {
-      // Build type_args from class type params (matching Go lowerer behavior)
-      let mut self_type_args: [LType?] = []
-      let cls_entry = self.classes!.get(sym(receiver))
-      if !isnull(cls_entry) {
-        for tp in cls_entry!.value.ctp_children() {
-          if !isnull(tp.name) {
-            append(self_type_args, LType { kind: TyTypeVar, name: tp.name!.name, bits: 0, is_exported: false })
+      let prim = self.primitive_type_for_name(receiver)
+      let self_type = if !isnull(prim) {
+        prim!
+      } else {
+        // Build type_args from class type params (matching Go lowerer behavior)
+        let mut self_type_args: [LType?] = []
+        let cls_entry = self.classes!.get(sym(receiver))
+        if !isnull(cls_entry) {
+          for tp in cls_entry!.value.ctp_children() {
+            if !isnull(tp.name) {
+              append(self_type_args, LType { kind: TyTypeVar, name: tp.name!.name, bits: 0, is_exported: false })
+            }
           }
         }
+        LType { kind: TyClassHandle, name: receiver, type_args: self_type_args, bits: 0, is_exported: false }
       }
-      let self_type = LType { kind: TyClassHandle, name: receiver, type_args: self_type_args, bits: 0, is_exported: false }
       append(params, LParam { name: "self", typ: self_type, mutable: false })
       self.define_var("self", self_type)
     }
@@ -3057,18 +3083,14 @@ lyric lowerer {
     let unit_lt = LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
 
     // Extract K and V type args from Dict<K, V>
-    let sym_lt = LType { kind: TyClassHandle, name: "Sym", type_args: [], bits: 0, is_exported: false }
-    let mut k_lt: LType? = sym_lt
+    let mut k_lt: LType? = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
     let mut v_lt: LType? = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
-    let mut ltype_args: [LType?] = [sym_lt, v_lt]
+    let mut ltype_args: [LType?] = [k_lt, v_lt]
     if !isnull(dict_ltype) && len(dict_ltype!.type_args) >= 2 {
       k_lt = dict_ltype!.type_args[0]
       v_lt = dict_ltype!.type_args[1]
       ltype_args = dict_ltype!.type_args
     }
-
-    // Auto-intern string keys when key type is Sym
-    let is_sym_key = !isnull(k_lt) && k_lt!.kind is TyClassHandle && k_lt!.name == "Sym"
 
     // Emit Dict<K,V>() class allocation
     let dict_type = LType { kind: TyClassHandle, name: "Dict", type_args: ltype_args, bits: 0, is_exported: false }
@@ -3082,18 +3104,7 @@ lyric lowerer {
     // Insert each key-value pair via dict.set(k, v)
     let mut i = 0
     while i < len(keys) {
-      let raw_key = self.lower_expr(keys[i])
-      let kv: LValue? = if is_sym_key {
-        // Wrap string key with sym() to intern it
-        let sym_call = LExpr {
-          kind: ExCall,
-          typ: sym_lt,
-          call: LCallData { func_name: "sym", args: [raw_key], mut_args: [false], type_args: [], is_exported: false }
-        }
-        self.emit_temp(sym_call)
-      } else {
-        raw_key
-      }
+      let kv = self.lower_expr(keys[i])
       let vv = self.lower_expr(values[i])
       let set_call = LExpr {
         kind: ExMethodCall,

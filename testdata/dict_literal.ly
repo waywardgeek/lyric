@@ -1,7 +1,7 @@
 lyric dict_literal {
   func main() {
-    // Basic dict literal with string keys (auto-interned as Sym)
-    let d = {"name": "Alice", "city": "Denver"}
+    // Dict literal with sym keys
+    let d = {`name`: "Alice", `city`: "Denver"}
     let name_entry = d.get(`name`)
     if !isnull(name_entry) {
       print(name_entry!.value + "\n")
@@ -11,11 +11,11 @@ lyric dict_literal {
       print(city_entry!.value + "\n")
     }
 
-    // Dict literal with integer values
-    let scores = {"alice": 95, "bob": 87}
-    let alice_entry = scores.get(`alice`)
+    // Dict literal with integer keys
+    let scores = {1: "alice", 2: "bob"}
+    let alice_entry = scores.get(1)
     if !isnull(alice_entry) {
-      print(itoa(alice_entry!.value as i64) + "\n")
+      print(alice_entry!.value + "\n")
     }
 
     // Empty dict literal
