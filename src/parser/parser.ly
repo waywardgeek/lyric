@@ -72,15 +72,8 @@ lyric parser {
     if tok.kind == LIdent {
       return (tok, null)
     }
-    // Accept annotation keywords and certain reserved words as identifiers
+    // Accept certain reserved words as identifiers
     match tok.kind {
-      AWhy => { return (tok, null) }
-      ADoc => { return (tok, null) }
-      AInvariant => { return (tok, null) }
-      ASource => { return (tok, null) }
-      AFake => { return (tok, null) }
-      AVerifiedAt => { return (tok, null) }
-      AGuardedBy => { return (tok, null) }
       KField => { return (tok, null) }
       KEmbed => { return (tok, null) }
       KDestructor => { return (tok, null) }
@@ -122,21 +115,6 @@ lyric parser {
       return true
     }
     return false
-  }
-
-  // ---- isWhyAnnotation ----
-  // Peeks ahead to check if `why` token is annotation ("string")
-  // vs field name (TypeExpr).
-
-  func Parser.is_why_annotation(self) -> bool {
-    let saved = self.lex!.save_state()
-    let pushed_saved = self.pushed
-    self.next()  // consume 'why'
-    self.next()  // consume ':'
-    let tok = self.peek()
-    self.lex!.restore_state(saved)
-    self.pushed = pushed_saved
-    return tok.kind == LStringLit || tok.kind == LTripleString
   }
 
   // ---- Top-level parsing ----
@@ -218,23 +196,6 @@ lyric parser {
     }
 
     match self.peek().kind {
-      AWhy => {
-        if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to why")) }
-        self.parse_why()?
-        return (true, null)
-      }
-      ADoc => {
-        if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to doc")) }
-        let doc_block = self.parse_doc()?
-        array_append<LyricBlock, DocBlock>(block, doc_block!)
-        return (true, null)
-      }
-      AInvariant => {
-        if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to invariant")) }
-        let inv = self.parse_invariant()?
-        array_append<LyricBlock, InvariantDecl>(block, inv!)
-        return (true, null)
-      }
       KImport => {
         if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to import")) }
         let imp = self.parse_import()?
@@ -295,16 +256,6 @@ lyric parser {
         array_append<LyricBlock, ImplBlock>(block, impl_block!)
         return (true, null)
       }
-      ASource => {
-        if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to source")) }
-        self.parse_source()?
-        return (true, null)
-      }
-      AFake => {
-        if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to fake")) }
-        self.parse_fake()?
-        return (true, null)
-      }
       _ => {
         return (false, self.make_error(tok.span, f"unexpected token in lyric block"))
       }
@@ -314,46 +265,6 @@ lyric parser {
   }
 
   // ---- Simple declarations ----
-
-  func Parser.parse_why(self) -> (string, error) {
-    self.next()  // consume 'why'
-    self.expect(PColon)?
-    let tok = self.expect(LStringLit)?
-    return (tok!.text, null)
-  }
-
-  func Parser.parse_doc(self) -> (DocBlock?, error) {
-    let start = self.peek().span.start
-    self.next()  // consume 'doc'
-    let section = self.expect(LStringLit)?
-    self.expect(PColon)?
-    let content = self.expect(LTripleString)?
-    return (DocBlock {
-      section!.text,
-      content!.text,
-      self.make_span(start)
-    }, null)
-  }
-
-  func Parser.parse_invariant(self) -> (InvariantDecl?, error) {
-    let start = self.peek().span.start
-    self.next()  // consume 'invariant'
-    self.expect(PColon)?
-    let claim = self.expect(LStringLit)?
-    let inv = InvariantDecl {
-      claim: claim!.text,
-      verified_at: "",
-      span: self.make_span(start)
-    }
-    self.skip_newlines()
-    if self.peek().kind == AVerifiedAt {
-      self.next()
-      self.expect(PColon)?
-      let hash = self.expect(LStringLit)?
-      inv.verified_at = hash!.text
-    }
-    return (inv, null)
-  }
 
   func Parser.parse_import(self) -> (ImportDecl?, error) {
     let start = self.peek().span.start
@@ -530,13 +441,8 @@ lyric parser {
     self.skip_newlines()
 
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      if self.peek().kind == AWhy && self.is_why_annotation() {
-        let why = self.parse_why()?
-        // TODO: store why
-      } else {
-        let field = self.parse_field()?
-        array_append<StructDecl, Field>(s, field!)
-      }
+      let field = self.parse_field()?
+      array_append<StructDecl, Field>(s, field!)
       if self.peek().kind == PComma {
         self.next()  // allow optional comma between fields
       }
@@ -567,12 +473,8 @@ lyric parser {
     self.skip_newlines()
 
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      if self.peek().kind == AWhy && self.is_why_annotation() {
-        let why = self.parse_why()?
-      } else {
-        let variant = self.parse_enum_variant()?
-        array_append<EnumDecl, EnumVariant>(e, variant!)
-      }
+      let variant = self.parse_enum_variant()?
+      array_append<EnumDecl, EnumVariant>(e, variant!)
       self.skip_newlines()
     }
 
@@ -623,12 +525,6 @@ lyric parser {
     self.skip_newlines()
 
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      // why annotation needs lookahead — handle before match
-      if self.peek().kind == AWhy && self.is_why_annotation() {
-        self.parse_why()?
-        self.skip_newlines()
-        continue
-      }
       // Check contextual keywords (field, implements) before match
       let ann = self.peek_annotation()
       if !isnull(ann) && ann! == KImplements {
@@ -969,16 +865,7 @@ lyric parser {
     self.skip_newlines()
 
     while self.peek().kind != PRBrace && self.peek().kind != SEOF {
-      // why annotation needs lookahead
-      if self.peek().kind == AWhy && self.is_why_annotation() {
-        self.parse_why()?
-        self.skip_newlines()
-        continue
-      }
       match self.peek().kind {
-        ASource => {
-          self.parse_source()?
-        }
         KPub => {
           self.next()
           if self.peek().kind == KFunc {
@@ -1071,10 +958,6 @@ lyric parser {
       self.skip_newlines()
     }
 
-    // Annotations
-    let ann = self.parse_annotations()?
-    fn.annotations = ann
-
     // Optional body
     if self.peek().kind == PLBrace {
       let body = self.parse_block()?
@@ -1083,122 +966,6 @@ lyric parser {
 
     fn.span = self.make_span(start)
     return (fn, null)
-  }
-
-  func Parser.parse_annotations(self) -> (Annotations?, error) {
-    let ann = Annotations {}
-    let mut found = false
-    while true {
-      match self.peek().kind {
-        AWhy => {
-          let why = self.parse_why()?
-          ann.why = why
-          found = true
-        }
-        AConcurrent => {
-          self.next()
-          self.expect(PColon)?
-          let val = self.next()
-          ann.concurrent = val.text == "true"
-          found = true
-        }
-        ARequiresLock => {
-          self.next()
-          self.expect(PLParen)?
-          let name = self.expect(LIdent)?
-          ann.requires_lock = append(ann.requires_lock, sym(name!.text))
-          self.expect(PRParen)?
-          found = true
-        }
-        AExcludesLock => {
-          self.next()
-          self.expect(PLParen)?
-          let name = self.expect(LIdent)?
-          ann.excludes_lock = append(ann.excludes_lock, sym(name!.text))
-          self.expect(PRParen)?
-          found = true
-        }
-        ARaises => {
-          self.next()
-          self.expect(PColon)?
-          while true {
-            let name = self.expect(LIdent)?
-            ann.raises = append(ann.raises, sym(name!.text))
-            if self.peek().kind == PComma {
-              self.next()
-            } else {
-              break
-            }
-          }
-          found = true
-        }
-        ARequires => {
-          self.next()
-          self.expect(PColon)?
-          ann.requires = append(ann.requires, self.parse_expr_text())
-          found = true
-        }
-        AEnsures => {
-          self.next()
-          self.expect(PColon)?
-          ann.ensures = append(ann.ensures, self.parse_expr_text())
-          found = true
-        }
-        ASpawns => {
-          self.next()
-          if self.peek().kind == PColon { self.next() }
-          ann.spawns = true
-          found = true
-        }
-        APure => {
-          self.next()
-          if self.peek().kind == PColon { self.next() }
-          ann.pure = true
-          found = true
-        }
-        _ => {
-          if found { return (ann, null) } else { return (null, null) }
-        }
-      }
-      self.skip_newlines()
-    }
-    return (null, null)
-  }
-
-  // Reads tokens until newline/EOF and returns them joined as text.
-  func Parser.parse_expr_text(self) -> string {
-    let mut result = ""
-    let mut first = true
-    while self.peek().kind != SNewline && self.peek().kind != SEOF {
-      let tok = self.next()
-      if !first { result = result + " " }
-      result = result + tok.text
-      first = false
-    }
-    return result
-  }
-
-  func Parser.parse_source(self) -> ([string], error) {
-    self.next()  // consume 'source'
-    self.expect(PColon)?
-    self.expect(PLBracket)?
-    let mut files: [string] = []
-    while self.peek().kind != PRBracket && self.peek().kind != SEOF {
-      let f = self.expect(LStringLit)?
-      files = append(files, f!.text)
-      if self.peek().kind == PComma {
-        self.next()
-      }
-    }
-    self.expect(PRBracket)?
-    return (files, null)
-  }
-
-  func Parser.parse_fake(self) -> (string, error) {
-    self.next()  // consume 'fake'
-    self.expect(PColon)?
-    let tok = self.expect(LStringLit)?
-    return (tok!.text, null)
   }
 
   func Parser.parse_const_decl(self) -> (ConstDecl?, error) {

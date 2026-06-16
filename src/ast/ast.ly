@@ -74,24 +74,11 @@ lyric ast {
     span: Span
   }
 
-  class Annotations {
-    why: string
-    concurrent: bool
-    requires_lock: [Sym]
-    excludes_lock: [Sym]
-    raises: [Sym]
-    requires: [string]
-    ensures: [string]
-    spawns: bool
-    pure: bool
-  }
-
   class FuncDecl {
     name: Sym?
     is_public: bool
     receiver_type: Sym?
     return_type: TypeExpr?
-    annotations: Annotations?
     body: Block?
     span: Span
   }
@@ -221,18 +208,6 @@ lyric ast {
   }
 
   // ---- Other top-level declarations ----
-
-  class DocBlock {
-    section: string
-    content: string
-    span: Span
-  }
-
-  class InvariantDecl {
-    claim: string
-    verified_at: string
-    span: Span
-  }
 
   class ImportDecl {
     alias: Sym?
@@ -385,12 +360,9 @@ lyric ast {
 
   class LyricBlock {
     name: Sym?
-    why: string
     span: Span
   }
   relation ArrayList LyricBlock:imp owns [ImportDecl:imp]
-  relation ArrayList LyricBlock:doc owns [DocBlock:doc]
-  relation ArrayList LyricBlock:inv owns [InvariantDecl:inv]
   relation ArrayList LyricBlock:sd owns [StructDecl:sd]
   relation ArrayList LyricBlock:ed owns [EnumDecl:ed]
   relation ArrayList LyricBlock:id owns [InterfaceDecl:id]

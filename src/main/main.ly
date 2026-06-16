@@ -1062,16 +1062,8 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
   let name = if !isnull(block.name) { block.name!.get_name() } else { "unnamed" }
   sb.write(f"lyric {name} {{\n")
 
-  if block.why != "" {
-    sb.write(f"  why: \"{block.why}\"\n\n")
-  }
-
   // Collect all declarations with source line for ordered emission
-  // We'll use a simple approach: emit each kind in source order
-  // Build a flat list of (line, kind_tag, index)
   let imports = block.imp_children()
-  let docs = block.doc_children()
-  let invariants = block.inv_children()
   let structs = block.sd_children()
   let enums = block.ed_children()
   let interfaces = block.id_children()
@@ -1080,8 +1072,6 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
   let relations = block.rd_children()
   let type_aliases = block.ta_children()
 
-  // Simple approach: collect all items as (line, tag) pairs, sort, then emit
-  // Since we can't easily sort heterogeneous items, we'll merge by line number
   let mut items: [DeclItem] = []
 
   let mut i = 0
@@ -1090,52 +1080,41 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
     i = i + 1
   }
   i = 0
-  while i < len(docs) {
-    items = append(items, DeclItem { line: docs[i].span.start.line, tag: 1, idx: i })
-    i = i + 1
-  }
-  i = 0
-  while i < len(invariants) {
-    items = append(items, DeclItem { line: invariants[i].span.start.line, tag: 2, idx: i })
-    i = i + 1
-  }
-  i = 0
   while i < len(structs) {
-    items = append(items, DeclItem { line: structs[i].span.start.line, tag: 3, idx: i })
+    items = append(items, DeclItem { line: structs[i].span.start.line, tag: 1, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(enums) {
-    items = append(items, DeclItem { line: enums[i].span.start.line, tag: 4, idx: i })
+    items = append(items, DeclItem { line: enums[i].span.start.line, tag: 2, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(interfaces) {
-    items = append(items, DeclItem { line: interfaces[i].span.start.line, tag: 5, idx: i })
+    items = append(items, DeclItem { line: interfaces[i].span.start.line, tag: 3, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(classes) {
-    items = append(items, DeclItem { line: classes[i].span.start.line, tag: 6, idx: i })
+    items = append(items, DeclItem { line: classes[i].span.start.line, tag: 4, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(funcs) {
-    items = append(items, DeclItem { line: funcs[i].span.start.line, tag: 7, idx: i })
+    items = append(items, DeclItem { line: funcs[i].span.start.line, tag: 5, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(relations) {
-    items = append(items, DeclItem { line: relations[i].span.start.line, tag: 8, idx: i })
+    items = append(items, DeclItem { line: relations[i].span.start.line, tag: 6, idx: i })
     i = i + 1
   }
   i = 0
   while i < len(type_aliases) {
-    items = append(items, DeclItem { line: type_aliases[i].span.start.line, tag: 9, idx: i })
+    items = append(items, DeclItem { line: type_aliases[i].span.start.line, tag: 7, idx: i })
     i = i + 1
   }
 
-  // Sort by line (insertion sort — good enough for small lists)
   sort_decl_items(items)
 
   let mut ci = comment_idx
@@ -1145,15 +1124,13 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
     ci = emit_comments_before(sb, comments, ci, item.line, "  ")
 
     if item.tag == 0 { fmt_import(sb, imports[item.idx]) }
-    if item.tag == 1 { fmt_doc(sb, docs[item.idx]) }
-    if item.tag == 2 { fmt_invariant(sb, invariants[item.idx]) }
-    if item.tag == 3 { fmt_struct(sb, structs[item.idx]) }
-    if item.tag == 4 { fmt_enum(sb, enums[item.idx]) }
-    if item.tag == 5 { fmt_interface(sb, interfaces[item.idx]) }
-    if item.tag == 6 { fmt_class(sb, classes[item.idx]) }
-    if item.tag == 7 { fmt_func(sb, funcs[item.idx], "  ") }
-    if item.tag == 8 { fmt_relation(sb, relations[item.idx]) }
-    if item.tag == 9 { fmt_type_alias(sb, type_aliases[item.idx]) }
+    if item.tag == 1 { fmt_struct(sb, structs[item.idx]) }
+    if item.tag == 2 { fmt_enum(sb, enums[item.idx]) }
+    if item.tag == 3 { fmt_interface(sb, interfaces[item.idx]) }
+    if item.tag == 4 { fmt_class(sb, classes[item.idx]) }
+    if item.tag == 5 { fmt_func(sb, funcs[item.idx], "  ") }
+    if item.tag == 6 { fmt_relation(sb, relations[item.idx]) }
+    if item.tag == 7 { fmt_type_alias(sb, type_aliases[item.idx]) }
 
     if i < len(items) - 1 {
       sb.write("\n")
@@ -1161,7 +1138,6 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
     i = i + 1
   }
 
-  // Emit comments before closing brace
   ci = emit_comments_before(sb, comments, ci, block.span.end.line + 1, "  ")
 
   sb.write("}\n")
@@ -1169,8 +1145,8 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
 
 struct DeclItem {
   line: i32
-  tag: i32   // 0=import, 1=doc, 2=invariant, 3=struct, 4=enum, 5=interface,
-             // 6=class, 7=func, 8=relation, 9=type_alias
+  tag: i32   // 0=import, 1=struct, 2=enum, 3=interface,
+             // 4=class, 5=func, 6=relation, 7=type_alias
   idx: i32
 }
 
@@ -1198,33 +1174,6 @@ func fmt_import(sb: StringBuilder, imp: ImportDecl) {
   } else {
     sb.write(f"  import \"{imp.path}\"\n")
   }
-}
-
-func fmt_doc(sb: StringBuilder, doc: DocBlock) {
-  sb.write(f"  doc \"{doc.section}\": \"\"\"\n")
-  // Split content by newlines and indent
-  let lines = str_split(doc.content, "\n")
-  let mut i = 0
-  while i < len(lines) {
-    let line = str_trim(lines[i])
-    if line == "" {
-      sb.write("\n")
-    } else {
-      sb.write("    ")
-      sb.write(line)
-      sb.write("\n")
-    }
-    i = i + 1
-  }
-  sb.write("  \"\"\"\n")
-}
-
-func fmt_invariant(sb: StringBuilder, inv: InvariantDecl) {
-  sb.write(f"  invariant \"{inv.claim}\"")
-  if inv.verified_at != "" {
-    sb.write(f" verified_at \"{inv.verified_at}\"")
-  }
-  sb.write("\n")
 }
 
 func fmt_struct(sb: StringBuilder, s: StructDecl) {

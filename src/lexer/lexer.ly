@@ -30,10 +30,6 @@ lyric lexer {
     OEqEq OBangEq OLtEq OGtEq OAmpAmp OPipePipe
     OBang OAmp OCaret OShl OShr
     OPlusEq OMinusEq OStarEq OSlashEq
-    // Annotations
-    AWhy ADoc AInvariant ARequires AEnsures ARaises
-    AConcurrent ARequiresLock AExcludesLock AGuardedBy
-    ASpawns APure ASource AFake AVerifiedAt
     // Special
     SNewline SEOF
   }
@@ -59,9 +55,9 @@ lyric lexer {
     d.set(`relation`, KRelation)
     d.set(`destructor`, KDestructor)
     d.set(`embed`, KEmbed)
-    // "field" is contextual — in annot_keywords only
+    // "field" is contextual — parsed by parser.peek_annotation()
     d.set(`import`, KImport)
-    // "implements" is contextual — in annot_keywords only
+    // "implements" is contextual — parsed by parser.peek_annotation()
     d.set(`impl`, KImpl)
     d.set(`as`, KAs)
     d.set(`is`, KIs)
@@ -89,45 +85,14 @@ lyric lexer {
     d.set(`spawn`, KSpawn)
     d.set(`select`, KSelect)
     d.set(`case`, KCase)
-    // "lock" is contextual — in annot_keywords only
+    // "lock" is contextual — parsed by parser.peek_annotation()
     d.set(`yield`, KYield)
     d.set(`pub`, KPub)
     return d
   }
 
-  func init_annot_keywords() -> Dict<Sym, TokenKind> {
-    let d = Dict<Sym, TokenKind>()
-    d.set(`why`, AWhy)
-    d.set(`doc`, ADoc)
-    d.set(`invariant`, AInvariant)
-    d.set(`requires`, ARequires)
-    d.set(`ensures`, AEnsures)
-    d.set(`raises`, ARaises)
-    d.set(`concurrent`, AConcurrent)
-    d.set(`requires_lock`, ARequiresLock)
-    d.set(`excludes_lock`, AExcludesLock)
-    d.set(`guarded_by`, AGuardedBy)
-    d.set(`spawns`, ASpawns)
-    d.set(`pure`, APure)
-    d.set(`source`, ASource)
-    d.set(`fake`, AFake)
-    d.set(`verified_at`, AVerifiedAt)
-    d.set(`field`, KField)
-    d.set(`lock`, KLock)
-    d.set(`implements`, KImplements)
-    return d
-  }
-
   func lookup_keyword(lex: Lexer, text: string) -> TokenKind? {
     let entry = lex.keywords!.get(sym(text))
-    if isnull(entry) {
-      return null
-    }
-    return entry!.value
-  }
-
-  func lookup_annot_keyword(lex: Lexer, text: string) -> TokenKind? {
-    let entry = lex.annot_keywords!.get(sym(text))
     if isnull(entry) {
       return null
     }
@@ -155,7 +120,6 @@ lyric lexer {
     column: i32 = 1
     peeked_token: Token?
     keywords: Dict<Sym, TokenKind>?
-    annot_keywords: Dict<Sym, TokenKind>?
     bracket_depth: i32 = 0
   }
   relation ArrayList Lexer:lc owns [Comment:lc]
@@ -182,8 +146,7 @@ lyric lexer {
     let lex = Lexer {
       src: src_text,
       filename: filename,
-      keywords: init_keywords(),
-      annot_keywords: init_annot_keywords()
+      keywords: init_keywords()
     }
     return lex
   }

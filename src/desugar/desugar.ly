@@ -102,7 +102,6 @@ lyric desugar {
             is_public: false,
             receiver_type: fd.type_param,
             return_type: fd.type_expr,
-            annotations: null,
             body: null,
             span: fd.span,
           }
@@ -133,7 +132,6 @@ lyric desugar {
             is_public: false,
             receiver_type: fd.type_param,
             return_type: null,
-            annotations: null,
             body: null,
             span: fd.span,
           }
@@ -478,7 +476,6 @@ lyric desugar {
               is_public: true,
               receiver_type: null,
               return_type: null,
-              annotations: null,
               body: destroy_body,
               span: db.span,
             }

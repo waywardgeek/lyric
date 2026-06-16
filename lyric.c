@@ -109,7 +109,6 @@ typedef struct TupleField TupleField;
 typedef struct TypeParam TypeParam;
 typedef struct WhereClause WhereClause;
 typedef struct Param Param;
-typedef struct Annotations Annotations;
 typedef struct FuncDecl FuncDecl;
 typedef struct Field Field;
 typedef struct ClassDecl ClassDecl;
@@ -123,8 +122,6 @@ typedef struct InterfaceDecl InterfaceDecl;
 typedef struct ImplMapping ImplMapping;
 typedef struct ImplBlock ImplBlock;
 typedef struct RelationDecl RelationDecl;
-typedef struct DocBlock DocBlock;
-typedef struct InvariantDecl InvariantDecl;
 typedef struct ImportDecl ImportDecl;
 typedef struct TypeAliasDecl TypeAliasDecl;
 typedef struct ConstDecl ConstDecl;
@@ -353,23 +350,8 @@ typedef enum {
     TokenKind_OMinusEq = 84,
     TokenKind_OStarEq = 85,
     TokenKind_OSlashEq = 86,
-    TokenKind_AWhy = 87,
-    TokenKind_ADoc = 88,
-    TokenKind_AInvariant = 89,
-    TokenKind_ARequires = 90,
-    TokenKind_AEnsures = 91,
-    TokenKind_ARaises = 92,
-    TokenKind_AConcurrent = 93,
-    TokenKind_ARequiresLock = 94,
-    TokenKind_AExcludesLock = 95,
-    TokenKind_AGuardedBy = 96,
-    TokenKind_ASpawns = 97,
-    TokenKind_APure = 98,
-    TokenKind_ASource = 99,
-    TokenKind_AFake = 100,
-    TokenKind_AVerifiedAt = 101,
-    TokenKind_SNewline = 102,
-    TokenKind_SEOF = 103
+    TokenKind_SNewline = 87,
+    TokenKind_SEOF = 88
 } TokenKind;
 
 typedef struct TypeKind TypeKind;
@@ -547,8 +529,6 @@ LYRIC_SLICE_DEF(ImplMapping*, LyricSlice_ImplMappingptr)
 LYRIC_SLICE_DEF(Pattern*, LyricSlice_Patternptr)
 LYRIC_SLICE_DEF(Stmt*, LyricSlice_Stmtptr)
 LYRIC_SLICE_DEF(ImportDecl*, LyricSlice_ImportDeclptr)
-LYRIC_SLICE_DEF(DocBlock*, LyricSlice_DocBlockptr)
-LYRIC_SLICE_DEF(InvariantDecl*, LyricSlice_InvariantDeclptr)
 LYRIC_SLICE_DEF(StructDecl*, LyricSlice_StructDeclptr)
 LYRIC_SLICE_DEF(EnumDecl*, LyricSlice_EnumDeclptr)
 LYRIC_SLICE_DEF(InterfaceDecl*, LyricSlice_InterfaceDeclptr)
@@ -1631,7 +1611,6 @@ LYRIC_OPT_DEF(ClassDecl*, LyricOpt_ClassDeclptr)
 LYRIC_OPT_DEF(StructDecl*, LyricOpt_StructDeclptr)
 LYRIC_OPT_DEF(EnumDecl*, LyricOpt_EnumDeclptr)
 LYRIC_OPT_DEF(InterfaceDecl*, LyricOpt_InterfaceDeclptr)
-LYRIC_OPT_DEF(Annotations*, LyricOpt_Annotationsptr)
 LYRIC_OPT_DEF(Block*, LyricOpt_Blockptr)
 LYRIC_OPT_DEF(LyricBlock*, LyricOpt_LyricBlockptr)
 LYRIC_OPT_DEF(File*, LyricOpt_Fileptr)
@@ -1677,9 +1656,6 @@ LYRIC_RESULT_DEF(File*, LyricResult_Fileptr)
 LYRIC_RESULT_DEF(Token*, LyricResult_Tokenptr)
 LYRIC_RESULT_DEF(LyricBlock*, LyricResult_LyricBlockptr)
 LYRIC_RESULT_DEF(bool, LyricResult_bool)
-LYRIC_RESULT_DEF(lyric_string, LyricResult_lyric_string)
-LYRIC_RESULT_DEF(DocBlock*, LyricResult_DocBlockptr)
-LYRIC_RESULT_DEF(InvariantDecl*, LyricResult_InvariantDeclptr)
 LYRIC_RESULT_DEF(ImportDecl*, LyricResult_ImportDeclptr)
 LYRIC_RESULT_DEF(ConstDecl*, LyricResult_ConstDeclptr)
 LYRIC_RESULT_DEF(StructDecl*, LyricResult_StructDeclptr)
@@ -1690,7 +1666,6 @@ LYRIC_RESULT_DEF(FuncDecl*, LyricResult_FuncDeclptr)
 LYRIC_RESULT_DEF(RelationDecl*, LyricResult_RelationDeclptr)
 LYRIC_RESULT_DEF(TypeAliasDecl*, LyricResult_TypeAliasDeclptr)
 LYRIC_RESULT_DEF(ImplBlock*, LyricResult_ImplBlockptr)
-LYRIC_RESULT_DEF(LyricSlice_lyric_string, LyricResult_LyricSlice_lyric_string)
 LYRIC_RESULT_DEF(TypeExpr*, LyricResult_TypeExprptr)
 LYRIC_RESULT_DEF(Field*, LyricResult_Fieldptr)
 LYRIC_RESULT_DEF(Expr*, LyricResult_Exprptr)
@@ -1704,7 +1679,6 @@ LYRIC_RESULT_DEF(DestructorBlock*, LyricResult_DestructorBlockptr)
 LYRIC_RESULT_DEF(Block*, LyricResult_Blockptr)
 LYRIC_RESULT_DEF(ImplMapping*, LyricResult_ImplMappingptr)
 LYRIC_RESULT_DEF(WhereClause*, LyricResult_WhereClauseptr)
-LYRIC_RESULT_DEF(Annotations*, LyricResult_Annotationsptr)
 LYRIC_RESULT_DEF(LyricOpt_ArgListResult, LyricResult_LyricOpt_ArgListResult)
 LYRIC_RESULT_DEF(LyricSlice_MatchArmptr, LyricResult_LyricSlice_MatchArmptr)
 LYRIC_RESULT_DEF(Stmt*, LyricResult_Stmtptr)
@@ -1771,25 +1745,11 @@ struct Param {
     struct Param* lyric_next;
 };
 
-struct Annotations {
-    lyric_string why;
-    bool concurrent;
-    LyricSlice_Symptr requires_lock;
-    LyricSlice_Symptr excludes_lock;
-    LyricSlice_Symptr raises;
-    LyricSlice_lyric_string requires;
-    LyricSlice_lyric_string ensures;
-    bool spawns;
-    bool pure;
-    struct Annotations* lyric_next;
-};
-
 struct FuncDecl {
     Sym* name;
     bool is_public;
     Sym* receiver_type;
     TypeExpr* return_type;
-    Annotations* annotations;
     Block* body;
     Span span;
     LyricSlice_TypeParamptr fp_children;
@@ -1943,24 +1903,6 @@ struct RelationDecl {
     struct RelationDecl* lyric_next;
 };
 
-struct DocBlock {
-    lyric_string section;
-    lyric_string content;
-    Span span;
-    LyricBlock* doc_parent;
-    int32_t doc_index;
-    struct DocBlock* lyric_next;
-};
-
-struct InvariantDecl {
-    lyric_string claim;
-    lyric_string verified_at;
-    Span span;
-    LyricBlock* inv_parent;
-    int32_t inv_index;
-    struct InvariantDecl* lyric_next;
-};
-
 struct ImportDecl {
     Sym* alias;
     lyric_string path;
@@ -2056,11 +1998,8 @@ struct Block {
 
 struct LyricBlock {
     Sym* name;
-    lyric_string why;
     Span span;
     LyricSlice_ImportDeclptr imp_children;
-    LyricSlice_DocBlockptr doc_children;
-    LyricSlice_InvariantDeclptr inv_children;
     LyricSlice_StructDeclptr sd_children;
     LyricSlice_EnumDeclptr ed_children;
     LyricSlice_InterfaceDeclptr id_children;
@@ -2124,7 +2063,6 @@ struct Lexer {
     int32_t column;
     Token* peeked_token;
     Dict_CSym_ETokenKind* keywords;
-    Dict_CSym_ETokenKind* annot_keywords;
     int32_t bracket_depth;
     LyricSlice_Commentptr lc_children;
     struct Lexer* lyric_next;
@@ -2954,14 +2892,6 @@ typedef struct LyricSlab_Param_Block {
 typedef struct { LyricSlab_Param_Block* cur; Param* free; } LyricSlab_Param;
 static LyricSlab_Param _lyric_slab_Param = {0};
 
-typedef struct LyricSlab_Annotations_Block {
-    struct Annotations data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_Annotations_Block* next;
-    int32_t used;
-} LyricSlab_Annotations_Block;
-typedef struct { LyricSlab_Annotations_Block* cur; Annotations* free; } LyricSlab_Annotations;
-static LyricSlab_Annotations _lyric_slab_Annotations = {0};
-
 typedef struct LyricSlab_FuncDecl_Block {
     struct FuncDecl data[LYRIC_SLAB_BLOCK];
     struct LyricSlab_FuncDecl_Block* next;
@@ -3065,22 +2995,6 @@ typedef struct LyricSlab_RelationDecl_Block {
 } LyricSlab_RelationDecl_Block;
 typedef struct { LyricSlab_RelationDecl_Block* cur; RelationDecl* free; } LyricSlab_RelationDecl;
 static LyricSlab_RelationDecl _lyric_slab_RelationDecl = {0};
-
-typedef struct LyricSlab_DocBlock_Block {
-    struct DocBlock data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_DocBlock_Block* next;
-    int32_t used;
-} LyricSlab_DocBlock_Block;
-typedef struct { LyricSlab_DocBlock_Block* cur; DocBlock* free; } LyricSlab_DocBlock;
-static LyricSlab_DocBlock _lyric_slab_DocBlock = {0};
-
-typedef struct LyricSlab_InvariantDecl_Block {
-    struct InvariantDecl data[LYRIC_SLAB_BLOCK];
-    struct LyricSlab_InvariantDecl_Block* next;
-    int32_t used;
-} LyricSlab_InvariantDecl_Block;
-typedef struct { LyricSlab_InvariantDecl_Block* cur; InvariantDecl* free; } LyricSlab_InvariantDecl;
-static LyricSlab_InvariantDecl _lyric_slab_InvariantDecl = {0};
 
 typedef struct LyricSlab_ImportDecl_Block {
     struct ImportDecl data[LYRIC_SLAB_BLOCK];
@@ -3949,21 +3863,6 @@ static Param* _lyric_slab_alloc_Param(void) {
     return &_lyric_slab_Param.cur->data[_lyric_slab_Param.cur->used++];
 }
 
-static Annotations* _lyric_slab_alloc_Annotations(void) {
-    if (_lyric_slab_Annotations.free) {
-        Annotations* p = _lyric_slab_Annotations.free;
-        _lyric_slab_Annotations.free = p->lyric_next;
-        memset(p, 0, sizeof(Annotations));
-        return p;
-    }
-    if (!_lyric_slab_Annotations.cur || _lyric_slab_Annotations.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_Annotations_Block* b = (LyricSlab_Annotations_Block*)calloc(1, sizeof(LyricSlab_Annotations_Block));
-        b->next = _lyric_slab_Annotations.cur;
-        _lyric_slab_Annotations.cur = b;
-    }
-    return &_lyric_slab_Annotations.cur->data[_lyric_slab_Annotations.cur->used++];
-}
-
 static FuncDecl* _lyric_slab_alloc_FuncDecl(void) {
     if (_lyric_slab_FuncDecl.free) {
         FuncDecl* p = _lyric_slab_FuncDecl.free;
@@ -4157,36 +4056,6 @@ static RelationDecl* _lyric_slab_alloc_RelationDecl(void) {
         _lyric_slab_RelationDecl.cur = b;
     }
     return &_lyric_slab_RelationDecl.cur->data[_lyric_slab_RelationDecl.cur->used++];
-}
-
-static DocBlock* _lyric_slab_alloc_DocBlock(void) {
-    if (_lyric_slab_DocBlock.free) {
-        DocBlock* p = _lyric_slab_DocBlock.free;
-        _lyric_slab_DocBlock.free = p->lyric_next;
-        memset(p, 0, sizeof(DocBlock));
-        return p;
-    }
-    if (!_lyric_slab_DocBlock.cur || _lyric_slab_DocBlock.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_DocBlock_Block* b = (LyricSlab_DocBlock_Block*)calloc(1, sizeof(LyricSlab_DocBlock_Block));
-        b->next = _lyric_slab_DocBlock.cur;
-        _lyric_slab_DocBlock.cur = b;
-    }
-    return &_lyric_slab_DocBlock.cur->data[_lyric_slab_DocBlock.cur->used++];
-}
-
-static InvariantDecl* _lyric_slab_alloc_InvariantDecl(void) {
-    if (_lyric_slab_InvariantDecl.free) {
-        InvariantDecl* p = _lyric_slab_InvariantDecl.free;
-        _lyric_slab_InvariantDecl.free = p->lyric_next;
-        memset(p, 0, sizeof(InvariantDecl));
-        return p;
-    }
-    if (!_lyric_slab_InvariantDecl.cur || _lyric_slab_InvariantDecl.cur->used == LYRIC_SLAB_BLOCK) {
-        LyricSlab_InvariantDecl_Block* b = (LyricSlab_InvariantDecl_Block*)calloc(1, sizeof(LyricSlab_InvariantDecl_Block));
-        b->next = _lyric_slab_InvariantDecl.cur;
-        _lyric_slab_InvariantDecl.cur = b;
-    }
-    return &_lyric_slab_InvariantDecl.cur->data[_lyric_slab_InvariantDecl.cur->used++];
 }
 
 static ImportDecl* _lyric_slab_alloc_ImportDecl(void) {
@@ -5704,12 +5573,6 @@ static void _lyric_slab_free_Param(Param* p) {
     _lyric_slab_Param.free = p;
 }
 
-static void _lyric_slab_free_Annotations(Annotations* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_Annotations.free;
-    _lyric_slab_Annotations.free = p;
-}
-
 static void _lyric_slab_free_FuncDecl(FuncDecl* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_FuncDecl.free;
@@ -5786,18 +5649,6 @@ static void _lyric_slab_free_RelationDecl(RelationDecl* p) {
     if (!p) return;
     p->lyric_next = _lyric_slab_RelationDecl.free;
     _lyric_slab_RelationDecl.free = p;
-}
-
-static void _lyric_slab_free_DocBlock(DocBlock* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_DocBlock.free;
-    _lyric_slab_DocBlock.free = p;
-}
-
-static void _lyric_slab_free_InvariantDecl(InvariantDecl* p) {
-    if (!p) return;
-    p->lyric_next = _lyric_slab_InvariantDecl.free;
-    _lyric_slab_InvariantDecl.free = p;
 }
 
 static void _lyric_slab_free_ImportDecl(ImportDecl* p) {
@@ -6507,7 +6358,6 @@ static lyric_string TupleField_to_string(TupleField* v);
 static lyric_string TypeParam_to_string(TypeParam* v);
 static lyric_string WhereClause_to_string(WhereClause* v);
 static lyric_string Param_to_string(Param* v);
-static lyric_string Annotations_to_string(Annotations* v);
 static lyric_string FuncDecl_to_string(FuncDecl* v);
 static lyric_string Field_to_string(Field* v);
 static lyric_string ClassDecl_to_string(ClassDecl* v);
@@ -6521,8 +6371,6 @@ static lyric_string InterfaceDecl_to_string(InterfaceDecl* v);
 static lyric_string ImplMapping_to_string(ImplMapping* v);
 static lyric_string ImplBlock_to_string(ImplBlock* v);
 static lyric_string RelationDecl_to_string(RelationDecl* v);
-static lyric_string DocBlock_to_string(DocBlock* v);
-static lyric_string InvariantDecl_to_string(InvariantDecl* v);
 static lyric_string ImportDecl_to_string(ImportDecl* v);
 static lyric_string TypeAliasDecl_to_string(TypeAliasDecl* v);
 static lyric_string ConstDecl_to_string(ConstDecl* v);
@@ -6843,21 +6691,6 @@ static lyric_string TokenKind_to_string(TokenKind v) {
         case TokenKind_OMinusEq: return LYRIC_STR("OMinusEq");
         case TokenKind_OStarEq: return LYRIC_STR("OStarEq");
         case TokenKind_OSlashEq: return LYRIC_STR("OSlashEq");
-        case TokenKind_AWhy: return LYRIC_STR("AWhy");
-        case TokenKind_ADoc: return LYRIC_STR("ADoc");
-        case TokenKind_AInvariant: return LYRIC_STR("AInvariant");
-        case TokenKind_ARequires: return LYRIC_STR("ARequires");
-        case TokenKind_AEnsures: return LYRIC_STR("AEnsures");
-        case TokenKind_ARaises: return LYRIC_STR("ARaises");
-        case TokenKind_AConcurrent: return LYRIC_STR("AConcurrent");
-        case TokenKind_ARequiresLock: return LYRIC_STR("ARequiresLock");
-        case TokenKind_AExcludesLock: return LYRIC_STR("AExcludesLock");
-        case TokenKind_AGuardedBy: return LYRIC_STR("AGuardedBy");
-        case TokenKind_ASpawns: return LYRIC_STR("ASpawns");
-        case TokenKind_APure: return LYRIC_STR("APure");
-        case TokenKind_ASource: return LYRIC_STR("ASource");
-        case TokenKind_AFake: return LYRIC_STR("AFake");
-        case TokenKind_AVerifiedAt: return LYRIC_STR("AVerifiedAt");
         case TokenKind_SNewline: return LYRIC_STR("SNewline");
         case TokenKind_SEOF: return LYRIC_STR("SEOF");
         default: return LYRIC_STR("<unknown TokenKind>");
@@ -8132,38 +7965,6 @@ static lyric_string Param_to_string(Param* v) {
     return _result;
 }
 
-static lyric_string Annotations_to_string(Annotations* v) {
-    lyric_string _result = LYRIC_STR("Annotations{");
-    _result = lyric_str_concat(_result, LYRIC_STR("why: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->why.len, (const char*)v->why.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("concurrent: "));
-    _result = lyric_str_concat(_result, (v->concurrent ? LYRIC_STR("true") : LYRIC_STR("false")));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("requires_lock: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("excludes_lock: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("raises: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("requires: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("ensures: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("spawns: "));
-    _result = lyric_str_concat(_result, (v->spawns ? LYRIC_STR("true") : LYRIC_STR("false")));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("pure: "));
-    _result = lyric_str_concat(_result, (v->pure ? LYRIC_STR("true") : LYRIC_STR("false")));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
 static lyric_string FuncDecl_to_string(FuncDecl* v) {
     lyric_string _result = LYRIC_STR("FuncDecl{");
     _result = lyric_str_concat(_result, LYRIC_STR("name: "));
@@ -8176,9 +7977,6 @@ static lyric_string FuncDecl_to_string(FuncDecl* v) {
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("return_type: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("annotations: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("body: "));
@@ -8550,46 +8348,6 @@ static lyric_string RelationDecl_to_string(RelationDecl* v) {
     return _result;
 }
 
-static lyric_string DocBlock_to_string(DocBlock* v) {
-    lyric_string _result = LYRIC_STR("DocBlock{");
-    _result = lyric_str_concat(_result, LYRIC_STR("section: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->section.len, (const char*)v->section.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("content: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->content.len, (const char*)v->content.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("span: "));
-    _result = lyric_str_concat(_result, Span_to_string(v->span));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("doc_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("doc_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->doc_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
-static lyric_string InvariantDecl_to_string(InvariantDecl* v) {
-    lyric_string _result = LYRIC_STR("InvariantDecl{");
-    _result = lyric_str_concat(_result, LYRIC_STR("claim: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->claim.len, (const char*)v->claim.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("verified_at: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->verified_at.len, (const char*)v->verified_at.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("span: "));
-    _result = lyric_str_concat(_result, Span_to_string(v->span));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("inv_parent: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("inv_index: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("%d", v->inv_index));
-    _result = lyric_str_concat(_result, LYRIC_STR("}"));
-    return _result;
-}
-
 static lyric_string ImportDecl_to_string(ImportDecl* v) {
     lyric_string _result = LYRIC_STR("ImportDecl{");
     _result = lyric_str_concat(_result, LYRIC_STR("alias: "));
@@ -8797,19 +8555,10 @@ static lyric_string LyricBlock_to_string(LyricBlock* v) {
     _result = lyric_str_concat(_result, LYRIC_STR("name: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("why: "));
-    _result = lyric_str_concat(_result, lyric_sprintf("\"%.*s\"", (int)v->why.len, (const char*)v->why.data));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("span: "));
     _result = lyric_str_concat(_result, Span_to_string(v->span));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("imp_children: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("doc_children: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("inv_children: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("sd_children: "));
@@ -8942,9 +8691,6 @@ static lyric_string Lexer_to_string(Lexer* v) {
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("keywords: "));
-    _result = lyric_str_concat(_result, LYRIC_STR("<>"));
-    _result = lyric_str_concat(_result, LYRIC_STR(", "));
-    _result = lyric_str_concat(_result, LYRIC_STR("annot_keywords: "));
     _result = lyric_str_concat(_result, LYRIC_STR("<>"));
     _result = lyric_str_concat(_result, LYRIC_STR(", "));
     _result = lyric_str_concat(_result, LYRIC_STR("bracket_depth: "));
@@ -10792,8 +10538,6 @@ void InterfaceDecl_destroy(InterfaceDecl* self);
 void ImplMapping_destroy(ImplMapping* self);
 void ImplBlock_destroy(ImplBlock* self);
 void RelationDecl_destroy(RelationDecl* self);
-void DocBlock_destroy(DocBlock* self);
-void InvariantDecl_destroy(InvariantDecl* self);
 void ImportDecl_destroy(ImportDecl* self);
 void TypeAliasDecl_destroy(TypeAliasDecl* self);
 void ConstDecl_destroy(ConstDecl* self);
@@ -10950,18 +10694,6 @@ LyricBlock* ImportDecl_imp_parent(ImportDecl* self);
 void ImportDecl_set_imp_parent(ImportDecl* self, LyricBlock* val);
 int32_t ImportDecl_imp_index(ImportDecl* self);
 void ImportDecl_set_imp_index(ImportDecl* self, int32_t val);
-LyricSlice_DocBlockptr LyricBlock_doc_children(LyricBlock* self);
-void LyricBlock_set_doc_children(LyricBlock* self, LyricSlice_DocBlockptr val);
-LyricBlock* DocBlock_doc_parent(DocBlock* self);
-void DocBlock_set_doc_parent(DocBlock* self, LyricBlock* val);
-int32_t DocBlock_doc_index(DocBlock* self);
-void DocBlock_set_doc_index(DocBlock* self, int32_t val);
-LyricSlice_InvariantDeclptr LyricBlock_inv_children(LyricBlock* self);
-void LyricBlock_set_inv_children(LyricBlock* self, LyricSlice_InvariantDeclptr val);
-LyricBlock* InvariantDecl_inv_parent(InvariantDecl* self);
-void InvariantDecl_set_inv_parent(InvariantDecl* self, LyricBlock* val);
-int32_t InvariantDecl_inv_index(InvariantDecl* self);
-void InvariantDecl_set_inv_index(InvariantDecl* self, int32_t val);
 LyricSlice_StructDeclptr LyricBlock_sd_children(LyricBlock* self);
 void LyricBlock_set_sd_children(LyricBlock* self, LyricSlice_StructDeclptr val);
 LyricBlock* StructDecl_sd_parent(StructDecl* self);
@@ -11060,9 +10792,7 @@ void rewrite_qualified_stmt(Stmt* stmt, LyricSlice_lyric_string alias_names, Lyr
 int32_t find_alias_index(lyric_string name, LyricSlice_lyric_string alias_names);
 void rewrite_qualified_expr(Expr* expr, LyricSlice_lyric_string alias_names, LyricSlice_LyricSlice_lyric_string orig_names, LyricSlice_LyricSlice_lyric_string prefixed_names);
 Dict_CSym_ETokenKind* init_keywords(void);
-Dict_CSym_ETokenKind* init_annot_keywords(void);
 LyricOpt_TokenKind lookup_keyword(Lexer* lex, lyric_string text);
-LyricOpt_TokenKind lookup_annot_keyword(Lexer* lex, lyric_string text);
 LexerState Lexer_save_state(Lexer* self);
 void Lexer_restore_state(Lexer* self, LexerState state);
 Lexer* new_lexer(lyric_string src_text, Sym* filename);
@@ -11105,13 +10835,9 @@ LyricResult_Tokenptr Parser_expect_ident(Parser* self);
 Span Parser_make_span(Parser* self, Pos start);
 LyricOpt_TokenKind Parser_peek_annotation(Parser* self);
 bool Parser_consume_annotation(Parser* self, TokenKind kind);
-bool Parser_is_why_annotation(Parser* self);
 LyricResult_Fileptr Parser_do_parse_file(Parser* self);
 LyricResult_LyricBlockptr Parser_parse_lyric_block(Parser* self);
 LyricResult_bool Parser_parse_lyric_item(Parser* self, LyricBlock* block);
-LyricResult_lyric_string Parser_parse_why(Parser* self);
-LyricResult_DocBlockptr Parser_parse_doc(Parser* self);
-LyricResult_InvariantDeclptr Parser_parse_invariant(Parser* self);
 LyricResult_ImportDeclptr Parser_parse_import(Parser* self);
 LyricResult_TypeAliasDeclptr Parser_parse_type_alias(Parser* self);
 LyricResult_Fieldptr Parser_parse_field(Parser* self);
@@ -11130,10 +10856,6 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
 LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self);
 LyricResult_ClassDeclptr Parser_parse_class(Parser* self);
 LyricResult_FuncDeclptr Parser_parse_func(Parser* self);
-LyricResult_Annotationsptr Parser_parse_annotations(Parser* self);
-lyric_string Parser_parse_expr_text(Parser* self);
-LyricResult_LyricSlice_lyric_string Parser_parse_source(Parser* self);
-LyricResult_lyric_string Parser_parse_fake(Parser* self);
 LyricResult_ConstDeclptr Parser_parse_const_decl(Parser* self);
 LyricResult_WhereClauseptr Parser_parse_where_clause(Parser* self);
 LyricResult_RelationDeclptr Parser_parse_relation(Parser* self);
@@ -11665,8 +11387,6 @@ int32_t emit_comments_before(StringBuilder* sb, LyricSlice_Commentptr comments, 
 void fmt_block(StringBuilder* sb, LyricBlock* block, LyricSlice_Commentptr comments, int32_t comment_idx);
 void sort_decl_items(LyricSlice_DeclItem items);
 void fmt_import(StringBuilder* sb, ImportDecl* imp);
-void fmt_doc(StringBuilder* sb, DocBlock* doc);
-void fmt_invariant(StringBuilder* sb, InvariantDecl* inv);
 void fmt_struct(StringBuilder* sb, StructDecl* s);
 void fmt_enum(StringBuilder* sb, EnumDecl* e);
 void fmt_interface(StringBuilder* sb, InterfaceDecl* iface);
@@ -11727,8 +11447,6 @@ void array_remove_CLyricBlock_CInterfaceDecl(InterfaceDecl* child);
 void array_remove_CImplBlock_CImplMapping(ImplMapping* child);
 void array_remove_CLyricBlock_CImplBlock(ImplBlock* child);
 void array_remove_CLyricBlock_CRelationDecl(RelationDecl* child);
-void array_remove_CLyricBlock_CDocBlock(DocBlock* child);
-void array_remove_CLyricBlock_CInvariantDecl(InvariantDecl* child);
 void array_remove_CLyricBlock_CImportDecl(ImportDecl* child);
 void array_remove_CLyricBlock_CTypeAliasDecl(TypeAliasDecl* child);
 void array_remove_CLyricBlock_CConstDecl(ConstDecl* child);
@@ -11739,8 +11457,6 @@ bool hash_remove_CSymTable_CSym(SymTable* parent, uint64_t key);
 void set_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key, TokenKind value);
 DictEntry_CSym_ETokenKind* get_CSym_ETokenKind(Dict_CSym_ETokenKind* self, Sym* key);
 void array_append_CLexer_CComment(Lexer* parent, Comment* child);
-void array_append_CLyricBlock_CDocBlock(LyricBlock* parent, DocBlock* child);
-void array_append_CLyricBlock_CInvariantDecl(LyricBlock* parent, InvariantDecl* child);
 void array_append_CLyricBlock_CImportDecl(LyricBlock* parent, ImportDecl* child);
 void array_append_CLyricBlock_CStructDecl(LyricBlock* parent, StructDecl* child);
 void array_append_CLyricBlock_CEnumDecl(LyricBlock* parent, EnumDecl* child);
@@ -16181,20 +15897,6 @@ void RelationDecl_destroy(RelationDecl* self) {
     _lyric_slab_free_RelationDecl(self);
 }
 
-void DocBlock_destroy(DocBlock* self) {
-    {
-        array_remove_CLyricBlock_CDocBlock(self);
-    }
-    _lyric_slab_free_DocBlock(self);
-}
-
-void InvariantDecl_destroy(InvariantDecl* self) {
-    {
-        array_remove_CLyricBlock_CInvariantDecl(self);
-    }
-    _lyric_slab_free_InvariantDecl(self);
-}
-
 void ImportDecl_destroy(ImportDecl* self) {
     {
         array_remove_CLyricBlock_CImportDecl(self);
@@ -16270,190 +15972,156 @@ void LyricBlock_destroy(LyricBlock* self) {
         }
     }
     {
-        LyricSlice_DocBlockptr _t9 = LyricBlock_doc_children(self);
-        LyricSlice_DocBlockptr kids = _t9;
+        LyricSlice_StructDeclptr _t9 = LyricBlock_sd_children(self);
+        LyricSlice_StructDeclptr kids = _t9;
         int32_t _t10 = kids.len;
         int32_t _t11 = (_t10 - 1);
         int32_t i = _t11;
         while (1) {
             bool _t12 = (i >= 0);
             if (!(_t12)) break;
-            DocBlock* _t13 = kids.data[i];
-            DocBlock_set_doc_parent(_t13, NULL);
-            DocBlock* _t15 = kids.data[i];
-            DocBlock_destroy(_t15);
+            StructDecl* _t13 = kids.data[i];
+            StructDecl_set_sd_parent(_t13, NULL);
+            StructDecl* _t15 = kids.data[i];
+            StructDecl_destroy(_t15);
             int32_t _t17 = (i - 1);
             i = _t17;
         }
     }
     {
-        LyricSlice_InvariantDeclptr _t18 = LyricBlock_inv_children(self);
-        LyricSlice_InvariantDeclptr kids = _t18;
+        LyricSlice_EnumDeclptr _t18 = LyricBlock_ed_children(self);
+        LyricSlice_EnumDeclptr kids = _t18;
         int32_t _t19 = kids.len;
         int32_t _t20 = (_t19 - 1);
         int32_t i = _t20;
         while (1) {
             bool _t21 = (i >= 0);
             if (!(_t21)) break;
-            InvariantDecl* _t22 = kids.data[i];
-            InvariantDecl_set_inv_parent(_t22, NULL);
-            InvariantDecl* _t24 = kids.data[i];
-            InvariantDecl_destroy(_t24);
+            EnumDecl* _t22 = kids.data[i];
+            EnumDecl_set_ed_parent(_t22, NULL);
+            EnumDecl* _t24 = kids.data[i];
+            EnumDecl_destroy(_t24);
             int32_t _t26 = (i - 1);
             i = _t26;
         }
     }
     {
-        LyricSlice_StructDeclptr _t27 = LyricBlock_sd_children(self);
-        LyricSlice_StructDeclptr kids = _t27;
+        LyricSlice_InterfaceDeclptr _t27 = LyricBlock_id_children(self);
+        LyricSlice_InterfaceDeclptr kids = _t27;
         int32_t _t28 = kids.len;
         int32_t _t29 = (_t28 - 1);
         int32_t i = _t29;
         while (1) {
             bool _t30 = (i >= 0);
             if (!(_t30)) break;
-            StructDecl* _t31 = kids.data[i];
-            StructDecl_set_sd_parent(_t31, NULL);
-            StructDecl* _t33 = kids.data[i];
-            StructDecl_destroy(_t33);
+            InterfaceDecl* _t31 = kids.data[i];
+            InterfaceDecl_set_id_parent(_t31, NULL);
+            InterfaceDecl* _t33 = kids.data[i];
+            InterfaceDecl_destroy(_t33);
             int32_t _t35 = (i - 1);
             i = _t35;
         }
     }
     {
-        LyricSlice_EnumDeclptr _t36 = LyricBlock_ed_children(self);
-        LyricSlice_EnumDeclptr kids = _t36;
+        LyricSlice_ClassDeclptr _t36 = LyricBlock_cd_children(self);
+        LyricSlice_ClassDeclptr kids = _t36;
         int32_t _t37 = kids.len;
         int32_t _t38 = (_t37 - 1);
         int32_t i = _t38;
         while (1) {
             bool _t39 = (i >= 0);
             if (!(_t39)) break;
-            EnumDecl* _t40 = kids.data[i];
-            EnumDecl_set_ed_parent(_t40, NULL);
-            EnumDecl* _t42 = kids.data[i];
-            EnumDecl_destroy(_t42);
+            ClassDecl* _t40 = kids.data[i];
+            ClassDecl_set_cd_parent(_t40, NULL);
+            ClassDecl* _t42 = kids.data[i];
+            ClassDecl_destroy(_t42);
             int32_t _t44 = (i - 1);
             i = _t44;
         }
     }
     {
-        LyricSlice_InterfaceDeclptr _t45 = LyricBlock_id_children(self);
-        LyricSlice_InterfaceDeclptr kids = _t45;
+        LyricSlice_FuncDeclptr _t45 = LyricBlock_fd_children(self);
+        LyricSlice_FuncDeclptr kids = _t45;
         int32_t _t46 = kids.len;
         int32_t _t47 = (_t46 - 1);
         int32_t i = _t47;
         while (1) {
             bool _t48 = (i >= 0);
             if (!(_t48)) break;
-            InterfaceDecl* _t49 = kids.data[i];
-            InterfaceDecl_set_id_parent(_t49, NULL);
-            InterfaceDecl* _t51 = kids.data[i];
-            InterfaceDecl_destroy(_t51);
+            FuncDecl* _t49 = kids.data[i];
+            FuncDecl_set_fd_parent(_t49, NULL);
+            FuncDecl* _t51 = kids.data[i];
+            FuncDecl_destroy(_t51);
             int32_t _t53 = (i - 1);
             i = _t53;
         }
     }
     {
-        LyricSlice_ClassDeclptr _t54 = LyricBlock_cd_children(self);
-        LyricSlice_ClassDeclptr kids = _t54;
+        LyricSlice_RelationDeclptr _t54 = LyricBlock_rd_children(self);
+        LyricSlice_RelationDeclptr kids = _t54;
         int32_t _t55 = kids.len;
         int32_t _t56 = (_t55 - 1);
         int32_t i = _t56;
         while (1) {
             bool _t57 = (i >= 0);
             if (!(_t57)) break;
-            ClassDecl* _t58 = kids.data[i];
-            ClassDecl_set_cd_parent(_t58, NULL);
-            ClassDecl* _t60 = kids.data[i];
-            ClassDecl_destroy(_t60);
+            RelationDecl* _t58 = kids.data[i];
+            RelationDecl_set_rd_parent(_t58, NULL);
+            RelationDecl* _t60 = kids.data[i];
+            RelationDecl_destroy(_t60);
             int32_t _t62 = (i - 1);
             i = _t62;
         }
     }
     {
-        LyricSlice_FuncDeclptr _t63 = LyricBlock_fd_children(self);
-        LyricSlice_FuncDeclptr kids = _t63;
+        LyricSlice_ImplBlockptr _t63 = LyricBlock_ib_children(self);
+        LyricSlice_ImplBlockptr kids = _t63;
         int32_t _t64 = kids.len;
         int32_t _t65 = (_t64 - 1);
         int32_t i = _t65;
         while (1) {
             bool _t66 = (i >= 0);
             if (!(_t66)) break;
-            FuncDecl* _t67 = kids.data[i];
-            FuncDecl_set_fd_parent(_t67, NULL);
-            FuncDecl* _t69 = kids.data[i];
-            FuncDecl_destroy(_t69);
+            ImplBlock* _t67 = kids.data[i];
+            ImplBlock_set_ib_parent(_t67, NULL);
+            ImplBlock* _t69 = kids.data[i];
+            ImplBlock_destroy(_t69);
             int32_t _t71 = (i - 1);
             i = _t71;
         }
     }
     {
-        LyricSlice_RelationDeclptr _t72 = LyricBlock_rd_children(self);
-        LyricSlice_RelationDeclptr kids = _t72;
+        LyricSlice_TypeAliasDeclptr _t72 = LyricBlock_ta_children(self);
+        LyricSlice_TypeAliasDeclptr kids = _t72;
         int32_t _t73 = kids.len;
         int32_t _t74 = (_t73 - 1);
         int32_t i = _t74;
         while (1) {
             bool _t75 = (i >= 0);
             if (!(_t75)) break;
-            RelationDecl* _t76 = kids.data[i];
-            RelationDecl_set_rd_parent(_t76, NULL);
-            RelationDecl* _t78 = kids.data[i];
-            RelationDecl_destroy(_t78);
+            TypeAliasDecl* _t76 = kids.data[i];
+            TypeAliasDecl_set_ta_parent(_t76, NULL);
+            TypeAliasDecl* _t78 = kids.data[i];
+            TypeAliasDecl_destroy(_t78);
             int32_t _t80 = (i - 1);
             i = _t80;
         }
     }
     {
-        LyricSlice_ImplBlockptr _t81 = LyricBlock_ib_children(self);
-        LyricSlice_ImplBlockptr kids = _t81;
+        LyricSlice_ConstDeclptr _t81 = LyricBlock_con_children(self);
+        LyricSlice_ConstDeclptr kids = _t81;
         int32_t _t82 = kids.len;
         int32_t _t83 = (_t82 - 1);
         int32_t i = _t83;
         while (1) {
             bool _t84 = (i >= 0);
             if (!(_t84)) break;
-            ImplBlock* _t85 = kids.data[i];
-            ImplBlock_set_ib_parent(_t85, NULL);
-            ImplBlock* _t87 = kids.data[i];
-            ImplBlock_destroy(_t87);
+            ConstDecl* _t85 = kids.data[i];
+            ConstDecl_set_con_parent(_t85, NULL);
+            ConstDecl* _t87 = kids.data[i];
+            ConstDecl_destroy(_t87);
             int32_t _t89 = (i - 1);
             i = _t89;
-        }
-    }
-    {
-        LyricSlice_TypeAliasDeclptr _t90 = LyricBlock_ta_children(self);
-        LyricSlice_TypeAliasDeclptr kids = _t90;
-        int32_t _t91 = kids.len;
-        int32_t _t92 = (_t91 - 1);
-        int32_t i = _t92;
-        while (1) {
-            bool _t93 = (i >= 0);
-            if (!(_t93)) break;
-            TypeAliasDecl* _t94 = kids.data[i];
-            TypeAliasDecl_set_ta_parent(_t94, NULL);
-            TypeAliasDecl* _t96 = kids.data[i];
-            TypeAliasDecl_destroy(_t96);
-            int32_t _t98 = (i - 1);
-            i = _t98;
-        }
-    }
-    {
-        LyricSlice_ConstDeclptr _t99 = LyricBlock_con_children(self);
-        LyricSlice_ConstDeclptr kids = _t99;
-        int32_t _t100 = kids.len;
-        int32_t _t101 = (_t100 - 1);
-        int32_t i = _t101;
-        while (1) {
-            bool _t102 = (i >= 0);
-            if (!(_t102)) break;
-            ConstDecl* _t103 = kids.data[i];
-            ConstDecl_set_con_parent(_t103, NULL);
-            ConstDecl* _t105 = kids.data[i];
-            ConstDecl_destroy(_t105);
-            int32_t _t107 = (i - 1);
-            i = _t107;
         }
     }
     {
@@ -17210,60 +16878,6 @@ int32_t ImportDecl_imp_index(ImportDecl* self) {
 
 void ImportDecl_set_imp_index(ImportDecl* self, int32_t val) {
     self->imp_index = val;
-}
-
-LyricSlice_DocBlockptr LyricBlock_doc_children(LyricBlock* self) {
-    LyricSlice_DocBlockptr _t0 = self->doc_children;
-    return _t0;
-}
-
-void LyricBlock_set_doc_children(LyricBlock* self, LyricSlice_DocBlockptr val) {
-    self->doc_children = val;
-}
-
-LyricBlock* DocBlock_doc_parent(DocBlock* self) {
-    LyricBlock* _t0 = self->doc_parent;
-    return _t0;
-}
-
-void DocBlock_set_doc_parent(DocBlock* self, LyricBlock* val) {
-    self->doc_parent = val;
-}
-
-int32_t DocBlock_doc_index(DocBlock* self) {
-    int32_t _t0 = self->doc_index;
-    return _t0;
-}
-
-void DocBlock_set_doc_index(DocBlock* self, int32_t val) {
-    self->doc_index = val;
-}
-
-LyricSlice_InvariantDeclptr LyricBlock_inv_children(LyricBlock* self) {
-    LyricSlice_InvariantDeclptr _t0 = self->inv_children;
-    return _t0;
-}
-
-void LyricBlock_set_inv_children(LyricBlock* self, LyricSlice_InvariantDeclptr val) {
-    self->inv_children = val;
-}
-
-LyricBlock* InvariantDecl_inv_parent(InvariantDecl* self) {
-    LyricBlock* _t0 = self->inv_parent;
-    return _t0;
-}
-
-void InvariantDecl_set_inv_parent(InvariantDecl* self, LyricBlock* val) {
-    self->inv_parent = val;
-}
-
-int32_t InvariantDecl_inv_index(InvariantDecl* self) {
-    int32_t _t0 = self->inv_index;
-    return _t0;
-}
-
-void InvariantDecl_set_inv_index(InvariantDecl* self, int32_t val) {
-    self->inv_index = val;
 }
 
 LyricSlice_StructDeclptr LyricBlock_sd_children(LyricBlock* self) {
@@ -20019,83 +19633,8 @@ Dict_CSym_ETokenKind* init_keywords(void) {
     return d;
 }
 
-Dict_CSym_ETokenKind* init_annot_keywords(void) {
-    Dict_CSym_ETokenKind* _t0 = _lyric_slab_alloc_Dict_CSym_ETokenKind();
-    Dict_CSym_ETokenKind* d = _t0;
-    Sym* _t1 = sym(LYRIC_STR("why"));
-    TokenKind _t2 = TokenKind_AWhy;
-    Dict_CSym_ETokenKind_set(d, _t1, _t2);
-    Sym* _t4 = sym(LYRIC_STR("doc"));
-    TokenKind _t5 = TokenKind_ADoc;
-    Dict_CSym_ETokenKind_set(d, _t4, _t5);
-    Sym* _t7 = sym(LYRIC_STR("invariant"));
-    TokenKind _t8 = TokenKind_AInvariant;
-    Dict_CSym_ETokenKind_set(d, _t7, _t8);
-    Sym* _t10 = sym(LYRIC_STR("requires"));
-    TokenKind _t11 = TokenKind_ARequires;
-    Dict_CSym_ETokenKind_set(d, _t10, _t11);
-    Sym* _t13 = sym(LYRIC_STR("ensures"));
-    TokenKind _t14 = TokenKind_AEnsures;
-    Dict_CSym_ETokenKind_set(d, _t13, _t14);
-    Sym* _t16 = sym(LYRIC_STR("raises"));
-    TokenKind _t17 = TokenKind_ARaises;
-    Dict_CSym_ETokenKind_set(d, _t16, _t17);
-    Sym* _t19 = sym(LYRIC_STR("concurrent"));
-    TokenKind _t20 = TokenKind_AConcurrent;
-    Dict_CSym_ETokenKind_set(d, _t19, _t20);
-    Sym* _t22 = sym(LYRIC_STR("requires_lock"));
-    TokenKind _t23 = TokenKind_ARequiresLock;
-    Dict_CSym_ETokenKind_set(d, _t22, _t23);
-    Sym* _t25 = sym(LYRIC_STR("excludes_lock"));
-    TokenKind _t26 = TokenKind_AExcludesLock;
-    Dict_CSym_ETokenKind_set(d, _t25, _t26);
-    Sym* _t28 = sym(LYRIC_STR("guarded_by"));
-    TokenKind _t29 = TokenKind_AGuardedBy;
-    Dict_CSym_ETokenKind_set(d, _t28, _t29);
-    Sym* _t31 = sym(LYRIC_STR("spawns"));
-    TokenKind _t32 = TokenKind_ASpawns;
-    Dict_CSym_ETokenKind_set(d, _t31, _t32);
-    Sym* _t34 = sym(LYRIC_STR("pure"));
-    TokenKind _t35 = TokenKind_APure;
-    Dict_CSym_ETokenKind_set(d, _t34, _t35);
-    Sym* _t37 = sym(LYRIC_STR("source"));
-    TokenKind _t38 = TokenKind_ASource;
-    Dict_CSym_ETokenKind_set(d, _t37, _t38);
-    Sym* _t40 = sym(LYRIC_STR("fake"));
-    TokenKind _t41 = TokenKind_AFake;
-    Dict_CSym_ETokenKind_set(d, _t40, _t41);
-    Sym* _t43 = sym(LYRIC_STR("verified_at"));
-    TokenKind _t44 = TokenKind_AVerifiedAt;
-    Dict_CSym_ETokenKind_set(d, _t43, _t44);
-    Sym* _t46 = sym(LYRIC_STR("field"));
-    TokenKind _t47 = TokenKind_KField;
-    Dict_CSym_ETokenKind_set(d, _t46, _t47);
-    Sym* _t49 = sym(LYRIC_STR("lock"));
-    TokenKind _t50 = TokenKind_KLock;
-    Dict_CSym_ETokenKind_set(d, _t49, _t50);
-    Sym* _t52 = sym(LYRIC_STR("implements"));
-    TokenKind _t53 = TokenKind_KImplements;
-    Dict_CSym_ETokenKind_set(d, _t52, _t53);
-    return d;
-}
-
 LyricOpt_TokenKind lookup_keyword(Lexer* lex, lyric_string text) {
     Dict_CSym_ETokenKind* _t0 = lex->keywords;
-    Dict_CSym_ETokenKind* _t1 = _t0;
-    Sym* _t2 = sym(text);
-    DictEntry_CSym_ETokenKind* _t3 = Dict_CSym_ETokenKind_get(_t1, _t2);
-    DictEntry_CSym_ETokenKind* entry = _t3;
-    bool _t4 = (entry == NULL);
-    if (_t4) {
-        return lyric_none(LyricOpt_TokenKind);
-    }
-    DictEntry_CSym_ETokenKind* _t5 = entry;
-    TokenKind _t6 = _t5->value;
-    return lyric_some(_t6, LyricOpt_TokenKind);
-}
-
-LyricOpt_TokenKind lookup_annot_keyword(Lexer* lex, lyric_string text) {
-    Dict_CSym_ETokenKind* _t0 = lex->annot_keywords;
     Dict_CSym_ETokenKind* _t1 = _t0;
     Sym* _t2 = sym(text);
     DictEntry_CSym_ETokenKind* _t3 = Dict_CSym_ETokenKind_get(_t1, _t2);
@@ -20134,16 +19673,14 @@ void Lexer_restore_state(Lexer* self, LexerState state) {
 
 Lexer* new_lexer(lyric_string src_text, Sym* filename) {
     Dict_CSym_ETokenKind* _t0 = init_keywords();
-    Dict_CSym_ETokenKind* _t1 = init_annot_keywords();
-    Lexer* _t2 = _lyric_slab_alloc_Lexer();
-    _t2->src = src_text;
-    _t2->filename = filename;
-    _t2->keywords = _t0;
-    _t2->annot_keywords = _t1;
-    _t2->line = 1;
-    _t2->column = 1;
-    _t2->bracket_depth = 0;
-    Lexer* lex = _t2;
+    Lexer* _t1 = _lyric_slab_alloc_Lexer();
+    _t1->src = src_text;
+    _t1->filename = filename;
+    _t1->keywords = _t0;
+    _t1->line = 1;
+    _t1->column = 1;
+    _t1->bracket_depth = 0;
+    Lexer* lex = _t1;
     return lex;
 }
 
@@ -21518,34 +21055,6 @@ LyricResult_Tokenptr Parser_expect_ident(Parser* self) {
     TokenKind _t4 = tok->kind;
     int32_t _t5 = _t4;
     switch (_t5) {
-    case 87: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 88: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 89: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 99: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 100: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 101: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
-    case 96: {
-        return lyric_ok(tok, LyricResult_Tokenptr);
-        break;
-    }
     case 7: {
         return lyric_ok(tok, LyricResult_Tokenptr);
         break;
@@ -21643,36 +21152,6 @@ bool Parser_consume_annotation(Parser* self, TokenKind kind) {
         return true;
     }
     return false;
-}
-
-bool Parser_is_why_annotation(Parser* self) {
-    Lexer* _t0 = self->lex;
-    Lexer* _t1 = _t0;
-    LexerState _t2 = Lexer_save_state(_t1);
-    LexerState saved = _t2;
-    Token* _t3 = self->pushed;
-    Token* pushed_saved = _t3;
-    Parser_next(self);
-    Parser_next(self);
-    Token* _t6 = Parser_peek(self);
-    Token* tok = _t6;
-    Lexer* _t7 = self->lex;
-    Lexer* _t8 = _t7;
-    Lexer_restore_state(_t8, saved);
-    self->pushed = pushed_saved;
-    TokenKind _t10 = tok->kind;
-    TokenKind _t11 = TokenKind_LStringLit;
-    bool _t12 = (_t10 == _t11);
-    bool _sc13 = false;
-    _sc13 = _t12;
-    bool _t14 = (!_sc13);
-    if (_t14) {
-        TokenKind _t15 = tok->kind;
-        TokenKind _t16 = TokenKind_LTripleString;
-        bool _t17 = (_t15 == _t16);
-        _sc13 = _t17;
-    }
-    return _sc13;
 }
 
 LyricResult_Fileptr Parser_do_parse_file(Parser* self) {
@@ -21882,13 +21361,14 @@ LyricResult_bool Parser_parse_lyric_item(Parser* self, LyricBlock* block) {
     TokenKind _t6 = _t5->kind;
     int32_t _t7 = _t6;
     switch (_t7) {
-    case 87: {
+    case 10: {
         if (is_pub) {
             Span _t8 = tok->span;
-            Error* _t9 = Parser_make_error(self, _t8, LYRIC_STR("pub cannot be applied to why"));
+            Error* _t9 = Parser_make_error(self, _t8, LYRIC_STR("pub cannot be applied to import"));
             return lyric_err((const char*)_t9->msg.data, LyricResult_bool);
         }
-        LyricResult_lyric_string _multi_9000 = Parser_parse_why(self);
+        LyricResult_ImportDeclptr _multi_9000 = Parser_parse_import(self);
+        ImportDecl* _t10_val = _multi_9000.value;
         const char* _t10_err = _multi_9000.error;
         const char* _t11 = _t10_err;
         bool _t12 = (_t11 == NULL);
@@ -21896,17 +21376,16 @@ LyricResult_bool Parser_parse_lyric_item(Parser* self, LyricBlock* block) {
         if (_t13) {
             return lyric_err(_t11, LyricResult_bool);
         }
+        ImportDecl* _t14 = _t10_val;
+        ImportDecl* imp = _t14;
+        ImportDecl* _t15 = imp;
+        array_append_CLyricBlock_CImportDecl(block, _t15);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
-    case 88: {
-        if (is_pub) {
-            Span _t15 = tok->span;
-            Error* _t16 = Parser_make_error(self, _t15, LYRIC_STR("pub cannot be applied to doc"));
-            return lyric_err((const char*)_t16->msg.data, LyricResult_bool);
-        }
-        LyricResult_DocBlockptr _multi_9001 = Parser_parse_doc(self);
-        DocBlock* _t17_val = _multi_9001.value;
+    case 26: {
+        LyricResult_ConstDeclptr _multi_9001 = Parser_parse_const_decl(self);
+        ConstDecl* _t17_val = _multi_9001.value;
         const char* _t17_err = _multi_9001.error;
         const char* _t18 = _t17_err;
         bool _t19 = (_t18 == NULL);
@@ -21914,136 +21393,135 @@ LyricResult_bool Parser_parse_lyric_item(Parser* self, LyricBlock* block) {
         if (_t20) {
             return lyric_err(_t18, LyricResult_bool);
         }
-        DocBlock* _t21 = _t17_val;
-        DocBlock* doc_block = _t21;
-        DocBlock* _t22 = doc_block;
-        array_append_CLyricBlock_CDocBlock(block, _t22);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 89: {
-        if (is_pub) {
-            Span _t24 = tok->span;
-            Error* _t25 = Parser_make_error(self, _t24, LYRIC_STR("pub cannot be applied to invariant"));
-            return lyric_err((const char*)_t25->msg.data, LyricResult_bool);
-        }
-        LyricResult_InvariantDeclptr _multi_9002 = Parser_parse_invariant(self);
-        InvariantDecl* _t26_val = _multi_9002.value;
-        const char* _t26_err = _multi_9002.error;
-        const char* _t27 = _t26_err;
-        bool _t28 = (_t27 == NULL);
-        bool _t29 = (!_t28);
-        if (_t29) {
-            return lyric_err(_t27, LyricResult_bool);
-        }
-        InvariantDecl* _t30 = _t26_val;
-        InvariantDecl* inv = _t30;
-        InvariantDecl* _t31 = inv;
-        array_append_CLyricBlock_CInvariantDecl(block, _t31);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 10: {
-        if (is_pub) {
-            Span _t33 = tok->span;
-            Error* _t34 = Parser_make_error(self, _t33, LYRIC_STR("pub cannot be applied to import"));
-            return lyric_err((const char*)_t34->msg.data, LyricResult_bool);
-        }
-        LyricResult_ImportDeclptr _multi_9003 = Parser_parse_import(self);
-        ImportDecl* _t35_val = _multi_9003.value;
-        const char* _t35_err = _multi_9003.error;
-        const char* _t36 = _t35_err;
-        bool _t37 = (_t36 == NULL);
-        bool _t38 = (!_t37);
-        if (_t38) {
-            return lyric_err(_t36, LyricResult_bool);
-        }
-        ImportDecl* _t39 = _t35_val;
-        ImportDecl* imp = _t39;
-        ImportDecl* _t40 = imp;
-        array_append_CLyricBlock_CImportDecl(block, _t40);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 26: {
-        LyricResult_ConstDeclptr _multi_9004 = Parser_parse_const_decl(self);
-        ConstDecl* _t42_val = _multi_9004.value;
-        const char* _t42_err = _multi_9004.error;
-        const char* _t43 = _t42_err;
-        bool _t44 = (_t43 == NULL);
-        bool _t45 = (!_t44);
-        if (_t45) {
-            return lyric_err(_t43, LyricResult_bool);
-        }
-        ConstDecl* _t46 = _t42_val;
-        ConstDecl* decl = _t46;
-        ConstDecl* _t47 = decl;
-        _t47->is_public = is_pub;
-        ConstDecl* _t48 = decl;
-        array_append_CLyricBlock_CConstDecl(block, _t48);
+        ConstDecl* _t21 = _t17_val;
+        ConstDecl* decl = _t21;
+        ConstDecl* _t22 = decl;
+        _t22->is_public = is_pub;
+        ConstDecl* _t23 = decl;
+        array_append_CLyricBlock_CConstDecl(block, _t23);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     case 3: {
-        LyricResult_StructDeclptr _multi_9005 = Parser_parse_struct(self);
-        StructDecl* _t50_val = _multi_9005.value;
-        const char* _t50_err = _multi_9005.error;
-        const char* _t51 = _t50_err;
-        bool _t52 = (_t51 == NULL);
-        bool _t53 = (!_t52);
-        if (_t53) {
-            return lyric_err(_t51, LyricResult_bool);
+        LyricResult_StructDeclptr _multi_9002 = Parser_parse_struct(self);
+        StructDecl* _t25_val = _multi_9002.value;
+        const char* _t25_err = _multi_9002.error;
+        const char* _t26 = _t25_err;
+        bool _t27 = (_t26 == NULL);
+        bool _t28 = (!_t27);
+        if (_t28) {
+            return lyric_err(_t26, LyricResult_bool);
         }
-        StructDecl* _t54 = _t50_val;
-        StructDecl* s = _t54;
-        StructDecl* _t55 = s;
-        _t55->is_public = is_pub;
-        StructDecl* _t56 = s;
-        array_append_CLyricBlock_CStructDecl(block, _t56);
+        StructDecl* _t29 = _t25_val;
+        StructDecl* s = _t29;
+        StructDecl* _t30 = s;
+        _t30->is_public = is_pub;
+        StructDecl* _t31 = s;
+        array_append_CLyricBlock_CStructDecl(block, _t31);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     case 4: {
-        LyricResult_EnumDeclptr _multi_9006 = Parser_parse_enum(self);
-        EnumDecl* _t58_val = _multi_9006.value;
-        const char* _t58_err = _multi_9006.error;
-        const char* _t59 = _t58_err;
-        bool _t60 = (_t59 == NULL);
-        bool _t61 = (!_t60);
-        if (_t61) {
-            return lyric_err(_t59, LyricResult_bool);
+        LyricResult_EnumDeclptr _multi_9003 = Parser_parse_enum(self);
+        EnumDecl* _t33_val = _multi_9003.value;
+        const char* _t33_err = _multi_9003.error;
+        const char* _t34 = _t33_err;
+        bool _t35 = (_t34 == NULL);
+        bool _t36 = (!_t35);
+        if (_t36) {
+            return lyric_err(_t34, LyricResult_bool);
         }
-        EnumDecl* _t62 = _t58_val;
-        EnumDecl* e = _t62;
-        EnumDecl* _t63 = e;
-        _t63->is_public = is_pub;
-        EnumDecl* _t64 = e;
-        array_append_CLyricBlock_CEnumDecl(block, _t64);
+        EnumDecl* _t37 = _t33_val;
+        EnumDecl* e = _t37;
+        EnumDecl* _t38 = e;
+        _t38->is_public = is_pub;
+        EnumDecl* _t39 = e;
+        array_append_CLyricBlock_CEnumDecl(block, _t39);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     case 5: {
-        LyricResult_InterfaceDeclptr _multi_9007 = Parser_parse_interface(self);
-        InterfaceDecl* _t66_val = _multi_9007.value;
-        const char* _t66_err = _multi_9007.error;
-        const char* _t67 = _t66_err;
-        bool _t68 = (_t67 == NULL);
-        bool _t69 = (!_t68);
-        if (_t69) {
-            return lyric_err(_t67, LyricResult_bool);
+        LyricResult_InterfaceDeclptr _multi_9004 = Parser_parse_interface(self);
+        InterfaceDecl* _t41_val = _multi_9004.value;
+        const char* _t41_err = _multi_9004.error;
+        const char* _t42 = _t41_err;
+        bool _t43 = (_t42 == NULL);
+        bool _t44 = (!_t43);
+        if (_t44) {
+            return lyric_err(_t42, LyricResult_bool);
         }
-        InterfaceDecl* _t70 = _t66_val;
-        InterfaceDecl* iface = _t70;
-        InterfaceDecl* _t71 = iface;
-        _t71->is_public = is_pub;
-        InterfaceDecl* _t72 = iface;
-        array_append_CLyricBlock_CInterfaceDecl(block, _t72);
+        InterfaceDecl* _t45 = _t41_val;
+        InterfaceDecl* iface = _t45;
+        InterfaceDecl* _t46 = iface;
+        _t46->is_public = is_pub;
+        InterfaceDecl* _t47 = iface;
+        array_append_CLyricBlock_CInterfaceDecl(block, _t47);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     case 2: {
-        LyricResult_ClassDeclptr _multi_9008 = Parser_parse_class(self);
-        ClassDecl* _t74_val = _multi_9008.value;
+        LyricResult_ClassDeclptr _multi_9005 = Parser_parse_class(self);
+        ClassDecl* _t49_val = _multi_9005.value;
+        const char* _t49_err = _multi_9005.error;
+        const char* _t50 = _t49_err;
+        bool _t51 = (_t50 == NULL);
+        bool _t52 = (!_t51);
+        if (_t52) {
+            return lyric_err(_t50, LyricResult_bool);
+        }
+        ClassDecl* _t53 = _t49_val;
+        ClassDecl* cls = _t53;
+        ClassDecl* _t54 = cls;
+        _t54->is_public = is_pub;
+        ClassDecl* _t55 = cls;
+        array_append_CLyricBlock_CClassDecl(block, _t55);
+        return lyric_ok(true, LyricResult_bool);
+        break;
+    }
+    case 1: {
+        LyricResult_FuncDeclptr _multi_9006 = Parser_parse_func(self);
+        FuncDecl* _t57_val = _multi_9006.value;
+        const char* _t57_err = _multi_9006.error;
+        const char* _t58 = _t57_err;
+        bool _t59 = (_t58 == NULL);
+        bool _t60 = (!_t59);
+        if (_t60) {
+            return lyric_err(_t58, LyricResult_bool);
+        }
+        FuncDecl* _t61 = _t57_val;
+        FuncDecl* fn = _t61;
+        FuncDecl* _t62 = fn;
+        _t62->is_public = is_pub;
+        FuncDecl* _t63 = fn;
+        array_append_CLyricBlock_CFuncDecl(block, _t63);
+        return lyric_ok(true, LyricResult_bool);
+        break;
+    }
+    case 6: {
+        if (is_pub) {
+            Span _t65 = tok->span;
+            Error* _t66 = Parser_make_error(self, _t65, LYRIC_STR("pub cannot be applied to relation"));
+            return lyric_err((const char*)_t66->msg.data, LyricResult_bool);
+        }
+        LyricResult_RelationDeclptr _multi_9007 = Parser_parse_relation(self);
+        RelationDecl* _t67_val = _multi_9007.value;
+        const char* _t67_err = _multi_9007.error;
+        const char* _t68 = _t67_err;
+        bool _t69 = (_t68 == NULL);
+        bool _t70 = (!_t69);
+        if (_t70) {
+            return lyric_err(_t68, LyricResult_bool);
+        }
+        RelationDecl* _t71 = _t67_val;
+        RelationDecl* rel = _t71;
+        RelationDecl* _t72 = rel;
+        array_append_CLyricBlock_CRelationDecl(block, _t72);
+        return lyric_ok(true, LyricResult_bool);
+        break;
+    }
+    case 15: {
+        LyricResult_TypeAliasDeclptr _multi_9008 = Parser_parse_type_alias(self);
+        TypeAliasDecl* _t74_val = _multi_9008.value;
         const char* _t74_err = _multi_9008.error;
         const char* _t75 = _t74_err;
         bool _t76 = (_t75 == NULL);
@@ -22051,294 +21529,51 @@ LyricResult_bool Parser_parse_lyric_item(Parser* self, LyricBlock* block) {
         if (_t77) {
             return lyric_err(_t75, LyricResult_bool);
         }
-        ClassDecl* _t78 = _t74_val;
-        ClassDecl* cls = _t78;
-        ClassDecl* _t79 = cls;
+        TypeAliasDecl* _t78 = _t74_val;
+        TypeAliasDecl* ta = _t78;
+        TypeAliasDecl* _t79 = ta;
         _t79->is_public = is_pub;
-        ClassDecl* _t80 = cls;
-        array_append_CLyricBlock_CClassDecl(block, _t80);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 1: {
-        LyricResult_FuncDeclptr _multi_9009 = Parser_parse_func(self);
-        FuncDecl* _t82_val = _multi_9009.value;
-        const char* _t82_err = _multi_9009.error;
-        const char* _t83 = _t82_err;
-        bool _t84 = (_t83 == NULL);
-        bool _t85 = (!_t84);
-        if (_t85) {
-            return lyric_err(_t83, LyricResult_bool);
-        }
-        FuncDecl* _t86 = _t82_val;
-        FuncDecl* fn = _t86;
-        FuncDecl* _t87 = fn;
-        _t87->is_public = is_pub;
-        FuncDecl* _t88 = fn;
-        array_append_CLyricBlock_CFuncDecl(block, _t88);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 6: {
-        if (is_pub) {
-            Span _t90 = tok->span;
-            Error* _t91 = Parser_make_error(self, _t90, LYRIC_STR("pub cannot be applied to relation"));
-            return lyric_err((const char*)_t91->msg.data, LyricResult_bool);
-        }
-        LyricResult_RelationDeclptr _multi_9010 = Parser_parse_relation(self);
-        RelationDecl* _t92_val = _multi_9010.value;
-        const char* _t92_err = _multi_9010.error;
-        const char* _t93 = _t92_err;
-        bool _t94 = (_t93 == NULL);
-        bool _t95 = (!_t94);
-        if (_t95) {
-            return lyric_err(_t93, LyricResult_bool);
-        }
-        RelationDecl* _t96 = _t92_val;
-        RelationDecl* rel = _t96;
-        RelationDecl* _t97 = rel;
-        array_append_CLyricBlock_CRelationDecl(block, _t97);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 15: {
-        LyricResult_TypeAliasDeclptr _multi_9011 = Parser_parse_type_alias(self);
-        TypeAliasDecl* _t99_val = _multi_9011.value;
-        const char* _t99_err = _multi_9011.error;
-        const char* _t100 = _t99_err;
-        bool _t101 = (_t100 == NULL);
-        bool _t102 = (!_t101);
-        if (_t102) {
-            return lyric_err(_t100, LyricResult_bool);
-        }
-        TypeAliasDecl* _t103 = _t99_val;
-        TypeAliasDecl* ta = _t103;
-        TypeAliasDecl* _t104 = ta;
-        _t104->is_public = is_pub;
-        TypeAliasDecl* _t105 = ta;
-        array_append_CLyricBlock_CTypeAliasDecl(block, _t105);
+        TypeAliasDecl* _t80 = ta;
+        array_append_CLyricBlock_CTypeAliasDecl(block, _t80);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     case 12: {
         if (is_pub) {
-            Span _t107 = tok->span;
-            Error* _t108 = Parser_make_error(self, _t107, LYRIC_STR("pub cannot be applied to impl"));
-            return lyric_err((const char*)_t108->msg.data, LyricResult_bool);
+            Span _t82 = tok->span;
+            Error* _t83 = Parser_make_error(self, _t82, LYRIC_STR("pub cannot be applied to impl"));
+            return lyric_err((const char*)_t83->msg.data, LyricResult_bool);
         }
-        LyricResult_ImplBlockptr _multi_9012 = Parser_parse_impl(self);
-        ImplBlock* _t109_val = _multi_9012.value;
-        const char* _t109_err = _multi_9012.error;
-        const char* _t110 = _t109_err;
-        bool _t111 = (_t110 == NULL);
-        bool _t112 = (!_t111);
-        if (_t112) {
-            return lyric_err(_t110, LyricResult_bool);
+        LyricResult_ImplBlockptr _multi_9009 = Parser_parse_impl(self);
+        ImplBlock* _t84_val = _multi_9009.value;
+        const char* _t84_err = _multi_9009.error;
+        const char* _t85 = _t84_err;
+        bool _t86 = (_t85 == NULL);
+        bool _t87 = (!_t86);
+        if (_t87) {
+            return lyric_err(_t85, LyricResult_bool);
         }
-        ImplBlock* _t113 = _t109_val;
-        ImplBlock* impl_block = _t113;
-        ImplBlock* _t114 = impl_block;
-        array_append_CLyricBlock_CImplBlock(block, _t114);
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 99: {
-        if (is_pub) {
-            Span _t116 = tok->span;
-            Error* _t117 = Parser_make_error(self, _t116, LYRIC_STR("pub cannot be applied to source"));
-            return lyric_err((const char*)_t117->msg.data, LyricResult_bool);
-        }
-        LyricResult_LyricSlice_lyric_string _multi_9013 = Parser_parse_source(self);
-        const char* _t118_err = _multi_9013.error;
-        const char* _t119 = _t118_err;
-        bool _t120 = (_t119 == NULL);
-        bool _t121 = (!_t120);
-        if (_t121) {
-            return lyric_err(_t119, LyricResult_bool);
-        }
-        return lyric_ok(true, LyricResult_bool);
-        break;
-    }
-    case 100: {
-        if (is_pub) {
-            Span _t123 = tok->span;
-            Error* _t124 = Parser_make_error(self, _t123, LYRIC_STR("pub cannot be applied to fake"));
-            return lyric_err((const char*)_t124->msg.data, LyricResult_bool);
-        }
-        LyricResult_lyric_string _multi_9014 = Parser_parse_fake(self);
-        const char* _t125_err = _multi_9014.error;
-        const char* _t126 = _t125_err;
-        bool _t127 = (_t126 == NULL);
-        bool _t128 = (!_t127);
-        if (_t128) {
-            return lyric_err(_t126, LyricResult_bool);
-        }
+        ImplBlock* _t88 = _t84_val;
+        ImplBlock* impl_block = _t88;
+        ImplBlock* _t89 = impl_block;
+        array_append_CLyricBlock_CImplBlock(block, _t89);
         return lyric_ok(true, LyricResult_bool);
         break;
     }
     default: {
-        Span _t130 = tok->span;
-        lyric_string _t131 = LYRIC_STR("unexpected token in lyric block");
-        Error* _t132 = Parser_make_error(self, _t130, _t131);
-        return lyric_err((const char*)_t132->msg.data, LyricResult_bool);
+        Span _t91 = tok->span;
+        lyric_string _t92 = LYRIC_STR("unexpected token in lyric block");
+        Error* _t93 = Parser_make_error(self, _t91, _t92);
+        return lyric_err((const char*)_t93->msg.data, LyricResult_bool);
         break;
     }
     }
-    Span _t133 = tok->span;
-    TokenKind _t134 = tok->kind;
-    lyric_string _t135 = tok->text;
-    lyric_string _t136 = lyric_sprintf("unexpected token %.*s (%.*s) in lyric block", (int)TokenKind_to_string(_t134).len, (const char*)TokenKind_to_string(_t134).data, (int)_t135.len, (const char*)_t135.data);
-    Error* _t137 = Parser_make_error(self, _t133, _t136);
-    return lyric_err((const char*)_t137->msg.data, LyricResult_bool);
-}
-
-LyricResult_lyric_string Parser_parse_why(Parser* self) {
-    Parser_next(self);
-    TokenKind _t1 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9015 = Parser_expect(self, _t1);
-    const char* _t2_err = _multi_9015.error;
-    const char* _t3 = _t2_err;
-    bool _t4 = (_t3 == NULL);
-    bool _t5 = (!_t4);
-    if (_t5) {
-        return lyric_err(_t3, LyricResult_lyric_string);
-    }
-    TokenKind _t7 = TokenKind_LStringLit;
-    LyricResult_Tokenptr _multi_9016 = Parser_expect(self, _t7);
-    Token* _t8_val = _multi_9016.value;
-    const char* _t8_err = _multi_9016.error;
-    const char* _t9 = _t8_err;
-    bool _t10 = (_t9 == NULL);
-    bool _t11 = (!_t10);
-    if (_t11) {
-        return lyric_err(_t9, LyricResult_lyric_string);
-    }
-    Token* _t12 = _t8_val;
-    Token* tok = _t12;
-    Token* _t13 = tok;
-    lyric_string _t14 = _t13->text;
-    return lyric_ok(_t14, LyricResult_lyric_string);
-}
-
-LyricResult_DocBlockptr Parser_parse_doc(Parser* self) {
-    Token* _t0 = Parser_peek(self);
-    Span _t1 = _t0->span;
-    Pos _t2 = _t1.start;
-    Pos start = _t2;
-    Parser_next(self);
-    TokenKind _t4 = TokenKind_LStringLit;
-    LyricResult_Tokenptr _multi_9017 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9017.value;
-    const char* _t5_err = _multi_9017.error;
-    const char* _t6 = _t5_err;
-    bool _t7 = (_t6 == NULL);
-    bool _t8 = (!_t7);
-    if (_t8) {
-        return lyric_err(_t6, LyricResult_DocBlockptr);
-    }
-    Token* _t9 = _t5_val;
-    Token* section = _t9;
-    TokenKind _t10 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9018 = Parser_expect(self, _t10);
-    const char* _t11_err = _multi_9018.error;
-    const char* _t12 = _t11_err;
-    bool _t13 = (_t12 == NULL);
-    bool _t14 = (!_t13);
-    if (_t14) {
-        return lyric_err(_t12, LyricResult_DocBlockptr);
-    }
-    TokenKind _t16 = TokenKind_LTripleString;
-    LyricResult_Tokenptr _multi_9019 = Parser_expect(self, _t16);
-    Token* _t17_val = _multi_9019.value;
-    const char* _t17_err = _multi_9019.error;
-    const char* _t18 = _t17_err;
-    bool _t19 = (_t18 == NULL);
-    bool _t20 = (!_t19);
-    if (_t20) {
-        return lyric_err(_t18, LyricResult_DocBlockptr);
-    }
-    Token* _t21 = _t17_val;
-    Token* content = _t21;
-    Token* _t22 = section;
-    lyric_string _t23 = _t22->text;
-    Token* _t24 = content;
-    lyric_string _t25 = _t24->text;
-    Span _t26 = Parser_make_span(self, start);
-    DocBlock* _t27 = _lyric_slab_alloc_DocBlock();
-    _t27->section = _t23;
-    _t27->content = _t25;
-    _t27->span = _t26;
-    return lyric_ok(_t27, LyricResult_DocBlockptr);
-}
-
-LyricResult_InvariantDeclptr Parser_parse_invariant(Parser* self) {
-    Token* _t0 = Parser_peek(self);
-    Span _t1 = _t0->span;
-    Pos _t2 = _t1.start;
-    Pos start = _t2;
-    Parser_next(self);
-    TokenKind _t4 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9020 = Parser_expect(self, _t4);
-    const char* _t5_err = _multi_9020.error;
-    const char* _t6 = _t5_err;
-    bool _t7 = (_t6 == NULL);
-    bool _t8 = (!_t7);
-    if (_t8) {
-        return lyric_err(_t6, LyricResult_InvariantDeclptr);
-    }
-    TokenKind _t10 = TokenKind_LStringLit;
-    LyricResult_Tokenptr _multi_9021 = Parser_expect(self, _t10);
-    Token* _t11_val = _multi_9021.value;
-    const char* _t11_err = _multi_9021.error;
-    const char* _t12 = _t11_err;
-    bool _t13 = (_t12 == NULL);
-    bool _t14 = (!_t13);
-    if (_t14) {
-        return lyric_err(_t12, LyricResult_InvariantDeclptr);
-    }
-    Token* _t15 = _t11_val;
-    Token* claim = _t15;
-    Token* _t16 = claim;
-    lyric_string _t17 = _t16->text;
-    Span _t18 = Parser_make_span(self, start);
-    InvariantDecl* _t19 = _lyric_slab_alloc_InvariantDecl();
-    _t19->claim = _t17;
-    _t19->verified_at = LYRIC_STR("");
-    _t19->span = _t18;
-    InvariantDecl* inv = _t19;
-    Parser_skip_newlines(self);
-    Token* _t21 = Parser_peek(self);
-    TokenKind _t22 = _t21->kind;
-    TokenKind _t23 = TokenKind_AVerifiedAt;
-    bool _t24 = (_t22 == _t23);
-    if (_t24) {
-        Token* _t25 = Parser_next(self);
-        _t25;
-        TokenKind _t26 = TokenKind_PColon;
-        LyricResult_Tokenptr _t27 = Parser_expect(self, _t26);
-        const char* _t28 = _t27.error;
-        bool _t29 = (_t28 == NULL);
-        bool _t30 = (!_t29);
-        if (_t30) {
-            return lyric_err(_t28, LyricResult_InvariantDeclptr);
-        }
-        Token* _t31 = _t27.value;
-        _t31;
-        TokenKind _t32 = TokenKind_LStringLit;
-        LyricResult_Tokenptr _t33 = Parser_expect(self, _t32);
-        const char* _t34 = _t33.error;
-        bool _t35 = (_t34 == NULL);
-        bool _t36 = (!_t35);
-        if (_t36) {
-            return lyric_err(_t34, LyricResult_InvariantDeclptr);
-        }
-        Token* _t37 = _t33.value;
-        Token* hash = _t37;
-        Token* _t38 = hash;
-        lyric_string _t39 = _t38->text;
-        inv->verified_at = _t39;
-    }
-    return lyric_ok(inv, LyricResult_InvariantDeclptr);
+    Span _t94 = tok->span;
+    TokenKind _t95 = tok->kind;
+    lyric_string _t96 = tok->text;
+    lyric_string _t97 = lyric_sprintf("unexpected token %.*s (%.*s) in lyric block", (int)TokenKind_to_string(_t95).len, (const char*)TokenKind_to_string(_t95).data, (int)_t96.len, (const char*)_t96.data);
+    Error* _t98 = Parser_make_error(self, _t94, _t97);
+    return lyric_err((const char*)_t98->msg.data, LyricResult_bool);
 }
 
 LyricResult_ImportDeclptr Parser_parse_import(Parser* self) {
@@ -22362,9 +21597,9 @@ LyricResult_ImportDeclptr Parser_parse_import(Parser* self) {
         return lyric_ok(_t11, LyricResult_ImportDeclptr);
     }
     TokenKind _t12 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9022 = Parser_expect(self, _t12);
-    Token* _t13_val = _multi_9022.value;
-    const char* _t13_err = _multi_9022.error;
+    LyricResult_Tokenptr _multi_9010 = Parser_expect(self, _t12);
+    Token* _t13_val = _multi_9010.value;
+    const char* _t13_err = _multi_9010.error;
     const char* _t14 = _t13_err;
     bool _t15 = (_t14 == NULL);
     bool _t16 = (!_t15);
@@ -22421,9 +21656,9 @@ LyricResult_TypeAliasDeclptr Parser_parse_type_alias(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Tokenptr _multi_9023 = Parser_expect_ident(self);
-    Token* _t4_val = _multi_9023.value;
-    const char* _t4_err = _multi_9023.error;
+    LyricResult_Tokenptr _multi_9011 = Parser_expect_ident(self);
+    Token* _t4_val = _multi_9011.value;
+    const char* _t4_err = _multi_9011.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -22433,17 +21668,17 @@ LyricResult_TypeAliasDeclptr Parser_parse_type_alias(Parser* self) {
     Token* _t8 = _t4_val;
     Token* name = _t8;
     TokenKind _t9 = TokenKind_OAssign;
-    LyricResult_Tokenptr _multi_9024 = Parser_expect(self, _t9);
-    const char* _t10_err = _multi_9024.error;
+    LyricResult_Tokenptr _multi_9012 = Parser_expect(self, _t9);
+    const char* _t10_err = _multi_9012.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
     if (_t13) {
         return lyric_err(_t11, LyricResult_TypeAliasDeclptr);
     }
-    LyricResult_TypeExprptr _multi_9025 = Parser_parse_type_expr(self);
-    TypeExpr* _t15_val = _multi_9025.value;
-    const char* _t15_err = _multi_9025.error;
+    LyricResult_TypeExprptr _multi_9013 = Parser_parse_type_expr(self);
+    TypeExpr* _t15_val = _multi_9013.value;
+    const char* _t15_err = _multi_9013.error;
     const char* _t16 = _t15_err;
     bool _t17 = (_t16 == NULL);
     bool _t18 = (!_t17);
@@ -22469,9 +21704,9 @@ LyricResult_Fieldptr Parser_parse_field(Parser* self) {
     Span _t1 = _t0->span;
     Pos _t2 = _t1.start;
     Pos start = _t2;
-    LyricResult_Tokenptr _multi_9026 = Parser_expect_ident(self);
-    Token* _t3_val = _multi_9026.value;
-    const char* _t3_err = _multi_9026.error;
+    LyricResult_Tokenptr _multi_9014 = Parser_expect_ident(self);
+    Token* _t3_val = _multi_9014.value;
+    const char* _t3_err = _multi_9014.error;
     const char* _t4 = _t3_err;
     bool _t5 = (_t4 == NULL);
     bool _t6 = (!_t5);
@@ -22481,17 +21716,17 @@ LyricResult_Fieldptr Parser_parse_field(Parser* self) {
     Token* _t7 = _t3_val;
     Token* name = _t7;
     TokenKind _t8 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9027 = Parser_expect(self, _t8);
-    const char* _t9_err = _multi_9027.error;
+    LyricResult_Tokenptr _multi_9015 = Parser_expect(self, _t8);
+    const char* _t9_err = _multi_9015.error;
     const char* _t10 = _t9_err;
     bool _t11 = (_t10 == NULL);
     bool _t12 = (!_t11);
     if (_t12) {
         return lyric_err(_t10, LyricResult_Fieldptr);
     }
-    LyricResult_TypeExprptr _multi_9028 = Parser_parse_type_expr(self);
-    TypeExpr* _t14_val = _multi_9028.value;
-    const char* _t14_err = _multi_9028.error;
+    LyricResult_TypeExprptr _multi_9016 = Parser_parse_type_expr(self);
+    TypeExpr* _t14_val = _multi_9016.value;
+    const char* _t14_err = _multi_9016.error;
     const char* _t15 = _t14_err;
     bool _t16 = (_t15 == NULL);
     bool _t17 = (!_t16);
@@ -22612,9 +21847,9 @@ LyricResult_Paramptr Parser_parse_param(Parser* self) {
         _t15->span = _t14;
         return lyric_ok(_t15, LyricResult_Paramptr);
     }
-    LyricResult_Tokenptr _multi_9029 = Parser_expect_ident(self);
-    Token* _t16_val = _multi_9029.value;
-    const char* _t16_err = _multi_9029.error;
+    LyricResult_Tokenptr _multi_9017 = Parser_expect_ident(self);
+    Token* _t16_val = _multi_9017.value;
+    const char* _t16_err = _multi_9017.error;
     const char* _t17 = _t16_err;
     bool _t18 = (_t17 == NULL);
     bool _t19 = (!_t18);
@@ -22637,17 +21872,17 @@ LyricResult_Paramptr Parser_parse_param(Parser* self) {
         return lyric_ok(_t26, LyricResult_Paramptr);
     }
     TokenKind _t27 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9030 = Parser_expect(self, _t27);
-    const char* _t28_err = _multi_9030.error;
+    LyricResult_Tokenptr _multi_9018 = Parser_expect(self, _t27);
+    const char* _t28_err = _multi_9018.error;
     const char* _t29 = _t28_err;
     bool _t30 = (_t29 == NULL);
     bool _t31 = (!_t30);
     if (_t31) {
         return lyric_err(_t29, LyricResult_Paramptr);
     }
-    LyricResult_TypeExprptr _multi_9031 = Parser_parse_type_expr(self);
-    TypeExpr* _t33_val = _multi_9031.value;
-    const char* _t33_err = _multi_9031.error;
+    LyricResult_TypeExprptr _multi_9019 = Parser_parse_type_expr(self);
+    TypeExpr* _t33_val = _multi_9019.value;
+    const char* _t33_err = _multi_9019.error;
     const char* _t34 = _t33_err;
     bool _t35 = (_t34 == NULL);
     bool _t36 = (!_t35);
@@ -22708,9 +21943,9 @@ LyricResult_TupleFieldptr Parser_parse_tuple_field(Parser* self) {
         Lexer* _t22 = _t21;
         Lexer_restore_state(_t22, saved);
     }
-    LyricResult_TypeExprptr _multi_9032 = Parser_parse_type_expr(self);
-    TypeExpr* _t24_val = _multi_9032.value;
-    const char* _t24_err = _multi_9032.error;
+    LyricResult_TypeExprptr _multi_9020 = Parser_parse_type_expr(self);
+    TypeExpr* _t24_val = _multi_9020.value;
+    const char* _t24_err = _multi_9020.error;
     const char* _t25 = _t24_err;
     bool _t26 = (_t25 == NULL);
     bool _t27 = (!_t26);
@@ -22726,8 +21961,8 @@ LyricResult_TupleFieldptr Parser_parse_tuple_field(Parser* self) {
 
 LyricResult_LyricSlice_TypeParamptr Parser_parse_type_params(Parser* self) {
     TokenKind _t0 = TokenKind_PLt;
-    LyricResult_Tokenptr _multi_9033 = Parser_expect(self, _t0);
-    const char* _t1_err = _multi_9033.error;
+    LyricResult_Tokenptr _multi_9021 = Parser_expect(self, _t0);
+    const char* _t1_err = _multi_9021.error;
     const char* _t2 = _t1_err;
     bool _t3 = (_t2 == NULL);
     bool _t4 = (!_t3);
@@ -22807,8 +22042,8 @@ LyricResult_LyricSlice_TypeParamptr Parser_parse_type_params(Parser* self) {
         }
     }
     TokenKind _t50 = TokenKind_PGt;
-    LyricResult_Tokenptr _multi_9034 = Parser_expect(self, _t50);
-    const char* _t51_err = _multi_9034.error;
+    LyricResult_Tokenptr _multi_9022 = Parser_expect(self, _t50);
+    const char* _t51_err = _multi_9022.error;
     const char* _t52 = _t51_err;
     bool _t53 = (_t52 == NULL);
     bool _t54 = (!_t53);
@@ -22825,9 +22060,9 @@ LyricResult_StructDeclptr Parser_parse_struct(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Tokenptr _multi_9035 = Parser_expect_ident(self);
-    Token* _t4_val = _multi_9035.value;
-    const char* _t4_err = _multi_9035.error;
+    LyricResult_Tokenptr _multi_9023 = Parser_expect_ident(self);
+    Token* _t4_val = _multi_9023.value;
+    const char* _t4_err = _multi_9023.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -22864,8 +22099,8 @@ LyricResult_StructDeclptr Parser_parse_struct(Parser* self) {
         }
     }
     TokenKind _t24 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9036 = Parser_expect(self, _t24);
-    const char* _t25_err = _multi_9036.error;
+    LyricResult_Tokenptr _multi_9024 = Parser_expect(self, _t24);
+    const char* _t25_err = _multi_9024.error;
     const char* _t26 = _t25_err;
     bool _t27 = (_t26 == NULL);
     bool _t28 = (!_t27);
@@ -22888,60 +22123,38 @@ LyricResult_StructDeclptr Parser_parse_struct(Parser* self) {
             _sc35 = _t39;
         }
         if (!(_sc35)) break;
-        Token* _t40 = Parser_peek(self);
-        TokenKind _t41 = _t40->kind;
-        TokenKind _t42 = TokenKind_AWhy;
-        bool _t43 = (_t41 == _t42);
-        bool _sc44 = false;
-        _sc44 = _t43;
-        if (_sc44) {
-            bool _t45 = Parser_is_why_annotation(self);
-            _sc44 = _t45;
+        LyricResult_Fieldptr _t40 = Parser_parse_field(self);
+        const char* _t41 = _t40.error;
+        bool _t42 = (_t41 == NULL);
+        bool _t43 = (!_t42);
+        if (_t43) {
+            return lyric_err(_t41, LyricResult_StructDeclptr);
         }
-        if (_sc44) {
-            LyricResult_lyric_string _t46 = Parser_parse_why(self);
-            const char* _t47 = _t46.error;
-            bool _t48 = (_t47 == NULL);
-            bool _t49 = (!_t48);
-            if (_t49) {
-                return lyric_err(_t47, LyricResult_StructDeclptr);
-            }
-            lyric_string _t50 = _t46.value;
-            lyric_string why = _t50;
-        } else {
-            LyricResult_Fieldptr _t51 = Parser_parse_field(self);
-            const char* _t52 = _t51.error;
-            bool _t53 = (_t52 == NULL);
-            bool _t54 = (!_t53);
-            if (_t54) {
-                return lyric_err(_t52, LyricResult_StructDeclptr);
-            }
-            Field* _t55 = _t51.value;
-            Field* field = _t55;
-            Field* _t56 = field;
-            array_append_CStructDecl_CField(s, _t56);
-        }
-        Token* _t58 = Parser_peek(self);
-        TokenKind _t59 = _t58->kind;
-        TokenKind _t60 = TokenKind_PComma;
-        bool _t61 = (_t59 == _t60);
-        if (_t61) {
-            Token* _t62 = Parser_next(self);
-            _t62;
+        Field* _t44 = _t40.value;
+        Field* field = _t44;
+        Field* _t45 = field;
+        array_append_CStructDecl_CField(s, _t45);
+        Token* _t47 = Parser_peek(self);
+        TokenKind _t48 = _t47->kind;
+        TokenKind _t49 = TokenKind_PComma;
+        bool _t50 = (_t48 == _t49);
+        if (_t50) {
+            Token* _t51 = Parser_next(self);
+            _t51;
         }
         Parser_skip_newlines(self);
     }
-    TokenKind _t64 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9037 = Parser_expect(self, _t64);
-    const char* _t65_err = _multi_9037.error;
-    const char* _t66 = _t65_err;
-    bool _t67 = (_t66 == NULL);
-    bool _t68 = (!_t67);
-    if (_t68) {
-        return lyric_err(_t66, LyricResult_StructDeclptr);
+    TokenKind _t53 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9025 = Parser_expect(self, _t53);
+    const char* _t54_err = _multi_9025.error;
+    const char* _t55 = _t54_err;
+    bool _t56 = (_t55 == NULL);
+    bool _t57 = (!_t56);
+    if (_t57) {
+        return lyric_err(_t55, LyricResult_StructDeclptr);
     }
-    Span _t70 = Parser_make_span(self, start);
-    s->span = _t70;
+    Span _t59 = Parser_make_span(self, start);
+    s->span = _t59;
     return lyric_ok(s, LyricResult_StructDeclptr);
 }
 
@@ -22952,9 +22165,9 @@ LyricResult_EnumDeclptr Parser_parse_enum(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9038 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9038.value;
-    const char* _t5_err = _multi_9038.error;
+    LyricResult_Tokenptr _multi_9026 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9026.value;
+    const char* _t5_err = _multi_9026.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -22991,8 +22204,8 @@ LyricResult_EnumDeclptr Parser_parse_enum(Parser* self) {
         }
     }
     TokenKind _t25 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9039 = Parser_expect(self, _t25);
-    const char* _t26_err = _multi_9039.error;
+    LyricResult_Tokenptr _multi_9027 = Parser_expect(self, _t25);
+    const char* _t26_err = _multi_9027.error;
     const char* _t27 = _t26_err;
     bool _t28 = (_t27 == NULL);
     bool _t29 = (!_t28);
@@ -23015,52 +22228,30 @@ LyricResult_EnumDeclptr Parser_parse_enum(Parser* self) {
             _sc36 = _t40;
         }
         if (!(_sc36)) break;
-        Token* _t41 = Parser_peek(self);
-        TokenKind _t42 = _t41->kind;
-        TokenKind _t43 = TokenKind_AWhy;
-        bool _t44 = (_t42 == _t43);
-        bool _sc45 = false;
-        _sc45 = _t44;
-        if (_sc45) {
-            bool _t46 = Parser_is_why_annotation(self);
-            _sc45 = _t46;
+        LyricResult_EnumVariantptr _t41 = Parser_parse_enum_variant(self);
+        const char* _t42 = _t41.error;
+        bool _t43 = (_t42 == NULL);
+        bool _t44 = (!_t43);
+        if (_t44) {
+            return lyric_err(_t42, LyricResult_EnumDeclptr);
         }
-        if (_sc45) {
-            LyricResult_lyric_string _t47 = Parser_parse_why(self);
-            const char* _t48 = _t47.error;
-            bool _t49 = (_t48 == NULL);
-            bool _t50 = (!_t49);
-            if (_t50) {
-                return lyric_err(_t48, LyricResult_EnumDeclptr);
-            }
-            lyric_string _t51 = _t47.value;
-            lyric_string why = _t51;
-        } else {
-            LyricResult_EnumVariantptr _t52 = Parser_parse_enum_variant(self);
-            const char* _t53 = _t52.error;
-            bool _t54 = (_t53 == NULL);
-            bool _t55 = (!_t54);
-            if (_t55) {
-                return lyric_err(_t53, LyricResult_EnumDeclptr);
-            }
-            EnumVariant* _t56 = _t52.value;
-            EnumVariant* variant = _t56;
-            EnumVariant* _t57 = variant;
-            array_append_CEnumDecl_CEnumVariant(e, _t57);
-        }
+        EnumVariant* _t45 = _t41.value;
+        EnumVariant* variant = _t45;
+        EnumVariant* _t46 = variant;
+        array_append_CEnumDecl_CEnumVariant(e, _t46);
         Parser_skip_newlines(self);
     }
-    TokenKind _t60 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9040 = Parser_expect(self, _t60);
-    const char* _t61_err = _multi_9040.error;
-    const char* _t62 = _t61_err;
-    bool _t63 = (_t62 == NULL);
-    bool _t64 = (!_t63);
-    if (_t64) {
-        return lyric_err(_t62, LyricResult_EnumDeclptr);
+    TokenKind _t49 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9028 = Parser_expect(self, _t49);
+    const char* _t50_err = _multi_9028.error;
+    const char* _t51 = _t50_err;
+    bool _t52 = (_t51 == NULL);
+    bool _t53 = (!_t52);
+    if (_t53) {
+        return lyric_err(_t51, LyricResult_EnumDeclptr);
     }
-    Span _t66 = Parser_make_span(self, start);
-    e->span = _t66;
+    Span _t55 = Parser_make_span(self, start);
+    e->span = _t55;
     return lyric_ok(e, LyricResult_EnumDeclptr);
 }
 
@@ -23070,9 +22261,9 @@ LyricResult_EnumVariantptr Parser_parse_enum_variant(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     TokenKind _t3 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9041 = Parser_expect(self, _t3);
-    Token* _t4_val = _multi_9041.value;
-    const char* _t4_err = _multi_9041.error;
+    LyricResult_Tokenptr _multi_9029 = Parser_expect(self, _t3);
+    Token* _t4_val = _multi_9029.value;
+    const char* _t4_err = _multi_9029.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -23156,9 +22347,9 @@ LyricResult_InterfaceDeclptr Parser_parse_interface(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9042 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9042.value;
-    const char* _t5_err = _multi_9042.error;
+    LyricResult_Tokenptr _multi_9030 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9030.value;
+    const char* _t5_err = _multi_9030.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -23195,8 +22386,8 @@ LyricResult_InterfaceDeclptr Parser_parse_interface(Parser* self) {
         }
     }
     TokenKind _t25 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9043 = Parser_expect(self, _t25);
-    const char* _t26_err = _multi_9043.error;
+    LyricResult_Tokenptr _multi_9031 = Parser_expect(self, _t25);
+    const char* _t26_err = _multi_9031.error;
     const char* _t27 = _t26_err;
     bool _t28 = (_t27 == NULL);
     bool _t29 = (!_t28);
@@ -23219,223 +22410,200 @@ LyricResult_InterfaceDeclptr Parser_parse_interface(Parser* self) {
             _sc36 = _t40;
         }
         if (!(_sc36)) break;
-        Token* _t41 = Parser_peek(self);
-        TokenKind _t42 = _t41->kind;
-        TokenKind _t43 = TokenKind_AWhy;
-        bool _t44 = (_t42 == _t43);
-        bool _sc45 = false;
-        _sc45 = _t44;
-        if (_sc45) {
-            bool _t46 = Parser_is_why_annotation(self);
-            _sc45 = _t46;
+        LyricOpt_TokenKind _t41 = Parser_peek_annotation(self);
+        LyricOpt_TokenKind ann = _t41;
+        bool _t42 = lyric_isnull(ann);
+        bool _t43 = (!_t42);
+        bool _sc44 = false;
+        _sc44 = _t43;
+        if (_sc44) {
+            TokenKind _t45 = lyric_unwrap(ann);
+            TokenKind _t46 = TokenKind_KImplements;
+            bool _t47 = (_t45 == _t46);
+            _sc44 = _t47;
         }
-        if (_sc45) {
-            LyricResult_lyric_string _t47 = Parser_parse_why(self);
-            const char* _t48 = _t47.error;
-            bool _t49 = (_t48 == NULL);
-            bool _t50 = (!_t49);
-            if (_t50) {
-                return lyric_err(_t48, LyricResult_InterfaceDeclptr);
+        if (_sc44) {
+            Token* _t48 = Parser_next(self);
+            _t48;
+            TokenKind _t49 = TokenKind_LIdent;
+            LyricResult_Tokenptr _t50 = Parser_expect(self, _t49);
+            const char* _t51 = _t50.error;
+            bool _t52 = (_t51 == NULL);
+            bool _t53 = (!_t52);
+            if (_t53) {
+                return lyric_err(_t51, LyricResult_InterfaceDeclptr);
             }
-            lyric_string _t51 = _t47.value;
-            _t51;
+            Token* _t54 = _t50.value;
+            Token* imp = _t54;
+            LyricSlice_Symptr _t55 = iface->implements;
+            Token* _t56 = imp;
+            lyric_string _t57 = _t56->text;
+            Sym* _t58 = sym(_t57);
+            LyricSlice_Symptr _t59 = ({ lyric_push(&_t55, _t58, LyricSlice_Symptr); _t55; });
+            iface->implements = _t55;
+            iface->implements = _t59;
             Parser_skip_newlines(self);
             continue;
         }
-        LyricOpt_TokenKind _t53 = Parser_peek_annotation(self);
-        LyricOpt_TokenKind ann = _t53;
-        bool _t54 = lyric_isnull(ann);
-        bool _t55 = (!_t54);
-        bool _sc56 = false;
-        _sc56 = _t55;
-        if (_sc56) {
-            TokenKind _t57 = lyric_unwrap(ann);
-            TokenKind _t58 = TokenKind_KImplements;
-            bool _t59 = (_t57 == _t58);
-            _sc56 = _t59;
+        bool _t61 = lyric_isnull(ann);
+        bool _t62 = (!_t61);
+        bool _sc63 = false;
+        _sc63 = _t62;
+        if (_sc63) {
+            TokenKind _t64 = lyric_unwrap(ann);
+            TokenKind _t65 = TokenKind_KField;
+            bool _t66 = (_t64 == _t65);
+            _sc63 = _t66;
         }
-        if (_sc56) {
-            Token* _t60 = Parser_next(self);
-            _t60;
-            TokenKind _t61 = TokenKind_LIdent;
-            LyricResult_Tokenptr _t62 = Parser_expect(self, _t61);
-            const char* _t63 = _t62.error;
-            bool _t64 = (_t63 == NULL);
-            bool _t65 = (!_t64);
-            if (_t65) {
-                return lyric_err(_t63, LyricResult_InterfaceDeclptr);
+        if (_sc63) {
+            LyricResult_InterfaceFieldDeclptr _t67 = Parser_parse_interface_field(self);
+            const char* _t68 = _t67.error;
+            bool _t69 = (_t68 == NULL);
+            bool _t70 = (!_t69);
+            if (_t70) {
+                return lyric_err(_t68, LyricResult_InterfaceDeclptr);
             }
-            Token* _t66 = _t62.value;
-            Token* imp = _t66;
-            LyricSlice_Symptr _t67 = iface->implements;
-            Token* _t68 = imp;
-            lyric_string _t69 = _t68->text;
-            Sym* _t70 = sym(_t69);
-            LyricSlice_Symptr _t71 = ({ lyric_push(&_t67, _t70, LyricSlice_Symptr); _t67; });
-            iface->implements = _t67;
-            iface->implements = _t71;
+            InterfaceFieldDecl* _t71 = _t67.value;
+            InterfaceFieldDecl* fd = _t71;
+            InterfaceFieldDecl* _t72 = fd;
+            array_append_CInterfaceDecl_CInterfaceFieldDecl(iface, _t72);
             Parser_skip_newlines(self);
             continue;
         }
-        bool _t73 = lyric_isnull(ann);
-        bool _t74 = (!_t73);
-        bool _sc75 = false;
-        _sc75 = _t74;
-        if (_sc75) {
-            TokenKind _t76 = lyric_unwrap(ann);
-            TokenKind _t77 = TokenKind_KField;
-            bool _t78 = (_t76 == _t77);
-            _sc75 = _t78;
-        }
-        if (_sc75) {
-            LyricResult_InterfaceFieldDeclptr _t79 = Parser_parse_interface_field(self);
-            const char* _t80 = _t79.error;
-            bool _t81 = (_t80 == NULL);
-            bool _t82 = (!_t81);
-            if (_t82) {
-                return lyric_err(_t80, LyricResult_InterfaceDeclptr);
-            }
-            InterfaceFieldDecl* _t83 = _t79.value;
-            InterfaceFieldDecl* fd = _t83;
-            InterfaceFieldDecl* _t84 = fd;
-            array_append_CInterfaceDecl_CInterfaceFieldDecl(iface, _t84);
-            Parser_skip_newlines(self);
-            continue;
-        }
-        Token* _t87 = Parser_peek(self);
-        TokenKind _t88 = _t87->kind;
-        int32_t _t89 = _t88;
-        switch (_t89) {
+        Token* _t75 = Parser_peek(self);
+        TokenKind _t76 = _t75->kind;
+        int32_t _t77 = _t76;
+        switch (_t77) {
         case 11: {
             Parser_next(self);
-            TokenKind _t91 = TokenKind_LIdent;
-            LyricResult_Tokenptr _multi_9044 = Parser_expect(self, _t91);
-            Token* _t92_val = _multi_9044.value;
-            const char* _t92_err = _multi_9044.error;
-            const char* _t93 = _t92_err;
-            bool _t94 = (_t93 == NULL);
-            bool _t95 = (!_t94);
-            if (_t95) {
-                return lyric_err(_t93, LyricResult_InterfaceDeclptr);
+            TokenKind _t79 = TokenKind_LIdent;
+            LyricResult_Tokenptr _multi_9032 = Parser_expect(self, _t79);
+            Token* _t80_val = _multi_9032.value;
+            const char* _t80_err = _multi_9032.error;
+            const char* _t81 = _t80_err;
+            bool _t82 = (_t81 == NULL);
+            bool _t83 = (!_t82);
+            if (_t83) {
+                return lyric_err(_t81, LyricResult_InterfaceDeclptr);
             }
-            Token* _t96 = _t92_val;
-            Token* imp = _t96;
-            LyricSlice_Symptr _t97 = iface->implements;
-            Token* _t98 = imp;
-            lyric_string _t99 = _t98->text;
-            Sym* _t100 = sym(_t99);
-            LyricSlice_Symptr _t101 = ({ lyric_push(&_t97, _t100, LyricSlice_Symptr); _t97; });
-            iface->implements = _t97;
-            iface->implements = _t101;
+            Token* _t84 = _t80_val;
+            Token* imp = _t84;
+            LyricSlice_Symptr _t85 = iface->implements;
+            Token* _t86 = imp;
+            lyric_string _t87 = _t86->text;
+            Sym* _t88 = sym(_t87);
+            LyricSlice_Symptr _t89 = ({ lyric_push(&_t85, _t88, LyricSlice_Symptr); _t85; });
+            iface->implements = _t85;
+            iface->implements = _t89;
             break;
         }
         case 25: {
             Parser_next(self);
-            LyricResult_FuncDeclptr _multi_9045 = Parser_parse_func(self);
-            FuncDecl* _t103_val = _multi_9045.value;
-            const char* _t103_err = _multi_9045.error;
-            const char* _t104 = _t103_err;
-            bool _t105 = (_t104 == NULL);
-            bool _t106 = (!_t105);
-            if (_t106) {
-                return lyric_err(_t104, LyricResult_InterfaceDeclptr);
+            LyricResult_FuncDeclptr _multi_9033 = Parser_parse_func(self);
+            FuncDecl* _t91_val = _multi_9033.value;
+            const char* _t91_err = _multi_9033.error;
+            const char* _t92 = _t91_err;
+            bool _t93 = (_t92 == NULL);
+            bool _t94 = (!_t93);
+            if (_t94) {
+                return lyric_err(_t92, LyricResult_InterfaceDeclptr);
             }
-            FuncDecl* _t107 = _t103_val;
-            FuncDecl* fn = _t107;
-            FuncDecl* _t108 = fn;
-            _t108->is_public = true;
-            FuncDecl* _t109 = fn;
-            array_append_CInterfaceDecl_CFuncDecl(iface, _t109);
+            FuncDecl* _t95 = _t91_val;
+            FuncDecl* fn = _t95;
+            FuncDecl* _t96 = fn;
+            _t96->is_public = true;
+            FuncDecl* _t97 = fn;
+            array_append_CInterfaceDecl_CFuncDecl(iface, _t97);
             break;
         }
         case 1: {
-            LyricResult_FuncDeclptr _multi_9046 = Parser_parse_func(self);
-            FuncDecl* _t111_val = _multi_9046.value;
-            const char* _t111_err = _multi_9046.error;
-            const char* _t112 = _t111_err;
-            bool _t113 = (_t112 == NULL);
-            bool _t114 = (!_t113);
-            if (_t114) {
-                return lyric_err(_t112, LyricResult_InterfaceDeclptr);
+            LyricResult_FuncDeclptr _multi_9034 = Parser_parse_func(self);
+            FuncDecl* _t99_val = _multi_9034.value;
+            const char* _t99_err = _multi_9034.error;
+            const char* _t100 = _t99_err;
+            bool _t101 = (_t100 == NULL);
+            bool _t102 = (!_t101);
+            if (_t102) {
+                return lyric_err(_t100, LyricResult_InterfaceDeclptr);
             }
-            FuncDecl* _t115 = _t111_val;
-            FuncDecl* fn = _t115;
-            FuncDecl* _t116 = fn;
-            array_append_CInterfaceDecl_CFuncDecl(iface, _t116);
+            FuncDecl* _t103 = _t99_val;
+            FuncDecl* fn = _t103;
+            FuncDecl* _t104 = fn;
+            array_append_CInterfaceDecl_CFuncDecl(iface, _t104);
             break;
         }
         case 9: {
-            LyricResult_InterfaceEmbedptr _multi_9047 = Parser_parse_interface_embed(self);
-            InterfaceEmbed* _t118_val = _multi_9047.value;
-            const char* _t118_err = _multi_9047.error;
-            const char* _t119 = _t118_err;
-            bool _t120 = (_t119 == NULL);
-            bool _t121 = (!_t120);
-            if (_t121) {
-                return lyric_err(_t119, LyricResult_InterfaceDeclptr);
+            LyricResult_InterfaceEmbedptr _multi_9035 = Parser_parse_interface_embed(self);
+            InterfaceEmbed* _t106_val = _multi_9035.value;
+            const char* _t106_err = _multi_9035.error;
+            const char* _t107 = _t106_err;
+            bool _t108 = (_t107 == NULL);
+            bool _t109 = (!_t108);
+            if (_t109) {
+                return lyric_err(_t107, LyricResult_InterfaceDeclptr);
             }
-            InterfaceEmbed* _t122 = _t118_val;
-            InterfaceEmbed* emb = _t122;
-            InterfaceEmbed* _t123 = emb;
-            array_append_CInterfaceDecl_CInterfaceEmbed(iface, _t123);
+            InterfaceEmbed* _t110 = _t106_val;
+            InterfaceEmbed* emb = _t110;
+            InterfaceEmbed* _t111 = emb;
+            array_append_CInterfaceDecl_CInterfaceEmbed(iface, _t111);
             break;
         }
         case 7: {
-            LyricResult_InterfaceFieldDeclptr _multi_9048 = Parser_parse_interface_field(self);
-            InterfaceFieldDecl* _t125_val = _multi_9048.value;
-            const char* _t125_err = _multi_9048.error;
-            const char* _t126 = _t125_err;
-            bool _t127 = (_t126 == NULL);
-            bool _t128 = (!_t127);
-            if (_t128) {
-                return lyric_err(_t126, LyricResult_InterfaceDeclptr);
+            LyricResult_InterfaceFieldDeclptr _multi_9036 = Parser_parse_interface_field(self);
+            InterfaceFieldDecl* _t113_val = _multi_9036.value;
+            const char* _t113_err = _multi_9036.error;
+            const char* _t114 = _t113_err;
+            bool _t115 = (_t114 == NULL);
+            bool _t116 = (!_t115);
+            if (_t116) {
+                return lyric_err(_t114, LyricResult_InterfaceDeclptr);
             }
-            InterfaceFieldDecl* _t129 = _t125_val;
-            InterfaceFieldDecl* fd = _t129;
-            InterfaceFieldDecl* _t130 = fd;
-            array_append_CInterfaceDecl_CInterfaceFieldDecl(iface, _t130);
+            InterfaceFieldDecl* _t117 = _t113_val;
+            InterfaceFieldDecl* fd = _t117;
+            InterfaceFieldDecl* _t118 = fd;
+            array_append_CInterfaceDecl_CInterfaceFieldDecl(iface, _t118);
             break;
         }
         case 8: {
-            LyricResult_DestructorBlockptr _multi_9049 = Parser_parse_destructor_block(self);
-            DestructorBlock* _t132_val = _multi_9049.value;
-            const char* _t132_err = _multi_9049.error;
-            const char* _t133 = _t132_err;
-            bool _t134 = (_t133 == NULL);
-            bool _t135 = (!_t134);
-            if (_t135) {
-                return lyric_err(_t133, LyricResult_InterfaceDeclptr);
+            LyricResult_DestructorBlockptr _multi_9037 = Parser_parse_destructor_block(self);
+            DestructorBlock* _t120_val = _multi_9037.value;
+            const char* _t120_err = _multi_9037.error;
+            const char* _t121 = _t120_err;
+            bool _t122 = (_t121 == NULL);
+            bool _t123 = (!_t122);
+            if (_t123) {
+                return lyric_err(_t121, LyricResult_InterfaceDeclptr);
             }
-            DestructorBlock* _t136 = _t132_val;
-            DestructorBlock* db = _t136;
-            DestructorBlock* _t137 = db;
-            array_append_CInterfaceDecl_CDestructorBlock(iface, _t137);
+            DestructorBlock* _t124 = _t120_val;
+            DestructorBlock* db = _t124;
+            DestructorBlock* _t125 = db;
+            array_append_CInterfaceDecl_CDestructorBlock(iface, _t125);
             break;
         }
         default: {
-            Token* _t139 = Parser_peek(self);
-            Span _t140 = _t139->span;
-            Token* _t141 = Parser_peek(self);
-            TokenKind _t142 = _t141->kind;
-            lyric_string _t143 = lyric_sprintf("unexpected %.*s in interface body", (int)TokenKind_to_string(_t142).len, (const char*)TokenKind_to_string(_t142).data);
-            Error* _t144 = Parser_make_error(self, _t140, _t143);
-            return lyric_err((const char*)_t144->msg.data, LyricResult_InterfaceDeclptr);
+            Token* _t127 = Parser_peek(self);
+            Span _t128 = _t127->span;
+            Token* _t129 = Parser_peek(self);
+            TokenKind _t130 = _t129->kind;
+            lyric_string _t131 = lyric_sprintf("unexpected %.*s in interface body", (int)TokenKind_to_string(_t130).len, (const char*)TokenKind_to_string(_t130).data);
+            Error* _t132 = Parser_make_error(self, _t128, _t131);
+            return lyric_err((const char*)_t132->msg.data, LyricResult_InterfaceDeclptr);
             break;
         }
         }
         Parser_skip_newlines(self);
     }
-    TokenKind _t146 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9050 = Parser_expect(self, _t146);
-    const char* _t147_err = _multi_9050.error;
-    const char* _t148 = _t147_err;
-    bool _t149 = (_t148 == NULL);
-    bool _t150 = (!_t149);
-    if (_t150) {
-        return lyric_err(_t148, LyricResult_InterfaceDeclptr);
+    TokenKind _t134 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9038 = Parser_expect(self, _t134);
+    const char* _t135_err = _multi_9038.error;
+    const char* _t136 = _t135_err;
+    bool _t137 = (_t136 == NULL);
+    bool _t138 = (!_t137);
+    if (_t138) {
+        return lyric_err(_t136, LyricResult_InterfaceDeclptr);
     }
-    Span _t152 = Parser_make_span(self, start);
-    iface->span = _t152;
+    Span _t140 = Parser_make_span(self, start);
+    iface->span = _t140;
     return lyric_ok(iface, LyricResult_InterfaceDeclptr);
 }
 
@@ -23446,9 +22614,9 @@ LyricResult_InterfaceFieldDeclptr Parser_parse_interface_field(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9051 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9051.value;
-    const char* _t5_err = _multi_9051.error;
+    LyricResult_Tokenptr _multi_9039 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9039.value;
+    const char* _t5_err = _multi_9039.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -23458,8 +22626,8 @@ LyricResult_InterfaceFieldDeclptr Parser_parse_interface_field(Parser* self) {
     Token* _t9 = _t5_val;
     Token* type_name = _t9;
     TokenKind _t10 = TokenKind_PDot;
-    LyricResult_Tokenptr _multi_9052 = Parser_expect(self, _t10);
-    const char* _t11_err = _multi_9052.error;
+    LyricResult_Tokenptr _multi_9040 = Parser_expect(self, _t10);
+    const char* _t11_err = _multi_9040.error;
     const char* _t12 = _t11_err;
     bool _t13 = (_t12 == NULL);
     bool _t14 = (!_t13);
@@ -23467,9 +22635,9 @@ LyricResult_InterfaceFieldDeclptr Parser_parse_interface_field(Parser* self) {
         return lyric_err(_t12, LyricResult_InterfaceFieldDeclptr);
     }
     TokenKind _t16 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9053 = Parser_expect(self, _t16);
-    Token* _t17_val = _multi_9053.value;
-    const char* _t17_err = _multi_9053.error;
+    LyricResult_Tokenptr _multi_9041 = Parser_expect(self, _t16);
+    Token* _t17_val = _multi_9041.value;
+    const char* _t17_err = _multi_9041.error;
     const char* _t18 = _t17_err;
     bool _t19 = (_t18 == NULL);
     bool _t20 = (!_t19);
@@ -23479,17 +22647,17 @@ LyricResult_InterfaceFieldDeclptr Parser_parse_interface_field(Parser* self) {
     Token* _t21 = _t17_val;
     Token* field_name = _t21;
     TokenKind _t22 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9054 = Parser_expect(self, _t22);
-    const char* _t23_err = _multi_9054.error;
+    LyricResult_Tokenptr _multi_9042 = Parser_expect(self, _t22);
+    const char* _t23_err = _multi_9042.error;
     const char* _t24 = _t23_err;
     bool _t25 = (_t24 == NULL);
     bool _t26 = (!_t25);
     if (_t26) {
         return lyric_err(_t24, LyricResult_InterfaceFieldDeclptr);
     }
-    LyricResult_TypeExprptr _multi_9055 = Parser_parse_type_expr(self);
-    TypeExpr* _t28_val = _multi_9055.value;
-    const char* _t28_err = _multi_9055.error;
+    LyricResult_TypeExprptr _multi_9043 = Parser_parse_type_expr(self);
+    TypeExpr* _t28_val = _multi_9043.value;
+    const char* _t28_err = _multi_9043.error;
     const char* _t29 = _t28_err;
     bool _t30 = (_t29 == NULL);
     bool _t31 = (!_t30);
@@ -23520,9 +22688,9 @@ LyricResult_InterfaceEmbedptr Parser_parse_interface_embed(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9056 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9056.value;
-    const char* _t5_err = _multi_9056.error;
+    LyricResult_Tokenptr _multi_9044 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9044.value;
+    const char* _t5_err = _multi_9044.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -23604,9 +22772,9 @@ LyricResult_DestructorBlockptr Parser_parse_destructor_block(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9057 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9057.value;
-    const char* _t5_err = _multi_9057.error;
+    LyricResult_Tokenptr _multi_9045 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9045.value;
+    const char* _t5_err = _multi_9045.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -23615,9 +22783,9 @@ LyricResult_DestructorBlockptr Parser_parse_destructor_block(Parser* self) {
     }
     Token* _t9 = _t5_val;
     Token* type_name = _t9;
-    LyricResult_Blockptr _multi_9058 = Parser_parse_block(self);
-    Block* _t10_val = _multi_9058.value;
-    const char* _t10_err = _multi_9058.error;
+    LyricResult_Blockptr _multi_9046 = Parser_parse_block(self);
+    Block* _t10_val = _multi_9046.value;
+    const char* _t10_err = _multi_9046.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
@@ -23644,9 +22812,9 @@ LyricResult_ImplBlockptr Parser_parse_impl(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9059 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9059.value;
-    const char* _t5_err = _multi_9059.error;
+    LyricResult_Tokenptr _multi_9047 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9047.value;
+    const char* _t5_err = _multi_9047.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -23761,8 +22929,8 @@ LyricResult_ImplBlockptr Parser_parse_impl(Parser* self) {
         impl_block->label = _t74;
     }
     TokenKind _t75 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9060 = Parser_expect(self, _t75);
-    const char* _t76_err = _multi_9060.error;
+    LyricResult_Tokenptr _multi_9048 = Parser_expect(self, _t75);
+    const char* _t76_err = _multi_9048.error;
     const char* _t77 = _t76_err;
     bool _t78 = (_t77 == NULL);
     bool _t79 = (!_t78);
@@ -23817,8 +22985,8 @@ LyricResult_ImplBlockptr Parser_parse_impl(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t110 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9061 = Parser_expect(self, _t110);
-    const char* _t111_err = _multi_9061.error;
+    LyricResult_Tokenptr _multi_9049 = Parser_expect(self, _t110);
+    const char* _t111_err = _multi_9049.error;
     const char* _t112 = _t111_err;
     bool _t113 = (_t112 == NULL);
     bool _t114 = (!_t113);
@@ -23836,9 +23004,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
     Pos _t2 = _t1.start;
     Pos start = _t2;
     TokenKind _t3 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9062 = Parser_expect(self, _t3);
-    Token* _t4_val = _multi_9062.value;
-    const char* _t4_err = _multi_9062.error;
+    LyricResult_Tokenptr _multi_9050 = Parser_expect(self, _t3);
+    Token* _t4_val = _multi_9050.value;
+    const char* _t4_err = _multi_9050.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -23865,9 +23033,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
     case 66: {
         Parser_next(self);
         TokenKind _t19 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9063 = Parser_expect(self, _t19);
-        Token* _t20_val = _multi_9063.value;
-        const char* _t20_err = _multi_9063.error;
+        LyricResult_Tokenptr _multi_9051 = Parser_expect(self, _t19);
+        Token* _t20_val = _multi_9051.value;
+        const char* _t20_err = _multi_9051.error;
         const char* _t21 = _t20_err;
         bool _t22 = (_t21 == NULL);
         bool _t23 = (!_t22);
@@ -23888,9 +23056,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
     case 61: {
         Parser_next(self);
         TokenKind _t30 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9064 = Parser_expect(self, _t30);
-        Token* _t31_val = _multi_9064.value;
-        const char* _t31_err = _multi_9064.error;
+        LyricResult_Tokenptr _multi_9052 = Parser_expect(self, _t30);
+        Token* _t31_val = _multi_9052.value;
+        const char* _t31_err = _multi_9052.error;
         const char* _t32 = _t31_err;
         bool _t33 = (_t32 == NULL);
         bool _t34 = (!_t33);
@@ -23957,8 +23125,8 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
             Parser_skip_newlines(self);
         }
         TokenKind _t69 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9065 = Parser_expect(self, _t69);
-        const char* _t70_err = _multi_9065.error;
+        LyricResult_Tokenptr _multi_9053 = Parser_expect(self, _t69);
+        const char* _t70_err = _multi_9053.error;
         const char* _t71 = _t70_err;
         bool _t72 = (_t71 == NULL);
         bool _t73 = (!_t72);
@@ -23983,9 +23151,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping_short(Parser* self, Sym* fo
             TypeExpr* ret = _t84;
             fn->return_type = ret;
         }
-        LyricResult_Blockptr _multi_9066 = Parser_parse_block(self);
-        Block* _t85_val = _multi_9066.value;
-        const char* _t85_err = _multi_9066.error;
+        LyricResult_Blockptr _multi_9054 = Parser_parse_block(self);
+        Block* _t85_val = _multi_9054.value;
+        const char* _t85_err = _multi_9054.error;
         const char* _t86 = _t85_err;
         bool _t87 = (_t86 == NULL);
         bool _t88 = (!_t87);
@@ -24020,9 +23188,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     TokenKind _t3 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9067 = Parser_expect(self, _t3);
-    Token* _t4_val = _multi_9067.value;
-    const char* _t4_err = _multi_9067.error;
+    LyricResult_Tokenptr _multi_9055 = Parser_expect(self, _t3);
+    Token* _t4_val = _multi_9055.value;
+    const char* _t4_err = _multi_9055.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -24032,8 +23200,8 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
     Token* _t8 = _t4_val;
     Token* type_param = _t8;
     TokenKind _t9 = TokenKind_PDot;
-    LyricResult_Tokenptr _multi_9068 = Parser_expect(self, _t9);
-    const char* _t10_err = _multi_9068.error;
+    LyricResult_Tokenptr _multi_9056 = Parser_expect(self, _t9);
+    const char* _t10_err = _multi_9056.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
@@ -24041,9 +23209,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
         return lyric_err(_t11, LyricResult_ImplMappingptr);
     }
     TokenKind _t15 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9069 = Parser_expect(self, _t15);
-    Token* _t16_val = _multi_9069.value;
-    const char* _t16_err = _multi_9069.error;
+    LyricResult_Tokenptr _multi_9057 = Parser_expect(self, _t15);
+    Token* _t16_val = _multi_9057.value;
+    const char* _t16_err = _multi_9057.error;
     const char* _t17 = _t16_err;
     bool _t18 = (_t17 == NULL);
     bool _t19 = (!_t18);
@@ -24073,9 +23241,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
     case 66: {
         Parser_next(self);
         TokenKind _t34 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9070 = Parser_expect(self, _t34);
-        Token* _t35_val = _multi_9070.value;
-        const char* _t35_err = _multi_9070.error;
+        LyricResult_Tokenptr _multi_9058 = Parser_expect(self, _t34);
+        Token* _t35_val = _multi_9058.value;
+        const char* _t35_err = _multi_9058.error;
         const char* _t36 = _t35_err;
         bool _t37 = (_t36 == NULL);
         bool _t38 = (!_t37);
@@ -24085,8 +23253,8 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
         Token* _t39 = _t35_val;
         Token* cls = _t39;
         TokenKind _t40 = TokenKind_PDot;
-        LyricResult_Tokenptr _multi_9071 = Parser_expect(self, _t40);
-        const char* _t41_err = _multi_9071.error;
+        LyricResult_Tokenptr _multi_9059 = Parser_expect(self, _t40);
+        const char* _t41_err = _multi_9059.error;
         const char* _t42 = _t41_err;
         bool _t43 = (_t42 == NULL);
         bool _t44 = (!_t43);
@@ -24094,9 +23262,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
             return lyric_err(_t42, LyricResult_ImplMappingptr);
         }
         TokenKind _t46 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9072 = Parser_expect(self, _t46);
-        Token* _t47_val = _multi_9072.value;
-        const char* _t47_err = _multi_9072.error;
+        LyricResult_Tokenptr _multi_9060 = Parser_expect(self, _t46);
+        Token* _t47_val = _multi_9060.value;
+        const char* _t47_err = _multi_9060.error;
         const char* _t48 = _t47_err;
         bool _t49 = (_t48 == NULL);
         bool _t50 = (!_t49);
@@ -24120,9 +23288,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
     case 61: {
         Parser_next(self);
         TokenKind _t60 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9073 = Parser_expect(self, _t60);
-        Token* _t61_val = _multi_9073.value;
-        const char* _t61_err = _multi_9073.error;
+        LyricResult_Tokenptr _multi_9061 = Parser_expect(self, _t60);
+        Token* _t61_val = _multi_9061.value;
+        const char* _t61_err = _multi_9061.error;
         const char* _t62 = _t61_err;
         bool _t63 = (_t62 == NULL);
         bool _t64 = (!_t63);
@@ -24132,8 +23300,8 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
         Token* _t65 = _t61_val;
         Token* cls = _t65;
         TokenKind _t66 = TokenKind_PDot;
-        LyricResult_Tokenptr _multi_9074 = Parser_expect(self, _t66);
-        const char* _t67_err = _multi_9074.error;
+        LyricResult_Tokenptr _multi_9062 = Parser_expect(self, _t66);
+        const char* _t67_err = _multi_9062.error;
         const char* _t68 = _t67_err;
         bool _t69 = (_t68 == NULL);
         bool _t70 = (!_t69);
@@ -24141,9 +23309,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
             return lyric_err(_t68, LyricResult_ImplMappingptr);
         }
         TokenKind _t72 = TokenKind_LIdent;
-        LyricResult_Tokenptr _multi_9075 = Parser_expect(self, _t72);
-        Token* _t73_val = _multi_9075.value;
-        const char* _t73_err = _multi_9075.error;
+        LyricResult_Tokenptr _multi_9063 = Parser_expect(self, _t72);
+        Token* _t73_val = _multi_9063.value;
+        const char* _t73_err = _multi_9063.error;
         const char* _t74 = _t73_err;
         bool _t75 = (_t74 == NULL);
         bool _t76 = (!_t75);
@@ -24216,8 +23384,8 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
             Parser_skip_newlines(self);
         }
         TokenKind _t117 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9076 = Parser_expect(self, _t117);
-        const char* _t118_err = _multi_9076.error;
+        LyricResult_Tokenptr _multi_9064 = Parser_expect(self, _t117);
+        const char* _t118_err = _multi_9064.error;
         const char* _t119 = _t118_err;
         bool _t120 = (_t119 == NULL);
         bool _t121 = (!_t120);
@@ -24242,9 +23410,9 @@ LyricResult_ImplMappingptr Parser_parse_impl_mapping(Parser* self) {
             TypeExpr* ret = _t132;
             fn->return_type = ret;
         }
-        LyricResult_Blockptr _multi_9077 = Parser_parse_block(self);
-        Block* _t133_val = _multi_9077.value;
-        const char* _t133_err = _multi_9077.error;
+        LyricResult_Blockptr _multi_9065 = Parser_parse_block(self);
+        Block* _t133_val = _multi_9065.value;
+        const char* _t133_err = _multi_9065.error;
         const char* _t134 = _t133_err;
         bool _t135 = (_t134 == NULL);
         bool _t136 = (!_t135);
@@ -24280,9 +23448,9 @@ LyricResult_ClassDeclptr Parser_parse_class(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9078 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9078.value;
-    const char* _t5_err = _multi_9078.error;
+    LyricResult_Tokenptr _multi_9066 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9066.value;
+    const char* _t5_err = _multi_9066.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -24410,8 +23578,8 @@ LyricResult_ClassDeclptr Parser_parse_class(Parser* self) {
         }
     }
     TokenKind _t75 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9079 = Parser_expect(self, _t75);
-    const char* _t76_err = _multi_9079.error;
+    LyricResult_Tokenptr _multi_9067 = Parser_expect(self, _t75);
+    const char* _t76_err = _multi_9067.error;
     const char* _t77 = _t76_err;
     bool _t78 = (_t77 == NULL);
     bool _t79 = (!_t78);
@@ -24436,133 +23604,99 @@ LyricResult_ClassDeclptr Parser_parse_class(Parser* self) {
         if (!(_sc86)) break;
         Token* _t91 = Parser_peek(self);
         TokenKind _t92 = _t91->kind;
-        TokenKind _t93 = TokenKind_AWhy;
-        bool _t94 = (_t92 == _t93);
-        bool _sc95 = false;
-        _sc95 = _t94;
-        if (_sc95) {
-            bool _t96 = Parser_is_why_annotation(self);
-            _sc95 = _t96;
-        }
-        if (_sc95) {
-            LyricResult_lyric_string _t97 = Parser_parse_why(self);
-            const char* _t98 = _t97.error;
-            bool _t99 = (_t98 == NULL);
-            bool _t100 = (!_t99);
-            if (_t100) {
-                return lyric_err(_t98, LyricResult_ClassDeclptr);
-            }
-            lyric_string _t101 = _t97.value;
-            _t101;
-            Parser_skip_newlines(self);
-            continue;
-        }
-        Token* _t103 = Parser_peek(self);
-        TokenKind _t104 = _t103->kind;
-        int32_t _t105 = _t104;
-        switch (_t105) {
-        case 99: {
-            LyricResult_LyricSlice_lyric_string _multi_9080 = Parser_parse_source(self);
-            const char* _t106_err = _multi_9080.error;
-            const char* _t107 = _t106_err;
-            bool _t108 = (_t107 == NULL);
-            bool _t109 = (!_t108);
-            if (_t109) {
-                return lyric_err(_t107, LyricResult_ClassDeclptr);
-            }
-            break;
-        }
+        int32_t _t93 = _t92;
+        switch (_t93) {
         case 25: {
             Parser_next(self);
-            Token* _t112 = Parser_peek(self);
-            TokenKind _t113 = _t112->kind;
-            TokenKind _t114 = TokenKind_KFunc;
-            bool _t115 = (_t113 == _t114);
-            if (_t115) {
-                LyricResult_FuncDeclptr _t116 = Parser_parse_func(self);
-                const char* _t117 = _t116.error;
-                bool _t118 = (_t117 == NULL);
-                bool _t119 = (!_t118);
-                if (_t119) {
-                    return lyric_err(_t117, LyricResult_ClassDeclptr);
+            Token* _t95 = Parser_peek(self);
+            TokenKind _t96 = _t95->kind;
+            TokenKind _t97 = TokenKind_KFunc;
+            bool _t98 = (_t96 == _t97);
+            if (_t98) {
+                LyricResult_FuncDeclptr _t99 = Parser_parse_func(self);
+                const char* _t100 = _t99.error;
+                bool _t101 = (_t100 == NULL);
+                bool _t102 = (!_t101);
+                if (_t102) {
+                    return lyric_err(_t100, LyricResult_ClassDeclptr);
                 }
-                FuncDecl* _t120 = _t116.value;
-                FuncDecl* fn = _t120;
-                FuncDecl* _t121 = fn;
-                _t121->is_public = true;
-                FuncDecl* _t122 = fn;
-                array_append_CClassDecl_CFuncDecl(cls, _t122);
+                FuncDecl* _t103 = _t99.value;
+                FuncDecl* fn = _t103;
+                FuncDecl* _t104 = fn;
+                _t104->is_public = true;
+                FuncDecl* _t105 = fn;
+                array_append_CClassDecl_CFuncDecl(cls, _t105);
             } else {
-                LyricResult_Fieldptr _t124 = Parser_parse_field(self);
-                const char* _t125 = _t124.error;
-                bool _t126 = (_t125 == NULL);
-                bool _t127 = (!_t126);
-                if (_t127) {
-                    return lyric_err(_t125, LyricResult_ClassDeclptr);
+                LyricResult_Fieldptr _t107 = Parser_parse_field(self);
+                const char* _t108 = _t107.error;
+                bool _t109 = (_t108 == NULL);
+                bool _t110 = (!_t109);
+                if (_t110) {
+                    return lyric_err(_t108, LyricResult_ClassDeclptr);
                 }
-                Field* _t128 = _t124.value;
-                Field* field = _t128;
-                Field* _t129 = field;
-                _t129->is_public = true;
-                Field* _t130 = field;
-                array_append_CClassDecl_CField(cls, _t130);
+                Field* _t111 = _t107.value;
+                Field* field = _t111;
+                Field* _t112 = field;
+                _t112->is_public = true;
+                Field* _t113 = field;
+                array_append_CClassDecl_CField(cls, _t113);
             }
             break;
         }
         case 1: {
-            LyricResult_FuncDeclptr _multi_9081 = Parser_parse_func(self);
-            FuncDecl* _t132_val = _multi_9081.value;
-            const char* _t132_err = _multi_9081.error;
-            const char* _t133 = _t132_err;
-            bool _t134 = (_t133 == NULL);
-            bool _t135 = (!_t134);
-            if (_t135) {
-                return lyric_err(_t133, LyricResult_ClassDeclptr);
+            LyricResult_FuncDeclptr _multi_9068 = Parser_parse_func(self);
+            FuncDecl* _t115_val = _multi_9068.value;
+            const char* _t115_err = _multi_9068.error;
+            const char* _t116 = _t115_err;
+            bool _t117 = (_t116 == NULL);
+            bool _t118 = (!_t117);
+            if (_t118) {
+                return lyric_err(_t116, LyricResult_ClassDeclptr);
             }
-            FuncDecl* _t136 = _t132_val;
-            FuncDecl* fn = _t136;
-            FuncDecl* _t137 = fn;
-            array_append_CClassDecl_CFuncDecl(cls, _t137);
+            FuncDecl* _t119 = _t115_val;
+            FuncDecl* fn = _t119;
+            FuncDecl* _t120 = fn;
+            array_append_CClassDecl_CFuncDecl(cls, _t120);
             break;
         }
         default: {
-            LyricResult_Fieldptr _multi_9082 = Parser_parse_field(self);
-            Field* _t139_val = _multi_9082.value;
-            const char* _t139_err = _multi_9082.error;
-            const char* _t140 = _t139_err;
-            bool _t141 = (_t140 == NULL);
-            bool _t142 = (!_t141);
-            if (_t142) {
-                return lyric_err(_t140, LyricResult_ClassDeclptr);
+            LyricResult_Fieldptr _multi_9069 = Parser_parse_field(self);
+            Field* _t122_val = _multi_9069.value;
+            const char* _t122_err = _multi_9069.error;
+            const char* _t123 = _t122_err;
+            bool _t124 = (_t123 == NULL);
+            bool _t125 = (!_t124);
+            if (_t125) {
+                return lyric_err(_t123, LyricResult_ClassDeclptr);
             }
-            Field* _t143 = _t139_val;
-            Field* field = _t143;
-            Field* _t144 = field;
-            array_append_CClassDecl_CField(cls, _t144);
+            Field* _t126 = _t122_val;
+            Field* field = _t126;
+            Field* _t127 = field;
+            array_append_CClassDecl_CField(cls, _t127);
             break;
         }
         }
-        Token* _t146 = Parser_peek(self);
-        TokenKind _t147 = _t146->kind;
-        TokenKind _t148 = TokenKind_PComma;
-        bool _t149 = (_t147 == _t148);
-        if (_t149) {
-            Token* _t150 = Parser_next(self);
-            _t150;
+        Token* _t129 = Parser_peek(self);
+        TokenKind _t130 = _t129->kind;
+        TokenKind _t131 = TokenKind_PComma;
+        bool _t132 = (_t130 == _t131);
+        if (_t132) {
+            Token* _t133 = Parser_next(self);
+            _t133;
         }
         Parser_skip_newlines(self);
     }
-    TokenKind _t152 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9083 = Parser_expect(self, _t152);
-    const char* _t153_err = _multi_9083.error;
-    const char* _t154 = _t153_err;
-    bool _t155 = (_t154 == NULL);
-    bool _t156 = (!_t155);
-    if (_t156) {
-        return lyric_err(_t154, LyricResult_ClassDeclptr);
+    TokenKind _t135 = TokenKind_PRBrace;
+    LyricResult_Tokenptr _multi_9070 = Parser_expect(self, _t135);
+    const char* _t136_err = _multi_9070.error;
+    const char* _t137 = _t136_err;
+    bool _t138 = (_t137 == NULL);
+    bool _t139 = (!_t138);
+    if (_t139) {
+        return lyric_err(_t137, LyricResult_ClassDeclptr);
     }
-    Span _t158 = Parser_make_span(self, start);
-    cls->span = _t158;
+    Span _t141 = Parser_make_span(self, start);
+    cls->span = _t141;
     return lyric_ok(cls, LyricResult_ClassDeclptr);
 }
 
@@ -24573,9 +23707,9 @@ LyricResult_FuncDeclptr Parser_parse_func(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9084 = Parser_expect(self, _t4);
-    Token* _t5_val = _multi_9084.value;
-    const char* _t5_err = _multi_9084.error;
+    LyricResult_Tokenptr _multi_9071 = Parser_expect(self, _t4);
+    Token* _t5_val = _multi_9071.value;
+    const char* _t5_err = _multi_9071.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -24638,8 +23772,8 @@ LyricResult_FuncDeclptr Parser_parse_func(Parser* self) {
         }
     }
     TokenKind _t42 = TokenKind_PLParen;
-    LyricResult_Tokenptr _multi_9085 = Parser_expect(self, _t42);
-    const char* _t43_err = _multi_9085.error;
+    LyricResult_Tokenptr _multi_9072 = Parser_expect(self, _t42);
+    const char* _t43_err = _multi_9072.error;
     const char* _t44 = _t43_err;
     bool _t45 = (_t44 == NULL);
     bool _t46 = (!_t45);
@@ -24684,8 +23818,8 @@ LyricResult_FuncDeclptr Parser_parse_func(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t71 = TokenKind_PRParen;
-    LyricResult_Tokenptr _multi_9086 = Parser_expect(self, _t71);
-    const char* _t72_err = _multi_9086.error;
+    LyricResult_Tokenptr _multi_9073 = Parser_expect(self, _t71);
+    const char* _t72_err = _multi_9073.error;
     const char* _t73 = _t72_err;
     bool _t74 = (_t73 == NULL);
     bool _t75 = (!_t74);
@@ -24745,424 +23879,25 @@ LyricResult_FuncDeclptr Parser_parse_func(Parser* self) {
         }
         Parser_skip_newlines(self);
     }
-    LyricResult_Annotationsptr _multi_9087 = Parser_parse_annotations(self);
-    Annotations* _t106_val = _multi_9087.value;
-    const char* _t106_err = _multi_9087.error;
-    const char* _t107 = _t106_err;
-    bool _t108 = (_t107 == NULL);
-    bool _t109 = (!_t108);
+    Token* _t106 = Parser_peek(self);
+    TokenKind _t107 = _t106->kind;
+    TokenKind _t108 = TokenKind_PLBrace;
+    bool _t109 = (_t107 == _t108);
     if (_t109) {
-        return lyric_err(_t107, LyricResult_FuncDeclptr);
-    }
-    Annotations* _t110 = _t106_val;
-    Annotations* ann = _t110;
-    fn->annotations = ann;
-    Token* _t111 = Parser_peek(self);
-    TokenKind _t112 = _t111->kind;
-    TokenKind _t113 = TokenKind_PLBrace;
-    bool _t114 = (_t112 == _t113);
-    if (_t114) {
-        LyricResult_Blockptr _t115 = Parser_parse_block(self);
-        const char* _t116 = _t115.error;
-        bool _t117 = (_t116 == NULL);
-        bool _t118 = (!_t117);
-        if (_t118) {
-            return lyric_err(_t116, LyricResult_FuncDeclptr);
+        LyricResult_Blockptr _t110 = Parser_parse_block(self);
+        const char* _t111 = _t110.error;
+        bool _t112 = (_t111 == NULL);
+        bool _t113 = (!_t112);
+        if (_t113) {
+            return lyric_err(_t111, LyricResult_FuncDeclptr);
         }
-        Block* _t119 = _t115.value;
-        Block* body = _t119;
+        Block* _t114 = _t110.value;
+        Block* body = _t114;
         fn->body = body;
     }
-    Span _t120 = Parser_make_span(self, start);
-    fn->span = _t120;
+    Span _t115 = Parser_make_span(self, start);
+    fn->span = _t115;
     return lyric_ok(fn, LyricResult_FuncDeclptr);
-}
-
-LyricResult_Annotationsptr Parser_parse_annotations(Parser* self) {
-    Annotations* _t0 = _lyric_slab_alloc_Annotations();
-    Annotations* ann = _t0;
-    bool found = false;
-    while (1) {
-        if (!(true)) break;
-        Token* _t1 = Parser_peek(self);
-        TokenKind _t2 = _t1->kind;
-        int32_t _t3 = _t2;
-        switch (_t3) {
-        case 87: {
-            LyricResult_lyric_string _multi_9088 = Parser_parse_why(self);
-            lyric_string _t4_val = _multi_9088.value;
-            const char* _t4_err = _multi_9088.error;
-            const char* _t5 = _t4_err;
-            bool _t6 = (_t5 == NULL);
-            bool _t7 = (!_t6);
-            if (_t7) {
-                return lyric_err(_t5, LyricResult_Annotationsptr);
-            }
-            lyric_string _t8 = _t4_val;
-            lyric_string why = _t8;
-            ann->why = why;
-            found = true;
-            break;
-        }
-        case 93: {
-            Parser_next(self);
-            TokenKind _t10 = TokenKind_PColon;
-            LyricResult_Tokenptr _multi_9089 = Parser_expect(self, _t10);
-            const char* _t11_err = _multi_9089.error;
-            const char* _t12 = _t11_err;
-            bool _t13 = (_t12 == NULL);
-            bool _t14 = (!_t13);
-            if (_t14) {
-                return lyric_err(_t12, LyricResult_Annotationsptr);
-            }
-            Token* _t16 = Parser_next(self);
-            Token* val = _t16;
-            lyric_string _t17 = val->text;
-            bool _t18 = lyric_str_eq(_t17, LYRIC_STR("true"));
-            ann->concurrent = _t18;
-            found = true;
-            break;
-        }
-        case 94: {
-            Parser_next(self);
-            TokenKind _t20 = TokenKind_PLParen;
-            LyricResult_Tokenptr _multi_9090 = Parser_expect(self, _t20);
-            const char* _t21_err = _multi_9090.error;
-            const char* _t22 = _t21_err;
-            bool _t23 = (_t22 == NULL);
-            bool _t24 = (!_t23);
-            if (_t24) {
-                return lyric_err(_t22, LyricResult_Annotationsptr);
-            }
-            TokenKind _t26 = TokenKind_LIdent;
-            LyricResult_Tokenptr _multi_9091 = Parser_expect(self, _t26);
-            Token* _t27_val = _multi_9091.value;
-            const char* _t27_err = _multi_9091.error;
-            const char* _t28 = _t27_err;
-            bool _t29 = (_t28 == NULL);
-            bool _t30 = (!_t29);
-            if (_t30) {
-                return lyric_err(_t28, LyricResult_Annotationsptr);
-            }
-            Token* _t31 = _t27_val;
-            Token* name = _t31;
-            LyricSlice_Symptr _t32 = ann->requires_lock;
-            Token* _t33 = name;
-            lyric_string _t34 = _t33->text;
-            Sym* _t35 = sym(_t34);
-            LyricSlice_Symptr _t36 = ({ lyric_push(&_t32, _t35, LyricSlice_Symptr); _t32; });
-            ann->requires_lock = _t32;
-            ann->requires_lock = _t36;
-            TokenKind _t37 = TokenKind_PRParen;
-            LyricResult_Tokenptr _multi_9092 = Parser_expect(self, _t37);
-            const char* _t38_err = _multi_9092.error;
-            const char* _t39 = _t38_err;
-            bool _t40 = (_t39 == NULL);
-            bool _t41 = (!_t40);
-            if (_t41) {
-                return lyric_err(_t39, LyricResult_Annotationsptr);
-            }
-            found = true;
-            break;
-        }
-        case 95: {
-            Parser_next(self);
-            TokenKind _t44 = TokenKind_PLParen;
-            LyricResult_Tokenptr _multi_9093 = Parser_expect(self, _t44);
-            const char* _t45_err = _multi_9093.error;
-            const char* _t46 = _t45_err;
-            bool _t47 = (_t46 == NULL);
-            bool _t48 = (!_t47);
-            if (_t48) {
-                return lyric_err(_t46, LyricResult_Annotationsptr);
-            }
-            TokenKind _t50 = TokenKind_LIdent;
-            LyricResult_Tokenptr _multi_9094 = Parser_expect(self, _t50);
-            Token* _t51_val = _multi_9094.value;
-            const char* _t51_err = _multi_9094.error;
-            const char* _t52 = _t51_err;
-            bool _t53 = (_t52 == NULL);
-            bool _t54 = (!_t53);
-            if (_t54) {
-                return lyric_err(_t52, LyricResult_Annotationsptr);
-            }
-            Token* _t55 = _t51_val;
-            Token* name = _t55;
-            LyricSlice_Symptr _t56 = ann->excludes_lock;
-            Token* _t57 = name;
-            lyric_string _t58 = _t57->text;
-            Sym* _t59 = sym(_t58);
-            LyricSlice_Symptr _t60 = ({ lyric_push(&_t56, _t59, LyricSlice_Symptr); _t56; });
-            ann->excludes_lock = _t56;
-            ann->excludes_lock = _t60;
-            TokenKind _t61 = TokenKind_PRParen;
-            LyricResult_Tokenptr _multi_9095 = Parser_expect(self, _t61);
-            const char* _t62_err = _multi_9095.error;
-            const char* _t63 = _t62_err;
-            bool _t64 = (_t63 == NULL);
-            bool _t65 = (!_t64);
-            if (_t65) {
-                return lyric_err(_t63, LyricResult_Annotationsptr);
-            }
-            found = true;
-            break;
-        }
-        case 92: {
-            Parser_next(self);
-            TokenKind _t68 = TokenKind_PColon;
-            LyricResult_Tokenptr _multi_9096 = Parser_expect(self, _t68);
-            const char* _t69_err = _multi_9096.error;
-            const char* _t70 = _t69_err;
-            bool _t71 = (_t70 == NULL);
-            bool _t72 = (!_t71);
-            if (_t72) {
-                return lyric_err(_t70, LyricResult_Annotationsptr);
-            }
-            while (1) {
-                if (!(true)) break;
-                TokenKind _t74 = TokenKind_LIdent;
-                LyricResult_Tokenptr _t75 = Parser_expect(self, _t74);
-                const char* _t76 = _t75.error;
-                bool _t77 = (_t76 == NULL);
-                bool _t78 = (!_t77);
-                if (_t78) {
-                    return lyric_err(_t76, LyricResult_Annotationsptr);
-                }
-                Token* _t79 = _t75.value;
-                Token* name = _t79;
-                LyricSlice_Symptr _t80 = ann->raises;
-                Token* _t81 = name;
-                lyric_string _t82 = _t81->text;
-                Sym* _t83 = sym(_t82);
-                LyricSlice_Symptr _t84 = ({ lyric_push(&_t80, _t83, LyricSlice_Symptr); _t80; });
-                ann->raises = _t80;
-                ann->raises = _t84;
-                Token* _t85 = Parser_peek(self);
-                TokenKind _t86 = _t85->kind;
-                TokenKind _t87 = TokenKind_PComma;
-                bool _t88 = (_t86 == _t87);
-                if (_t88) {
-                    Token* _t89 = Parser_next(self);
-                    _t89;
-                } else {
-                    break;
-                }
-            }
-            found = true;
-            break;
-        }
-        case 90: {
-            Parser_next(self);
-            TokenKind _t91 = TokenKind_PColon;
-            LyricResult_Tokenptr _multi_9097 = Parser_expect(self, _t91);
-            const char* _t92_err = _multi_9097.error;
-            const char* _t93 = _t92_err;
-            bool _t94 = (_t93 == NULL);
-            bool _t95 = (!_t94);
-            if (_t95) {
-                return lyric_err(_t93, LyricResult_Annotationsptr);
-            }
-            LyricSlice_lyric_string _t97 = ann->requires;
-            lyric_string _t98 = Parser_parse_expr_text(self);
-            LyricSlice_lyric_string _t99 = ({ lyric_push(&_t97, _t98, LyricSlice_lyric_string); _t97; });
-            ann->requires = _t97;
-            ann->requires = _t99;
-            found = true;
-            break;
-        }
-        case 91: {
-            Parser_next(self);
-            TokenKind _t101 = TokenKind_PColon;
-            LyricResult_Tokenptr _multi_9098 = Parser_expect(self, _t101);
-            const char* _t102_err = _multi_9098.error;
-            const char* _t103 = _t102_err;
-            bool _t104 = (_t103 == NULL);
-            bool _t105 = (!_t104);
-            if (_t105) {
-                return lyric_err(_t103, LyricResult_Annotationsptr);
-            }
-            LyricSlice_lyric_string _t107 = ann->ensures;
-            lyric_string _t108 = Parser_parse_expr_text(self);
-            LyricSlice_lyric_string _t109 = ({ lyric_push(&_t107, _t108, LyricSlice_lyric_string); _t107; });
-            ann->ensures = _t107;
-            ann->ensures = _t109;
-            found = true;
-            break;
-        }
-        case 97: {
-            Parser_next(self);
-            Token* _t111 = Parser_peek(self);
-            TokenKind _t112 = _t111->kind;
-            TokenKind _t113 = TokenKind_PColon;
-            bool _t114 = (_t112 == _t113);
-            if (_t114) {
-                Token* _t115 = Parser_next(self);
-                _t115;
-            }
-            ann->spawns = true;
-            found = true;
-            break;
-        }
-        case 98: {
-            Parser_next(self);
-            Token* _t117 = Parser_peek(self);
-            TokenKind _t118 = _t117->kind;
-            TokenKind _t119 = TokenKind_PColon;
-            bool _t120 = (_t118 == _t119);
-            if (_t120) {
-                Token* _t121 = Parser_next(self);
-                _t121;
-            }
-            ann->pure = true;
-            found = true;
-            break;
-        }
-        default: {
-            if (found) {
-                return lyric_ok(ann, LyricResult_Annotationsptr);
-            } else {
-                return lyric_ok(0, LyricResult_Annotationsptr);
-            }
-            break;
-        }
-        }
-        Parser_skip_newlines(self);
-    }
-    return lyric_ok(0, LyricResult_Annotationsptr);
-}
-
-lyric_string Parser_parse_expr_text(Parser* self) {
-    lyric_string result = LYRIC_STR("");
-    bool first = true;
-    while (1) {
-        Token* _t0 = Parser_peek(self);
-        TokenKind _t1 = _t0->kind;
-        TokenKind _t2 = TokenKind_SNewline;
-        bool _t3 = (_t1 != _t2);
-        bool _sc4 = false;
-        _sc4 = _t3;
-        if (_sc4) {
-            Token* _t5 = Parser_peek(self);
-            TokenKind _t6 = _t5->kind;
-            TokenKind _t7 = TokenKind_SEOF;
-            bool _t8 = (_t6 != _t7);
-            _sc4 = _t8;
-        }
-        if (!(_sc4)) break;
-        Token* _t9 = Parser_next(self);
-        Token* tok = _t9;
-        bool _t10 = (!first);
-        if (_t10) {
-            lyric_string _t11 = lyric_str_concat(result, LYRIC_STR(" "));
-            result = _t11;
-        }
-        lyric_string _t12 = tok->text;
-        lyric_string _t13 = lyric_str_concat(result, _t12);
-        result = _t13;
-        first = false;
-    }
-    return result;
-}
-
-LyricResult_LyricSlice_lyric_string Parser_parse_source(Parser* self) {
-    Parser_next(self);
-    TokenKind _t1 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9099 = Parser_expect(self, _t1);
-    const char* _t2_err = _multi_9099.error;
-    const char* _t3 = _t2_err;
-    bool _t4 = (_t3 == NULL);
-    bool _t5 = (!_t4);
-    if (_t5) {
-        return lyric_err(_t3, LyricResult_LyricSlice_lyric_string);
-    }
-    TokenKind _t7 = TokenKind_PLBracket;
-    LyricResult_Tokenptr _multi_9100 = Parser_expect(self, _t7);
-    const char* _t8_err = _multi_9100.error;
-    const char* _t9 = _t8_err;
-    bool _t10 = (_t9 == NULL);
-    bool _t11 = (!_t10);
-    if (_t11) {
-        return lyric_err(_t9, LyricResult_LyricSlice_lyric_string);
-    }
-    LyricSlice_lyric_string _t13 = lyric_slice_empty(LyricSlice_lyric_string);
-    LyricSlice_lyric_string files = _t13;
-    while (1) {
-        Token* _t14 = Parser_peek(self);
-        TokenKind _t15 = _t14->kind;
-        TokenKind _t16 = TokenKind_PRBracket;
-        bool _t17 = (_t15 != _t16);
-        bool _sc18 = false;
-        _sc18 = _t17;
-        if (_sc18) {
-            Token* _t19 = Parser_peek(self);
-            TokenKind _t20 = _t19->kind;
-            TokenKind _t21 = TokenKind_SEOF;
-            bool _t22 = (_t20 != _t21);
-            _sc18 = _t22;
-        }
-        if (!(_sc18)) break;
-        TokenKind _t23 = TokenKind_LStringLit;
-        LyricResult_Tokenptr _t24 = Parser_expect(self, _t23);
-        const char* _t25 = _t24.error;
-        bool _t26 = (_t25 == NULL);
-        bool _t27 = (!_t26);
-        if (_t27) {
-            return lyric_err(_t25, LyricResult_LyricSlice_lyric_string);
-        }
-        Token* _t28 = _t24.value;
-        Token* f = _t28;
-        Token* _t29 = f;
-        lyric_string _t30 = _t29->text;
-        LyricSlice_lyric_string _t31 = ({ lyric_push(&files, _t30, LyricSlice_lyric_string); files; });
-        files = _t31;
-        Token* _t32 = Parser_peek(self);
-        TokenKind _t33 = _t32->kind;
-        TokenKind _t34 = TokenKind_PComma;
-        bool _t35 = (_t33 == _t34);
-        if (_t35) {
-            Token* _t36 = Parser_next(self);
-            _t36;
-        }
-    }
-    TokenKind _t37 = TokenKind_PRBracket;
-    LyricResult_Tokenptr _multi_9101 = Parser_expect(self, _t37);
-    const char* _t38_err = _multi_9101.error;
-    const char* _t39 = _t38_err;
-    bool _t40 = (_t39 == NULL);
-    bool _t41 = (!_t40);
-    if (_t41) {
-        return lyric_err(_t39, LyricResult_LyricSlice_lyric_string);
-    }
-    return lyric_ok(files, LyricResult_LyricSlice_lyric_string);
-    if (files.cap > 0 && files.data) free(files.data);
-}
-
-LyricResult_lyric_string Parser_parse_fake(Parser* self) {
-    Parser_next(self);
-    TokenKind _t1 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9102 = Parser_expect(self, _t1);
-    const char* _t2_err = _multi_9102.error;
-    const char* _t3 = _t2_err;
-    bool _t4 = (_t3 == NULL);
-    bool _t5 = (!_t4);
-    if (_t5) {
-        return lyric_err(_t3, LyricResult_lyric_string);
-    }
-    TokenKind _t7 = TokenKind_LStringLit;
-    LyricResult_Tokenptr _multi_9103 = Parser_expect(self, _t7);
-    Token* _t8_val = _multi_9103.value;
-    const char* _t8_err = _multi_9103.error;
-    const char* _t9 = _t8_err;
-    bool _t10 = (_t9 == NULL);
-    bool _t11 = (!_t10);
-    if (_t11) {
-        return lyric_err(_t9, LyricResult_lyric_string);
-    }
-    Token* _t12 = _t8_val;
-    Token* tok = _t12;
-    Token* _t13 = tok;
-    lyric_string _t14 = _t13->text;
-    return lyric_ok(_t14, LyricResult_lyric_string);
 }
 
 LyricResult_ConstDeclptr Parser_parse_const_decl(Parser* self) {
@@ -25181,9 +23916,9 @@ LyricResult_ConstDeclptr Parser_parse_const_decl(Parser* self) {
         _t8;
         is_mut = true;
     }
-    LyricResult_Tokenptr _multi_9104 = Parser_expect_ident(self);
-    Token* _t9_val = _multi_9104.value;
-    const char* _t9_err = _multi_9104.error;
+    LyricResult_Tokenptr _multi_9074 = Parser_expect_ident(self);
+    Token* _t9_val = _multi_9074.value;
+    const char* _t9_err = _multi_9074.error;
     const char* _t10 = _t9_err;
     bool _t11 = (_t10 == NULL);
     bool _t12 = (!_t11);
@@ -25220,17 +23955,17 @@ LyricResult_ConstDeclptr Parser_parse_const_decl(Parser* self) {
         decl->type_expr = typ;
     }
     TokenKind _t29 = TokenKind_OAssign;
-    LyricResult_Tokenptr _multi_9105 = Parser_expect(self, _t29);
-    const char* _t30_err = _multi_9105.error;
+    LyricResult_Tokenptr _multi_9075 = Parser_expect(self, _t29);
+    const char* _t30_err = _multi_9075.error;
     const char* _t31 = _t30_err;
     bool _t32 = (_t31 == NULL);
     bool _t33 = (!_t32);
     if (_t33) {
         return lyric_err(_t31, LyricResult_ConstDeclptr);
     }
-    LyricResult_Exprptr _multi_9106 = Parser_parse_expr(self);
-    Expr* _t35_val = _multi_9106.value;
-    const char* _t35_err = _multi_9106.error;
+    LyricResult_Exprptr _multi_9076 = Parser_parse_expr(self);
+    Expr* _t35_val = _multi_9076.value;
+    const char* _t35_err = _multi_9076.error;
     const char* _t36 = _t35_err;
     bool _t37 = (_t36 == NULL);
     bool _t38 = (!_t37);
@@ -25251,9 +23986,9 @@ LyricResult_WhereClauseptr Parser_parse_where_clause(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     TokenKind _t3 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9107 = Parser_expect(self, _t3);
-    Token* _t4_val = _multi_9107.value;
-    const char* _t4_err = _multi_9107.error;
+    LyricResult_Tokenptr _multi_9077 = Parser_expect(self, _t3);
+    Token* _t4_val = _multi_9077.value;
+    const char* _t4_err = _multi_9077.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -25327,8 +24062,8 @@ LyricResult_WhereClauseptr Parser_parse_where_clause(Parser* self) {
         return lyric_ok(wc, LyricResult_WhereClauseptr);
     }
     TokenKind _t47 = TokenKind_PColon;
-    LyricResult_Tokenptr _multi_9108 = Parser_expect(self, _t47);
-    const char* _t48_err = _multi_9108.error;
+    LyricResult_Tokenptr _multi_9078 = Parser_expect(self, _t47);
+    const char* _t48_err = _multi_9078.error;
     const char* _t49 = _t48_err;
     bool _t50 = (_t49 == NULL);
     bool _t51 = (!_t50);
@@ -25336,9 +24071,9 @@ LyricResult_WhereClauseptr Parser_parse_where_clause(Parser* self) {
         return lyric_err(_t49, LyricResult_WhereClauseptr);
     }
     TokenKind _t53 = TokenKind_LIdent;
-    LyricResult_Tokenptr _multi_9109 = Parser_expect(self, _t53);
-    Token* _t54_val = _multi_9109.value;
-    const char* _t54_err = _multi_9109.error;
+    LyricResult_Tokenptr _multi_9079 = Parser_expect(self, _t53);
+    Token* _t54_val = _multi_9079.value;
+    const char* _t54_err = _multi_9079.error;
     const char* _t55 = _t54_err;
     bool _t56 = (_t55 == NULL);
     bool _t57 = (!_t56);
@@ -25597,9 +24332,9 @@ LyricResult_TypeExprptr Parser_parse_type_expr(Parser* self) {
     Span _t1 = _t0->span;
     Pos _t2 = _t1.start;
     Pos start = _t2;
-    LyricResult_TypeExprptr _multi_9110 = Parser_parse_base_type(self);
-    TypeExpr* _t3_val = _multi_9110.value;
-    const char* _t3_err = _multi_9110.error;
+    LyricResult_TypeExprptr _multi_9080 = Parser_parse_base_type(self);
+    TypeExpr* _t3_val = _multi_9080.value;
+    const char* _t3_err = _multi_9080.error;
     const char* _t4 = _t3_err;
     bool _t5 = (_t4 == NULL);
     bool _t6 = (!_t5);
@@ -25658,9 +24393,9 @@ LyricResult_TypeExprptr Parser_parse_type_expr(Parser* self) {
     }
     case 59: {
         Parser_next(self);
-        LyricResult_TypeExprptr _multi_9111 = Parser_parse_type_expr(self);
-        TypeExpr* _t34_val = _multi_9111.value;
-        const char* _t34_err = _multi_9111.error;
+        LyricResult_TypeExprptr _multi_9081 = Parser_parse_type_expr(self);
+        TypeExpr* _t34_val = _multi_9081.value;
+        const char* _t34_err = _multi_9081.error;
         const char* _t35 = _t34_err;
         bool _t36 = (_t35 == NULL);
         bool _t37 = (!_t36);
@@ -25722,8 +24457,8 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
     case 1: {
         Parser_next(self);
         TokenKind _t7 = TokenKind_PLParen;
-        LyricResult_Tokenptr _multi_9112 = Parser_expect(self, _t7);
-        const char* _t8_err = _multi_9112.error;
+        LyricResult_Tokenptr _multi_9082 = Parser_expect(self, _t7);
+        const char* _t8_err = _multi_9082.error;
         const char* _t9 = _t8_err;
         bool _t10 = (_t9 == NULL);
         bool _t11 = (!_t10);
@@ -25771,8 +24506,8 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
             Parser_skip_newlines(self);
         }
         TokenKind _t37 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9113 = Parser_expect(self, _t37);
-        const char* _t38_err = _multi_9113.error;
+        LyricResult_Tokenptr _multi_9083 = Parser_expect(self, _t37);
+        const char* _t38_err = _multi_9083.error;
         const char* _t39 = _t38_err;
         bool _t40 = (_t39 == NULL);
         bool _t41 = (!_t40);
@@ -25780,17 +24515,17 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
             return lyric_err(_t39, LyricResult_TypeExprptr);
         }
         TokenKind _t43 = TokenKind_PArrow;
-        LyricResult_Tokenptr _multi_9114 = Parser_expect(self, _t43);
-        const char* _t44_err = _multi_9114.error;
+        LyricResult_Tokenptr _multi_9084 = Parser_expect(self, _t43);
+        const char* _t44_err = _multi_9084.error;
         const char* _t45 = _t44_err;
         bool _t46 = (_t45 == NULL);
         bool _t47 = (!_t46);
         if (_t47) {
             return lyric_err(_t45, LyricResult_TypeExprptr);
         }
-        LyricResult_TypeExprptr _multi_9115 = Parser_parse_type_expr(self);
-        TypeExpr* _t49_val = _multi_9115.value;
-        const char* _t49_err = _multi_9115.error;
+        LyricResult_TypeExprptr _multi_9085 = Parser_parse_type_expr(self);
+        TypeExpr* _t49_val = _multi_9085.value;
+        const char* _t49_err = _multi_9085.error;
         const char* _t50 = _t49_err;
         bool _t51 = (_t50 == NULL);
         bool _t52 = (!_t51);
@@ -25810,9 +24545,9 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
     }
     case 54: {
         Parser_next(self);
-        LyricResult_TypeExprptr _multi_9116 = Parser_parse_type_expr(self);
-        TypeExpr* _t59_val = _multi_9116.value;
-        const char* _t59_err = _multi_9116.error;
+        LyricResult_TypeExprptr _multi_9086 = Parser_parse_type_expr(self);
+        TypeExpr* _t59_val = _multi_9086.value;
+        const char* _t59_err = _multi_9086.error;
         const char* _t60 = _t59_err;
         bool _t61 = (_t60 == NULL);
         bool _t62 = (!_t61);
@@ -25822,8 +24557,8 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
         TypeExpr* _t63 = _t59_val;
         TypeExpr* elem = _t63;
         TokenKind _t64 = TokenKind_PRBracket;
-        LyricResult_Tokenptr _multi_9117 = Parser_expect(self, _t64);
-        const char* _t65_err = _multi_9117.error;
+        LyricResult_Tokenptr _multi_9087 = Parser_expect(self, _t64);
+        const char* _t65_err = _multi_9087.error;
         const char* _t66 = _t65_err;
         bool _t67 = (_t66 == NULL);
         bool _t68 = (!_t67);
@@ -25882,8 +24617,8 @@ LyricResult_TypeExprptr Parser_parse_base_type(Parser* self) {
             Parser_skip_newlines(self);
         }
         TokenKind _t99 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9118 = Parser_expect(self, _t99);
-        const char* _t100_err = _multi_9118.error;
+        LyricResult_Tokenptr _multi_9088 = Parser_expect(self, _t99);
+        const char* _t100_err = _multi_9088.error;
         const char* _t101 = _t100_err;
         bool _t102 = (_t101 == NULL);
         bool _t103 = (!_t102);
@@ -26404,9 +25139,9 @@ LyricResult_Exprptr Parser_parse_expr_no_struct_lit(Parser* self) {
 }
 
 LyricResult_Exprptr Parser_parse_prec_expr(Parser* self, int32_t min_prec) {
-    LyricResult_Exprptr _multi_9119 = Parser_parse_unary_expr(self);
-    Expr* _t0_val = _multi_9119.value;
-    const char* _t0_err = _multi_9119.error;
+    LyricResult_Exprptr _multi_9089 = Parser_parse_unary_expr(self);
+    Expr* _t0_val = _multi_9089.value;
+    const char* _t0_err = _multi_9089.error;
     const char* _t1 = _t0_err;
     bool _t2 = (_t1 == NULL);
     bool _t3 = (!_t2);
@@ -26465,9 +25200,9 @@ LyricResult_Exprptr Parser_parse_unary_expr(Parser* self) {
     switch (_t2) {
     case 78: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9120 = Parser_parse_unary_expr(self);
-        Expr* _t4_val = _multi_9120.value;
-        const char* _t4_err = _multi_9120.error;
+        LyricResult_Exprptr _multi_9090 = Parser_parse_unary_expr(self);
+        Expr* _t4_val = _multi_9090.value;
+        const char* _t4_err = _multi_9090.error;
         const char* _t5 = _t4_err;
         bool _t6 = (_t5 == NULL);
         bool _t7 = (!_t6);
@@ -26493,9 +25228,9 @@ LyricResult_Exprptr Parser_parse_unary_expr(Parser* self) {
     }
     case 68: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9121 = Parser_parse_unary_expr(self);
-        Expr* _t20_val = _multi_9121.value;
-        const char* _t20_err = _multi_9121.error;
+        LyricResult_Exprptr _multi_9091 = Parser_parse_unary_expr(self);
+        Expr* _t20_val = _multi_9091.value;
+        const char* _t20_err = _multi_9091.error;
         const char* _t21 = _t20_err;
         bool _t22 = (_t21 == NULL);
         bool _t23 = (!_t22);
@@ -26528,9 +25263,9 @@ LyricResult_Exprptr Parser_parse_unary_expr(Parser* self) {
 }
 
 LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
-    LyricResult_Exprptr _multi_9122 = Parser_parse_primary_expr(self);
-    Expr* _t0_val = _multi_9122.value;
-    const char* _t0_err = _multi_9122.error;
+    LyricResult_Exprptr _multi_9092 = Parser_parse_primary_expr(self);
+    Expr* _t0_val = _multi_9092.value;
+    const char* _t0_err = _multi_9092.error;
     const char* _t1 = _t0_err;
     bool _t2 = (_t1 == NULL);
     bool _t3 = (!_t2);
@@ -26547,9 +25282,9 @@ LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
         switch (_t7) {
         case 58: {
             Parser_next(self);
-            LyricResult_Tokenptr _multi_9123 = Parser_expect_ident(self);
-            Token* _t9_val = _multi_9123.value;
-            const char* _t9_err = _multi_9123.error;
+            LyricResult_Tokenptr _multi_9093 = Parser_expect_ident(self);
+            Token* _t9_val = _multi_9093.value;
+            const char* _t9_err = _multi_9093.error;
             const char* _t10 = _t9_err;
             bool _t11 = (_t10 == NULL);
             bool _t12 = (!_t11);
@@ -26564,9 +25299,9 @@ LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
             switch (_t16) {
             case 50: {
                 Parser_next(self);
-                LyricResult_LyricOpt_ArgListResult _multi_9124 = Parser_parse_arg_list(self);
-                LyricOpt_ArgListResult _t18_val = _multi_9124.value;
-                const char* _t18_err = _multi_9124.error;
+                LyricResult_LyricOpt_ArgListResult _multi_9094 = Parser_parse_arg_list(self);
+                LyricOpt_ArgListResult _t18_val = _multi_9094.value;
+                const char* _t18_err = _multi_9094.error;
                 const char* _t19 = _t18_err;
                 bool _t20 = (_t19 == NULL);
                 bool _t21 = (!_t20);
@@ -26890,9 +25625,9 @@ LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
         }
         case 50: {
             Parser_next(self);
-            LyricResult_LyricOpt_ArgListResult _multi_9125 = Parser_parse_arg_list(self);
-            LyricOpt_ArgListResult _t210_val = _multi_9125.value;
-            const char* _t210_err = _multi_9125.error;
+            LyricResult_LyricOpt_ArgListResult _multi_9095 = Parser_parse_arg_list(self);
+            LyricOpt_ArgListResult _t210_val = _multi_9095.value;
+            const char* _t210_err = _multi_9095.error;
             const char* _t211 = _t210_err;
             bool _t212 = (_t211 == NULL);
             bool _t213 = (!_t212);
@@ -27089,9 +25824,9 @@ LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
         }
         case 14: {
             Parser_next(self);
-            LyricResult_Tokenptr _multi_9126 = Parser_expect_ident(self);
-            Token* _t333_val = _multi_9126.value;
-            const char* _t333_err = _multi_9126.error;
+            LyricResult_Tokenptr _multi_9096 = Parser_expect_ident(self);
+            Token* _t333_val = _multi_9096.value;
+            const char* _t333_err = _multi_9096.error;
             const char* _t334 = _t333_err;
             bool _t335 = (_t334 == NULL);
             bool _t336 = (!_t335);
@@ -27120,9 +25855,9 @@ LyricResult_Exprptr Parser_parse_postfix_expr(Parser* self) {
         }
         case 13: {
             Parser_next(self);
-            LyricResult_TypeExprptr _multi_9127 = Parser_parse_type_expr(self);
-            TypeExpr* _t352_val = _multi_9127.value;
-            const char* _t352_err = _multi_9127.error;
+            LyricResult_TypeExprptr _multi_9097 = Parser_parse_type_expr(self);
+            TypeExpr* _t352_val = _multi_9097.value;
+            const char* _t352_err = _multi_9097.error;
             const char* _t353 = _t352_err;
             bool _t354 = (_t353 == NULL);
             bool _t355 = (!_t354);
@@ -27217,9 +25952,9 @@ LyricResult_LyricOpt_ArgListResult Parser_parse_arg_list(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t33 = TokenKind_PRParen;
-    LyricResult_Tokenptr _multi_9128 = Parser_expect(self, _t33);
-    Token* _t34_val = _multi_9128.value;
-    const char* _t34_err = _multi_9128.error;
+    LyricResult_Tokenptr _multi_9098 = Parser_expect(self, _t33);
+    Token* _t34_val = _multi_9098.value;
+    const char* _t34_err = _multi_9098.error;
     const char* _t35 = _t34_err;
     bool _t36 = (_t35 == NULL);
     bool _t37 = (!_t36);
@@ -27480,9 +26215,9 @@ LyricResult_Exprptr Parser_parse_primary_expr(Parser* self) {
             _t118->span = _t117;
             return lyric_ok(_t118, LyricResult_Exprptr);
         }
-        LyricResult_Exprptr _multi_9129 = Parser_parse_expr(self);
-        Expr* _t119_val = _multi_9129.value;
-        const char* _t119_err = _multi_9129.error;
+        LyricResult_Exprptr _multi_9099 = Parser_parse_expr(self);
+        Expr* _t119_val = _multi_9099.value;
+        const char* _t119_err = _multi_9099.error;
         const char* _t120 = _t119_err;
         bool _t121 = (_t120 == NULL);
         bool _t122 = (!_t121);
@@ -27553,8 +26288,8 @@ LyricResult_Exprptr Parser_parse_primary_expr(Parser* self) {
             return lyric_ok(_t161, LyricResult_Exprptr);
         }
         TokenKind _t162 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9130 = Parser_expect(self, _t162);
-        const char* _t163_err = _multi_9130.error;
+        LyricResult_Tokenptr _multi_9100 = Parser_expect(self, _t162);
+        const char* _t163_err = _multi_9100.error;
         const char* _t164 = _t163_err;
         bool _t165 = (_t164 == NULL);
         bool _t166 = (!_t165);
@@ -27613,9 +26348,9 @@ LyricResult_Exprptr Parser_parse_primary_expr(Parser* self) {
             Parser_skip_newlines(self);
         }
         TokenKind _t197 = TokenKind_PRBracket;
-        LyricResult_Tokenptr _multi_9131 = Parser_expect(self, _t197);
-        Token* _t198_val = _multi_9131.value;
-        const char* _t198_err = _multi_9131.error;
+        LyricResult_Tokenptr _multi_9101 = Parser_expect(self, _t197);
+        Token* _t198_val = _multi_9101.value;
+        const char* _t198_err = _multi_9101.error;
         const char* _t199 = _t198_err;
         bool _t200 = (_t199 == NULL);
         bool _t201 = (!_t200);
@@ -27723,8 +26458,8 @@ LyricResult_Exprptr Parser_parse_map_lit(Parser* self, Token* lbrace) {
         _t24;
     }
     TokenKind _t25 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9132 = Parser_expect(self, _t25);
-    const char* _t26_err = _multi_9132.error;
+    LyricResult_Tokenptr _multi_9102 = Parser_expect(self, _t25);
+    const char* _t26_err = _multi_9102.error;
     const char* _t27 = _t26_err;
     bool _t28 = (_t27 == NULL);
     bool _t29 = (!_t28);
@@ -27796,9 +26531,9 @@ LyricResult_Exprptr Parser_parse_map_lit(Parser* self, Token* lbrace) {
         Parser_skip_newlines(self);
     }
     TokenKind _t69 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9133 = Parser_expect(self, _t69);
-    Token* _t70_val = _multi_9133.value;
-    const char* _t70_err = _multi_9133.error;
+    LyricResult_Tokenptr _multi_9103 = Parser_expect(self, _t69);
+    Token* _t70_val = _multi_9103.value;
+    const char* _t70_err = _multi_9103.error;
     const char* _t71 = _t70_err;
     bool _t72 = (_t71 == NULL);
     bool _t73 = (!_t72);
@@ -27826,9 +26561,9 @@ LyricResult_Exprptr Parser_parse_match_expr(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Exprptr _multi_9134 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t4_val = _multi_9134.value;
-    const char* _t4_err = _multi_9134.error;
+    LyricResult_Exprptr _multi_9104 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t4_val = _multi_9104.value;
+    const char* _t4_err = _multi_9104.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -27838,8 +26573,8 @@ LyricResult_Exprptr Parser_parse_match_expr(Parser* self) {
     Expr* _t8 = _t4_val;
     Expr* value = _t8;
     TokenKind _t9 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9135 = Parser_expect(self, _t9);
-    const char* _t10_err = _multi_9135.error;
+    LyricResult_Tokenptr _multi_9105 = Parser_expect(self, _t9);
+    const char* _t10_err = _multi_9105.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
@@ -27847,9 +26582,9 @@ LyricResult_Exprptr Parser_parse_match_expr(Parser* self) {
         return lyric_err(_t11, LyricResult_Exprptr);
     }
     Parser_skip_newlines(self);
-    LyricResult_LyricSlice_MatchArmptr _multi_9136 = Parser_parse_match_arms(self);
-    LyricSlice_MatchArmptr _t16_val = _multi_9136.value;
-    const char* _t16_err = _multi_9136.error;
+    LyricResult_LyricSlice_MatchArmptr _multi_9106 = Parser_parse_match_arms(self);
+    LyricSlice_MatchArmptr _t16_val = _multi_9106.value;
+    const char* _t16_err = _multi_9106.error;
     const char* _t17 = _t16_err;
     bool _t18 = (_t17 == NULL);
     bool _t19 = (!_t18);
@@ -27877,9 +26612,9 @@ LyricResult_Exprptr Parser_parse_if_expr(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Exprptr _multi_9137 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t4_val = _multi_9137.value;
-    const char* _t4_err = _multi_9137.error;
+    LyricResult_Exprptr _multi_9107 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t4_val = _multi_9107.value;
+    const char* _t4_err = _multi_9107.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -27888,9 +26623,9 @@ LyricResult_Exprptr Parser_parse_if_expr(Parser* self) {
     }
     Expr* _t8 = _t4_val;
     Expr* cond = _t8;
-    LyricResult_Blockptr _multi_9138 = Parser_parse_block(self);
-    Block* _t9_val = _multi_9138.value;
-    const char* _t9_err = _multi_9138.error;
+    LyricResult_Blockptr _multi_9108 = Parser_parse_block(self);
+    Block* _t9_val = _multi_9108.value;
+    const char* _t9_err = _multi_9108.error;
     const char* _t10 = _t9_err;
     bool _t11 = (_t10 == NULL);
     bool _t12 = (!_t11);
@@ -28064,8 +26799,8 @@ LyricResult_Exprptr Parser_parse_lambda_expr(Parser* self) {
         }
     }
     TokenKind _t52 = TokenKind_PPipe;
-    LyricResult_Tokenptr _multi_9139 = Parser_expect(self, _t52);
-    const char* _t53_err = _multi_9139.error;
+    LyricResult_Tokenptr _multi_9109 = Parser_expect(self, _t52);
+    const char* _t53_err = _multi_9109.error;
     const char* _t54 = _t53_err;
     bool _t55 = (_t54 == NULL);
     bool _t56 = (!_t55);
@@ -28090,9 +26825,9 @@ LyricResult_Exprptr Parser_parse_lambda_expr(Parser* self) {
         TypeExpr* _t67 = _t63.value;
         ret_type = _t67;
     }
-    LyricResult_Blockptr _multi_9140 = Parser_parse_block(self);
-    Block* _t68_val = _multi_9140.value;
-    const char* _t68_err = _multi_9140.error;
+    LyricResult_Blockptr _multi_9110 = Parser_parse_block(self);
+    Block* _t68_val = _multi_9110.value;
+    const char* _t68_err = _multi_9110.error;
     const char* _t69 = _t68_err;
     bool _t70 = (_t69 == NULL);
     bool _t71 = (!_t70);
@@ -28253,8 +26988,8 @@ LyricResult_Exprptr Parser_parse_paren_lambda(Parser* self, Pos start) {
         Parser_skip_newlines(self);
     }
     TokenKind _t25 = TokenKind_PRParen;
-    LyricResult_Tokenptr _multi_9141 = Parser_expect(self, _t25);
-    const char* _t26_err = _multi_9141.error;
+    LyricResult_Tokenptr _multi_9111 = Parser_expect(self, _t25);
+    const char* _t26_err = _multi_9111.error;
     const char* _t27 = _t26_err;
     bool _t28 = (_t27 == NULL);
     bool _t29 = (!_t28);
@@ -28279,9 +27014,9 @@ LyricResult_Exprptr Parser_parse_paren_lambda(Parser* self, Pos start) {
         TypeExpr* _t40 = _t36.value;
         ret_type = _t40;
     }
-    LyricResult_Blockptr _multi_9142 = Parser_parse_block(self);
-    Block* _t41_val = _multi_9142.value;
-    const char* _t41_err = _multi_9142.error;
+    LyricResult_Blockptr _multi_9112 = Parser_parse_block(self);
+    Block* _t41_val = _multi_9112.value;
+    const char* _t41_err = _multi_9112.error;
     const char* _t42 = _t41_err;
     bool _t43 = (_t42 == NULL);
     bool _t44 = (!_t43);
@@ -28308,8 +27043,8 @@ LyricResult_Blockptr Parser_parse_block(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     TokenKind _t3 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9143 = Parser_expect(self, _t3);
-    const char* _t4_err = _multi_9143.error;
+    LyricResult_Tokenptr _multi_9113 = Parser_expect(self, _t3);
+    const char* _t4_err = _multi_9113.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -28350,9 +27085,9 @@ LyricResult_Blockptr Parser_parse_block(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t29 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9144 = Parser_expect(self, _t29);
-    Token* _t30_val = _multi_9144.value;
-    const char* _t30_err = _multi_9144.error;
+    LyricResult_Tokenptr _multi_9114 = Parser_expect(self, _t29);
+    Token* _t30_val = _multi_9114.value;
+    const char* _t30_err = _multi_9114.error;
     const char* _t31 = _t30_err;
     bool _t32 = (_t31 == NULL);
     bool _t33 = (!_t32);
@@ -28451,9 +27186,9 @@ LyricResult_Stmtptr Parser_parse_stmt(Parser* self) {
         break;
     }
     case 52: {
-        LyricResult_Blockptr _multi_9145 = Parser_parse_block(self);
-        Block* _t22_val = _multi_9145.value;
-        const char* _t22_err = _multi_9145.error;
+        LyricResult_Blockptr _multi_9115 = Parser_parse_block(self);
+        Block* _t22_val = _multi_9115.value;
+        const char* _t22_err = _multi_9115.error;
         const char* _t23 = _t22_err;
         bool _t24 = (_t23 == NULL);
         bool _t25 = (!_t24);
@@ -28595,9 +27330,9 @@ LyricResult_Stmtptr Parser_parse_var_decl(Parser* self) {
         _t54->span = _t53;
         return lyric_ok(_t54, LyricResult_Stmtptr);
     }
-    LyricResult_Tokenptr _multi_9146 = Parser_expect_ident(self);
-    Token* _t55_val = _multi_9146.value;
-    const char* _t55_err = _multi_9146.error;
+    LyricResult_Tokenptr _multi_9116 = Parser_expect_ident(self);
+    Token* _t55_val = _multi_9116.value;
+    const char* _t55_err = _multi_9116.error;
     const char* _t56 = _t55_err;
     bool _t57 = (_t56 == NULL);
     bool _t58 = (!_t57);
@@ -28707,9 +27442,9 @@ bool Parser_is_pattern_let_ahead(Parser* self) {
 }
 
 LyricResult_Stmtptr Parser_parse_let_else(Parser* self, Pos start, bool is_mut) {
-    LyricResult_Patternptr _multi_9147 = Parser_parse_pattern(self);
-    Pattern* _t0_val = _multi_9147.value;
-    const char* _t0_err = _multi_9147.error;
+    LyricResult_Patternptr _multi_9117 = Parser_parse_pattern(self);
+    Pattern* _t0_val = _multi_9117.value;
+    const char* _t0_err = _multi_9117.error;
     const char* _t1 = _t0_err;
     bool _t2 = (_t1 == NULL);
     bool _t3 = (!_t2);
@@ -28719,17 +27454,17 @@ LyricResult_Stmtptr Parser_parse_let_else(Parser* self, Pos start, bool is_mut) 
     Pattern* _t4 = _t0_val;
     Pattern* pat = _t4;
     TokenKind _t5 = TokenKind_OAssign;
-    LyricResult_Tokenptr _multi_9148 = Parser_expect(self, _t5);
-    const char* _t6_err = _multi_9148.error;
+    LyricResult_Tokenptr _multi_9118 = Parser_expect(self, _t5);
+    const char* _t6_err = _multi_9118.error;
     const char* _t7 = _t6_err;
     bool _t8 = (_t7 == NULL);
     bool _t9 = (!_t8);
     if (_t9) {
         return lyric_err(_t7, LyricResult_Stmtptr);
     }
-    LyricResult_Exprptr _multi_9149 = Parser_parse_expr(self);
-    Expr* _t11_val = _multi_9149.value;
-    const char* _t11_err = _multi_9149.error;
+    LyricResult_Exprptr _multi_9119 = Parser_parse_expr(self);
+    Expr* _t11_val = _multi_9119.value;
+    const char* _t11_err = _multi_9119.error;
     const char* _t12 = _t11_err;
     bool _t13 = (_t12 == NULL);
     bool _t14 = (!_t13);
@@ -28739,17 +27474,17 @@ LyricResult_Stmtptr Parser_parse_let_else(Parser* self, Pos start, bool is_mut) 
     Expr* _t15 = _t11_val;
     Expr* val = _t15;
     TokenKind _t16 = TokenKind_KElse;
-    LyricResult_Tokenptr _multi_9150 = Parser_expect(self, _t16);
-    const char* _t17_err = _multi_9150.error;
+    LyricResult_Tokenptr _multi_9120 = Parser_expect(self, _t16);
+    const char* _t17_err = _multi_9120.error;
     const char* _t18 = _t17_err;
     bool _t19 = (_t18 == NULL);
     bool _t20 = (!_t19);
     if (_t20) {
         return lyric_err(_t18, LyricResult_Stmtptr);
     }
-    LyricResult_Blockptr _multi_9151 = Parser_parse_block(self);
-    Block* _t22_val = _multi_9151.value;
-    const char* _t22_err = _multi_9151.error;
+    LyricResult_Blockptr _multi_9121 = Parser_parse_block(self);
+    Block* _t22_val = _multi_9121.value;
+    const char* _t22_err = _multi_9121.error;
     const char* _t23 = _t22_err;
     bool _t24 = (_t23 == NULL);
     bool _t25 = (!_t24);
@@ -28829,9 +27564,9 @@ LyricResult_Stmtptr Parser_parse_yield(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Exprptr _multi_9152 = Parser_parse_expr(self);
-    Expr* _t4_val = _multi_9152.value;
-    const char* _t4_err = _multi_9152.error;
+    LyricResult_Exprptr _multi_9122 = Parser_parse_expr(self);
+    Expr* _t4_val = _multi_9122.value;
+    const char* _t4_err = _multi_9122.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -28865,9 +27600,9 @@ LyricResult_Stmtptr Parser_parse_if(Parser* self) {
         LyricResult_Stmtptr _t8 = Parser_parse_if_let(self, start);
         return _t8;
     }
-    LyricResult_Exprptr _multi_9153 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t9_val = _multi_9153.value;
-    const char* _t9_err = _multi_9153.error;
+    LyricResult_Exprptr _multi_9123 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t9_val = _multi_9123.value;
+    const char* _t9_err = _multi_9123.error;
     const char* _t10 = _t9_err;
     bool _t11 = (_t10 == NULL);
     bool _t12 = (!_t11);
@@ -28876,9 +27611,9 @@ LyricResult_Stmtptr Parser_parse_if(Parser* self) {
     }
     Expr* _t13 = _t9_val;
     Expr* cond = _t13;
-    LyricResult_Blockptr _multi_9154 = Parser_parse_block(self);
-    Block* _t14_val = _multi_9154.value;
-    const char* _t14_err = _multi_9154.error;
+    LyricResult_Blockptr _multi_9124 = Parser_parse_block(self);
+    Block* _t14_val = _multi_9124.value;
+    const char* _t14_err = _multi_9124.error;
     const char* _t15 = _t14_err;
     bool _t16 = (_t15 == NULL);
     bool _t17 = (!_t16);
@@ -28959,9 +27694,9 @@ LyricResult_Stmtptr Parser_parse_if(Parser* self) {
 
 LyricResult_Stmtptr Parser_parse_if_let(Parser* self, Pos start) {
     Parser_next(self);
-    LyricResult_Patternptr _multi_9155 = Parser_parse_pattern(self);
-    Pattern* _t1_val = _multi_9155.value;
-    const char* _t1_err = _multi_9155.error;
+    LyricResult_Patternptr _multi_9125 = Parser_parse_pattern(self);
+    Pattern* _t1_val = _multi_9125.value;
+    const char* _t1_err = _multi_9125.error;
     const char* _t2 = _t1_err;
     bool _t3 = (_t2 == NULL);
     bool _t4 = (!_t3);
@@ -28971,17 +27706,17 @@ LyricResult_Stmtptr Parser_parse_if_let(Parser* self, Pos start) {
     Pattern* _t5 = _t1_val;
     Pattern* pat = _t5;
     TokenKind _t6 = TokenKind_OAssign;
-    LyricResult_Tokenptr _multi_9156 = Parser_expect(self, _t6);
-    const char* _t7_err = _multi_9156.error;
+    LyricResult_Tokenptr _multi_9126 = Parser_expect(self, _t6);
+    const char* _t7_err = _multi_9126.error;
     const char* _t8 = _t7_err;
     bool _t9 = (_t8 == NULL);
     bool _t10 = (!_t9);
     if (_t10) {
         return lyric_err(_t8, LyricResult_Stmtptr);
     }
-    LyricResult_Exprptr _multi_9157 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t12_val = _multi_9157.value;
-    const char* _t12_err = _multi_9157.error;
+    LyricResult_Exprptr _multi_9127 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t12_val = _multi_9127.value;
+    const char* _t12_err = _multi_9127.error;
     const char* _t13 = _t12_err;
     bool _t14 = (_t13 == NULL);
     bool _t15 = (!_t14);
@@ -28990,9 +27725,9 @@ LyricResult_Stmtptr Parser_parse_if_let(Parser* self, Pos start) {
     }
     Expr* _t16 = _t12_val;
     Expr* value = _t16;
-    LyricResult_Blockptr _multi_9158 = Parser_parse_block(self);
-    Block* _t17_val = _multi_9158.value;
-    const char* _t17_err = _multi_9158.error;
+    LyricResult_Blockptr _multi_9128 = Parser_parse_block(self);
+    Block* _t17_val = _multi_9128.value;
+    const char* _t17_err = _multi_9128.error;
     const char* _t18 = _t17_err;
     bool _t19 = (_t18 == NULL);
     bool _t20 = (!_t19);
@@ -29039,9 +27774,9 @@ LyricResult_Stmtptr Parser_parse_for(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Tokenptr _multi_9159 = Parser_expect_ident(self);
-    Token* _t4_val = _multi_9159.value;
-    const char* _t4_err = _multi_9159.error;
+    LyricResult_Tokenptr _multi_9129 = Parser_expect_ident(self);
+    Token* _t4_val = _multi_9129.value;
+    const char* _t4_err = _multi_9129.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -29115,17 +27850,17 @@ LyricResult_Stmtptr Parser_parse_for(Parser* self) {
         return lyric_ok(_t48, LyricResult_Stmtptr);
     }
     TokenKind _t49 = TokenKind_KIn;
-    LyricResult_Tokenptr _multi_9160 = Parser_expect(self, _t49);
-    const char* _t50_err = _multi_9160.error;
+    LyricResult_Tokenptr _multi_9130 = Parser_expect(self, _t49);
+    const char* _t50_err = _multi_9130.error;
     const char* _t51 = _t50_err;
     bool _t52 = (_t51 == NULL);
     bool _t53 = (!_t52);
     if (_t53) {
         return lyric_err(_t51, LyricResult_Stmtptr);
     }
-    LyricResult_Exprptr _multi_9161 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t55_val = _multi_9161.value;
-    const char* _t55_err = _multi_9161.error;
+    LyricResult_Exprptr _multi_9131 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t55_val = _multi_9131.value;
+    const char* _t55_err = _multi_9131.error;
     const char* _t56 = _t55_err;
     bool _t57 = (_t56 == NULL);
     bool _t58 = (!_t57);
@@ -29134,9 +27869,9 @@ LyricResult_Stmtptr Parser_parse_for(Parser* self) {
     }
     Expr* _t59 = _t55_val;
     Expr* collection = _t59;
-    LyricResult_Blockptr _multi_9162 = Parser_parse_block(self);
-    Block* _t60_val = _multi_9162.value;
-    const char* _t60_err = _multi_9162.error;
+    LyricResult_Blockptr _multi_9132 = Parser_parse_block(self);
+    Block* _t60_val = _multi_9132.value;
+    const char* _t60_err = _multi_9132.error;
     const char* _t61 = _t60_err;
     bool _t62 = (_t61 == NULL);
     bool _t63 = (!_t62);
@@ -29167,9 +27902,9 @@ LyricResult_Stmtptr Parser_parse_while(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Exprptr _multi_9163 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t4_val = _multi_9163.value;
-    const char* _t4_err = _multi_9163.error;
+    LyricResult_Exprptr _multi_9133 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t4_val = _multi_9133.value;
+    const char* _t4_err = _multi_9133.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -29178,9 +27913,9 @@ LyricResult_Stmtptr Parser_parse_while(Parser* self) {
     }
     Expr* _t8 = _t4_val;
     Expr* cond = _t8;
-    LyricResult_Blockptr _multi_9164 = Parser_parse_block(self);
-    Block* _t9_val = _multi_9164.value;
-    const char* _t9_err = _multi_9164.error;
+    LyricResult_Blockptr _multi_9134 = Parser_parse_block(self);
+    Block* _t9_val = _multi_9134.value;
+    const char* _t9_err = _multi_9134.error;
     const char* _t10 = _t9_err;
     bool _t11 = (_t10 == NULL);
     bool _t12 = (!_t11);
@@ -29208,9 +27943,9 @@ LyricResult_Stmtptr Parser_parse_match_stmt(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Exprptr _multi_9165 = Parser_parse_expr_no_struct_lit(self);
-    Expr* _t4_val = _multi_9165.value;
-    const char* _t4_err = _multi_9165.error;
+    LyricResult_Exprptr _multi_9135 = Parser_parse_expr_no_struct_lit(self);
+    Expr* _t4_val = _multi_9135.value;
+    const char* _t4_err = _multi_9135.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -29220,8 +27955,8 @@ LyricResult_Stmtptr Parser_parse_match_stmt(Parser* self) {
     Expr* _t8 = _t4_val;
     Expr* value = _t8;
     TokenKind _t9 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9166 = Parser_expect(self, _t9);
-    const char* _t10_err = _multi_9166.error;
+    LyricResult_Tokenptr _multi_9136 = Parser_expect(self, _t9);
+    const char* _t10_err = _multi_9136.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
@@ -29229,9 +27964,9 @@ LyricResult_Stmtptr Parser_parse_match_stmt(Parser* self) {
         return lyric_err(_t11, LyricResult_Stmtptr);
     }
     Parser_skip_newlines(self);
-    LyricResult_LyricSlice_MatchArmptr _multi_9167 = Parser_parse_match_arms(self);
-    LyricSlice_MatchArmptr _t16_val = _multi_9167.value;
-    const char* _t16_err = _multi_9167.error;
+    LyricResult_LyricSlice_MatchArmptr _multi_9137 = Parser_parse_match_arms(self);
+    LyricSlice_MatchArmptr _t16_val = _multi_9137.value;
+    const char* _t16_err = _multi_9137.error;
     const char* _t17 = _t16_err;
     bool _t18 = (_t17 == NULL);
     bool _t19 = (!_t18);
@@ -29352,8 +28087,8 @@ LyricResult_LyricSlice_MatchArmptr Parser_parse_match_arms(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t54 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9168 = Parser_expect(self, _t54);
-    const char* _t55_err = _multi_9168.error;
+    LyricResult_Tokenptr _multi_9138 = Parser_expect(self, _t54);
+    const char* _t55_err = _multi_9138.error;
     const char* _t56 = _t55_err;
     bool _t57 = (_t56 == NULL);
     bool _t58 = (!_t57);
@@ -29719,8 +28454,8 @@ LyricResult_Patternptr Parser_parse_pattern(Parser* self) {
         Pos _t200 = _t199.end;
         Pos end = _t200;
         TokenKind _t201 = TokenKind_PRParen;
-        LyricResult_Tokenptr _multi_9169 = Parser_expect(self, _t201);
-        const char* _t202_err = _multi_9169.error;
+        LyricResult_Tokenptr _multi_9139 = Parser_expect(self, _t201);
+        const char* _t202_err = _multi_9139.error;
         const char* _t203 = _t202_err;
         bool _t204 = (_t203 == NULL);
         bool _t205 = (!_t204);
@@ -29755,9 +28490,9 @@ LyricResult_Stmtptr Parser_parse_cascade(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Blockptr _multi_9170 = Parser_parse_block(self);
-    Block* _t4_val = _multi_9170.value;
-    const char* _t4_err = _multi_9170.error;
+    LyricResult_Blockptr _multi_9140 = Parser_parse_block(self);
+    Block* _t4_val = _multi_9140.value;
+    const char* _t4_err = _multi_9140.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -29784,9 +28519,9 @@ LyricResult_Stmtptr Parser_parse_spawn(Parser* self) {
     Pos _t2 = _t1.start;
     Pos start = _t2;
     Parser_next(self);
-    LyricResult_Blockptr _multi_9171 = Parser_parse_block(self);
-    Block* _t4_val = _multi_9171.value;
-    const char* _t4_err = _multi_9171.error;
+    LyricResult_Blockptr _multi_9141 = Parser_parse_block(self);
+    Block* _t4_val = _multi_9141.value;
+    const char* _t4_err = _multi_9141.error;
     const char* _t5 = _t4_err;
     bool _t6 = (_t5 == NULL);
     bool _t7 = (!_t6);
@@ -29814,8 +28549,8 @@ LyricResult_Stmtptr Parser_parse_select(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_PLBrace;
-    LyricResult_Tokenptr _multi_9172 = Parser_expect(self, _t4);
-    const char* _t5_err = _multi_9172.error;
+    LyricResult_Tokenptr _multi_9142 = Parser_expect(self, _t4);
+    const char* _t5_err = _multi_9142.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
@@ -29855,8 +28590,8 @@ LyricResult_Stmtptr Parser_parse_select(Parser* self) {
         Parser_skip_newlines(self);
     }
     TokenKind _t29 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9173 = Parser_expect(self, _t29);
-    const char* _t30_err = _multi_9173.error;
+    LyricResult_Tokenptr _multi_9143 = Parser_expect(self, _t29);
+    const char* _t30_err = _multi_9143.error;
     const char* _t31 = _t30_err;
     bool _t32 = (_t31 == NULL);
     bool _t33 = (!_t32);
@@ -29924,8 +28659,8 @@ LyricResult_SelectCaseptr Parser_parse_select_case(Parser* self) {
         return lyric_ok(_t27, LyricResult_SelectCaseptr);
     }
     TokenKind _t28 = TokenKind_KCase;
-    LyricResult_Tokenptr _multi_9174 = Parser_expect(self, _t28);
-    const char* _t29_err = _multi_9174.error;
+    LyricResult_Tokenptr _multi_9144 = Parser_expect(self, _t28);
+    const char* _t29_err = _multi_9144.error;
     const char* _t30 = _t29_err;
     bool _t31 = (_t30 == NULL);
     bool _t32 = (!_t31);
@@ -29960,9 +28695,9 @@ LyricResult_SelectCaseptr Parser_parse_select_case(Parser* self) {
             Lexer_restore_state(_t50, saved);
         }
     }
-    LyricResult_Exprptr _multi_9175 = Parser_parse_expr(self);
-    Expr* _t52_val = _multi_9175.value;
-    const char* _t52_err = _multi_9175.error;
+    LyricResult_Exprptr _multi_9145 = Parser_parse_expr(self);
+    Expr* _t52_val = _multi_9145.value;
+    const char* _t52_err = _multi_9145.error;
     const char* _t53 = _t52_err;
     bool _t54 = (_t53 == NULL);
     bool _t55 = (!_t54);
@@ -29972,17 +28707,17 @@ LyricResult_SelectCaseptr Parser_parse_select_case(Parser* self) {
     Expr* _t56 = _t52_val;
     Expr* expr = _t56;
     TokenKind _t57 = TokenKind_PFatArrow;
-    LyricResult_Tokenptr _multi_9176 = Parser_expect(self, _t57);
-    const char* _t58_err = _multi_9176.error;
+    LyricResult_Tokenptr _multi_9146 = Parser_expect(self, _t57);
+    const char* _t58_err = _multi_9146.error;
     const char* _t59 = _t58_err;
     bool _t60 = (_t59 == NULL);
     bool _t61 = (!_t60);
     if (_t61) {
         return lyric_err(_t59, LyricResult_SelectCaseptr);
     }
-    LyricResult_Blockptr _multi_9177 = Parser_parse_block(self);
-    Block* _t63_val = _multi_9177.value;
-    const char* _t63_err = _multi_9177.error;
+    LyricResult_Blockptr _multi_9147 = Parser_parse_block(self);
+    Block* _t63_val = _multi_9147.value;
+    const char* _t63_err = _multi_9147.error;
     const char* _t64 = _t63_err;
     bool _t65 = (_t64 == NULL);
     bool _t66 = (!_t65);
@@ -30011,17 +28746,17 @@ LyricResult_Stmtptr Parser_parse_lock(Parser* self) {
     Pos start = _t2;
     Parser_next(self);
     TokenKind _t4 = TokenKind_PLParen;
-    LyricResult_Tokenptr _multi_9178 = Parser_expect(self, _t4);
-    const char* _t5_err = _multi_9178.error;
+    LyricResult_Tokenptr _multi_9148 = Parser_expect(self, _t4);
+    const char* _t5_err = _multi_9148.error;
     const char* _t6 = _t5_err;
     bool _t7 = (_t6 == NULL);
     bool _t8 = (!_t7);
     if (_t8) {
         return lyric_err(_t6, LyricResult_Stmtptr);
     }
-    LyricResult_Exprptr _multi_9179 = Parser_parse_expr(self);
-    Expr* _t10_val = _multi_9179.value;
-    const char* _t10_err = _multi_9179.error;
+    LyricResult_Exprptr _multi_9149 = Parser_parse_expr(self);
+    Expr* _t10_val = _multi_9149.value;
+    const char* _t10_err = _multi_9149.error;
     const char* _t11 = _t10_err;
     bool _t12 = (_t11 == NULL);
     bool _t13 = (!_t12);
@@ -30031,17 +28766,17 @@ LyricResult_Stmtptr Parser_parse_lock(Parser* self) {
     Expr* _t14 = _t10_val;
     Expr* mutex = _t14;
     TokenKind _t15 = TokenKind_PRParen;
-    LyricResult_Tokenptr _multi_9180 = Parser_expect(self, _t15);
-    const char* _t16_err = _multi_9180.error;
+    LyricResult_Tokenptr _multi_9150 = Parser_expect(self, _t15);
+    const char* _t16_err = _multi_9150.error;
     const char* _t17 = _t16_err;
     bool _t18 = (_t17 == NULL);
     bool _t19 = (!_t18);
     if (_t19) {
         return lyric_err(_t17, LyricResult_Stmtptr);
     }
-    LyricResult_Blockptr _multi_9181 = Parser_parse_block(self);
-    Block* _t21_val = _multi_9181.value;
-    const char* _t21_err = _multi_9181.error;
+    LyricResult_Blockptr _multi_9151 = Parser_parse_block(self);
+    Block* _t21_val = _multi_9151.value;
+    const char* _t21_err = _multi_9151.error;
     const char* _t22 = _t21_err;
     bool _t23 = (_t22 == NULL);
     bool _t24 = (!_t23);
@@ -30068,9 +28803,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     Span _t1 = _t0->span;
     Pos _t2 = _t1.start;
     Pos start = _t2;
-    LyricResult_Exprptr _multi_9182 = Parser_parse_expr(self);
-    Expr* _t3_val = _multi_9182.value;
-    const char* _t3_err = _multi_9182.error;
+    LyricResult_Exprptr _multi_9152 = Parser_parse_expr(self);
+    Expr* _t3_val = _multi_9152.value;
+    const char* _t3_err = _multi_9152.error;
     const char* _t4 = _t3_err;
     bool _t5 = (_t4 == NULL);
     bool _t6 = (!_t5);
@@ -30085,9 +28820,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     switch (_t10) {
     case 66: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9183 = Parser_parse_expr(self);
-        Expr* _t12_val = _multi_9183.value;
-        const char* _t12_err = _multi_9183.error;
+        LyricResult_Exprptr _multi_9153 = Parser_parse_expr(self);
+        Expr* _t12_val = _multi_9153.value;
+        const char* _t12_err = _multi_9153.error;
         const char* _t13 = _t12_err;
         bool _t14 = (_t13 == NULL);
         bool _t15 = (!_t14);
@@ -30111,9 +28846,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     }
     case 83: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9184 = Parser_parse_expr(self);
-        Expr* _t26_val = _multi_9184.value;
-        const char* _t26_err = _multi_9184.error;
+        LyricResult_Exprptr _multi_9154 = Parser_parse_expr(self);
+        Expr* _t26_val = _multi_9154.value;
+        const char* _t26_err = _multi_9154.error;
         const char* _t27 = _t26_err;
         bool _t28 = (_t27 == NULL);
         bool _t29 = (!_t28);
@@ -30150,9 +28885,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     }
     case 84: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9185 = Parser_parse_expr(self);
-        Expr* _t51_val = _multi_9185.value;
-        const char* _t51_err = _multi_9185.error;
+        LyricResult_Exprptr _multi_9155 = Parser_parse_expr(self);
+        Expr* _t51_val = _multi_9155.value;
+        const char* _t51_err = _multi_9155.error;
         const char* _t52 = _t51_err;
         bool _t53 = (_t52 == NULL);
         bool _t54 = (!_t53);
@@ -30189,9 +28924,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     }
     case 85: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9186 = Parser_parse_expr(self);
-        Expr* _t76_val = _multi_9186.value;
-        const char* _t76_err = _multi_9186.error;
+        LyricResult_Exprptr _multi_9156 = Parser_parse_expr(self);
+        Expr* _t76_val = _multi_9156.value;
+        const char* _t76_err = _multi_9156.error;
         const char* _t77 = _t76_err;
         bool _t78 = (_t77 == NULL);
         bool _t79 = (!_t78);
@@ -30228,9 +28963,9 @@ LyricResult_Stmtptr Parser_parse_expr_or_assign(Parser* self) {
     }
     case 86: {
         Parser_next(self);
-        LyricResult_Exprptr _multi_9187 = Parser_parse_expr(self);
-        Expr* _t101_val = _multi_9187.value;
-        const char* _t101_err = _multi_9187.error;
+        LyricResult_Exprptr _multi_9157 = Parser_parse_expr(self);
+        Expr* _t101_val = _multi_9157.value;
+        const char* _t101_err = _multi_9157.error;
         const char* _t102 = _t101_err;
         bool _t103 = (_t102 == NULL);
         bool _t104 = (!_t103);
@@ -30507,9 +29242,9 @@ LyricResult_Exprptr Parser_parse_struct_lit(Parser* self, Sym* name, LyricSlice_
         Parser_skip_newlines(self);
     }
     TokenKind _t58 = TokenKind_PRBrace;
-    LyricResult_Tokenptr _multi_9188 = Parser_expect(self, _t58);
-    Token* _t59_val = _multi_9188.value;
-    const char* _t59_err = _multi_9188.error;
+    LyricResult_Tokenptr _multi_9158 = Parser_expect(self, _t58);
+    Token* _t59_val = _multi_9158.value;
+    const char* _t59_err = _multi_9158.error;
     const char* _t60 = _t59_err;
     bool _t61 = (_t60 == NULL);
     bool _t62 = (!_t61);
@@ -30902,7 +29637,6 @@ void desugar_interface_fields(File* file) {
                 _t10->is_public = false;
                 _t10->receiver_type = _t7;
                 _t10->return_type = _t8;
-                _t10->annotations = NULL;
                 _t10->body = NULL;
                 _t10->span = _t9;
                 FuncDecl* getter = _t10;
@@ -30946,7 +29680,6 @@ void desugar_interface_fields(File* file) {
                 _t30->is_public = false;
                 _t30->receiver_type = _t28;
                 _t30->return_type = NULL;
-                _t30->annotations = NULL;
                 _t30->body = NULL;
                 _t30->span = _t29;
                 FuncDecl* setter = _t30;
@@ -31813,7 +30546,6 @@ void desugar_destructors(File* file) {
                     _t241->is_public = true;
                     _t241->receiver_type = NULL;
                     _t241->return_type = NULL;
-                    _t241->annotations = NULL;
                     _t241->body = destroy_body;
                     _t241->span = _t240;
                     FuncDecl* m = _t241;
@@ -89662,282 +88394,227 @@ void fmt_block(StringBuilder* sb, LyricBlock* block, LyricSlice_Commentptr comme
     lyric_string name = __ifexpr_0;
     lyric_string _t7 = lyric_sprintf("lyric %.*s {\n", (int)name.len, (const char*)name.data);
     StringBuilder_write(sb, _t7);
-    lyric_string _t9 = block->why;
-    bool _t10 = (!lyric_str_eq(_t9, LYRIC_STR("")));
-    if (_t10) {
-        lyric_string _t11 = block->why;
-        lyric_string _t12 = lyric_sprintf("  why: \"%.*s\"\n\n", (int)_t11.len, (const char*)_t11.data);
-        StringBuilder_write(sb, _t12);
-    }
-    LyricSlice_ImportDeclptr _t14 = LyricBlock_imp_children(block);
-    LyricSlice_ImportDeclptr imports = _t14;
-    LyricSlice_DocBlockptr _t15 = LyricBlock_doc_children(block);
-    LyricSlice_DocBlockptr docs = _t15;
-    LyricSlice_InvariantDeclptr _t16 = LyricBlock_inv_children(block);
-    LyricSlice_InvariantDeclptr invariants = _t16;
-    LyricSlice_StructDeclptr _t17 = LyricBlock_sd_children(block);
-    LyricSlice_StructDeclptr structs = _t17;
-    LyricSlice_EnumDeclptr _t18 = LyricBlock_ed_children(block);
-    LyricSlice_EnumDeclptr enums = _t18;
-    LyricSlice_InterfaceDeclptr _t19 = LyricBlock_id_children(block);
-    LyricSlice_InterfaceDeclptr interfaces = _t19;
-    LyricSlice_ClassDeclptr _t20 = LyricBlock_cd_children(block);
-    LyricSlice_ClassDeclptr classes = _t20;
-    LyricSlice_FuncDeclptr _t21 = LyricBlock_fd_children(block);
-    LyricSlice_FuncDeclptr funcs = _t21;
-    LyricSlice_RelationDeclptr _t22 = LyricBlock_rd_children(block);
-    LyricSlice_RelationDeclptr relations = _t22;
-    LyricSlice_TypeAliasDeclptr _t23 = LyricBlock_ta_children(block);
-    LyricSlice_TypeAliasDeclptr type_aliases = _t23;
-    LyricSlice_DeclItem _t24 = lyric_slice_empty(LyricSlice_DeclItem);
-    LyricSlice_DeclItem items = _t24;
+    LyricSlice_ImportDeclptr _t9 = LyricBlock_imp_children(block);
+    LyricSlice_ImportDeclptr imports = _t9;
+    LyricSlice_StructDeclptr _t10 = LyricBlock_sd_children(block);
+    LyricSlice_StructDeclptr structs = _t10;
+    LyricSlice_EnumDeclptr _t11 = LyricBlock_ed_children(block);
+    LyricSlice_EnumDeclptr enums = _t11;
+    LyricSlice_InterfaceDeclptr _t12 = LyricBlock_id_children(block);
+    LyricSlice_InterfaceDeclptr interfaces = _t12;
+    LyricSlice_ClassDeclptr _t13 = LyricBlock_cd_children(block);
+    LyricSlice_ClassDeclptr classes = _t13;
+    LyricSlice_FuncDeclptr _t14 = LyricBlock_fd_children(block);
+    LyricSlice_FuncDeclptr funcs = _t14;
+    LyricSlice_RelationDeclptr _t15 = LyricBlock_rd_children(block);
+    LyricSlice_RelationDeclptr relations = _t15;
+    LyricSlice_TypeAliasDeclptr _t16 = LyricBlock_ta_children(block);
+    LyricSlice_TypeAliasDeclptr type_aliases = _t16;
+    LyricSlice_DeclItem _t17 = lyric_slice_empty(LyricSlice_DeclItem);
+    LyricSlice_DeclItem items = _t17;
     int32_t i = 0;
     while (1) {
-        int32_t _t25 = imports.len;
-        bool _t26 = (i < _t25);
-        if (!(_t26)) break;
-        ImportDecl* _t27 = imports.data[i];
-        Span _t28 = _t27->span;
-        Pos _t29 = _t28.start;
-        int32_t _t30 = _t29.line;
-        DeclItem _t31 = (DeclItem){.line = _t30, .tag = 0, .idx = i};
-        LyricSlice_DeclItem _t32 = ({ lyric_push(&items, _t31, LyricSlice_DeclItem); items; });
-        items = _t32;
-        int32_t _t33 = (i + 1);
-        i = _t33;
+        int32_t _t18 = imports.len;
+        bool _t19 = (i < _t18);
+        if (!(_t19)) break;
+        ImportDecl* _t20 = imports.data[i];
+        Span _t21 = _t20->span;
+        Pos _t22 = _t21.start;
+        int32_t _t23 = _t22.line;
+        DeclItem _t24 = (DeclItem){.line = _t23, .tag = 0, .idx = i};
+        LyricSlice_DeclItem _t25 = ({ lyric_push(&items, _t24, LyricSlice_DeclItem); items; });
+        items = _t25;
+        int32_t _t26 = (i + 1);
+        i = _t26;
     }
     i = 0;
     while (1) {
-        int32_t _t34 = docs.len;
-        bool _t35 = (i < _t34);
-        if (!(_t35)) break;
-        DocBlock* _t36 = docs.data[i];
-        Span _t37 = _t36->span;
-        Pos _t38 = _t37.start;
-        int32_t _t39 = _t38.line;
-        DeclItem _t40 = (DeclItem){.line = _t39, .tag = 1, .idx = i};
-        LyricSlice_DeclItem _t41 = ({ lyric_push(&items, _t40, LyricSlice_DeclItem); items; });
-        items = _t41;
-        int32_t _t42 = (i + 1);
-        i = _t42;
+        int32_t _t27 = structs.len;
+        bool _t28 = (i < _t27);
+        if (!(_t28)) break;
+        StructDecl* _t29 = structs.data[i];
+        Span _t30 = _t29->span;
+        Pos _t31 = _t30.start;
+        int32_t _t32 = _t31.line;
+        DeclItem _t33 = (DeclItem){.line = _t32, .tag = 1, .idx = i};
+        LyricSlice_DeclItem _t34 = ({ lyric_push(&items, _t33, LyricSlice_DeclItem); items; });
+        items = _t34;
+        int32_t _t35 = (i + 1);
+        i = _t35;
     }
     i = 0;
     while (1) {
-        int32_t _t43 = invariants.len;
-        bool _t44 = (i < _t43);
-        if (!(_t44)) break;
-        InvariantDecl* _t45 = invariants.data[i];
-        Span _t46 = _t45->span;
-        Pos _t47 = _t46.start;
-        int32_t _t48 = _t47.line;
-        DeclItem _t49 = (DeclItem){.line = _t48, .tag = 2, .idx = i};
-        LyricSlice_DeclItem _t50 = ({ lyric_push(&items, _t49, LyricSlice_DeclItem); items; });
-        items = _t50;
-        int32_t _t51 = (i + 1);
-        i = _t51;
+        int32_t _t36 = enums.len;
+        bool _t37 = (i < _t36);
+        if (!(_t37)) break;
+        EnumDecl* _t38 = enums.data[i];
+        Span _t39 = _t38->span;
+        Pos _t40 = _t39.start;
+        int32_t _t41 = _t40.line;
+        DeclItem _t42 = (DeclItem){.line = _t41, .tag = 2, .idx = i};
+        LyricSlice_DeclItem _t43 = ({ lyric_push(&items, _t42, LyricSlice_DeclItem); items; });
+        items = _t43;
+        int32_t _t44 = (i + 1);
+        i = _t44;
     }
     i = 0;
     while (1) {
-        int32_t _t52 = structs.len;
-        bool _t53 = (i < _t52);
-        if (!(_t53)) break;
-        StructDecl* _t54 = structs.data[i];
-        Span _t55 = _t54->span;
-        Pos _t56 = _t55.start;
-        int32_t _t57 = _t56.line;
-        DeclItem _t58 = (DeclItem){.line = _t57, .tag = 3, .idx = i};
-        LyricSlice_DeclItem _t59 = ({ lyric_push(&items, _t58, LyricSlice_DeclItem); items; });
-        items = _t59;
-        int32_t _t60 = (i + 1);
-        i = _t60;
+        int32_t _t45 = interfaces.len;
+        bool _t46 = (i < _t45);
+        if (!(_t46)) break;
+        InterfaceDecl* _t47 = interfaces.data[i];
+        Span _t48 = _t47->span;
+        Pos _t49 = _t48.start;
+        int32_t _t50 = _t49.line;
+        DeclItem _t51 = (DeclItem){.line = _t50, .tag = 3, .idx = i};
+        LyricSlice_DeclItem _t52 = ({ lyric_push(&items, _t51, LyricSlice_DeclItem); items; });
+        items = _t52;
+        int32_t _t53 = (i + 1);
+        i = _t53;
     }
     i = 0;
     while (1) {
-        int32_t _t61 = enums.len;
-        bool _t62 = (i < _t61);
-        if (!(_t62)) break;
-        EnumDecl* _t63 = enums.data[i];
-        Span _t64 = _t63->span;
-        Pos _t65 = _t64.start;
-        int32_t _t66 = _t65.line;
-        DeclItem _t67 = (DeclItem){.line = _t66, .tag = 4, .idx = i};
-        LyricSlice_DeclItem _t68 = ({ lyric_push(&items, _t67, LyricSlice_DeclItem); items; });
-        items = _t68;
-        int32_t _t69 = (i + 1);
-        i = _t69;
+        int32_t _t54 = classes.len;
+        bool _t55 = (i < _t54);
+        if (!(_t55)) break;
+        ClassDecl* _t56 = classes.data[i];
+        Span _t57 = _t56->span;
+        Pos _t58 = _t57.start;
+        int32_t _t59 = _t58.line;
+        DeclItem _t60 = (DeclItem){.line = _t59, .tag = 4, .idx = i};
+        LyricSlice_DeclItem _t61 = ({ lyric_push(&items, _t60, LyricSlice_DeclItem); items; });
+        items = _t61;
+        int32_t _t62 = (i + 1);
+        i = _t62;
     }
     i = 0;
     while (1) {
-        int32_t _t70 = interfaces.len;
-        bool _t71 = (i < _t70);
-        if (!(_t71)) break;
-        InterfaceDecl* _t72 = interfaces.data[i];
-        Span _t73 = _t72->span;
-        Pos _t74 = _t73.start;
-        int32_t _t75 = _t74.line;
-        DeclItem _t76 = (DeclItem){.line = _t75, .tag = 5, .idx = i};
-        LyricSlice_DeclItem _t77 = ({ lyric_push(&items, _t76, LyricSlice_DeclItem); items; });
-        items = _t77;
-        int32_t _t78 = (i + 1);
-        i = _t78;
+        int32_t _t63 = funcs.len;
+        bool _t64 = (i < _t63);
+        if (!(_t64)) break;
+        FuncDecl* _t65 = funcs.data[i];
+        Span _t66 = _t65->span;
+        Pos _t67 = _t66.start;
+        int32_t _t68 = _t67.line;
+        DeclItem _t69 = (DeclItem){.line = _t68, .tag = 5, .idx = i};
+        LyricSlice_DeclItem _t70 = ({ lyric_push(&items, _t69, LyricSlice_DeclItem); items; });
+        items = _t70;
+        int32_t _t71 = (i + 1);
+        i = _t71;
     }
     i = 0;
     while (1) {
-        int32_t _t79 = classes.len;
-        bool _t80 = (i < _t79);
-        if (!(_t80)) break;
-        ClassDecl* _t81 = classes.data[i];
-        Span _t82 = _t81->span;
-        Pos _t83 = _t82.start;
-        int32_t _t84 = _t83.line;
-        DeclItem _t85 = (DeclItem){.line = _t84, .tag = 6, .idx = i};
-        LyricSlice_DeclItem _t86 = ({ lyric_push(&items, _t85, LyricSlice_DeclItem); items; });
-        items = _t86;
-        int32_t _t87 = (i + 1);
-        i = _t87;
+        int32_t _t72 = relations.len;
+        bool _t73 = (i < _t72);
+        if (!(_t73)) break;
+        RelationDecl* _t74 = relations.data[i];
+        Span _t75 = _t74->span;
+        Pos _t76 = _t75.start;
+        int32_t _t77 = _t76.line;
+        DeclItem _t78 = (DeclItem){.line = _t77, .tag = 6, .idx = i};
+        LyricSlice_DeclItem _t79 = ({ lyric_push(&items, _t78, LyricSlice_DeclItem); items; });
+        items = _t79;
+        int32_t _t80 = (i + 1);
+        i = _t80;
     }
     i = 0;
     while (1) {
-        int32_t _t88 = funcs.len;
-        bool _t89 = (i < _t88);
-        if (!(_t89)) break;
-        FuncDecl* _t90 = funcs.data[i];
-        Span _t91 = _t90->span;
-        Pos _t92 = _t91.start;
-        int32_t _t93 = _t92.line;
-        DeclItem _t94 = (DeclItem){.line = _t93, .tag = 7, .idx = i};
-        LyricSlice_DeclItem _t95 = ({ lyric_push(&items, _t94, LyricSlice_DeclItem); items; });
-        items = _t95;
-        int32_t _t96 = (i + 1);
-        i = _t96;
-    }
-    i = 0;
-    while (1) {
-        int32_t _t97 = relations.len;
-        bool _t98 = (i < _t97);
-        if (!(_t98)) break;
-        RelationDecl* _t99 = relations.data[i];
-        Span _t100 = _t99->span;
-        Pos _t101 = _t100.start;
-        int32_t _t102 = _t101.line;
-        DeclItem _t103 = (DeclItem){.line = _t102, .tag = 8, .idx = i};
-        LyricSlice_DeclItem _t104 = ({ lyric_push(&items, _t103, LyricSlice_DeclItem); items; });
-        items = _t104;
-        int32_t _t105 = (i + 1);
-        i = _t105;
-    }
-    i = 0;
-    while (1) {
-        int32_t _t106 = type_aliases.len;
-        bool _t107 = (i < _t106);
-        if (!(_t107)) break;
-        TypeAliasDecl* _t108 = type_aliases.data[i];
-        Span _t109 = _t108->span;
-        Pos _t110 = _t109.start;
-        int32_t _t111 = _t110.line;
-        DeclItem _t112 = (DeclItem){.line = _t111, .tag = 9, .idx = i};
-        LyricSlice_DeclItem _t113 = ({ lyric_push(&items, _t112, LyricSlice_DeclItem); items; });
-        items = _t113;
-        int32_t _t114 = (i + 1);
-        i = _t114;
+        int32_t _t81 = type_aliases.len;
+        bool _t82 = (i < _t81);
+        if (!(_t82)) break;
+        TypeAliasDecl* _t83 = type_aliases.data[i];
+        Span _t84 = _t83->span;
+        Pos _t85 = _t84.start;
+        int32_t _t86 = _t85.line;
+        DeclItem _t87 = (DeclItem){.line = _t86, .tag = 7, .idx = i};
+        LyricSlice_DeclItem _t88 = ({ lyric_push(&items, _t87, LyricSlice_DeclItem); items; });
+        items = _t88;
+        int32_t _t89 = (i + 1);
+        i = _t89;
     }
     sort_decl_items(items);
     int32_t ci = comment_idx;
     i = 0;
     while (1) {
-        int32_t _t116 = items.len;
-        bool _t117 = (i < _t116);
-        if (!(_t117)) break;
-        DeclItem _t118 = items.data[i];
-        DeclItem item = _t118;
-        int32_t _t119 = item.line;
-        int32_t _t120 = emit_comments_before(sb, comments, ci, _t119, LYRIC_STR("  "));
-        ci = _t120;
+        int32_t _t91 = items.len;
+        bool _t92 = (i < _t91);
+        if (!(_t92)) break;
+        DeclItem _t93 = items.data[i];
+        DeclItem item = _t93;
+        int32_t _t94 = item.line;
+        int32_t _t95 = emit_comments_before(sb, comments, ci, _t94, LYRIC_STR("  "));
+        ci = _t95;
+        int32_t _t96 = item.tag;
+        bool _t97 = (_t96 == 0);
+        if (_t97) {
+            int32_t _t98 = item.idx;
+            ImportDecl* _t99 = imports.data[_t98];
+            fmt_import(sb, _t99);
+        }
+        int32_t _t101 = item.tag;
+        bool _t102 = (_t101 == 1);
+        if (_t102) {
+            int32_t _t103 = item.idx;
+            StructDecl* _t104 = structs.data[_t103];
+            fmt_struct(sb, _t104);
+        }
+        int32_t _t106 = item.tag;
+        bool _t107 = (_t106 == 2);
+        if (_t107) {
+            int32_t _t108 = item.idx;
+            EnumDecl* _t109 = enums.data[_t108];
+            fmt_enum(sb, _t109);
+        }
+        int32_t _t111 = item.tag;
+        bool _t112 = (_t111 == 3);
+        if (_t112) {
+            int32_t _t113 = item.idx;
+            InterfaceDecl* _t114 = interfaces.data[_t113];
+            fmt_interface(sb, _t114);
+        }
+        int32_t _t116 = item.tag;
+        bool _t117 = (_t116 == 4);
+        if (_t117) {
+            int32_t _t118 = item.idx;
+            ClassDecl* _t119 = classes.data[_t118];
+            fmt_class(sb, _t119);
+        }
         int32_t _t121 = item.tag;
-        bool _t122 = (_t121 == 0);
+        bool _t122 = (_t121 == 5);
         if (_t122) {
             int32_t _t123 = item.idx;
-            ImportDecl* _t124 = imports.data[_t123];
-            fmt_import(sb, _t124);
+            FuncDecl* _t124 = funcs.data[_t123];
+            fmt_func(sb, _t124, LYRIC_STR("  "));
         }
         int32_t _t126 = item.tag;
-        bool _t127 = (_t126 == 1);
+        bool _t127 = (_t126 == 6);
         if (_t127) {
             int32_t _t128 = item.idx;
-            DocBlock* _t129 = docs.data[_t128];
-            fmt_doc(sb, _t129);
+            RelationDecl* _t129 = relations.data[_t128];
+            fmt_relation(sb, _t129);
         }
         int32_t _t131 = item.tag;
-        bool _t132 = (_t131 == 2);
+        bool _t132 = (_t131 == 7);
         if (_t132) {
             int32_t _t133 = item.idx;
-            InvariantDecl* _t134 = invariants.data[_t133];
-            fmt_invariant(sb, _t134);
+            TypeAliasDecl* _t134 = type_aliases.data[_t133];
+            fmt_type_alias(sb, _t134);
         }
-        int32_t _t136 = item.tag;
-        bool _t137 = (_t136 == 3);
-        if (_t137) {
-            int32_t _t138 = item.idx;
-            StructDecl* _t139 = structs.data[_t138];
-            fmt_struct(sb, _t139);
-        }
-        int32_t _t141 = item.tag;
-        bool _t142 = (_t141 == 4);
-        if (_t142) {
-            int32_t _t143 = item.idx;
-            EnumDecl* _t144 = enums.data[_t143];
-            fmt_enum(sb, _t144);
-        }
-        int32_t _t146 = item.tag;
-        bool _t147 = (_t146 == 5);
-        if (_t147) {
-            int32_t _t148 = item.idx;
-            InterfaceDecl* _t149 = interfaces.data[_t148];
-            fmt_interface(sb, _t149);
-        }
-        int32_t _t151 = item.tag;
-        bool _t152 = (_t151 == 6);
-        if (_t152) {
-            int32_t _t153 = item.idx;
-            ClassDecl* _t154 = classes.data[_t153];
-            fmt_class(sb, _t154);
-        }
-        int32_t _t156 = item.tag;
-        bool _t157 = (_t156 == 7);
-        if (_t157) {
-            int32_t _t158 = item.idx;
-            FuncDecl* _t159 = funcs.data[_t158];
-            fmt_func(sb, _t159, LYRIC_STR("  "));
-        }
-        int32_t _t161 = item.tag;
-        bool _t162 = (_t161 == 8);
-        if (_t162) {
-            int32_t _t163 = item.idx;
-            RelationDecl* _t164 = relations.data[_t163];
-            fmt_relation(sb, _t164);
-        }
-        int32_t _t166 = item.tag;
-        bool _t167 = (_t166 == 9);
-        if (_t167) {
-            int32_t _t168 = item.idx;
-            TypeAliasDecl* _t169 = type_aliases.data[_t168];
-            fmt_type_alias(sb, _t169);
-        }
-        int32_t _t171 = items.len;
-        int32_t _t172 = (_t171 - 1);
-        bool _t173 = (i < _t172);
-        if (_t173) {
+        int32_t _t136 = items.len;
+        int32_t _t137 = (_t136 - 1);
+        bool _t138 = (i < _t137);
+        if (_t138) {
             StringBuilder_write(sb, LYRIC_STR("\n"));
         }
-        int32_t _t175 = (i + 1);
-        i = _t175;
+        int32_t _t140 = (i + 1);
+        i = _t140;
     }
-    Span _t176 = block->span;
-    Pos _t177 = _t176.end;
-    int32_t _t178 = _t177.line;
-    int32_t _t179 = (_t178 + 1);
-    int32_t _t180 = emit_comments_before(sb, comments, ci, _t179, LYRIC_STR("  "));
-    ci = _t180;
+    Span _t141 = block->span;
+    Pos _t142 = _t141.end;
+    int32_t _t143 = _t142.line;
+    int32_t _t144 = (_t143 + 1);
+    int32_t _t145 = emit_comments_before(sb, comments, ci, _t144, LYRIC_STR("  "));
+    ci = _t145;
     StringBuilder_write(sb, LYRIC_STR("}\n"));
     if (items.cap > 0 && items.data) free(items.data);
 }
@@ -89991,49 +88668,6 @@ void fmt_import(StringBuilder* sb, ImportDecl* imp) {
         lyric_string _t10 = lyric_sprintf("  import \"%.*s\"\n", (int)_t9.len, (const char*)_t9.data);
         StringBuilder_write(sb, _t10);
     }
-}
-
-void fmt_doc(StringBuilder* sb, DocBlock* doc) {
-    lyric_string _t0 = doc->section;
-    lyric_string _t1 = lyric_sprintf("  doc \"%.*s\": \"\"\"\n", (int)_t0.len, (const char*)_t0.data);
-    StringBuilder_write(sb, _t1);
-    lyric_string _t3 = doc->content;
-    LyricSlice_lyric_string _t4 = str_split(_t3, LYRIC_STR("\n"));
-    LyricSlice_lyric_string lines = _t4;
-    int32_t i = 0;
-    while (1) {
-        int32_t _t5 = lines.len;
-        bool _t6 = (i < _t5);
-        if (!(_t6)) break;
-        lyric_string _t7 = lines.data[i];
-        lyric_string _t8 = lyric_str_trim(_t7);
-        lyric_string line = _t8;
-        bool _t9 = lyric_str_eq(line, LYRIC_STR(""));
-        if (_t9) {
-            StringBuilder_write(sb, LYRIC_STR("\n"));
-        } else {
-            StringBuilder_write(sb, LYRIC_STR("    "));
-            StringBuilder_write(sb, line);
-            StringBuilder_write(sb, LYRIC_STR("\n"));
-        }
-        int32_t _t14 = (i + 1);
-        i = _t14;
-    }
-    StringBuilder_write(sb, LYRIC_STR("  \"\"\"\n"));
-}
-
-void fmt_invariant(StringBuilder* sb, InvariantDecl* inv) {
-    lyric_string _t0 = inv->claim;
-    lyric_string _t1 = lyric_sprintf("  invariant \"%.*s\"", (int)_t0.len, (const char*)_t0.data);
-    StringBuilder_write(sb, _t1);
-    lyric_string _t3 = inv->verified_at;
-    bool _t4 = (!lyric_str_eq(_t3, LYRIC_STR("")));
-    if (_t4) {
-        lyric_string _t5 = inv->verified_at;
-        lyric_string _t6 = lyric_sprintf(" verified_at \"%.*s\"", (int)_t5.len, (const char*)_t5.data);
-        StringBuilder_write(sb, _t6);
-    }
-    StringBuilder_write(sb, LYRIC_STR("\n"));
 }
 
 void fmt_struct(StringBuilder* sb, StructDecl* s) {
@@ -92136,64 +90770,6 @@ void array_remove_CLyricBlock_CRelationDecl(RelationDecl* child) {
     RelationDecl_set_rd_index(child, 0);
 }
 
-void array_remove_CLyricBlock_CDocBlock(DocBlock* child) {
-    LyricBlock* _t0 = DocBlock_doc_parent(child);
-    LyricBlock* p = _t0;
-    bool _t1 = (p == NULL);
-    if (_t1) {
-        return;
-    }
-    LyricBlock* _t2 = p;
-    LyricSlice_DocBlockptr _t3 = LyricBlock_doc_children(_t2);
-    LyricSlice_DocBlockptr kids = _t3;
-    int32_t _t4 = DocBlock_doc_index(child);
-    int32_t idx = _t4;
-    int32_t _t5 = kids.len;
-    int32_t _t6 = (_t5 - 1);
-    int32_t last_idx = _t6;
-    bool _t7 = (idx < last_idx);
-    if (_t7) {
-        DocBlock* _t8 = kids.data[last_idx];
-        DocBlock* last_child = _t8;
-        DocBlock_set_doc_index(last_child, idx);
-        kids.data[idx] = last_child;
-    }
-    LyricBlock* _t10 = p;
-    LyricSlice_DocBlockptr _t11 = lyric_subslice(kids, 0, last_idx, LyricSlice_DocBlockptr);
-    LyricBlock_set_doc_children(_t10, _t11);
-    DocBlock_set_doc_parent(child, 0);
-    DocBlock_set_doc_index(child, 0);
-}
-
-void array_remove_CLyricBlock_CInvariantDecl(InvariantDecl* child) {
-    LyricBlock* _t0 = InvariantDecl_inv_parent(child);
-    LyricBlock* p = _t0;
-    bool _t1 = (p == NULL);
-    if (_t1) {
-        return;
-    }
-    LyricBlock* _t2 = p;
-    LyricSlice_InvariantDeclptr _t3 = LyricBlock_inv_children(_t2);
-    LyricSlice_InvariantDeclptr kids = _t3;
-    int32_t _t4 = InvariantDecl_inv_index(child);
-    int32_t idx = _t4;
-    int32_t _t5 = kids.len;
-    int32_t _t6 = (_t5 - 1);
-    int32_t last_idx = _t6;
-    bool _t7 = (idx < last_idx);
-    if (_t7) {
-        InvariantDecl* _t8 = kids.data[last_idx];
-        InvariantDecl* last_child = _t8;
-        InvariantDecl_set_inv_index(last_child, idx);
-        kids.data[idx] = last_child;
-    }
-    LyricBlock* _t10 = p;
-    LyricSlice_InvariantDeclptr _t11 = lyric_subslice(kids, 0, last_idx, LyricSlice_InvariantDeclptr);
-    LyricBlock_set_inv_children(_t10, _t11);
-    InvariantDecl_set_inv_parent(child, 0);
-    InvariantDecl_set_inv_index(child, 0);
-}
-
 void array_remove_CLyricBlock_CImportDecl(ImportDecl* child) {
     LyricBlock* _t0 = ImportDecl_imp_parent(child);
     LyricBlock* p = _t0;
@@ -92482,28 +91058,6 @@ void array_append_CLexer_CComment(Lexer* parent, Comment* child) {
     Comment_set_lc_parent(child, parent);
     LyricSlice_Commentptr _t4 = ({ lyric_push(&kids, child, LyricSlice_Commentptr); kids; });
     Lexer_set_lc_children(parent, _t4);
-}
-
-void array_append_CLyricBlock_CDocBlock(LyricBlock* parent, DocBlock* child) {
-    LyricSlice_DocBlockptr _t0 = LyricBlock_doc_children(parent);
-    LyricSlice_DocBlockptr kids = _t0;
-    int32_t _t1 = kids.len;
-    int32_t num = _t1;
-    DocBlock_set_doc_index(child, num);
-    DocBlock_set_doc_parent(child, parent);
-    LyricSlice_DocBlockptr _t4 = ({ lyric_push(&kids, child, LyricSlice_DocBlockptr); kids; });
-    LyricBlock_set_doc_children(parent, _t4);
-}
-
-void array_append_CLyricBlock_CInvariantDecl(LyricBlock* parent, InvariantDecl* child) {
-    LyricSlice_InvariantDeclptr _t0 = LyricBlock_inv_children(parent);
-    LyricSlice_InvariantDeclptr kids = _t0;
-    int32_t _t1 = kids.len;
-    int32_t num = _t1;
-    InvariantDecl_set_inv_index(child, num);
-    InvariantDecl_set_inv_parent(child, parent);
-    LyricSlice_InvariantDeclptr _t4 = ({ lyric_push(&kids, child, LyricSlice_InvariantDeclptr); kids; });
-    LyricBlock_set_inv_children(parent, _t4);
 }
 
 void array_append_CLyricBlock_CImportDecl(LyricBlock* parent, ImportDecl* child) {
