@@ -37,6 +37,7 @@ lyric: lyric.c runtime/lyric_runtime.h
 
 test: lyric
 	@bash test_lyric.sh
+	@bash test_cli.sh
 
 self-test: lyric
 	@bash test_self_compile.sh
