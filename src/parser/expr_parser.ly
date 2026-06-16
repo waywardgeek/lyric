@@ -466,13 +466,68 @@ lyric parser {
       KIf => {
         return self.parse_if_expr()
       }
+      PLBrace => {
+        // Dict literal: { "key": val, ... } or {}
+        // tok = { (peeked but NOT yet consumed)
+        // Lookahead: consume {, skip newlines, check what follows
+        let saved = self.lex!.save_state()
+        self.next()  // consume {
+        self.skip_newlines()
+        let next = self.peek()
+        if next.kind == PRBrace {
+          // Empty dict literal {}
+          let end = self.next()
+          return (Expr {
+            MapLit([], []),
+            span: Span { start: tok.span.start, end: end.span.end }
+          }, null)
+        }
+        if next.kind == LStringLit {
+          let saved2 = self.lex!.save_state()
+          self.next()  // consume string to peek at token after it
+          let after = self.peek()
+          self.lex!.restore_state(saved2)
+          if after.kind == PColon {
+            // String literal followed by : → dict literal
+            return self.parse_dict_lit(tok)
+          }
+        }
+        // Not a dict literal — restore state (un-consume {) and return error
+        self.lex!.restore_state(saved)
+        return (null, self.make_error(tok.span, f"expected expression, got {tok.kind} ({tok.text})"))
+      }
       _ => {
         return (null, self.make_error(tok.span, f"expected expression, got {tok.kind} ({tok.text})"))
       }
     }
   }
 
-  // ---- Map literal ----
+  // ---- Dict literal: { "key": val, ... } ----
+  // Called after { has been consumed (tok = the { token)
+
+  func Parser.parse_dict_lit(self, lbrace: Token) -> (Expr?, error) {
+    self.skip_newlines()
+    let mut keys: [Expr] = []
+    let mut values: [Expr] = []
+    while self.peek().kind != PRBrace && self.peek().kind != SEOF {
+      let key = self.parse_expr()?
+      self.expect(PColon)?
+      let val = self.parse_expr()?
+      keys = append(keys, key!)
+      values = append(values, val!)
+      if self.peek().kind == PComma {
+        self.next()
+      }
+      self.skip_newlines()
+    }
+    let end = self.expect(PRBrace)?
+    return (Expr {
+      MapLit(keys, values),
+      span: Span { start: lbrace.span.start, end: end!.span.end }
+    }, null)
+  }
+
+  // ---- Map literal (legacy: map[K]V { ... }) ----
 
   func Parser.parse_map_lit(self, lbrace: Token) -> (Expr?, error) {
     // Already consumed "map", peek is [

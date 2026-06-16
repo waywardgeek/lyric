@@ -2951,16 +2951,44 @@ lyric checker {
   }
 
   func Checker.check_map_lit(self, keys: [Expr], values: [Expr]) -> Type {
-    if len(keys) > 0 {
-      let key_type = self.check_expr(keys[0])
-      let val_type = self.check_expr(values[0])
-      for i in range(1, len(keys)) {
-        self.check_expr(keys[i])
-        self.check_expr(values[i])
-      }
-      return make_map_type(key_type, val_type)
+    let sym_type = make_class_type("Sym")
+    if len(keys) == 0 {
+      // Empty dict literal {} — Dict<Sym, Void>
+      return Type { kind: Class("Dict"), bits: 0, type_args: [sym_type, make_void_type()] }
     }
-    return make_map_type(make_void_type(), make_void_type())
+    // Determine if all keys are string literals — those get auto-interned as Sym in lowerer.
+    // We MUST call check_expr on every key regardless to set resolved_type (validator requires it).
+    let mut all_string_keys = true
+    let mut ki = 0
+    while ki < len(keys) {
+      match keys[ki].kind {
+        StringLit(_) => {}
+        _ => { all_string_keys = false }
+      }
+      ki = ki + 1
+    }
+    // Annotate all keys via check_expr (sets resolved_type on each).
+    // We discard the returned type for string-literal keys — their inferred key type is Sym.
+    let mut i = 0
+    while i < len(keys) {
+      self.check_expr(keys[i])
+      i = i + 1
+    }
+    // Key type: Sym for all-string-literal keys, otherwise infer from first key
+    let key_type = if all_string_keys {
+      sym_type
+    } else {
+      // Already checked above; ask again so we have the type in hand.
+      self.check_expr(keys[0])
+    }
+    // Infer value type from first value; check all values (also annotates each)
+    let val_type = self.check_expr(values[0])
+    let mut j = 1
+    while j < len(values) {
+      self.check_expr(values[j])
+      j = j + 1
+    }
+    return Type { kind: Class("Dict"), bits: 0, type_args: [key_type, val_type] }
   }
 
   func Checker.check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type {

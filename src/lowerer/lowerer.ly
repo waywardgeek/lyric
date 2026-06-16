@@ -3050,30 +3050,69 @@ lyric lowerer {
     return self.emit_temp(ml)
   }
 
-  // ---------- Map literal ----------
+  // ---------- Map literal (lowers to Dict<K,V> construction) ----------
 
   func Lowerer.lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue? {
-    let rt = self.expr_type(orig)
-    // Create empty map then insert
-    let make = LExpr {
-      kind: ExMakeMap,
-      typ: rt,
-      builtin: LBuiltinData { name: "make_map", args: [] }
-    }
-    let map_val = self.emit_temp(make)
+    let dict_ltype = self.expr_type(orig)
+    let unit_lt = LType { kind: TyUnit, name: "", bits: 0, is_exported: false }
 
+    // Extract K and V type args from Dict<K, V>
+    let sym_lt = LType { kind: TyClassHandle, name: "Sym", type_args: [], bits: 0, is_exported: false }
+    let mut k_lt: LType? = sym_lt
+    let mut v_lt: LType? = LType { kind: TyAny, name: "", bits: 0, is_exported: false }
+    let mut ltype_args: [LType?] = [sym_lt, v_lt]
+    if !isnull(dict_ltype) && len(dict_ltype!.type_args) >= 2 {
+      k_lt = dict_ltype!.type_args[0]
+      v_lt = dict_ltype!.type_args[1]
+      ltype_args = dict_ltype!.type_args
+    }
+
+    // Auto-intern string keys when key type is Sym
+    let is_sym_key = !isnull(k_lt) && k_lt!.kind is TyClassHandle && k_lt!.name == "Sym"
+
+    // Emit Dict<K,V>() class allocation
+    let dict_type = LType { kind: TyClassHandle, name: "Dict", type_args: ltype_args, bits: 0, is_exported: false }
+    let alloc = LExpr {
+      kind: ExClassAlloc,
+      typ: dict_type,
+      class_alloc: LClassAllocData { class_name: "Dict", fields: [], type_args: ltype_args }
+    }
+    let dict_val = self.emit_temp(alloc)
+
+    // Insert each key-value pair via dict.set(k, v)
     let mut i = 0
     while i < len(keys) {
-      let kv = self.lower_expr(keys[i])
+      let raw_key = self.lower_expr(keys[i])
+      let kv: LValue? = if is_sym_key {
+        // Wrap string key with sym() to intern it
+        let sym_call = LExpr {
+          kind: ExCall,
+          typ: sym_lt,
+          call: LCallData { func_name: "sym", args: [raw_key], mut_args: [false], type_args: [], is_exported: false }
+        }
+        self.emit_temp(sym_call)
+      } else {
+        raw_key
+      }
       let vv = self.lower_expr(values[i])
-      self.emit(LStmt {
-        kind: StIndexSet,
-        index_set: LIndexSetData { collection: map_val, index: kv, value: vv, field: "" }
-      })
+      let set_call = LExpr {
+        kind: ExMethodCall,
+        typ: unit_lt,
+        method_call: LMethodCallData {
+          receiver: dict_val,
+          method: "set",
+          args: [kv, vv],
+          mut_args: [false, false],
+          type_args: [],
+          is_exported: false,
+          param_types: []
+        }
+      }
+      self.emit_temp(set_call)
       i = i + 1
     }
 
-    return map_val
+    return dict_val
   }
 
   // ---------- Struct/class literal ----------

@@ -639,6 +639,9 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
             }
         }
         MapLit(keys, values) => {
+            // Dict literals desugar to Dict<Sym, V> — ensure stdlib pulls in both.
+            names.set(`Dict`, true)
+            names.set(`Sym`, true)
             for i in range(0, len(keys)) {
                 ast_collect_call_names_expr(keys[i], names)
                 ast_collect_call_names_expr(values[i], names)
