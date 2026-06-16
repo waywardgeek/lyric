@@ -104,7 +104,7 @@ func runUpdate(forgePath string, prune bool) error {
 	importSet := make(map[string]bool)
 	for _, src := range sources {
 		fullPath := filepath.Join(forgeDir, src)
-		funcs, imports, extractErr := extractFuncsFromGoFile(fullPath, filepath.Base(src))
+		funcs, imports, extractErr := extractFuncsFromGoFile(fullPath, src)
 		if extractErr != nil {
 			continue
 		}
@@ -133,13 +133,13 @@ type goInfo struct {
 }
 
 type goStructDef struct {
-	Fields  map[string]string          // field name → Go type string
+	Fields  map[string]string // field name → Go type string
 	Methods map[string]*goFuncDef
 }
 
 type goIfaceDef struct {
-	Methods    map[string]*goFuncDef
-	Embeds     []string // embedded interface names
+	Methods map[string]*goFuncDef
+	Embeds  []string // embedded interface names
 }
 
 type goFuncDef struct {
