@@ -74171,1039 +74171,1129 @@ lyric_string CGen_emit_builtin(CGen* self, LyricOpt_LBuiltinData d) {
             return _t146;
         }
     }
-    bool _t147 = lyric_str_eq(name, LYRIC_STR("contains"));
+    bool _t147 = lyric_str_eq(name, LYRIC_STR("starts_with"));
     bool _sc148 = false;
     _sc148 = _t147;
     bool _t149 = (!_sc148);
     if (_t149) {
-        bool _t150 = lyric_str_eq(name, LYRIC_STR("str_contains"));
+        bool _t150 = lyric_str_eq(name, LYRIC_STR("str_starts_with"));
         _sc148 = _t150;
     }
-    bool _sc151 = false;
-    _sc151 = _sc148;
-    bool _t152 = (!_sc151);
-    if (_t152) {
-        bool _t153 = lyric_str_eq(name, LYRIC_STR("string_contains"));
-        _sc151 = _t153;
+    if (_sc148) {
+        int32_t _t151 = args.len;
+        bool _t152 = (_t151 >= 2);
+        if (_t152) {
+            LValue* _t153 = args.data[0];
+            lyric_string _t154 = CGen_emit_value(self, _t153);
+            LValue* _t155 = args.data[1];
+            lyric_string _t156 = CGen_emit_value(self, _t155);
+            lyric_string _t157 = lyric_sprintf("lyric_str_has_prefix(%.*s, %.*s)", (int)_t154.len, (const char*)_t154.data, (int)_t156.len, (const char*)_t156.data);
+            return _t157;
+        }
     }
-    bool _sc154 = false;
-    _sc154 = _sc151;
-    bool _t155 = (!_sc154);
-    if (_t155) {
-        bool _t156 = lyric_str_eq(name, LYRIC_STR("slice_contains"));
-        _sc154 = _t156;
+    bool _t158 = lyric_str_eq(name, LYRIC_STR("ends_with"));
+    bool _sc159 = false;
+    _sc159 = _t158;
+    bool _t160 = (!_sc159);
+    if (_t160) {
+        bool _t161 = lyric_str_eq(name, LYRIC_STR("str_ends_with"));
+        _sc159 = _t161;
     }
-    if (_sc154) {
-        int32_t _t157 = args.len;
-        bool _t158 = (_t157 >= 2);
-        if (_t158) {
-            LValue* _t159 = args.data[0];
-            bool _t160 = (_t159 == NULL);
-            bool _t161 = (!_t160);
-            bool _sc162 = false;
-            _sc162 = _t161;
-            if (_sc162) {
-                LValue* _t163 = args.data[0];
-                LValue* _t164 = _t163;
-                LType* _t165 = _t164->typ;
-                bool _t166 = (_t165 == NULL);
-                bool _t167 = (!_t166);
-                _sc162 = _t167;
+    if (_sc159) {
+        int32_t _t162 = args.len;
+        bool _t163 = (_t162 >= 2);
+        if (_t163) {
+            LValue* _t164 = args.data[0];
+            lyric_string _t165 = CGen_emit_value(self, _t164);
+            LValue* _t166 = args.data[1];
+            lyric_string _t167 = CGen_emit_value(self, _t166);
+            lyric_string _t168 = lyric_sprintf("lyric_str_has_suffix(%.*s, %.*s)", (int)_t165.len, (const char*)_t165.data, (int)_t167.len, (const char*)_t167.data);
+            return _t168;
+        }
+    }
+    bool _t169 = lyric_str_eq(name, LYRIC_STR("str_is_empty"));
+    bool _sc170 = false;
+    _sc170 = _t169;
+    bool _t171 = (!_sc170);
+    if (_t171) {
+        bool _t172 = lyric_str_eq(name, LYRIC_STR("string_is_empty"));
+        _sc170 = _t172;
+    }
+    if (_sc170) {
+        int32_t _t173 = args.len;
+        bool _t174 = (_t173 > 0);
+        if (_t174) {
+            LValue* _t175 = args.data[0];
+            lyric_string _t176 = CGen_emit_value(self, _t175);
+            lyric_string _t177 = lyric_sprintf("(%.*s.len == 0)", (int)_t176.len, (const char*)_t176.data);
+            return _t177;
+        }
+    }
+    bool _t178 = lyric_str_eq(name, LYRIC_STR("str_char_at"));
+    bool _sc179 = false;
+    _sc179 = _t178;
+    bool _t180 = (!_sc179);
+    if (_t180) {
+        bool _t181 = lyric_str_eq(name, LYRIC_STR("string_char_at"));
+        _sc179 = _t181;
+    }
+    bool _sc182 = false;
+    _sc182 = _sc179;
+    bool _t183 = (!_sc182);
+    if (_t183) {
+        bool _t184 = lyric_str_eq(name, LYRIC_STR("char_at"));
+        _sc182 = _t184;
+    }
+    if (_sc182) {
+        int32_t _t185 = args.len;
+        bool _t186 = (_t185 >= 2);
+        if (_t186) {
+            LValue* _t187 = args.data[0];
+            lyric_string _t188 = CGen_emit_value(self, _t187);
+            lyric_string sv = _t188;
+            LValue* _t189 = args.data[1];
+            lyric_string _t190 = CGen_emit_value(self, _t189);
+            lyric_string iv = _t190;
+            lyric_string _t191 = lyric_str_concat(LYRIC_STR("((lyric_string){.data = (char*)"), sv);
+            lyric_string _t192 = lyric_str_concat(_t191, LYRIC_STR(".data + "));
+            lyric_string _t193 = lyric_str_concat(_t192, iv);
+            lyric_string _t194 = lyric_str_concat(_t193, LYRIC_STR(", .len = 1, .cap = 0})"));
+            return _t194;
+        }
+    }
+    bool _t195 = lyric_str_eq(name, LYRIC_STR("contains"));
+    bool _sc196 = false;
+    _sc196 = _t195;
+    bool _t197 = (!_sc196);
+    if (_t197) {
+        bool _t198 = lyric_str_eq(name, LYRIC_STR("str_contains"));
+        _sc196 = _t198;
+    }
+    bool _sc199 = false;
+    _sc199 = _sc196;
+    bool _t200 = (!_sc199);
+    if (_t200) {
+        bool _t201 = lyric_str_eq(name, LYRIC_STR("string_contains"));
+        _sc199 = _t201;
+    }
+    bool _sc202 = false;
+    _sc202 = _sc199;
+    bool _t203 = (!_sc202);
+    if (_t203) {
+        bool _t204 = lyric_str_eq(name, LYRIC_STR("slice_contains"));
+        _sc202 = _t204;
+    }
+    if (_sc202) {
+        int32_t _t205 = args.len;
+        bool _t206 = (_t205 >= 2);
+        if (_t206) {
+            LValue* _t207 = args.data[0];
+            bool _t208 = (_t207 == NULL);
+            bool _t209 = (!_t208);
+            bool _sc210 = false;
+            _sc210 = _t209;
+            if (_sc210) {
+                LValue* _t211 = args.data[0];
+                LValue* _t212 = _t211;
+                LType* _t213 = _t212->typ;
+                bool _t214 = (_t213 == NULL);
+                bool _t215 = (!_t214);
+                _sc210 = _t215;
             }
-            bool _sc168 = false;
-            _sc168 = _sc162;
-            if (_sc168) {
-                LValue* _t169 = args.data[0];
-                LValue* _t170 = _t169;
-                LType* _t171 = _t170->typ;
-                LType* _t172 = _t171;
-                LTypeKind _t173 = _t172->kind;
-                int32_t _t174 = _t173;
-                bool _t175 = (_t174 == 11);
-                _sc168 = _t175;
+            bool _sc216 = false;
+            _sc216 = _sc210;
+            if (_sc216) {
+                LValue* _t217 = args.data[0];
+                LValue* _t218 = _t217;
+                LType* _t219 = _t218->typ;
+                LType* _t220 = _t219;
+                LTypeKind _t221 = _t220->kind;
+                int32_t _t222 = _t221;
+                bool _t223 = (_t222 == 11);
+                _sc216 = _t223;
             }
-            if (_sc168) {
-                LValue* _t176 = args.data[0];
-                lyric_string _t177 = CGen_emit_value(self, _t176);
-                LValue* _t178 = args.data[1];
-                lyric_string _t179 = CGen_emit_value(self, _t178);
-                lyric_string _t180 = lyric_sprintf("lyric_str_contains(%.*s, %.*s)", (int)_t177.len, (const char*)_t177.data, (int)_t179.len, (const char*)_t179.data);
-                return _t180;
+            if (_sc216) {
+                LValue* _t224 = args.data[0];
+                lyric_string _t225 = CGen_emit_value(self, _t224);
+                LValue* _t226 = args.data[1];
+                lyric_string _t227 = CGen_emit_value(self, _t226);
+                lyric_string _t228 = lyric_sprintf("lyric_str_contains(%.*s, %.*s)", (int)_t225.len, (const char*)_t225.data, (int)_t227.len, (const char*)_t227.data);
+                return _t228;
             }
-            LValue* _t181 = args.data[0];
-            lyric_string _t182 = CGen_emit_value(self, _t181);
-            LValue* _t183 = args.data[1];
-            lyric_string _t184 = CGen_emit_value(self, _t183);
-            lyric_string _t185 = lyric_sprintf("lyric_contains(%.*s, %.*s)", (int)_t182.len, (const char*)_t182.data, (int)_t184.len, (const char*)_t184.data);
-            return _t185;
+            LValue* _t229 = args.data[0];
+            lyric_string _t230 = CGen_emit_value(self, _t229);
+            LValue* _t231 = args.data[1];
+            lyric_string _t232 = CGen_emit_value(self, _t231);
+            lyric_string _t233 = lyric_sprintf("lyric_contains(%.*s, %.*s)", (int)_t230.len, (const char*)_t230.data, (int)_t232.len, (const char*)_t232.data);
+            return _t233;
         }
     }
-    bool _t186 = lyric_str_eq(name, LYRIC_STR("index_of"));
-    bool _sc187 = false;
-    _sc187 = _t186;
-    bool _t188 = (!_sc187);
-    if (_t188) {
-        bool _t189 = lyric_str_eq(name, LYRIC_STR("str_index_of"));
-        _sc187 = _t189;
-    }
-    bool _sc190 = false;
-    _sc190 = _sc187;
-    bool _t191 = (!_sc190);
-    if (_t191) {
-        bool _t192 = lyric_str_eq(name, LYRIC_STR("string_index_of"));
-        _sc190 = _t192;
-    }
-    if (_sc190) {
-        int32_t _t193 = args.len;
-        bool _t194 = (_t193 >= 2);
-        if (_t194) {
-            LValue* _t195 = args.data[0];
-            lyric_string _t196 = CGen_emit_value(self, _t195);
-            LValue* _t197 = args.data[1];
-            lyric_string _t198 = CGen_emit_value(self, _t197);
-            lyric_string _t199 = lyric_sprintf("lyric_str_index_of(%.*s, %.*s)", (int)_t196.len, (const char*)_t196.data, (int)_t198.len, (const char*)_t198.data);
-            return _t199;
-        }
-    }
-    bool _t200 = lyric_str_eq(name, LYRIC_STR("replace"));
-    bool _sc201 = false;
-    _sc201 = _t200;
-    bool _t202 = (!_sc201);
-    if (_t202) {
-        bool _t203 = lyric_str_eq(name, LYRIC_STR("str_replace"));
-        _sc201 = _t203;
-    }
-    bool _sc204 = false;
-    _sc204 = _sc201;
-    bool _t205 = (!_sc204);
-    if (_t205) {
-        bool _t206 = lyric_str_eq(name, LYRIC_STR("string_replace"));
-        _sc204 = _t206;
-    }
-    if (_sc204) {
-        int32_t _t207 = args.len;
-        bool _t208 = (_t207 >= 3);
-        if (_t208) {
-            LValue* _t209 = args.data[0];
-            lyric_string _t210 = CGen_emit_value(self, _t209);
-            LValue* _t211 = args.data[1];
-            lyric_string _t212 = CGen_emit_value(self, _t211);
-            LValue* _t213 = args.data[2];
-            lyric_string _t214 = CGen_emit_value(self, _t213);
-            lyric_string _t215 = lyric_sprintf("lyric_str_replace(%.*s, %.*s, %.*s)", (int)_t210.len, (const char*)_t210.data, (int)_t212.len, (const char*)_t212.data, (int)_t214.len, (const char*)_t214.data);
-            return _t215;
-        }
-    }
-    bool _t216 = lyric_str_eq(name, LYRIC_STR("join"));
-    bool _sc217 = false;
-    _sc217 = _t216;
-    bool _t218 = (!_sc217);
-    if (_t218) {
-        bool _t219 = lyric_str_eq(name, LYRIC_STR("str_join"));
-        _sc217 = _t219;
-    }
-    bool _sc220 = false;
-    _sc220 = _sc217;
-    bool _t221 = (!_sc220);
-    if (_t221) {
-        bool _t222 = lyric_str_eq(name, LYRIC_STR("slice_join"));
-        _sc220 = _t222;
-    }
-    if (_sc220) {
-        int32_t _t223 = args.len;
-        bool _t224 = (_t223 >= 2);
-        if (_t224) {
-            LValue* _t225 = args.data[0];
-            lyric_string _t226 = CGen_emit_value(self, _t225);
-            lyric_string slice_val = _t226;
-            LValue* _t227 = args.data[1];
-            lyric_string _t228 = CGen_emit_value(self, _t227);
-            lyric_string sep = _t228;
-            lyric_string _t229 = lyric_sprintf("lyric_str_join(%.*s, %.*s.data, %.*s.len)", (int)sep.len, (const char*)sep.data, (int)slice_val.len, (const char*)slice_val.data, (int)slice_val.len, (const char*)slice_val.data);
-            return _t229;
-        }
-    }
-    bool _t230 = lyric_str_eq(name, LYRIC_STR("slice_is_empty"));
-    if (_t230) {
-        int32_t _t231 = args.len;
-        bool _t232 = (_t231 > 0);
-        if (_t232) {
-            LValue* _t233 = args.data[0];
-            lyric_string _t234 = CGen_emit_value(self, _t233);
-            lyric_string _t235 = lyric_sprintf("(%.*s.len == 0)", (int)_t234.len, (const char*)_t234.data);
-            return _t235;
-        }
-    }
-    bool _t236 = lyric_str_eq(name, LYRIC_STR("slice_first"));
+    bool _t234 = lyric_str_eq(name, LYRIC_STR("index_of"));
+    bool _sc235 = false;
+    _sc235 = _t234;
+    bool _t236 = (!_sc235);
     if (_t236) {
-        int32_t _t237 = args.len;
-        bool _t238 = (_t237 > 0);
-        bool _sc239 = false;
-        _sc239 = _t238;
-        if (_sc239) {
-            LValue* _t240 = args.data[0];
-            bool _t241 = (_t240 == NULL);
-            bool _t242 = (!_t241);
-            _sc239 = _t242;
-        }
-        bool _sc243 = false;
-        _sc243 = _sc239;
-        if (_sc243) {
-            LValue* _t244 = args.data[0];
-            LValue* _t245 = _t244;
-            LType* _t246 = _t245->typ;
-            bool _t247 = (_t246 == NULL);
-            bool _t248 = (!_t247);
-            _sc243 = _t248;
-        }
-        if (_sc243) {
-            LValue* _t249 = args.data[0];
-            lyric_string _t250 = CGen_emit_value(self, _t249);
-            lyric_string sv = _t250;
-            LValue* _t251 = args.data[0];
-            LValue* _t252 = _t251;
-            LType* _t253 = _t252->typ;
-            LType* _t254 = _t253;
-            LType* _t255 = _t254->elem;
-            lyric_string _t256 = CGen_opt_type_name(self, _t255);
-            lyric_string opt_name = _t256;
-            lyric_string _t257 = lyric_sprintf("((%.*s.len == 0) ? lyric_none(%.*s) : lyric_some(%.*s.data[0], %.*s))", (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data, (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data);
-            return _t257;
+        bool _t237 = lyric_str_eq(name, LYRIC_STR("str_index_of"));
+        _sc235 = _t237;
+    }
+    bool _sc238 = false;
+    _sc238 = _sc235;
+    bool _t239 = (!_sc238);
+    if (_t239) {
+        bool _t240 = lyric_str_eq(name, LYRIC_STR("string_index_of"));
+        _sc238 = _t240;
+    }
+    if (_sc238) {
+        int32_t _t241 = args.len;
+        bool _t242 = (_t241 >= 2);
+        if (_t242) {
+            LValue* _t243 = args.data[0];
+            lyric_string _t244 = CGen_emit_value(self, _t243);
+            LValue* _t245 = args.data[1];
+            lyric_string _t246 = CGen_emit_value(self, _t245);
+            lyric_string _t247 = lyric_sprintf("lyric_str_index_of(%.*s, %.*s)", (int)_t244.len, (const char*)_t244.data, (int)_t246.len, (const char*)_t246.data);
+            return _t247;
         }
     }
-    bool _t258 = lyric_str_eq(name, LYRIC_STR("slice_last"));
-    if (_t258) {
-        int32_t _t259 = args.len;
-        bool _t260 = (_t259 > 0);
-        bool _sc261 = false;
-        _sc261 = _t260;
-        if (_sc261) {
-            LValue* _t262 = args.data[0];
-            bool _t263 = (_t262 == NULL);
-            bool _t264 = (!_t263);
-            _sc261 = _t264;
+    bool _t248 = lyric_str_eq(name, LYRIC_STR("replace"));
+    bool _sc249 = false;
+    _sc249 = _t248;
+    bool _t250 = (!_sc249);
+    if (_t250) {
+        bool _t251 = lyric_str_eq(name, LYRIC_STR("str_replace"));
+        _sc249 = _t251;
+    }
+    bool _sc252 = false;
+    _sc252 = _sc249;
+    bool _t253 = (!_sc252);
+    if (_t253) {
+        bool _t254 = lyric_str_eq(name, LYRIC_STR("string_replace"));
+        _sc252 = _t254;
+    }
+    if (_sc252) {
+        int32_t _t255 = args.len;
+        bool _t256 = (_t255 >= 3);
+        if (_t256) {
+            LValue* _t257 = args.data[0];
+            lyric_string _t258 = CGen_emit_value(self, _t257);
+            LValue* _t259 = args.data[1];
+            lyric_string _t260 = CGen_emit_value(self, _t259);
+            LValue* _t261 = args.data[2];
+            lyric_string _t262 = CGen_emit_value(self, _t261);
+            lyric_string _t263 = lyric_sprintf("lyric_str_replace(%.*s, %.*s, %.*s)", (int)_t258.len, (const char*)_t258.data, (int)_t260.len, (const char*)_t260.data, (int)_t262.len, (const char*)_t262.data);
+            return _t263;
         }
-        bool _sc265 = false;
-        _sc265 = _sc261;
-        if (_sc265) {
-            LValue* _t266 = args.data[0];
-            LValue* _t267 = _t266;
-            LType* _t268 = _t267->typ;
-            bool _t269 = (_t268 == NULL);
-            bool _t270 = (!_t269);
-            _sc265 = _t270;
-        }
-        if (_sc265) {
-            LValue* _t271 = args.data[0];
-            lyric_string _t272 = CGen_emit_value(self, _t271);
-            lyric_string sv = _t272;
+    }
+    bool _t264 = lyric_str_eq(name, LYRIC_STR("join"));
+    bool _sc265 = false;
+    _sc265 = _t264;
+    bool _t266 = (!_sc265);
+    if (_t266) {
+        bool _t267 = lyric_str_eq(name, LYRIC_STR("str_join"));
+        _sc265 = _t267;
+    }
+    bool _sc268 = false;
+    _sc268 = _sc265;
+    bool _t269 = (!_sc268);
+    if (_t269) {
+        bool _t270 = lyric_str_eq(name, LYRIC_STR("slice_join"));
+        _sc268 = _t270;
+    }
+    if (_sc268) {
+        int32_t _t271 = args.len;
+        bool _t272 = (_t271 >= 2);
+        if (_t272) {
             LValue* _t273 = args.data[0];
-            LValue* _t274 = _t273;
-            LType* _t275 = _t274->typ;
-            LType* _t276 = _t275;
-            LType* _t277 = _t276->elem;
-            lyric_string _t278 = CGen_opt_type_name(self, _t277);
-            lyric_string opt_name = _t278;
-            lyric_string _t279 = lyric_sprintf("((%.*s.len == 0) ? lyric_none(%.*s) : lyric_some(%.*s.data[%.*s.len - 1], %.*s))", (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data, (int)sv.len, (const char*)sv.data, (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data);
-            return _t279;
+            lyric_string _t274 = CGen_emit_value(self, _t273);
+            lyric_string slice_val = _t274;
+            LValue* _t275 = args.data[1];
+            lyric_string _t276 = CGen_emit_value(self, _t275);
+            lyric_string sep = _t276;
+            lyric_string _t277 = lyric_sprintf("lyric_str_join(%.*s, %.*s.data, %.*s.len)", (int)sep.len, (const char*)sep.data, (int)slice_val.len, (const char*)slice_val.data, (int)slice_val.len, (const char*)slice_val.data);
+            return _t277;
         }
     }
-    bool _t280 = lyric_str_eq(name, LYRIC_STR("slice_index_of"));
-    if (_t280) {
-        int32_t _t281 = args.len;
-        bool _t282 = (_t281 >= 2);
-        if (_t282) {
-            LValue* _t283 = args.data[0];
-            lyric_string _t284 = CGen_emit_value(self, _t283);
-            lyric_string sv = _t284;
-            LValue* _t285 = args.data[1];
-            lyric_string _t286 = CGen_emit_value(self, _t285);
-            lyric_string ev = _t286;
-            lyric_string _t287 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ int32_t _idx = -1; for (int32_t _i = 0; _i < "));
-            lyric_string _t288 = lyric_str_concat(_t287, sv);
-            lyric_string _t289 = lyric_str_concat(_t288, LYRIC_STR(".len; _i++) { if ("));
-            lyric_string _t290 = lyric_str_concat(_t289, sv);
-            lyric_string _t291 = lyric_str_concat(_t290, LYRIC_STR(".data[_i] == "));
-            lyric_string _t292 = lyric_str_concat(_t291, ev);
-            lyric_string _t293 = lyric_str_concat(_t292, LYRIC_STR(") { _idx = _i; break; } } _idx; })"));
-            return _t293;
+    bool _t278 = lyric_str_eq(name, LYRIC_STR("slice_is_empty"));
+    if (_t278) {
+        int32_t _t279 = args.len;
+        bool _t280 = (_t279 > 0);
+        if (_t280) {
+            LValue* _t281 = args.data[0];
+            lyric_string _t282 = CGen_emit_value(self, _t281);
+            lyric_string _t283 = lyric_sprintf("(%.*s.len == 0)", (int)_t282.len, (const char*)_t282.data);
+            return _t283;
         }
     }
-    bool _t294 = lyric_str_eq(name, LYRIC_STR("slice_remove"));
-    if (_t294) {
-        int32_t _t295 = args.len;
-        bool _t296 = (_t295 >= 2);
-        if (_t296) {
+    bool _t284 = lyric_str_eq(name, LYRIC_STR("slice_first"));
+    if (_t284) {
+        int32_t _t285 = args.len;
+        bool _t286 = (_t285 > 0);
+        bool _sc287 = false;
+        _sc287 = _t286;
+        if (_sc287) {
+            LValue* _t288 = args.data[0];
+            bool _t289 = (_t288 == NULL);
+            bool _t290 = (!_t289);
+            _sc287 = _t290;
+        }
+        bool _sc291 = false;
+        _sc291 = _sc287;
+        if (_sc291) {
+            LValue* _t292 = args.data[0];
+            LValue* _t293 = _t292;
+            LType* _t294 = _t293->typ;
+            bool _t295 = (_t294 == NULL);
+            bool _t296 = (!_t295);
+            _sc291 = _t296;
+        }
+        if (_sc291) {
             LValue* _t297 = args.data[0];
             lyric_string _t298 = CGen_emit_value(self, _t297);
             lyric_string sv = _t298;
-            LValue* _t299 = args.data[1];
-            lyric_string _t300 = CGen_emit_value(self, _t299);
-            lyric_string ev = _t300;
-            lyric_string _t301 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ for (int32_t _i = 0; _i < "));
-            lyric_string _t302 = lyric_str_concat(_t301, sv);
-            lyric_string _t303 = lyric_str_concat(_t302, LYRIC_STR(".len; _i++) { if ("));
-            lyric_string _t304 = lyric_str_concat(_t303, sv);
-            lyric_string _t305 = lyric_str_concat(_t304, LYRIC_STR(".data[_i] == "));
-            lyric_string _t306 = lyric_str_concat(_t305, ev);
-            lyric_string _t307 = lyric_str_concat(_t306, LYRIC_STR(") { memmove(&"));
-            lyric_string _t308 = lyric_str_concat(_t307, sv);
-            lyric_string _t309 = lyric_str_concat(_t308, LYRIC_STR(".data[_i], &"));
-            lyric_string _t310 = lyric_str_concat(_t309, sv);
-            lyric_string _t311 = lyric_str_concat(_t310, LYRIC_STR(".data[_i+1], ("));
-            lyric_string _t312 = lyric_str_concat(_t311, sv);
-            lyric_string _t313 = lyric_str_concat(_t312, LYRIC_STR(".len-_i-1)*sizeof(*"));
-            lyric_string _t314 = lyric_str_concat(_t313, sv);
-            lyric_string _t315 = lyric_str_concat(_t314, LYRIC_STR(".data)); (&"));
-            lyric_string _t316 = lyric_str_concat(_t315, sv);
-            lyric_string _t317 = lyric_str_concat(_t316, LYRIC_STR(")->len--; break; } } })"));
-            return _t317;
+            LValue* _t299 = args.data[0];
+            LValue* _t300 = _t299;
+            LType* _t301 = _t300->typ;
+            LType* _t302 = _t301;
+            LType* _t303 = _t302->elem;
+            lyric_string _t304 = CGen_opt_type_name(self, _t303);
+            lyric_string opt_name = _t304;
+            lyric_string _t305 = lyric_sprintf("((%.*s.len == 0) ? lyric_none(%.*s) : lyric_some(%.*s.data[0], %.*s))", (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data, (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data);
+            return _t305;
         }
     }
-    bool _t318 = lyric_str_eq(name, LYRIC_STR("slice_clear"));
-    if (_t318) {
-        int32_t _t319 = args.len;
-        bool _t320 = (_t319 > 0);
-        if (_t320) {
+    bool _t306 = lyric_str_eq(name, LYRIC_STR("slice_last"));
+    if (_t306) {
+        int32_t _t307 = args.len;
+        bool _t308 = (_t307 > 0);
+        bool _sc309 = false;
+        _sc309 = _t308;
+        if (_sc309) {
+            LValue* _t310 = args.data[0];
+            bool _t311 = (_t310 == NULL);
+            bool _t312 = (!_t311);
+            _sc309 = _t312;
+        }
+        bool _sc313 = false;
+        _sc313 = _sc309;
+        if (_sc313) {
+            LValue* _t314 = args.data[0];
+            LValue* _t315 = _t314;
+            LType* _t316 = _t315->typ;
+            bool _t317 = (_t316 == NULL);
+            bool _t318 = (!_t317);
+            _sc313 = _t318;
+        }
+        if (_sc313) {
+            LValue* _t319 = args.data[0];
+            lyric_string _t320 = CGen_emit_value(self, _t319);
+            lyric_string sv = _t320;
             LValue* _t321 = args.data[0];
-            lyric_string _t322 = CGen_emit_value(self, _t321);
-            lyric_string _t323 = lyric_sprintf("((&%.*s)->len = 0)", (int)_t322.len, (const char*)_t322.data);
-            return _t323;
+            LValue* _t322 = _t321;
+            LType* _t323 = _t322->typ;
+            LType* _t324 = _t323;
+            LType* _t325 = _t324->elem;
+            lyric_string _t326 = CGen_opt_type_name(self, _t325);
+            lyric_string opt_name = _t326;
+            lyric_string _t327 = lyric_sprintf("((%.*s.len == 0) ? lyric_none(%.*s) : lyric_some(%.*s.data[%.*s.len - 1], %.*s))", (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data, (int)sv.len, (const char*)sv.data, (int)sv.len, (const char*)sv.data, (int)opt_name.len, (const char*)opt_name.data);
+            return _t327;
         }
     }
-    bool _t324 = lyric_str_eq(name, LYRIC_STR("slice_reverse"));
-    if (_t324) {
-        int32_t _t325 = args.len;
-        bool _t326 = (_t325 > 0);
-        if (_t326) {
-            LValue* _t327 = args.data[0];
-            lyric_string _t328 = CGen_emit_value(self, _t327);
-            lyric_string sv = _t328;
-            lyric_string _t329 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ int32_t _l = 0, _r = "));
-            lyric_string _t330 = lyric_str_concat(_t329, sv);
-            lyric_string _t331 = lyric_str_concat(_t330, LYRIC_STR(".len - 1; while (_l < _r) { __typeof__("));
-            lyric_string _t332 = lyric_str_concat(_t331, sv);
-            lyric_string _t333 = lyric_str_concat(_t332, LYRIC_STR(".data[0]) _tmp = "));
-            lyric_string _t334 = lyric_str_concat(_t333, sv);
-            lyric_string _t335 = lyric_str_concat(_t334, LYRIC_STR(".data[_l]; "));
+    bool _t328 = lyric_str_eq(name, LYRIC_STR("slice_index_of"));
+    if (_t328) {
+        int32_t _t329 = args.len;
+        bool _t330 = (_t329 >= 2);
+        if (_t330) {
+            LValue* _t331 = args.data[0];
+            lyric_string _t332 = CGen_emit_value(self, _t331);
+            lyric_string sv = _t332;
+            LValue* _t333 = args.data[1];
+            lyric_string _t334 = CGen_emit_value(self, _t333);
+            lyric_string ev = _t334;
+            lyric_string _t335 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ int32_t _idx = -1; for (int32_t _i = 0; _i < "));
             lyric_string _t336 = lyric_str_concat(_t335, sv);
-            lyric_string _t337 = lyric_str_concat(_t336, LYRIC_STR(".data[_l++] = "));
+            lyric_string _t337 = lyric_str_concat(_t336, LYRIC_STR(".len; _i++) { if ("));
             lyric_string _t338 = lyric_str_concat(_t337, sv);
-            lyric_string _t339 = lyric_str_concat(_t338, LYRIC_STR(".data[_r]; "));
-            lyric_string _t340 = lyric_str_concat(_t339, sv);
-            lyric_string _t341 = lyric_str_concat(_t340, LYRIC_STR(".data[_r--] = _tmp; } })"));
+            lyric_string _t339 = lyric_str_concat(_t338, LYRIC_STR(".data[_i] == "));
+            lyric_string _t340 = lyric_str_concat(_t339, ev);
+            lyric_string _t341 = lyric_str_concat(_t340, LYRIC_STR(") { _idx = _i; break; } } _idx; })"));
             return _t341;
         }
     }
-    bool _t342 = lyric_str_eq(name, LYRIC_STR("repeat"));
-    bool _sc343 = false;
-    _sc343 = _t342;
-    bool _t344 = (!_sc343);
-    if (_t344) {
-        bool _t345 = lyric_str_eq(name, LYRIC_STR("str_repeat"));
-        _sc343 = _t345;
-    }
-    bool _sc346 = false;
-    _sc346 = _sc343;
-    bool _t347 = (!_sc346);
-    if (_t347) {
-        bool _t348 = lyric_str_eq(name, LYRIC_STR("string_repeat"));
-        _sc346 = _t348;
-    }
-    if (_sc346) {
-        int32_t _t349 = args.len;
-        bool _t350 = (_t349 >= 2);
-        if (_t350) {
-            LValue* _t351 = args.data[0];
-            lyric_string _t352 = CGen_emit_value(self, _t351);
-            LValue* _t353 = args.data[1];
-            lyric_string _t354 = CGen_emit_value(self, _t353);
-            lyric_string _t355 = lyric_sprintf("lyric_str_repeat(%.*s, %.*s)", (int)_t352.len, (const char*)_t352.data, (int)_t354.len, (const char*)_t354.data);
-            return _t355;
+    bool _t342 = lyric_str_eq(name, LYRIC_STR("slice_remove"));
+    if (_t342) {
+        int32_t _t343 = args.len;
+        bool _t344 = (_t343 >= 2);
+        if (_t344) {
+            LValue* _t345 = args.data[0];
+            lyric_string _t346 = CGen_emit_value(self, _t345);
+            lyric_string sv = _t346;
+            LValue* _t347 = args.data[1];
+            lyric_string _t348 = CGen_emit_value(self, _t347);
+            lyric_string ev = _t348;
+            lyric_string _t349 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ for (int32_t _i = 0; _i < "));
+            lyric_string _t350 = lyric_str_concat(_t349, sv);
+            lyric_string _t351 = lyric_str_concat(_t350, LYRIC_STR(".len; _i++) { if ("));
+            lyric_string _t352 = lyric_str_concat(_t351, sv);
+            lyric_string _t353 = lyric_str_concat(_t352, LYRIC_STR(".data[_i] == "));
+            lyric_string _t354 = lyric_str_concat(_t353, ev);
+            lyric_string _t355 = lyric_str_concat(_t354, LYRIC_STR(") { memmove(&"));
+            lyric_string _t356 = lyric_str_concat(_t355, sv);
+            lyric_string _t357 = lyric_str_concat(_t356, LYRIC_STR(".data[_i], &"));
+            lyric_string _t358 = lyric_str_concat(_t357, sv);
+            lyric_string _t359 = lyric_str_concat(_t358, LYRIC_STR(".data[_i+1], ("));
+            lyric_string _t360 = lyric_str_concat(_t359, sv);
+            lyric_string _t361 = lyric_str_concat(_t360, LYRIC_STR(".len-_i-1)*sizeof(*"));
+            lyric_string _t362 = lyric_str_concat(_t361, sv);
+            lyric_string _t363 = lyric_str_concat(_t362, LYRIC_STR(".data)); (&"));
+            lyric_string _t364 = lyric_str_concat(_t363, sv);
+            lyric_string _t365 = lyric_str_concat(_t364, LYRIC_STR(")->len--; break; } } })"));
+            return _t365;
         }
     }
-    bool _t356 = lyric_str_eq(name, LYRIC_STR("string_to_upper"));
-    bool _sc357 = false;
-    _sc357 = _t356;
-    bool _t358 = (!_sc357);
-    if (_t358) {
-        bool _t359 = lyric_str_eq(name, LYRIC_STR("str_to_upper"));
-        _sc357 = _t359;
-    }
-    if (_sc357) {
-        int32_t _t360 = args.len;
-        bool _t361 = (_t360 > 0);
-        if (_t361) {
-            LValue* _t362 = args.data[0];
-            lyric_string _t363 = CGen_emit_value(self, _t362);
-            lyric_string _t364 = lyric_sprintf("lyric_toupper(%.*s)", (int)_t363.len, (const char*)_t363.data);
-            return _t364;
+    bool _t366 = lyric_str_eq(name, LYRIC_STR("slice_clear"));
+    if (_t366) {
+        int32_t _t367 = args.len;
+        bool _t368 = (_t367 > 0);
+        if (_t368) {
+            LValue* _t369 = args.data[0];
+            lyric_string _t370 = CGen_emit_value(self, _t369);
+            lyric_string _t371 = lyric_sprintf("((&%.*s)->len = 0)", (int)_t370.len, (const char*)_t370.data);
+            return _t371;
         }
     }
-    bool _t365 = lyric_str_eq(name, LYRIC_STR("string_to_lower"));
-    bool _sc366 = false;
-    _sc366 = _t365;
-    bool _t367 = (!_sc366);
-    if (_t367) {
-        bool _t368 = lyric_str_eq(name, LYRIC_STR("str_to_lower"));
-        _sc366 = _t368;
-    }
-    if (_sc366) {
-        int32_t _t369 = args.len;
-        bool _t370 = (_t369 > 0);
-        if (_t370) {
-            LValue* _t371 = args.data[0];
-            lyric_string _t372 = CGen_emit_value(self, _t371);
-            lyric_string _t373 = lyric_sprintf("lyric_tolower(%.*s)", (int)_t372.len, (const char*)_t372.data);
-            return _t373;
+    bool _t372 = lyric_str_eq(name, LYRIC_STR("slice_reverse"));
+    if (_t372) {
+        int32_t _t373 = args.len;
+        bool _t374 = (_t373 > 0);
+        if (_t374) {
+            LValue* _t375 = args.data[0];
+            lyric_string _t376 = CGen_emit_value(self, _t375);
+            lyric_string sv = _t376;
+            lyric_string _t377 = lyric_str_concat(LYRIC_STR("("), LYRIC_STR("{ int32_t _l = 0, _r = "));
+            lyric_string _t378 = lyric_str_concat(_t377, sv);
+            lyric_string _t379 = lyric_str_concat(_t378, LYRIC_STR(".len - 1; while (_l < _r) { __typeof__("));
+            lyric_string _t380 = lyric_str_concat(_t379, sv);
+            lyric_string _t381 = lyric_str_concat(_t380, LYRIC_STR(".data[0]) _tmp = "));
+            lyric_string _t382 = lyric_str_concat(_t381, sv);
+            lyric_string _t383 = lyric_str_concat(_t382, LYRIC_STR(".data[_l]; "));
+            lyric_string _t384 = lyric_str_concat(_t383, sv);
+            lyric_string _t385 = lyric_str_concat(_t384, LYRIC_STR(".data[_l++] = "));
+            lyric_string _t386 = lyric_str_concat(_t385, sv);
+            lyric_string _t387 = lyric_str_concat(_t386, LYRIC_STR(".data[_r]; "));
+            lyric_string _t388 = lyric_str_concat(_t387, sv);
+            lyric_string _t389 = lyric_str_concat(_t388, LYRIC_STR(".data[_r--] = _tmp; } })"));
+            return _t389;
         }
     }
-    bool _t374 = lyric_str_eq(name, LYRIC_STR("string_split"));
-    bool _sc375 = false;
-    _sc375 = _t374;
-    bool _t376 = (!_sc375);
-    if (_t376) {
-        bool _t377 = lyric_str_eq(name, LYRIC_STR("str_split"));
-        _sc375 = _t377;
+    bool _t390 = lyric_str_eq(name, LYRIC_STR("repeat"));
+    bool _sc391 = false;
+    _sc391 = _t390;
+    bool _t392 = (!_sc391);
+    if (_t392) {
+        bool _t393 = lyric_str_eq(name, LYRIC_STR("str_repeat"));
+        _sc391 = _t393;
     }
-    if (_sc375) {
-        int32_t _t378 = args.len;
-        bool _t379 = (_t378 >= 2);
-        if (_t379) {
-            LValue* _t380 = args.data[0];
-            lyric_string _t381 = CGen_emit_value(self, _t380);
-            LValue* _t382 = args.data[1];
-            lyric_string _t383 = CGen_emit_value(self, _t382);
-            lyric_string _t384 = lyric_sprintf("lyric_str_split(%.*s, %.*s)", (int)_t381.len, (const char*)_t381.data, (int)_t383.len, (const char*)_t383.data);
-            return _t384;
+    bool _sc394 = false;
+    _sc394 = _sc391;
+    bool _t395 = (!_sc394);
+    if (_t395) {
+        bool _t396 = lyric_str_eq(name, LYRIC_STR("string_repeat"));
+        _sc394 = _t396;
+    }
+    if (_sc394) {
+        int32_t _t397 = args.len;
+        bool _t398 = (_t397 >= 2);
+        if (_t398) {
+            LValue* _t399 = args.data[0];
+            lyric_string _t400 = CGen_emit_value(self, _t399);
+            LValue* _t401 = args.data[1];
+            lyric_string _t402 = CGen_emit_value(self, _t401);
+            lyric_string _t403 = lyric_sprintf("lyric_str_repeat(%.*s, %.*s)", (int)_t400.len, (const char*)_t400.data, (int)_t402.len, (const char*)_t402.data);
+            return _t403;
         }
     }
-    bool _t385 = lyric_str_eq(name, LYRIC_STR("string_trim"));
-    bool _sc386 = false;
-    _sc386 = _t385;
-    bool _t387 = (!_sc386);
-    if (_t387) {
-        bool _t388 = lyric_str_eq(name, LYRIC_STR("str_trim"));
-        _sc386 = _t388;
+    bool _t404 = lyric_str_eq(name, LYRIC_STR("string_to_upper"));
+    bool _sc405 = false;
+    _sc405 = _t404;
+    bool _t406 = (!_sc405);
+    if (_t406) {
+        bool _t407 = lyric_str_eq(name, LYRIC_STR("str_to_upper"));
+        _sc405 = _t407;
     }
-    if (_sc386) {
-        int32_t _t389 = args.len;
-        bool _t390 = (_t389 > 0);
-        if (_t390) {
-            LValue* _t391 = args.data[0];
-            lyric_string _t392 = CGen_emit_value(self, _t391);
-            lyric_string _t393 = lyric_sprintf("lyric_str_trim(%.*s)", (int)_t392.len, (const char*)_t392.data);
-            return _t393;
+    if (_sc405) {
+        int32_t _t408 = args.len;
+        bool _t409 = (_t408 > 0);
+        if (_t409) {
+            LValue* _t410 = args.data[0];
+            lyric_string _t411 = CGen_emit_value(self, _t410);
+            lyric_string _t412 = lyric_sprintf("lyric_toupper(%.*s)", (int)_t411.len, (const char*)_t411.data);
+            return _t412;
         }
     }
-    bool _t394 = lyric_str_eq(name, LYRIC_STR("hash_string"));
-    if (_t394) {
-        int32_t _t395 = args.len;
-        bool _t396 = (_t395 > 0);
-        if (_t396) {
-            LValue* _t397 = args.data[0];
-            lyric_string _t398 = CGen_emit_value(self, _t397);
-            lyric_string _t399 = lyric_sprintf("lyric_hash_string(%.*s)", (int)_t398.len, (const char*)_t398.data);
-            return _t399;
+    bool _t413 = lyric_str_eq(name, LYRIC_STR("string_to_lower"));
+    bool _sc414 = false;
+    _sc414 = _t413;
+    bool _t415 = (!_sc414);
+    if (_t415) {
+        bool _t416 = lyric_str_eq(name, LYRIC_STR("str_to_lower"));
+        _sc414 = _t416;
+    }
+    if (_sc414) {
+        int32_t _t417 = args.len;
+        bool _t418 = (_t417 > 0);
+        if (_t418) {
+            LValue* _t419 = args.data[0];
+            lyric_string _t420 = CGen_emit_value(self, _t419);
+            lyric_string _t421 = lyric_sprintf("lyric_tolower(%.*s)", (int)_t420.len, (const char*)_t420.data);
+            return _t421;
+        }
+    }
+    bool _t422 = lyric_str_eq(name, LYRIC_STR("string_split"));
+    bool _sc423 = false;
+    _sc423 = _t422;
+    bool _t424 = (!_sc423);
+    if (_t424) {
+        bool _t425 = lyric_str_eq(name, LYRIC_STR("str_split"));
+        _sc423 = _t425;
+    }
+    if (_sc423) {
+        int32_t _t426 = args.len;
+        bool _t427 = (_t426 >= 2);
+        if (_t427) {
+            LValue* _t428 = args.data[0];
+            lyric_string _t429 = CGen_emit_value(self, _t428);
+            LValue* _t430 = args.data[1];
+            lyric_string _t431 = CGen_emit_value(self, _t430);
+            lyric_string _t432 = lyric_sprintf("lyric_str_split(%.*s, %.*s)", (int)_t429.len, (const char*)_t429.data, (int)_t431.len, (const char*)_t431.data);
+            return _t432;
+        }
+    }
+    bool _t433 = lyric_str_eq(name, LYRIC_STR("string_trim"));
+    bool _sc434 = false;
+    _sc434 = _t433;
+    bool _t435 = (!_sc434);
+    if (_t435) {
+        bool _t436 = lyric_str_eq(name, LYRIC_STR("str_trim"));
+        _sc434 = _t436;
+    }
+    if (_sc434) {
+        int32_t _t437 = args.len;
+        bool _t438 = (_t437 > 0);
+        if (_t438) {
+            LValue* _t439 = args.data[0];
+            lyric_string _t440 = CGen_emit_value(self, _t439);
+            lyric_string _t441 = lyric_sprintf("lyric_str_trim(%.*s)", (int)_t440.len, (const char*)_t440.data);
+            return _t441;
+        }
+    }
+    bool _t442 = lyric_str_eq(name, LYRIC_STR("hash_string"));
+    if (_t442) {
+        int32_t _t443 = args.len;
+        bool _t444 = (_t443 > 0);
+        if (_t444) {
+            LValue* _t445 = args.data[0];
+            lyric_string _t446 = CGen_emit_value(self, _t445);
+            lyric_string _t447 = lyric_sprintf("lyric_hash_string(%.*s)", (int)_t446.len, (const char*)_t446.data);
+            return _t447;
         }
         return LYRIC_STR("0");
     }
-    bool _t400 = lyric_str_eq(name, LYRIC_STR("eprint"));
-    if (_t400) {
-        lyric_string _t401 = CGen_emit_fprint(self, LYRIC_STR("stderr"), args, false);
-        return _t401;
+    bool _t448 = lyric_str_eq(name, LYRIC_STR("eprint"));
+    if (_t448) {
+        lyric_string _t449 = CGen_emit_fprint(self, LYRIC_STR("stderr"), args, false);
+        return _t449;
     }
-    bool _t402 = lyric_str_eq(name, LYRIC_STR("eprintln"));
-    if (_t402) {
-        lyric_string _t403 = CGen_emit_fprint(self, LYRIC_STR("stderr"), args, true);
-        return _t403;
+    bool _t450 = lyric_str_eq(name, LYRIC_STR("eprintln"));
+    if (_t450) {
+        lyric_string _t451 = CGen_emit_fprint(self, LYRIC_STR("stderr"), args, true);
+        return _t451;
     }
-    bool _t404 = lyric_str_eq(name, LYRIC_STR("read_file"));
-    if (_t404) {
-        int32_t _t405 = args.len;
-        bool _t406 = (_t405 > 0);
-        if (_t406) {
-            LValue* _t407 = args.data[0];
-            lyric_string _t408 = CGen_emit_value(self, _t407);
-            lyric_string _t409 = lyric_sprintf("lyric_read_file(%.*s)", (int)_t408.len, (const char*)_t408.data);
-            return _t409;
-        }
-    }
-    bool _t410 = lyric_str_eq(name, LYRIC_STR("write_file"));
-    if (_t410) {
-        int32_t _t411 = args.len;
-        bool _t412 = (_t411 >= 2);
-        if (_t412) {
-            LValue* _t413 = args.data[0];
-            lyric_string _t414 = CGen_emit_value(self, _t413);
-            LValue* _t415 = args.data[1];
-            lyric_string _t416 = CGen_emit_value(self, _t415);
-            lyric_string _t417 = lyric_sprintf("lyric_write_file(%.*s, %.*s)", (int)_t414.len, (const char*)_t414.data, (int)_t416.len, (const char*)_t416.data);
-            return _t417;
-        }
-    }
-    bool _t418 = lyric_str_eq(name, LYRIC_STR("os_args"));
-    if (_t418) {
-        self->needs_os_args = true;
-        return LYRIC_STR("_lyric_os_args(_argc, _argv)");
-    }
-    bool _t419 = lyric_str_eq(name, LYRIC_STR("os_exit"));
-    if (_t419) {
-        int32_t _t420 = args.len;
-        bool _t421 = (_t420 > 0);
-        if (_t421) {
-            LValue* _t422 = args.data[0];
-            lyric_string _t423 = CGen_emit_value(self, _t422);
-            lyric_string _t424 = lyric_sprintf("exit(%.*s)", (int)_t423.len, (const char*)_t423.data);
-            return _t424;
-        }
-        return LYRIC_STR("exit(0)");
-    }
-    bool _t425 = lyric_str_eq(name, LYRIC_STR("os_getwd"));
-    if (_t425) {
-        return LYRIC_STR("lyric_getwd()");
-    }
-    bool _t426 = lyric_str_eq(name, LYRIC_STR("list_dir"));
-    if (_t426) {
-        int32_t _t427 = args.len;
-        bool _t428 = (_t427 > 0);
-        if (_t428) {
-            LValue* _t429 = args.data[0];
-            lyric_string _t430 = CGen_emit_value(self, _t429);
-            lyric_string _t431 = lyric_sprintf("lyric_list_dir(%.*s)", (int)_t430.len, (const char*)_t430.data);
-            return _t431;
-        }
-    }
-    bool _t432 = lyric_str_eq(name, LYRIC_STR("file_exists"));
-    if (_t432) {
-        int32_t _t433 = args.len;
-        bool _t434 = (_t433 > 0);
-        if (_t434) {
-            LValue* _t435 = args.data[0];
-            lyric_string _t436 = CGen_emit_value(self, _t435);
-            lyric_string _t437 = lyric_sprintf("lyric_file_exists(%.*s)", (int)_t436.len, (const char*)_t436.data);
-            return _t437;
-        }
-    }
-    bool _t438 = lyric_str_eq(name, LYRIC_STR("mkdtemp"));
-    if (_t438) {
-        int32_t _t439 = args.len;
-        bool _t440 = (_t439 > 0);
-        if (_t440) {
-            LValue* _t441 = args.data[0];
-            lyric_string _t442 = CGen_emit_value(self, _t441);
-            lyric_string _t443 = lyric_sprintf("lyric_mkdtemp(%.*s)", (int)_t442.len, (const char*)_t442.data);
-            return _t443;
-        }
-    }
-    bool _t444 = lyric_str_eq(name, LYRIC_STR("exec_command"));
-    if (_t444) {
-        self->needs_exec_cmd = true;
-        int32_t _t445 = args.len;
-        bool _t446 = (_t445 >= 2);
-        if (_t446) {
-            LValue* _t447 = args.data[0];
-            lyric_string _t448 = CGen_emit_value(self, _t447);
-            LValue* _t449 = args.data[1];
-            lyric_string _t450 = CGen_emit_value(self, _t449);
-            lyric_string _t451 = lyric_sprintf("_lyric_exec_command(%.*s, %.*s)", (int)_t448.len, (const char*)_t448.data, (int)_t450.len, (const char*)_t450.data);
-            return _t451;
-        }
-    }
-    bool _t452 = lyric_str_eq(name, LYRIC_STR("path_join"));
+    bool _t452 = lyric_str_eq(name, LYRIC_STR("read_file"));
     if (_t452) {
-        self->needs_path_join = true;
         int32_t _t453 = args.len;
         bool _t454 = (_t453 > 0);
         if (_t454) {
             LValue* _t455 = args.data[0];
             lyric_string _t456 = CGen_emit_value(self, _t455);
-            lyric_string _t457 = lyric_sprintf("_lyric_path_join(%.*s)", (int)_t456.len, (const char*)_t456.data);
+            lyric_string _t457 = lyric_sprintf("lyric_read_file(%.*s)", (int)_t456.len, (const char*)_t456.data);
             return _t457;
         }
     }
-    bool _t458 = lyric_str_eq(name, LYRIC_STR("path_dir"));
+    bool _t458 = lyric_str_eq(name, LYRIC_STR("write_file"));
     if (_t458) {
         int32_t _t459 = args.len;
-        bool _t460 = (_t459 > 0);
+        bool _t460 = (_t459 >= 2);
         if (_t460) {
             LValue* _t461 = args.data[0];
             lyric_string _t462 = CGen_emit_value(self, _t461);
-            lyric_string _t463 = lyric_sprintf("lyric_path_dir(%.*s)", (int)_t462.len, (const char*)_t462.data);
-            return _t463;
+            LValue* _t463 = args.data[1];
+            lyric_string _t464 = CGen_emit_value(self, _t463);
+            lyric_string _t465 = lyric_sprintf("lyric_write_file(%.*s, %.*s)", (int)_t462.len, (const char*)_t462.data, (int)_t464.len, (const char*)_t464.data);
+            return _t465;
         }
     }
-    bool _t464 = lyric_str_eq(name, LYRIC_STR("path_base"));
-    if (_t464) {
-        int32_t _t465 = args.len;
-        bool _t466 = (_t465 > 0);
-        if (_t466) {
-            LValue* _t467 = args.data[0];
-            lyric_string _t468 = CGen_emit_value(self, _t467);
-            lyric_string _t469 = lyric_sprintf("lyric_path_base(%.*s)", (int)_t468.len, (const char*)_t468.data);
-            return _t469;
-        }
-    }
-    bool _t470 = lyric_str_eq(name, LYRIC_STR("path_ext"));
-    if (_t470) {
-        int32_t _t471 = args.len;
-        bool _t472 = (_t471 > 0);
-        if (_t472) {
-            LValue* _t473 = args.data[0];
-            lyric_string _t474 = CGen_emit_value(self, _t473);
-            lyric_string _t475 = lyric_sprintf("lyric_path_ext(%.*s)", (int)_t474.len, (const char*)_t474.data);
-            return _t475;
-        }
-    }
-    bool _t476 = lyric_str_eq(name, LYRIC_STR("itoa"));
-    if (_t476) {
-        int32_t _t477 = args.len;
-        bool _t478 = (_t477 > 0);
-        if (_t478) {
-            LValue* _t479 = args.data[0];
-            lyric_string _t480 = CGen_emit_value(self, _t479);
-            lyric_string _t481 = lyric_sprintf("lyric_itoa(%.*s)", (int)_t480.len, (const char*)_t480.data);
-            return _t481;
-        }
-    }
-    bool _t482 = lyric_str_eq(name, LYRIC_STR("atoi"));
-    if (_t482) {
-        int32_t _t483 = args.len;
-        bool _t484 = (_t483 > 0);
-        if (_t484) {
-            LValue* _t485 = args.data[0];
-            lyric_string _t486 = CGen_emit_value(self, _t485);
-            lyric_string _t487 = lyric_sprintf("lyric_atoi(%.*s)", (int)_t486.len, (const char*)_t486.data);
-            return _t487;
-        }
-    }
-    bool _t488 = lyric_str_eq(name, LYRIC_STR("parse_float"));
-    if (_t488) {
-        int32_t _t489 = args.len;
-        bool _t490 = (_t489 > 0);
-        if (_t490) {
-            LValue* _t491 = args.data[0];
-            lyric_string _t492 = CGen_emit_value(self, _t491);
-            lyric_string _t493 = lyric_sprintf("lyric_parse_float(%.*s)", (int)_t492.len, (const char*)_t492.data);
-            return _t493;
-        }
-    }
-    bool _t494 = lyric_str_eq(name, LYRIC_STR("char_to_string"));
-    if (_t494) {
-        int32_t _t495 = args.len;
-        bool _t496 = (_t495 > 0);
-        if (_t496) {
-            LValue* _t497 = args.data[0];
-            lyric_string _t498 = CGen_emit_value(self, _t497);
-            lyric_string _t499 = lyric_sprintf("lyric_char_to_string(%.*s)", (int)_t498.len, (const char*)_t498.data);
-            return _t499;
-        }
-    }
-    bool _t500 = lyric_str_eq(name, LYRIC_STR("println"));
-    bool _sc501 = false;
-    _sc501 = _t500;
-    bool _t502 = (!_sc501);
-    if (_t502) {
-        bool _t503 = lyric_str_eq(name, LYRIC_STR("Println"));
-        _sc501 = _t503;
-    }
-    bool _sc504 = false;
-    _sc504 = _sc501;
-    bool _t505 = (!_sc504);
-    if (_t505) {
-        bool _t506 = lyric_str_eq(name, LYRIC_STR("fmt.Println"));
-        _sc504 = _t506;
-    }
-    if (_sc504) {
-        lyric_string _t507 = CGen_emit_println(self, args);
-        return _t507;
-    }
-    bool _t508 = lyric_str_eq(name, LYRIC_STR("print"));
-    bool _sc509 = false;
-    _sc509 = _t508;
-    bool _t510 = (!_sc509);
-    if (_t510) {
-        bool _t511 = lyric_str_eq(name, LYRIC_STR("Print"));
-        _sc509 = _t511;
-    }
-    bool _sc512 = false;
-    _sc512 = _sc509;
-    bool _t513 = (!_sc512);
-    if (_t513) {
-        bool _t514 = lyric_str_eq(name, LYRIC_STR("fmt.Print"));
-        _sc512 = _t514;
-    }
-    if (_sc512) {
-        lyric_string _t515 = CGen_emit_fprint(self, LYRIC_STR("stdout"), args, false);
-        return _t515;
-    }
-    bool _t516 = lyric_str_eq(name, LYRIC_STR("assert"));
-    if (_t516) {
-        int32_t _t517 = args.len;
-        bool _t518 = (_t517 >= 1);
-        if (_t518) {
-            LValue* _t519 = args.data[0];
-            lyric_string _t520 = CGen_emit_value(self, _t519);
-            lyric_string cond = _t520;
-            lyric_string msg = LYRIC_STR("LYRIC_STR(\"assertion failed\")");
-            int32_t _t521 = args.len;
-            bool _t522 = (_t521 >= 2);
-            if (_t522) {
-                LValue* _t523 = args.data[1];
-                lyric_string _t524 = CGen_emit_value(self, _t523);
-                msg = _t524;
-            }
-            LBuiltinData _t525 = lyric_unwrap(d);
-            lyric_string _t526 = _t525.file;
-            LBuiltinData _t527 = lyric_unwrap(d);
-            int32_t _t528 = _t527.line;
-            lyric_string _t529 = lyric_itoa(_t528);
-            lyric_string _t530 = lyric_sprintf("lyric_assert(%.*s, %.*s, \"%.*s\", %.*s)", (int)cond.len, (const char*)cond.data, (int)msg.len, (const char*)msg.data, (int)_t526.len, (const char*)_t526.data, (int)_t529.len, (const char*)_t529.data);
-            return _t530;
-        }
-    }
-    bool _t531 = lyric_str_eq(name, LYRIC_STR("assert_eq"));
-    if (_t531) {
-        int32_t _t532 = args.len;
-        bool _t533 = (_t532 >= 2);
-        if (_t533) {
-            LValue* _t534 = args.data[0];
-            lyric_string _t535 = CGen_to_string_expr(self, _t534);
-            lyric_string to_str_a = _t535;
-            LValue* _t536 = args.data[1];
-            lyric_string _t537 = CGen_to_string_expr(self, _t536);
-            lyric_string to_str_e = _t537;
-            LValue* _t538 = args.data[0];
-            LValue* _t539 = args.data[1];
-            lyric_string _t540 = CGen_eq_expr(self, _t538, _t539);
-            lyric_string eq = _t540;
-            lyric_string msg = LYRIC_STR("LYRIC_STR(\"assert_eq failed\")");
-            int32_t _t541 = args.len;
-            bool _t542 = (_t541 >= 3);
-            if (_t542) {
-                LValue* _t543 = args.data[2];
-                lyric_string _t544 = CGen_emit_value(self, _t543);
-                msg = _t544;
-            }
-            LBuiltinData _t545 = lyric_unwrap(d);
-            lyric_string _t546 = _t545.file;
-            LBuiltinData _t547 = lyric_unwrap(d);
-            int32_t _t548 = _t547.line;
-            lyric_string _t549 = lyric_itoa(_t548);
-            lyric_string _t550 = lyric_sprintf("lyric_assert_eq(%.*s, %.*s, %.*s, %.*s, \"%.*s\", %.*s)", (int)eq.len, (const char*)eq.data, (int)to_str_a.len, (const char*)to_str_a.data, (int)to_str_e.len, (const char*)to_str_e.data, (int)msg.len, (const char*)msg.data, (int)_t546.len, (const char*)_t546.data, (int)_t549.len, (const char*)_t549.data);
-            return _t550;
-        }
-    }
-    bool _t551 = lyric_str_eq(name, LYRIC_STR("panic"));
-    if (_t551) {
-        int32_t _t552 = args.len;
-        bool _t553 = (_t552 >= 1);
-        if (_t553) {
-            LValue* _t554 = args.data[0];
-            lyric_string _t555 = CGen_emit_value(self, _t554);
-            lyric_string _t556 = lyric_sprintf("lyric_panic(%.*s)", (int)_t555.len, (const char*)_t555.data);
-            return _t556;
-        }
-    }
-    bool _t557 = lyric_str_eq(name, LYRIC_STR("channel_receive"));
-    if (_t557) {
-        int32_t _t558 = args.len;
-        bool _t559 = (_t558 > 0);
-        if (_t559) {
-            LValue* _t560 = args.data[0];
-            LType* _t561 = CGen_resolve_value_type(self, _t560);
-            LType* chan_type = _t561;
-            lyric_string suffix = LYRIC_STR("void");
-            bool _t562 = (chan_type == NULL);
-            bool _t563 = (!_t562);
-            bool _sc564 = false;
-            _sc564 = _t563;
-            if (_sc564) {
-                LType* _t565 = chan_type;
-                LTypeKind _t566 = _t565->kind;
-                int32_t _t567 = _t566;
-                bool _t568 = (_t567 == 21);
-                _sc564 = _t568;
-            }
-            bool _sc569 = false;
-            _sc569 = _sc564;
-            if (_sc569) {
-                LType* _t570 = chan_type;
-                LType* _t571 = _t570->elem;
-                bool _t572 = (_t571 == NULL);
-                bool _t573 = (!_t572);
-                _sc569 = _t573;
-            }
-            if (_sc569) {
-                LType* _t574 = chan_type;
-                LType* _t575 = _t574->elem;
-                lyric_string _t576 = CGen_chan_suffix(self, _t575);
-                suffix = _t576;
-            }
-            LValue* _t577 = args.data[0];
-            lyric_string _t578 = CGen_emit_value(self, _t577);
-            lyric_string _t579 = lyric_sprintf("lyric_chan_recv_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t578.len, (const char*)_t578.data);
-            return _t579;
-        }
-    }
-    bool _t580 = lyric_str_eq(name, LYRIC_STR("channel_close"));
-    if (_t580) {
-        int32_t _t581 = args.len;
-        bool _t582 = (_t581 > 0);
-        if (_t582) {
-            LValue* _t583 = args.data[0];
-            LType* _t584 = CGen_resolve_value_type(self, _t583);
-            LType* chan_type = _t584;
-            lyric_string suffix = LYRIC_STR("void");
-            bool _t585 = (chan_type == NULL);
-            bool _t586 = (!_t585);
-            bool _sc587 = false;
-            _sc587 = _t586;
-            if (_sc587) {
-                LType* _t588 = chan_type;
-                LTypeKind _t589 = _t588->kind;
-                int32_t _t590 = _t589;
-                bool _t591 = (_t590 == 21);
-                _sc587 = _t591;
-            }
-            bool _sc592 = false;
-            _sc592 = _sc587;
-            if (_sc592) {
-                LType* _t593 = chan_type;
-                LType* _t594 = _t593->elem;
-                bool _t595 = (_t594 == NULL);
-                bool _t596 = (!_t595);
-                _sc592 = _t596;
-            }
-            if (_sc592) {
-                LType* _t597 = chan_type;
-                LType* _t598 = _t597->elem;
-                lyric_string _t599 = CGen_chan_suffix(self, _t598);
-                suffix = _t599;
-            }
-            LValue* _t600 = args.data[0];
-            lyric_string _t601 = CGen_emit_value(self, _t600);
-            lyric_string _t602 = lyric_sprintf("lyric_chan_close_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t601.len, (const char*)_t601.data);
-            return _t602;
-        }
-    }
-    bool _t603 = lyric_str_eq(name, LYRIC_STR("map_len"));
-    if (_t603) {
-        return LYRIC_STR("0 /* map_len: maps not supported */");
-    }
-    bool _t604 = lyric_str_eq(name, LYRIC_STR("map_contains_key"));
-    bool _sc605 = false;
-    _sc605 = _t604;
-    bool _t606 = (!_sc605);
-    if (_t606) {
-        bool _t607 = lyric_str_eq(name, LYRIC_STR("contains_key"));
-        _sc605 = _t607;
-    }
-    if (_sc605) {
-        return LYRIC_STR("false /* contains_key: not supported */");
-    }
-    bool _t608 = lyric_str_eq(name, LYRIC_STR("read_file"));
-    if (_t608) {
-        int32_t _t609 = args.len;
-        bool _t610 = (_t609 > 0);
-        if (_t610) {
-            LValue* _t611 = args.data[0];
-            lyric_string _t612 = CGen_emit_value(self, _t611);
-            lyric_string _t613 = lyric_sprintf("lyric_read_file(%.*s)", (int)_t612.len, (const char*)_t612.data);
-            return _t613;
-        }
-    }
-    bool _t614 = lyric_str_eq(name, LYRIC_STR("write_file"));
-    if (_t614) {
-        int32_t _t615 = args.len;
-        bool _t616 = (_t615 >= 2);
-        if (_t616) {
-            LValue* _t617 = args.data[0];
-            lyric_string _t618 = CGen_emit_value(self, _t617);
-            LValue* _t619 = args.data[1];
-            lyric_string _t620 = CGen_emit_value(self, _t619);
-            lyric_string _t621 = lyric_sprintf("lyric_write_file(%.*s, %.*s)", (int)_t618.len, (const char*)_t618.data, (int)_t620.len, (const char*)_t620.data);
-            return _t621;
-        }
-    }
-    bool _t622 = lyric_str_eq(name, LYRIC_STR("os_args"));
-    if (_t622) {
+    bool _t466 = lyric_str_eq(name, LYRIC_STR("os_args"));
+    if (_t466) {
         self->needs_os_args = true;
         return LYRIC_STR("_lyric_os_args(_argc, _argv)");
     }
-    bool _t623 = lyric_str_eq(name, LYRIC_STR("os_exit"));
-    if (_t623) {
-        int32_t _t624 = args.len;
-        bool _t625 = (_t624 > 0);
-        if (_t625) {
-            LValue* _t626 = args.data[0];
-            lyric_string _t627 = CGen_emit_value(self, _t626);
-            lyric_string _t628 = lyric_sprintf("exit(%.*s)", (int)_t627.len, (const char*)_t627.data);
-            return _t628;
+    bool _t467 = lyric_str_eq(name, LYRIC_STR("os_exit"));
+    if (_t467) {
+        int32_t _t468 = args.len;
+        bool _t469 = (_t468 > 0);
+        if (_t469) {
+            LValue* _t470 = args.data[0];
+            lyric_string _t471 = CGen_emit_value(self, _t470);
+            lyric_string _t472 = lyric_sprintf("exit(%.*s)", (int)_t471.len, (const char*)_t471.data);
+            return _t472;
         }
         return LYRIC_STR("exit(0)");
     }
-    bool _t629 = lyric_str_eq(name, LYRIC_STR("os_getwd"));
-    if (_t629) {
+    bool _t473 = lyric_str_eq(name, LYRIC_STR("os_getwd"));
+    if (_t473) {
         return LYRIC_STR("lyric_getwd()");
     }
-    bool _t630 = lyric_str_eq(name, LYRIC_STR("list_dir"));
-    if (_t630) {
-        int32_t _t631 = args.len;
-        bool _t632 = (_t631 > 0);
-        if (_t632) {
-            LValue* _t633 = args.data[0];
-            lyric_string _t634 = CGen_emit_value(self, _t633);
-            lyric_string _t635 = lyric_sprintf("lyric_list_dir(%.*s)", (int)_t634.len, (const char*)_t634.data);
-            return _t635;
+    bool _t474 = lyric_str_eq(name, LYRIC_STR("list_dir"));
+    if (_t474) {
+        int32_t _t475 = args.len;
+        bool _t476 = (_t475 > 0);
+        if (_t476) {
+            LValue* _t477 = args.data[0];
+            lyric_string _t478 = CGen_emit_value(self, _t477);
+            lyric_string _t479 = lyric_sprintf("lyric_list_dir(%.*s)", (int)_t478.len, (const char*)_t478.data);
+            return _t479;
         }
     }
-    bool _t636 = lyric_str_eq(name, LYRIC_STR("file_exists"));
-    if (_t636) {
-        int32_t _t637 = args.len;
-        bool _t638 = (_t637 > 0);
-        if (_t638) {
-            LValue* _t639 = args.data[0];
-            lyric_string _t640 = CGen_emit_value(self, _t639);
-            lyric_string _t641 = lyric_sprintf("lyric_file_exists(%.*s)", (int)_t640.len, (const char*)_t640.data);
-            return _t641;
+    bool _t480 = lyric_str_eq(name, LYRIC_STR("file_exists"));
+    if (_t480) {
+        int32_t _t481 = args.len;
+        bool _t482 = (_t481 > 0);
+        if (_t482) {
+            LValue* _t483 = args.data[0];
+            lyric_string _t484 = CGen_emit_value(self, _t483);
+            lyric_string _t485 = lyric_sprintf("lyric_file_exists(%.*s)", (int)_t484.len, (const char*)_t484.data);
+            return _t485;
         }
     }
-    bool _t642 = lyric_str_eq(name, LYRIC_STR("mkdtemp"));
-    if (_t642) {
-        int32_t _t643 = args.len;
-        bool _t644 = (_t643 > 0);
-        if (_t644) {
-            LValue* _t645 = args.data[0];
-            lyric_string _t646 = CGen_emit_value(self, _t645);
-            lyric_string _t647 = lyric_sprintf("lyric_mkdtemp(%.*s)", (int)_t646.len, (const char*)_t646.data);
-            return _t647;
+    bool _t486 = lyric_str_eq(name, LYRIC_STR("mkdtemp"));
+    if (_t486) {
+        int32_t _t487 = args.len;
+        bool _t488 = (_t487 > 0);
+        if (_t488) {
+            LValue* _t489 = args.data[0];
+            lyric_string _t490 = CGen_emit_value(self, _t489);
+            lyric_string _t491 = lyric_sprintf("lyric_mkdtemp(%.*s)", (int)_t490.len, (const char*)_t490.data);
+            return _t491;
         }
     }
-    bool _t648 = lyric_str_eq(name, LYRIC_STR("itoa"));
-    if (_t648) {
-        int32_t _t649 = args.len;
-        bool _t650 = (_t649 > 0);
-        if (_t650) {
-            LValue* _t651 = args.data[0];
-            lyric_string _t652 = CGen_emit_value(self, _t651);
-            lyric_string _t653 = lyric_sprintf("lyric_itoa(%.*s)", (int)_t652.len, (const char*)_t652.data);
-            return _t653;
-        }
-    }
-    bool _t654 = lyric_str_eq(name, LYRIC_STR("atoi"));
-    if (_t654) {
-        int32_t _t655 = args.len;
-        bool _t656 = (_t655 > 0);
-        if (_t656) {
-            LValue* _t657 = args.data[0];
-            lyric_string _t658 = CGen_emit_value(self, _t657);
-            lyric_string _t659 = lyric_sprintf("lyric_atoi(%.*s)", (int)_t658.len, (const char*)_t658.data);
-            return _t659;
-        }
-    }
-    bool _t660 = lyric_str_eq(name, LYRIC_STR("char_to_string"));
-    if (_t660) {
-        int32_t _t661 = args.len;
-        bool _t662 = (_t661 > 0);
-        if (_t662) {
-            LValue* _t663 = args.data[0];
-            lyric_string _t664 = CGen_emit_value(self, _t663);
-            lyric_string _t665 = lyric_sprintf("lyric_char_to_string(%.*s)", (int)_t664.len, (const char*)_t664.data);
-            return _t665;
-        }
-    }
-    bool _t666 = lyric_str_eq(name, LYRIC_STR("hash_string"));
-    if (_t666) {
-        int32_t _t667 = args.len;
-        bool _t668 = (_t667 > 0);
-        if (_t668) {
-            LValue* _t669 = args.data[0];
-            lyric_string _t670 = CGen_emit_value(self, _t669);
-            lyric_string _t671 = lyric_sprintf("lyric_hash_string(%.*s)", (int)_t670.len, (const char*)_t670.data);
-            return _t671;
-        }
-    }
-    bool _t672 = lyric_str_eq(name, LYRIC_STR("exec_command"));
-    if (_t672) {
+    bool _t492 = lyric_str_eq(name, LYRIC_STR("exec_command"));
+    if (_t492) {
         self->needs_exec_cmd = true;
-        int32_t _t673 = args.len;
-        bool _t674 = (_t673 >= 2);
-        if (_t674) {
-            LValue* _t675 = args.data[0];
-            lyric_string _t676 = CGen_emit_value(self, _t675);
-            LValue* _t677 = args.data[1];
-            lyric_string _t678 = CGen_emit_value(self, _t677);
-            lyric_string _t679 = lyric_sprintf("_lyric_exec_command(%.*s, %.*s)", (int)_t676.len, (const char*)_t676.data, (int)_t678.len, (const char*)_t678.data);
-            return _t679;
+        int32_t _t493 = args.len;
+        bool _t494 = (_t493 >= 2);
+        if (_t494) {
+            LValue* _t495 = args.data[0];
+            lyric_string _t496 = CGen_emit_value(self, _t495);
+            LValue* _t497 = args.data[1];
+            lyric_string _t498 = CGen_emit_value(self, _t497);
+            lyric_string _t499 = lyric_sprintf("_lyric_exec_command(%.*s, %.*s)", (int)_t496.len, (const char*)_t496.data, (int)_t498.len, (const char*)_t498.data);
+            return _t499;
         }
     }
-    bool _t680 = lyric_str_eq(name, LYRIC_STR("path_join"));
-    if (_t680) {
+    bool _t500 = lyric_str_eq(name, LYRIC_STR("path_join"));
+    if (_t500) {
         self->needs_path_join = true;
-        int32_t _t681 = args.len;
-        bool _t682 = (_t681 > 0);
-        if (_t682) {
-            LValue* _t683 = args.data[0];
-            lyric_string _t684 = CGen_emit_value(self, _t683);
-            lyric_string _t685 = lyric_sprintf("_lyric_path_join(%.*s)", (int)_t684.len, (const char*)_t684.data);
-            return _t685;
+        int32_t _t501 = args.len;
+        bool _t502 = (_t501 > 0);
+        if (_t502) {
+            LValue* _t503 = args.data[0];
+            lyric_string _t504 = CGen_emit_value(self, _t503);
+            lyric_string _t505 = lyric_sprintf("_lyric_path_join(%.*s)", (int)_t504.len, (const char*)_t504.data);
+            return _t505;
         }
     }
-    bool _t686 = lyric_str_eq(name, LYRIC_STR("path_dir"));
-    if (_t686) {
-        int32_t _t687 = args.len;
-        bool _t688 = (_t687 > 0);
-        if (_t688) {
-            LValue* _t689 = args.data[0];
-            lyric_string _t690 = CGen_emit_value(self, _t689);
-            lyric_string _t691 = lyric_sprintf("lyric_path_dir(%.*s)", (int)_t690.len, (const char*)_t690.data);
-            return _t691;
+    bool _t506 = lyric_str_eq(name, LYRIC_STR("path_dir"));
+    if (_t506) {
+        int32_t _t507 = args.len;
+        bool _t508 = (_t507 > 0);
+        if (_t508) {
+            LValue* _t509 = args.data[0];
+            lyric_string _t510 = CGen_emit_value(self, _t509);
+            lyric_string _t511 = lyric_sprintf("lyric_path_dir(%.*s)", (int)_t510.len, (const char*)_t510.data);
+            return _t511;
         }
     }
-    bool _t692 = lyric_str_eq(name, LYRIC_STR("path_base"));
-    if (_t692) {
-        int32_t _t693 = args.len;
-        bool _t694 = (_t693 > 0);
-        if (_t694) {
-            LValue* _t695 = args.data[0];
-            lyric_string _t696 = CGen_emit_value(self, _t695);
-            lyric_string _t697 = lyric_sprintf("lyric_path_base(%.*s)", (int)_t696.len, (const char*)_t696.data);
-            return _t697;
+    bool _t512 = lyric_str_eq(name, LYRIC_STR("path_base"));
+    if (_t512) {
+        int32_t _t513 = args.len;
+        bool _t514 = (_t513 > 0);
+        if (_t514) {
+            LValue* _t515 = args.data[0];
+            lyric_string _t516 = CGen_emit_value(self, _t515);
+            lyric_string _t517 = lyric_sprintf("lyric_path_base(%.*s)", (int)_t516.len, (const char*)_t516.data);
+            return _t517;
         }
     }
-    bool _t698 = lyric_str_eq(name, LYRIC_STR("path_ext"));
-    if (_t698) {
-        int32_t _t699 = args.len;
-        bool _t700 = (_t699 > 0);
-        if (_t700) {
-            LValue* _t701 = args.data[0];
-            lyric_string _t702 = CGen_emit_value(self, _t701);
-            lyric_string _t703 = lyric_sprintf("lyric_path_ext(%.*s)", (int)_t702.len, (const char*)_t702.data);
-            return _t703;
+    bool _t518 = lyric_str_eq(name, LYRIC_STR("path_ext"));
+    if (_t518) {
+        int32_t _t519 = args.len;
+        bool _t520 = (_t519 > 0);
+        if (_t520) {
+            LValue* _t521 = args.data[0];
+            lyric_string _t522 = CGen_emit_value(self, _t521);
+            lyric_string _t523 = lyric_sprintf("lyric_path_ext(%.*s)", (int)_t522.len, (const char*)_t522.data);
+            return _t523;
         }
     }
-    bool _t704 = lyric_str_eq(name, LYRIC_STR("new_string_builder"));
-    if (_t704) {
+    bool _t524 = lyric_str_eq(name, LYRIC_STR("itoa"));
+    if (_t524) {
+        int32_t _t525 = args.len;
+        bool _t526 = (_t525 > 0);
+        if (_t526) {
+            LValue* _t527 = args.data[0];
+            lyric_string _t528 = CGen_emit_value(self, _t527);
+            lyric_string _t529 = lyric_sprintf("lyric_itoa(%.*s)", (int)_t528.len, (const char*)_t528.data);
+            return _t529;
+        }
+    }
+    bool _t530 = lyric_str_eq(name, LYRIC_STR("atoi"));
+    if (_t530) {
+        int32_t _t531 = args.len;
+        bool _t532 = (_t531 > 0);
+        if (_t532) {
+            LValue* _t533 = args.data[0];
+            lyric_string _t534 = CGen_emit_value(self, _t533);
+            lyric_string _t535 = lyric_sprintf("lyric_atoi(%.*s)", (int)_t534.len, (const char*)_t534.data);
+            return _t535;
+        }
+    }
+    bool _t536 = lyric_str_eq(name, LYRIC_STR("parse_float"));
+    if (_t536) {
+        int32_t _t537 = args.len;
+        bool _t538 = (_t537 > 0);
+        if (_t538) {
+            LValue* _t539 = args.data[0];
+            lyric_string _t540 = CGen_emit_value(self, _t539);
+            lyric_string _t541 = lyric_sprintf("lyric_parse_float(%.*s)", (int)_t540.len, (const char*)_t540.data);
+            return _t541;
+        }
+    }
+    bool _t542 = lyric_str_eq(name, LYRIC_STR("char_to_string"));
+    if (_t542) {
+        int32_t _t543 = args.len;
+        bool _t544 = (_t543 > 0);
+        if (_t544) {
+            LValue* _t545 = args.data[0];
+            lyric_string _t546 = CGen_emit_value(self, _t545);
+            lyric_string _t547 = lyric_sprintf("lyric_char_to_string(%.*s)", (int)_t546.len, (const char*)_t546.data);
+            return _t547;
+        }
+    }
+    bool _t548 = lyric_str_eq(name, LYRIC_STR("println"));
+    bool _sc549 = false;
+    _sc549 = _t548;
+    bool _t550 = (!_sc549);
+    if (_t550) {
+        bool _t551 = lyric_str_eq(name, LYRIC_STR("Println"));
+        _sc549 = _t551;
+    }
+    bool _sc552 = false;
+    _sc552 = _sc549;
+    bool _t553 = (!_sc552);
+    if (_t553) {
+        bool _t554 = lyric_str_eq(name, LYRIC_STR("fmt.Println"));
+        _sc552 = _t554;
+    }
+    if (_sc552) {
+        lyric_string _t555 = CGen_emit_println(self, args);
+        return _t555;
+    }
+    bool _t556 = lyric_str_eq(name, LYRIC_STR("print"));
+    bool _sc557 = false;
+    _sc557 = _t556;
+    bool _t558 = (!_sc557);
+    if (_t558) {
+        bool _t559 = lyric_str_eq(name, LYRIC_STR("Print"));
+        _sc557 = _t559;
+    }
+    bool _sc560 = false;
+    _sc560 = _sc557;
+    bool _t561 = (!_sc560);
+    if (_t561) {
+        bool _t562 = lyric_str_eq(name, LYRIC_STR("fmt.Print"));
+        _sc560 = _t562;
+    }
+    if (_sc560) {
+        lyric_string _t563 = CGen_emit_fprint(self, LYRIC_STR("stdout"), args, false);
+        return _t563;
+    }
+    bool _t564 = lyric_str_eq(name, LYRIC_STR("assert"));
+    if (_t564) {
+        int32_t _t565 = args.len;
+        bool _t566 = (_t565 >= 1);
+        if (_t566) {
+            LValue* _t567 = args.data[0];
+            lyric_string _t568 = CGen_emit_value(self, _t567);
+            lyric_string cond = _t568;
+            lyric_string msg = LYRIC_STR("LYRIC_STR(\"assertion failed\")");
+            int32_t _t569 = args.len;
+            bool _t570 = (_t569 >= 2);
+            if (_t570) {
+                LValue* _t571 = args.data[1];
+                lyric_string _t572 = CGen_emit_value(self, _t571);
+                msg = _t572;
+            }
+            LBuiltinData _t573 = lyric_unwrap(d);
+            lyric_string _t574 = _t573.file;
+            LBuiltinData _t575 = lyric_unwrap(d);
+            int32_t _t576 = _t575.line;
+            lyric_string _t577 = lyric_itoa(_t576);
+            lyric_string _t578 = lyric_sprintf("lyric_assert(%.*s, %.*s, \"%.*s\", %.*s)", (int)cond.len, (const char*)cond.data, (int)msg.len, (const char*)msg.data, (int)_t574.len, (const char*)_t574.data, (int)_t577.len, (const char*)_t577.data);
+            return _t578;
+        }
+    }
+    bool _t579 = lyric_str_eq(name, LYRIC_STR("assert_eq"));
+    if (_t579) {
+        int32_t _t580 = args.len;
+        bool _t581 = (_t580 >= 2);
+        if (_t581) {
+            LValue* _t582 = args.data[0];
+            lyric_string _t583 = CGen_to_string_expr(self, _t582);
+            lyric_string to_str_a = _t583;
+            LValue* _t584 = args.data[1];
+            lyric_string _t585 = CGen_to_string_expr(self, _t584);
+            lyric_string to_str_e = _t585;
+            LValue* _t586 = args.data[0];
+            LValue* _t587 = args.data[1];
+            lyric_string _t588 = CGen_eq_expr(self, _t586, _t587);
+            lyric_string eq = _t588;
+            lyric_string msg = LYRIC_STR("LYRIC_STR(\"assert_eq failed\")");
+            int32_t _t589 = args.len;
+            bool _t590 = (_t589 >= 3);
+            if (_t590) {
+                LValue* _t591 = args.data[2];
+                lyric_string _t592 = CGen_emit_value(self, _t591);
+                msg = _t592;
+            }
+            LBuiltinData _t593 = lyric_unwrap(d);
+            lyric_string _t594 = _t593.file;
+            LBuiltinData _t595 = lyric_unwrap(d);
+            int32_t _t596 = _t595.line;
+            lyric_string _t597 = lyric_itoa(_t596);
+            lyric_string _t598 = lyric_sprintf("lyric_assert_eq(%.*s, %.*s, %.*s, %.*s, \"%.*s\", %.*s)", (int)eq.len, (const char*)eq.data, (int)to_str_a.len, (const char*)to_str_a.data, (int)to_str_e.len, (const char*)to_str_e.data, (int)msg.len, (const char*)msg.data, (int)_t594.len, (const char*)_t594.data, (int)_t597.len, (const char*)_t597.data);
+            return _t598;
+        }
+    }
+    bool _t599 = lyric_str_eq(name, LYRIC_STR("panic"));
+    if (_t599) {
+        int32_t _t600 = args.len;
+        bool _t601 = (_t600 >= 1);
+        if (_t601) {
+            LValue* _t602 = args.data[0];
+            lyric_string _t603 = CGen_emit_value(self, _t602);
+            lyric_string _t604 = lyric_sprintf("lyric_panic(%.*s)", (int)_t603.len, (const char*)_t603.data);
+            return _t604;
+        }
+    }
+    bool _t605 = lyric_str_eq(name, LYRIC_STR("channel_receive"));
+    if (_t605) {
+        int32_t _t606 = args.len;
+        bool _t607 = (_t606 > 0);
+        if (_t607) {
+            LValue* _t608 = args.data[0];
+            LType* _t609 = CGen_resolve_value_type(self, _t608);
+            LType* chan_type = _t609;
+            lyric_string suffix = LYRIC_STR("void");
+            bool _t610 = (chan_type == NULL);
+            bool _t611 = (!_t610);
+            bool _sc612 = false;
+            _sc612 = _t611;
+            if (_sc612) {
+                LType* _t613 = chan_type;
+                LTypeKind _t614 = _t613->kind;
+                int32_t _t615 = _t614;
+                bool _t616 = (_t615 == 21);
+                _sc612 = _t616;
+            }
+            bool _sc617 = false;
+            _sc617 = _sc612;
+            if (_sc617) {
+                LType* _t618 = chan_type;
+                LType* _t619 = _t618->elem;
+                bool _t620 = (_t619 == NULL);
+                bool _t621 = (!_t620);
+                _sc617 = _t621;
+            }
+            if (_sc617) {
+                LType* _t622 = chan_type;
+                LType* _t623 = _t622->elem;
+                lyric_string _t624 = CGen_chan_suffix(self, _t623);
+                suffix = _t624;
+            }
+            LValue* _t625 = args.data[0];
+            lyric_string _t626 = CGen_emit_value(self, _t625);
+            lyric_string _t627 = lyric_sprintf("lyric_chan_recv_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t626.len, (const char*)_t626.data);
+            return _t627;
+        }
+    }
+    bool _t628 = lyric_str_eq(name, LYRIC_STR("channel_close"));
+    if (_t628) {
+        int32_t _t629 = args.len;
+        bool _t630 = (_t629 > 0);
+        if (_t630) {
+            LValue* _t631 = args.data[0];
+            LType* _t632 = CGen_resolve_value_type(self, _t631);
+            LType* chan_type = _t632;
+            lyric_string suffix = LYRIC_STR("void");
+            bool _t633 = (chan_type == NULL);
+            bool _t634 = (!_t633);
+            bool _sc635 = false;
+            _sc635 = _t634;
+            if (_sc635) {
+                LType* _t636 = chan_type;
+                LTypeKind _t637 = _t636->kind;
+                int32_t _t638 = _t637;
+                bool _t639 = (_t638 == 21);
+                _sc635 = _t639;
+            }
+            bool _sc640 = false;
+            _sc640 = _sc635;
+            if (_sc640) {
+                LType* _t641 = chan_type;
+                LType* _t642 = _t641->elem;
+                bool _t643 = (_t642 == NULL);
+                bool _t644 = (!_t643);
+                _sc640 = _t644;
+            }
+            if (_sc640) {
+                LType* _t645 = chan_type;
+                LType* _t646 = _t645->elem;
+                lyric_string _t647 = CGen_chan_suffix(self, _t646);
+                suffix = _t647;
+            }
+            LValue* _t648 = args.data[0];
+            lyric_string _t649 = CGen_emit_value(self, _t648);
+            lyric_string _t650 = lyric_sprintf("lyric_chan_close_%.*s(%.*s)", (int)suffix.len, (const char*)suffix.data, (int)_t649.len, (const char*)_t649.data);
+            return _t650;
+        }
+    }
+    bool _t651 = lyric_str_eq(name, LYRIC_STR("map_len"));
+    if (_t651) {
+        return LYRIC_STR("0 /* map_len: maps not supported */");
+    }
+    bool _t652 = lyric_str_eq(name, LYRIC_STR("map_contains_key"));
+    bool _sc653 = false;
+    _sc653 = _t652;
+    bool _t654 = (!_sc653);
+    if (_t654) {
+        bool _t655 = lyric_str_eq(name, LYRIC_STR("contains_key"));
+        _sc653 = _t655;
+    }
+    if (_sc653) {
+        return LYRIC_STR("false /* contains_key: not supported */");
+    }
+    bool _t656 = lyric_str_eq(name, LYRIC_STR("read_file"));
+    if (_t656) {
+        int32_t _t657 = args.len;
+        bool _t658 = (_t657 > 0);
+        if (_t658) {
+            LValue* _t659 = args.data[0];
+            lyric_string _t660 = CGen_emit_value(self, _t659);
+            lyric_string _t661 = lyric_sprintf("lyric_read_file(%.*s)", (int)_t660.len, (const char*)_t660.data);
+            return _t661;
+        }
+    }
+    bool _t662 = lyric_str_eq(name, LYRIC_STR("write_file"));
+    if (_t662) {
+        int32_t _t663 = args.len;
+        bool _t664 = (_t663 >= 2);
+        if (_t664) {
+            LValue* _t665 = args.data[0];
+            lyric_string _t666 = CGen_emit_value(self, _t665);
+            LValue* _t667 = args.data[1];
+            lyric_string _t668 = CGen_emit_value(self, _t667);
+            lyric_string _t669 = lyric_sprintf("lyric_write_file(%.*s, %.*s)", (int)_t666.len, (const char*)_t666.data, (int)_t668.len, (const char*)_t668.data);
+            return _t669;
+        }
+    }
+    bool _t670 = lyric_str_eq(name, LYRIC_STR("os_args"));
+    if (_t670) {
+        self->needs_os_args = true;
+        return LYRIC_STR("_lyric_os_args(_argc, _argv)");
+    }
+    bool _t671 = lyric_str_eq(name, LYRIC_STR("os_exit"));
+    if (_t671) {
+        int32_t _t672 = args.len;
+        bool _t673 = (_t672 > 0);
+        if (_t673) {
+            LValue* _t674 = args.data[0];
+            lyric_string _t675 = CGen_emit_value(self, _t674);
+            lyric_string _t676 = lyric_sprintf("exit(%.*s)", (int)_t675.len, (const char*)_t675.data);
+            return _t676;
+        }
+        return LYRIC_STR("exit(0)");
+    }
+    bool _t677 = lyric_str_eq(name, LYRIC_STR("os_getwd"));
+    if (_t677) {
+        return LYRIC_STR("lyric_getwd()");
+    }
+    bool _t678 = lyric_str_eq(name, LYRIC_STR("list_dir"));
+    if (_t678) {
+        int32_t _t679 = args.len;
+        bool _t680 = (_t679 > 0);
+        if (_t680) {
+            LValue* _t681 = args.data[0];
+            lyric_string _t682 = CGen_emit_value(self, _t681);
+            lyric_string _t683 = lyric_sprintf("lyric_list_dir(%.*s)", (int)_t682.len, (const char*)_t682.data);
+            return _t683;
+        }
+    }
+    bool _t684 = lyric_str_eq(name, LYRIC_STR("file_exists"));
+    if (_t684) {
+        int32_t _t685 = args.len;
+        bool _t686 = (_t685 > 0);
+        if (_t686) {
+            LValue* _t687 = args.data[0];
+            lyric_string _t688 = CGen_emit_value(self, _t687);
+            lyric_string _t689 = lyric_sprintf("lyric_file_exists(%.*s)", (int)_t688.len, (const char*)_t688.data);
+            return _t689;
+        }
+    }
+    bool _t690 = lyric_str_eq(name, LYRIC_STR("mkdtemp"));
+    if (_t690) {
+        int32_t _t691 = args.len;
+        bool _t692 = (_t691 > 0);
+        if (_t692) {
+            LValue* _t693 = args.data[0];
+            lyric_string _t694 = CGen_emit_value(self, _t693);
+            lyric_string _t695 = lyric_sprintf("lyric_mkdtemp(%.*s)", (int)_t694.len, (const char*)_t694.data);
+            return _t695;
+        }
+    }
+    bool _t696 = lyric_str_eq(name, LYRIC_STR("itoa"));
+    if (_t696) {
+        int32_t _t697 = args.len;
+        bool _t698 = (_t697 > 0);
+        if (_t698) {
+            LValue* _t699 = args.data[0];
+            lyric_string _t700 = CGen_emit_value(self, _t699);
+            lyric_string _t701 = lyric_sprintf("lyric_itoa(%.*s)", (int)_t700.len, (const char*)_t700.data);
+            return _t701;
+        }
+    }
+    bool _t702 = lyric_str_eq(name, LYRIC_STR("atoi"));
+    if (_t702) {
+        int32_t _t703 = args.len;
+        bool _t704 = (_t703 > 0);
+        if (_t704) {
+            LValue* _t705 = args.data[0];
+            lyric_string _t706 = CGen_emit_value(self, _t705);
+            lyric_string _t707 = lyric_sprintf("lyric_atoi(%.*s)", (int)_t706.len, (const char*)_t706.data);
+            return _t707;
+        }
+    }
+    bool _t708 = lyric_str_eq(name, LYRIC_STR("char_to_string"));
+    if (_t708) {
+        int32_t _t709 = args.len;
+        bool _t710 = (_t709 > 0);
+        if (_t710) {
+            LValue* _t711 = args.data[0];
+            lyric_string _t712 = CGen_emit_value(self, _t711);
+            lyric_string _t713 = lyric_sprintf("lyric_char_to_string(%.*s)", (int)_t712.len, (const char*)_t712.data);
+            return _t713;
+        }
+    }
+    bool _t714 = lyric_str_eq(name, LYRIC_STR("hash_string"));
+    if (_t714) {
+        int32_t _t715 = args.len;
+        bool _t716 = (_t715 > 0);
+        if (_t716) {
+            LValue* _t717 = args.data[0];
+            lyric_string _t718 = CGen_emit_value(self, _t717);
+            lyric_string _t719 = lyric_sprintf("lyric_hash_string(%.*s)", (int)_t718.len, (const char*)_t718.data);
+            return _t719;
+        }
+    }
+    bool _t720 = lyric_str_eq(name, LYRIC_STR("exec_command"));
+    if (_t720) {
+        self->needs_exec_cmd = true;
+        int32_t _t721 = args.len;
+        bool _t722 = (_t721 >= 2);
+        if (_t722) {
+            LValue* _t723 = args.data[0];
+            lyric_string _t724 = CGen_emit_value(self, _t723);
+            LValue* _t725 = args.data[1];
+            lyric_string _t726 = CGen_emit_value(self, _t725);
+            lyric_string _t727 = lyric_sprintf("_lyric_exec_command(%.*s, %.*s)", (int)_t724.len, (const char*)_t724.data, (int)_t726.len, (const char*)_t726.data);
+            return _t727;
+        }
+    }
+    bool _t728 = lyric_str_eq(name, LYRIC_STR("path_join"));
+    if (_t728) {
+        self->needs_path_join = true;
+        int32_t _t729 = args.len;
+        bool _t730 = (_t729 > 0);
+        if (_t730) {
+            LValue* _t731 = args.data[0];
+            lyric_string _t732 = CGen_emit_value(self, _t731);
+            lyric_string _t733 = lyric_sprintf("_lyric_path_join(%.*s)", (int)_t732.len, (const char*)_t732.data);
+            return _t733;
+        }
+    }
+    bool _t734 = lyric_str_eq(name, LYRIC_STR("path_dir"));
+    if (_t734) {
+        int32_t _t735 = args.len;
+        bool _t736 = (_t735 > 0);
+        if (_t736) {
+            LValue* _t737 = args.data[0];
+            lyric_string _t738 = CGen_emit_value(self, _t737);
+            lyric_string _t739 = lyric_sprintf("lyric_path_dir(%.*s)", (int)_t738.len, (const char*)_t738.data);
+            return _t739;
+        }
+    }
+    bool _t740 = lyric_str_eq(name, LYRIC_STR("path_base"));
+    if (_t740) {
+        int32_t _t741 = args.len;
+        bool _t742 = (_t741 > 0);
+        if (_t742) {
+            LValue* _t743 = args.data[0];
+            lyric_string _t744 = CGen_emit_value(self, _t743);
+            lyric_string _t745 = lyric_sprintf("lyric_path_base(%.*s)", (int)_t744.len, (const char*)_t744.data);
+            return _t745;
+        }
+    }
+    bool _t746 = lyric_str_eq(name, LYRIC_STR("path_ext"));
+    if (_t746) {
+        int32_t _t747 = args.len;
+        bool _t748 = (_t747 > 0);
+        if (_t748) {
+            LValue* _t749 = args.data[0];
+            lyric_string _t750 = CGen_emit_value(self, _t749);
+            lyric_string _t751 = lyric_sprintf("lyric_path_ext(%.*s)", (int)_t750.len, (const char*)_t750.data);
+            return _t751;
+        }
+    }
+    bool _t752 = lyric_str_eq(name, LYRIC_STR("new_string_builder"));
+    if (_t752) {
         return LYRIC_STR("new_string_builder()");
     }
-    bool _t705 = lyric_str_eq(name, LYRIC_STR("new_dict"));
-    if (_t705) {
+    bool _t753 = lyric_str_eq(name, LYRIC_STR("new_dict"));
+    if (_t753) {
         return LYRIC_STR("/* new_dict */");
     }
-    bool _t706 = lyric_str_eq(name, LYRIC_STR("to_string"));
-    if (_t706) {
-        int32_t _t707 = args.len;
-        bool _t708 = (_t707 > 0);
-        if (_t708) {
-            LValue* _t709 = args.data[0];
-            lyric_string _t710 = CGen_emit_value(self, _t709);
-            lyric_string _t711 = lyric_sprintf("lyric_to_string(%.*s)", (int)_t710.len, (const char*)_t710.data);
-            return _t711;
+    bool _t754 = lyric_str_eq(name, LYRIC_STR("to_string"));
+    if (_t754) {
+        int32_t _t755 = args.len;
+        bool _t756 = (_t755 > 0);
+        if (_t756) {
+            LValue* _t757 = args.data[0];
+            lyric_string _t758 = CGen_emit_value(self, _t757);
+            lyric_string _t759 = lyric_sprintf("lyric_to_string(%.*s)", (int)_t758.len, (const char*)_t758.data);
+            return _t759;
         }
     }
-    lyric_string _t712 = lyric_sprintf("c_backend: unhandled builtin: %.*s", (int)name.len, (const char*)name.data);
-    fprintf(stderr, "%.*s\n", (int)_t712.len, (const char*)_t712.data);
+    lyric_string _t760 = lyric_sprintf("c_backend: unhandled builtin: %.*s", (int)name.len, (const char*)name.data);
+    fprintf(stderr, "%.*s\n", (int)_t760.len, (const char*)_t760.data);
     return LYRIC_STR("");
 }
 

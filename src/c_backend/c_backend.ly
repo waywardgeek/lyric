@@ -1367,6 +1367,28 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       return f"lyric_str_has_suffix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
     }
   }
+  if name == "starts_with" || name == "str_starts_with" {
+    if len(args) >= 2 {
+      return f"lyric_str_has_prefix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+    }
+  }
+  if name == "ends_with" || name == "str_ends_with" {
+    if len(args) >= 2 {
+      return f"lyric_str_has_suffix({self.emit_value(args[0])}, {self.emit_value(args[1])})"
+    }
+  }
+  if name == "str_is_empty" || name == "string_is_empty" {
+    if len(args) > 0 {
+      return f"({self.emit_value(args[0])}.len == 0)"
+    }
+  }
+  if name == "str_char_at" || name == "string_char_at" || name == "char_at" {
+    if len(args) >= 2 {
+      let sv = self.emit_value(args[0])
+      let iv = self.emit_value(args[1])
+      return "((lyric_string){.data = (char*)" + sv + ".data + " + iv + ", .len = 1, .cap = 0})"
+    }
+  }
   if name == "contains" || name == "str_contains" || name == "string_contains" || name == "slice_contains" {
     if len(args) >= 2 {
       if !isnull(args[0]) && !isnull(args[0]!.typ) && args[0]!.typ!.kind is TyString {
