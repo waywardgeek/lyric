@@ -142,6 +142,8 @@ func is_side_effect_expr(e: LExpr) -> bool {
           b!.name == "slice_pop" ||
           b!.name == "slice_clear" ||
           b!.name == "slice_reverse" ||
+          b!.name == "slice_remove" ||
+          b!.name == "slice_sort" ||
           b!.name == "channel_close" ||
           b!.name == "channel_receive") {
         return true
@@ -1153,6 +1155,14 @@ func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>) {
         }
       }
     }
+    ExMakeMap => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_temps_in_value(a!, used) }
+        }
+      }
+    }
     ExMakeChannel => {
       let d = e.make_channel
       if !isnull(d) {
@@ -1502,6 +1512,14 @@ func collect_used_var_names_in_expr(e: LExpr, used: Dict<Sym, bool>) {
       }
     }
     ExMakeSlice => {
+      let d = e.builtin
+      if !isnull(d) {
+        for a in d!.args {
+          if !isnull(a) { collect_used_var_names_in_value(a!, used) }
+        }
+      }
+    }
+    ExMakeMap => {
       let d = e.builtin
       if !isnull(d) {
         for a in d!.args {

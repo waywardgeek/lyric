@@ -1392,6 +1392,50 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
       return f"lyric_str_join({sep}, {slice_val}.data, {slice_val}.len)"
     }
   }
+  if name == "slice_is_empty" {
+    if len(args) > 0 {
+      return f"({self.emit_value(args[0])}.len == 0)"
+    }
+  }
+  if name == "slice_first" {
+    if len(args) > 0 && !isnull(args[0]) && !isnull(args[0]!.typ) {
+      let sv = self.emit_value(args[0])
+      let opt_name = self.opt_type_name(args[0]!.typ!.elem)
+      return f"(({sv}.len == 0) ? lyric_none({opt_name}) : lyric_some({sv}.data[0], {opt_name}))"
+    }
+  }
+  if name == "slice_last" {
+    if len(args) > 0 && !isnull(args[0]) && !isnull(args[0]!.typ) {
+      let sv = self.emit_value(args[0])
+      let opt_name = self.opt_type_name(args[0]!.typ!.elem)
+      return f"(({sv}.len == 0) ? lyric_none({opt_name}) : lyric_some({sv}.data[{sv}.len - 1], {opt_name}))"
+    }
+  }
+  if name == "slice_index_of" {
+    if len(args) >= 2 {
+      let sv = self.emit_value(args[0])
+      let ev = self.emit_value(args[1])
+      return "(" + "{ int32_t _idx = -1; for (int32_t _i = 0; _i < " + sv + ".len; _i++) { if (" + sv + ".data[_i] == " + ev + ") { _idx = _i; break; } } _idx; })"
+    }
+  }
+  if name == "slice_remove" {
+    if len(args) >= 2 {
+      let sv = self.emit_value(args[0])
+      let ev = self.emit_value(args[1])
+      return "(" + "{ for (int32_t _i = 0; _i < " + sv + ".len; _i++) { if (" + sv + ".data[_i] == " + ev + ") { memmove(&" + sv + ".data[_i], &" + sv + ".data[_i+1], (" + sv + ".len-_i-1)*sizeof(*" + sv + ".data)); (&" + sv + ")->len--; break; } } })"
+    }
+  }
+  if name == "slice_clear" {
+    if len(args) > 0 {
+      return f"((&{self.emit_value(args[0])})->len = 0)"
+    }
+  }
+  if name == "slice_reverse" {
+    if len(args) > 0 {
+      let sv = self.emit_value(args[0])
+      return "(" + "{ int32_t _l = 0, _r = " + sv + ".len - 1; while (_l < _r) { __typeof__(" + sv + ".data[0]) _tmp = " + sv + ".data[_l]; " + sv + ".data[_l++] = " + sv + ".data[_r]; " + sv + ".data[_r--] = _tmp; } })"
+    }
+  }
   if name == "repeat" || name == "str_repeat" || name == "string_repeat" {
     if len(args) >= 2 {
       return f"lyric_str_repeat({self.emit_value(args[0])}, {self.emit_value(args[1])})"

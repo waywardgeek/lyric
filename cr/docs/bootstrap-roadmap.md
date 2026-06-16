@@ -99,15 +99,16 @@ AST/LIR/C backend support exists for spawn/channels/select/lock. Needs hardening
 
 ## Known Bugs
 
-- [ ] `any_type.ly` — int-to-void* needs boxing in C backend
-- [ ] `interfaces.ly` — where-clause generic monomorphizes `children()` return type wrong
-- [ ] `arraylist.ly` — relation field injection bug in C backend test
-- [ ] `collectUsedTemps` walker incomplete (ExMakeSlice, ExFormat, etc.)
+- [x] `any_type.ly` — was int-to-void* boxing; now passes (fixed by earlier sessions)
+- [x] `interfaces.ly` — was where-clause generic return type; now passes (fixed by earlier sessions)
+- [x] `arraylist.ly` — was relation field injection; now passes (fixed by earlier sessions)
+- [x] `collectUsedTemps` walker — ExMakeSlice/ExFormat were already handled; added ExMakeMap (2026-06-16)
+- [x] **Slice methods `is_empty`, `first`, `last`, `remove`, `index_of`, `clear`, `reverse`** — were missing from lowerer dispatch, c_backend emit_builtin, optimizer `is_side_effect_expr` list, and checker `check_list_method`. All added 2026-06-16. New test: `testdata/slice_methods.ly`.
 - [ ] External methods not registered in global scope
 - [ ] `LTyError` → `const char*` wrong (should be `lyric_string`)
 - [ ] Several bootstrap TODOs in checker/parser (see `grep TODO src/`)
-- [ ] **Selective stdlib merge misses class literals in function bodies** — `ast_collect_used_type_names` only walks type annotations, not expression bodies. `Error { msg: "..." }` or `StringBuilder {}` in function bodies never get pulled from stdlib. Fix: add `type_name` to collected names in StructLit arm of `ast_collect_call_names_expr`. (Found 2026-06-14 via book verification)
-- [ ] **Lock field emits incompatible C** — `pthread_mutex_t` struct assigned from `void*` in generated C. Any class with a `Lock` field fails at GCC stage. (Found 2026-06-14)
+- [x] **Selective stdlib merge misses class literals in function bodies** — Fixed 2026-06-16: added StructLit arm to `ast_collect_call_names_expr` in `src/ast/ast.ly`.
+- [x] **Lock field emits incompatible C** — Fixed 2026-06-16: `lock` is now a lowercase builtin type handled by checker `check_struct_lit` and lowerer `lower_named_type`. `Lock` → `lock` standardized everywhere.
 - [ ] **Interface method mangling last-writer-wins** — monomorphizer uses `orig.name` instead of `mangle_name(orig.name, types)` for interface methods; C backend also needs child type in emitted name. Multi-class interface methods (e.g. `MyList.add()`) don't get properly emitted. (Known, confirmed 2026-06-14)
 
 ---

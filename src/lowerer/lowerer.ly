@@ -2612,10 +2612,10 @@ lyric lowerer {
 
     // Slice/list methods
     if !isnull(recv_type) && recv_type!.kind is TySlice {
-      if method_name == "len" || method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "contains" || method_name == "reverse" || method_name == "join" || method_name == "extend" {
+      if method_name == "len" || method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "contains" || method_name == "reverse" || method_name == "join" || method_name == "extend" || method_name == "is_empty" || method_name == "last" || method_name == "first" || method_name == "remove" || method_name == "index_of" || method_name == "sort" {
         // For mutating methods on class field receivers, use a reference
         // to avoid the copy-then-discard problem with value-type slice headers.
-        let is_mutating = method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "reverse" || method_name == "extend"
+        let is_mutating = method_name == "push" || method_name == "append" || method_name == "pop" || method_name == "clear" || method_name == "reverse" || method_name == "extend" || method_name == "remove" || method_name == "sort"
         let mut slice_val = recv
         if is_mutating && !isnull(receiver) && receiver!.kind is FieldAccess {
           match receiver!.kind {

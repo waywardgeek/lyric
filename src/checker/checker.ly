@@ -3676,7 +3676,7 @@ lyric checker {
   }
 
   func Checker.check_list_method(self, elem: Type, method: string) -> Type? {
-    if method == "push" || method == "append" || method == "sort" || method == "remove" || method == "extend" {
+    if method == "push" || method == "append" || method == "sort" || method == "remove" || method == "extend" || method == "clear" || method == "reverse" {
       return make_void_type()
     }
     if method == "pop" { return elem }
