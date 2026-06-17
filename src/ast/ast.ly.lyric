@@ -107,11 +107,38 @@
 
 // UnaryOp = enum { Neg, Not }
 
-struct Block {
+
+// ast.ly:243
+// BinaryOp = enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
+
+// ast.ly:255
+// ExprKind = enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }
+
+// ast.ly:171
+// ImplMappingKind = enum { Alias, FieldBind, Inline }
+
+// ast.ly:292
+// PatternKind = enum { Ident(name: Sym), Literal(expr: Expr), Variant(name: Sym, bindings: [Pattern]), Wildcard, Tuple(elems: [Pattern]) }
+
+// ast.ly:194
+// RelationKind = enum { Owns, Refs }
+
+// ast.ly:315
+// StmtKind = enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block) }
+
+// ast.ly:28
+// TypeExprKind = enum { Named(name: Sym, args: [TypeExpr]), Optional(inner: TypeExpr), Union(variants: [TypeExpr]), Sequence(elem: TypeExpr), Map(key: TypeExpr, value: TypeExpr), Tuple(fields: [TupleField]), Func(params: [TypeExpr], ret: TypeExpr), Channel(elem: TypeExpr), Generator(elem: TypeExpr), Lock, Unit }
+
+// ast.ly:241
+// UnaryOp = enum { Neg, Not }
+
+// ast.ly:355
+class Block {
   span: Span
 }
 
-struct ClassDecl {
+// ast.ly:102
+class ClassDecl {
   implements: [Sym]
   is_permanent: bool
   is_public: bool
@@ -119,12 +146,14 @@ struct ClassDecl {
   span: Span
 }
 
-struct Comment {
+// ast.ly:234
+class Comment {
   pos: Pos
   text: string
 }
 
-struct ConstDecl {
+// ast.ly:226
+class ConstDecl {
   is_public: bool
   name: Sym?
   span: Span
@@ -132,37 +161,43 @@ struct ConstDecl {
   value: Expr?
 }
 
-struct DestructorBlock {
+// ast.ly:151
+class DestructorBlock {
   body: Block?
   span: Span
   type_param: Sym?
 }
 
-struct ElseIf {
+// ast.ly:341
+class ElseIf {
   body: Block?
   condition: Expr?
   span: Span
 }
 
-struct EnumDecl {
+// ast.ly:128
+class EnumDecl {
   is_public: bool
   name: Sym?
   span: Span
 }
 
-struct EnumVariant {
+// ast.ly:122
+class EnumVariant {
   name: Sym?
   span: Span
 }
 
-struct Expr {
+// ast.ly:283
+class Expr {
   inferred_type_args: [TypeExpr]
   kind: ExprKind
   resolved_type: TypeExpr?
   span: Span
 }
 
-struct Field {
+// ast.ly:91
+class Field {
   default_value: Expr?
   guarded_by: Sym?
   is_public: bool
@@ -171,12 +206,14 @@ struct Field {
   type_expr: TypeExpr?
 }
 
-struct File {
+// ast.ly:377
+class File {
   filename: string
   span: Span
 }
 
-struct FuncDecl {
+// ast.ly:77
+class FuncDecl {
   body: Block?
   is_public: bool
   name: Sym?
@@ -185,14 +222,16 @@ struct FuncDecl {
   span: Span
 }
 
-struct ImplBlock {
+// ast.ly:183
+class ImplBlock {
   for_type: Sym?
   interface_name: Sym?
   label: Sym?
   span: Span
 }
 
-struct ImplMapping {
+// ast.ly:173
+class ImplMapping {
   inline_func: FuncDecl?
   kind: ImplMappingKind
   method_name: Sym?
@@ -202,37 +241,43 @@ struct ImplMapping {
   type_param: Sym?
 }
 
-struct ImportDecl {
+// ast.ly:213
+class ImportDecl {
   alias: Sym?
   path: string
   span: Span
 }
 
-struct InterfaceDecl {
+// ast.ly:157
+class InterfaceDecl {
   implements: [Sym]
   is_public: bool
   name: Sym?
   span: Span
 }
 
-struct InterfaceEmbed {
+// ast.ly:145
+class InterfaceEmbed {
   name: Sym?
   span: Span
 }
 
-struct InterfaceFieldDecl {
+// ast.ly:138
+class InterfaceFieldDecl {
   name: Sym?
   span: Span
   type_expr: TypeExpr?
   type_param: Sym?
 }
 
-struct LyricBlock {
+// ast.ly:362
+class LyricBlock {
   name: Sym?
   span: Span
 }
 
-struct MatchArm {
+// ast.ly:305
+class MatchArm {
   body: Block?
   guard: Expr?
   pattern: Pattern?
@@ -240,7 +285,8 @@ struct MatchArm {
   span: Span
 }
 
-struct Param {
+// ast.ly:69
+class Param {
   is_mut: bool
   is_self: bool
   name: Sym?
@@ -248,18 +294,21 @@ struct Param {
   type_expr: TypeExpr?
 }
 
-struct Pattern {
+// ast.ly:300
+class Pattern {
   kind: PatternKind
   span: Span
 }
 
+// ast.ly:15
 struct Pos {
   column: i32
   file: Sym?
   line: i32
 }
 
-struct RelationDecl {
+// ast.ly:202
+class RelationDecl {
   child: RelationSide
   hint: Sym?
   is_many: bool
@@ -268,13 +317,15 @@ struct RelationDecl {
   span: Span
 }
 
+// ast.ly:196
 struct RelationSide {
   label: Sym?
   type_args: [Sym]
   type_name: Sym?
 }
 
-struct SelectCase {
+// ast.ly:347
+class SelectCase {
   bind_var: Sym?
   body: Block?
   expr: Expr?
@@ -282,89 +333,132 @@ struct SelectCase {
   span: Span
 }
 
+// ast.ly:21
 struct Span {
   end: Pos
   start: Pos
 }
 
-struct Stmt {
+// ast.ly:336
+class Stmt {
   kind: StmtKind
   span: Span
 }
 
-struct StructDecl {
+// ast.ly:114
+class StructDecl {
   is_public: bool
   name: Sym?
   span: Span
 }
 
+// ast.ly:250
 struct StructLitField {
   name: Sym?
   value: Expr?
 }
 
-struct TupleField {
+// ast.ly:47
+class TupleField {
   name: Sym?
   type_expr: TypeExpr?
 }
 
-struct TypeAliasDecl {
+// ast.ly:219
+class TypeAliasDecl {
   is_public: bool
   name: Sym?
   span: Span
   type_expr: TypeExpr?
 }
 
-struct TypeExpr {
+// ast.ly:42
+class TypeExpr {
   kind: TypeExprKind
   span: Span
 }
 
-struct TypeParam {
+// ast.ly:54
+class TypeParam {
   constraint: Sym?
   name: Sym?
   span: Span
 }
 
-struct WhereClause {
+// ast.ly:60
+class WhereClause {
   constraint: Sym?
   span: Span
   variable: Sym?
 }
 
+// ast.ly:780
 func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>)
+// ast.ly:586
 func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>)
+// ast.ly:696
 func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+// ast.ly:495
 func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>)
+// ast.ly:990
 func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool>
+// ast.ly:535
 func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool>
+// ast.ly:981
 func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>)
+// ast.ly:789
 func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>)
+// ast.ly:893
 func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+// ast.ly:1019
 func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bool
+// modules.ly:744
 func find_alias_index(name: string, alias_names: [string]) -> i32
+// ast.ly:425
 func find_stdlib_dir() -> string
+// ast.ly:467
 func is_primitive_type(name: string) -> bool
+// ast.ly:436
 func load_stdlib(dir: string) -> File?
+// modules.ly:126
 func lookup_name(name: string, orig: [string], prefixed: [string]) -> string
+// ast.ly:389
 func merge_files(files: [File?]) -> File?
+// ast.ly:1036
 func merge_stdlib(file: File?, std_file: File?)
+// modules.ly:145
 func prefix_block_declarations(block: LyricBlock, prefix: string, mut orig: [string], mut prefixed: [string])
+// modules.ly:136
 func prefix_sym(s: Sym?, prefix: string) -> Sym?
+// modules.ly:10
 func resolve_module_imports(module_root: string, root_file: File?) -> (File?, string)
+// modules.ly:216
 func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string])
+// modules.ly:330
 func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string])
+// modules.ly:414
 func rewrite_expr(expr: Expr?, orig: [string], prefixed: [string])
+// modules.ly:271
 func rewrite_func_references(f: FuncDecl, orig: [string], prefixed: [string])
+// modules.ly:542
 func rewrite_pattern(pat: Pattern?, orig: [string], prefixed: [string])
+// modules.ly:567
 func rewrite_qualified_access(block: LyricBlock, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:655
 func rewrite_qualified_block(block: Block, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:754
 func rewrite_qualified_expr(expr: Expr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:593
 func rewrite_qualified_in_func(f: FuncDecl, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:663
 func rewrite_qualified_stmt(stmt: Stmt, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:605
 func rewrite_qualified_type_expr(te: TypeExpr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+// modules.ly:337
 func rewrite_stmt(stmt: Stmt, orig: [string], prefixed: [string])
+// modules.ly:290
 func rewrite_type_expr(te: TypeExpr?, orig: [string], prefixed: [string])
+// modules.ly:115
 func strip_imports(block: LyricBlock)
 
 // --- index ---

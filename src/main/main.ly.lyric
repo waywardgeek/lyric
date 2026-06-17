@@ -32,41 +32,73 @@
 // Generates a C test runner using emit_test_runner (setjmp/longjmp isolation).
 // Compiles + runs in a temp directory; cleans up after.
 
+
+// main.ly:1174
 struct DeclItem {
   idx: i32
   line: i32
   tag: i32
 }
 
+// main.ly:696
 func cmd_compile(args: [string]) -> bool
+// main.ly:985
 func cmd_fmt(args: [string]) -> bool
+// main.ly:786
 func cmd_test(args: [string]) -> bool
+// main.ly:584
 func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool
+// main.ly:129
 func dump_expr_to_sb(sb: StringBuilder, e: LExpr?)
+// main.ly:489
 func dump_lir_func(sb: StringBuilder, f: LFuncDecl)
+// main.ly:508
 func dump_lir_to_file(prog: LProgram, path: string)
+// main.ly:325
 func dump_stmts(sb: StringBuilder, stmts: [LStmt?], indent: string)
+// main.ly:66
 func dump_type_str(t: LType?) -> string
+// main.ly:110
 func dump_value_str(v: LValue?) -> string
+// main.ly:1067
 func emit_comments_before(sb: StringBuilder, comments: [Comment], idx: i32, before_line: i32, indent: string) -> i32
+// main.ly:969
 func find_runtime_dir() -> string
+// main.ly:1089
 func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], comment_idx: i32)
+// main.ly:1348
 func fmt_class(sb: StringBuilder, c: ClassDecl)
+// main.ly:1223
 func fmt_enum(sb: StringBuilder, e: EnumDecl)
+// main.ly:1455
 func fmt_field(sb: StringBuilder, f: Field)
+// main.ly:1001
 func fmt_file(path: string) -> bool
+// main.ly:1379
 func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string)
+// main.ly:1199
 func fmt_import(sb: StringBuilder, imp: ImportDecl)
+// main.ly:1280
 func fmt_interface(sb: StringBuilder, iface: InterfaceDecl)
+// main.ly:1420
 func fmt_relation(sb: StringBuilder, r: RelationDecl)
+// main.ly:1207
 func fmt_struct(sb: StringBuilder, s: StructDecl)
+// main.ly:1444
 func fmt_type_alias(sb: StringBuilder, t: TypeAliasDecl)
+// main.ly:1481
 func fmt_type_expr(sb: StringBuilder, te: TypeExpr?)
+// main.ly:1465
 func fmt_type_params(sb: StringBuilder, tps: [TypeParam])
+// main.ly:1566
 func main()
+// main.ly:11
 func resolve_command(prefix: string) -> (string, bool)
+// main.ly:1181
 func sort_decl_items(items: [DeclItem])
+// main.ly:1059
 func split_at_marker(text: string, marker: string) -> (string, string)
+// main.ly:46
 func str_join(parts: [string], sep: string) -> string
 
 // --- index ---

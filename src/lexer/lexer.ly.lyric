@@ -59,7 +59,12 @@
 
 // TokenKind = enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KEmbed, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KCascade, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
 
-struct Lexer {
+
+// lexer.ly:15
+// TokenKind = enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KEmbed, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KCascade, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
+
+// lexer.ly:115
+class Lexer {
   bracket_depth: i32
   column: i32
   filename: Sym?
@@ -69,24 +74,42 @@ struct Lexer {
   pos: i32
   src: string
 }
+// lexer.ly:193
 func Lexer.advance(self) -> u8
+// lexer.ly:189
 func Lexer.current_pos(self) -> Pos
+// lexer.ly:234
 func Lexer.next(self) -> Token
+// lexer.ly:224
 func Lexer.peek(self) -> Token
+// lexer.ly:215
 func Lexer.peek_at(self, offset: i32) -> u8
+// lexer.ly:208
 func Lexer.peek_char(self) -> u8
+// lexer.ly:137
 func Lexer.restore_state(self, state: LexerState)
+// lexer.ly:127
 func Lexer.save_state(self) -> LexerState
+// lexer.ly:458
 func Lexer.scan(self) -> Token
+// lexer.ly:293
 func Lexer.scan_backtick_sym(self, start: Pos) -> Token
+// lexer.ly:277
 func Lexer.scan_char_lit(self, start: Pos) -> Token
+// lexer.ly:246
 func Lexer.scan_escape(self, buf: StringBuilder) -> bool
+// lexer.ly:353
 func Lexer.scan_fstring(self, start: Pos) -> Token
+// lexer.ly:427
 func Lexer.scan_ident(self, start: Pos) -> Token
+// lexer.ly:397
 func Lexer.scan_number(self, start: Pos) -> Token
+// lexer.ly:310
 func Lexer.scan_string(self, start: Pos) -> Token
+// lexer.ly:336
 func Lexer.scan_triple_string(self, start: Pos) -> Token
 
+// lexer.ly:107
 struct LexerState {
   bracket_depth: i32
   column: i32
@@ -95,19 +118,28 @@ struct LexerState {
   pos: i32
 }
 
-struct Token {
+// lexer.ly:39
+class Token {
   kind: TokenKind
   span: Span
   text: string
 }
 
+// lexer.ly:168
 func hex_val(ch: u8) -> u8
+// lexer.ly:47
 func init_keywords() -> Dict<Sym, TokenKind>
+// lexer.ly:160
 func is_digit(ch: u8) -> bool
+// lexer.ly:164
 func is_ident_char(ch: u8) -> bool
+// lexer.ly:156
 func is_letter(ch: u8) -> bool
+// lexer.ly:94
 func lookup_keyword(lex: Lexer, text: string) -> TokenKind?
+// lexer.ly:183
 func make_token(kind: TokenKind, text: string, start: Pos, end: Pos) -> Token
+// lexer.ly:145
 func new_lexer(src_text: string, filename: Sym) -> Lexer
 
 // --- index ---

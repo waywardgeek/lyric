@@ -37,13 +37,16 @@
 // before walking the program. rewrite_impl_method_calls uses relational
 // constraints on functions to find and apply the correct renames.
 
+
+// monomorphizer.ly:591
 struct ImplRenameEntry {
   class_name: string
   new_method: string
   old_method: string
 }
 
-struct MonoPass {
+// monomorphizer.ly:11
+class MonoPass {
   class_by_name: Dict<Sym, LClassDecl>?
   class_inst_count: Dict<Sym, i32>?
   class_inst_names: [string]
@@ -64,59 +67,112 @@ struct MonoPass {
   struct_inst_types: Dict<Sym, LType?>?
   struct_instances: Dict<Sym, string>?
 }
+// monomorphizer.ly:788
 func MonoPass.build_class_rename_map(self, subst: Dict<Sym, LType?>?) -> Dict<Sym, string>?
+// monomorphizer.ly:469
 func MonoPass.collect_from_expr(self, e: LExpr)
+// monomorphizer.ly:378
 func MonoPass.collect_from_stmt(self, s: LStmt)
+// monomorphizer.ly:368
 func MonoPass.collect_from_stmts(self, stmts: [LStmt?])
+// monomorphizer.ly:314
 func MonoPass.collect_from_type(self, t: LType?)
+// monomorphizer.ly:199
 func MonoPass.func_key(self, f: LFuncDecl) -> string
+// monomorphizer.ly:236
 func MonoPass.record_class_instance(self, name: string, types: [LType?])
+// monomorphizer.ly:212
 func MonoPass.record_func_instance(self, name: string, types: [LType?])
+// monomorphizer.ly:258
 func MonoPass.record_struct_instance(self, name: string, types: [LType?])
+// monomorphizer.ly:1098
 func MonoPass.rewrite_expr(self, e: LExpr)
+// monomorphizer.ly:597
 func MonoPass.rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?)
+// monomorphizer.ly:881
 func MonoPass.rewrite_stmt(self, s: LStmt)
+// monomorphizer.ly:871
 func MonoPass.rewrite_stmts(self, stmts: [LStmt?])
+// monomorphizer.ly:860
 func MonoPass.rewrite_value(self, v: LValue?)
+// monomorphizer.ly:755
 func MonoPass.specialize_class(self, orig: LClassDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LClassDecl
+// monomorphizer.ly:543
 func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string) -> LFuncDecl
+// monomorphizer.ly:773
 func MonoPass.specialize_struct(self, orig: LStructDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LStructDecl
+// monomorphizer.ly:1475
 func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType?
 
+// monomorphizer.ly:117
 func check_no_typevar(func_name: string, context: string, t: LType)
+// monomorphizer.ly:148
 func check_stmts_no_typevar(func_name: string, stmts: [LStmt?])
+// monomorphizer.ly:2041
 func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr?
+// monomorphizer.ly:1554
 func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt?
+// monomorphizer.ly:1540
 func clone_stmts(stmts: [LStmt?], subst: Dict<Sym, LType?>?) -> [LStmt?]
+// monomorphizer.ly:2027
 func clone_value(v: LValue, subst: Dict<Sym, LType?>?) -> LValue?
+// monomorphizer.ly:2863
 func filter_classes(classes: [LClassDecl], class_instances: Dict<Sym, string>?) -> [LClassDecl]
+// monomorphizer.ly:2837
 func filter_funcs(funcs: [LFuncDecl], class_instances: Dict<Sym, string>?, class_by_name: Dict<Sym, LClassDecl>?) -> [LFuncDecl]
+// monomorphizer.ly:2877
 func filter_structs(structs: [LStructDecl], struct_instances: Dict<Sym, string>?) -> [LStructDecl]
+// monomorphizer.ly:292
 func get_inst_types(types_dict: Dict<Sym, LType?>?, count_dict: Dict<Sym, i32>?, key: string) -> [LType?]
+// monomorphizer.ly:280
 func has_inst_name(names: [string], name: string) -> bool
+// monomorphizer.ly:2782
 func has_type_vars(types: [LType?]) -> bool
+// monomorphizer.ly:207
 func inst_key(name: string, type_key_str: string) -> string
+// monomorphizer.ly:2692
 func mangle_name(base: string, type_args: [LType?]) -> string
+// monomorphizer.ly:3696
 func mono_starts_with(s: string, prefix: string) -> bool
+// monomorphizer.ly:3360
 func monomorphize(prog: LProgram?)
+// monomorphizer.ly:49
 func new_mono_pass(prog: LProgram?) -> MonoPass?
+// monomorphizer.ly:3093
 func resolve_class_expr(e: LExpr, renames: Dict<Sym, string>)
+// monomorphizer.ly:2895
 func resolve_class_names(prog: LProgram?)
+// monomorphizer.ly:2931
 func resolve_class_stmt(s: LStmt, renames: Dict<Sym, string>)
+// monomorphizer.ly:2921
 func resolve_class_stmts(stmts: [LStmt?], renames: Dict<Sym, string>)
+// monomorphizer.ly:3326
 func resolve_class_type(t: LType?, renames: Dict<Sym, string>)
+// monomorphizer.ly:3322
 func resolve_class_value(v: LValue, renames: Dict<Sym, string>)
+// monomorphizer.ly:3862
 func rewrite_impl_expr(e: LExpr?, renames: Dict<Sym, string>?)
+// monomorphizer.ly:3701
 func rewrite_impl_renames(prog: LProgram?)
+// monomorphizer.ly:3824
 func rewrite_impl_stmt(s: LStmt, renames: Dict<Sym, string>?)
+// monomorphizer.ly:3814
 func rewrite_impl_stmts(stmts: [LStmt?], renames: Dict<Sym, string>?)
+// monomorphizer.ly:711
 func rewrite_method_calls_in_expr(e: LExpr?, renames: [ImplRenameEntry])
+// monomorphizer.ly:668
 func rewrite_method_calls_in_stmt(s: LStmt, renames: [ImplRenameEntry])
+// monomorphizer.ly:658
 func rewrite_method_calls_in_stmts(stmts: [LStmt?], renames: [ImplRenameEntry])
+// monomorphizer.ly:1408
 func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType?
+// monomorphizer.ly:2793
 func type_has_var(t: LType?) -> bool
+// monomorphizer.ly:2768
 func type_key(types: [LType?]) -> string
+// monomorphizer.ly:2706
 func type_to_mangle(t: LType?) -> string
+// monomorphizer.ly:80
 func validate_post_mono(prog: LProgram?)
 
 // --- index ---

@@ -35,29 +35,54 @@
 // sort, reverse, remove, extend), it's converted to StSideEffect rather
 // than deleted. This prevents accidentally optimizing away function calls.
 
+
+// optimizer.ly:703
 func blank_unused_multi_assign_names(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
+// optimizer.ly:824
 func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>)
+// optimizer.ly:988
 func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>)
+// optimizer.ly:832
 func collect_used_temps_in_stmt(s: LStmt, used: Dict<Sym, bool>)
+// optimizer.ly:1176
 func collect_used_temps_in_value(v: LValue, used: Dict<Sym, bool>)
+// optimizer.ly:1194
 func collect_used_var_names(stmts: [LStmt?], used: Dict<Sym, bool>)
+// optimizer.ly:1352
 func collect_used_var_names_in_expr(e: LExpr, used: Dict<Sym, bool>)
+// optimizer.ly:1202
 func collect_used_var_names_in_stmt(s: LStmt, used: Dict<Sym, bool>)
+// optimizer.ly:1540
 func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>)
+// optimizer.ly:228
 func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?]
+// optimizer.ly:166
 func destructure_multi_return(stmts: [LStmt?]) -> [LStmt?]
+// optimizer.ly:514
 func eliminate_unused_temps(stmts: [LStmt?], used_temps: Dict<Sym, bool>) -> [LStmt?]
+// optimizer.ly:598
 func eliminate_unused_temps_recursive(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>) -> [LStmt?]
+// optimizer.ly:376
 func fix_nil_zero_values(stmts: [LStmt?]) -> [LStmt?]
+// optimizer.ly:67
 func fuse_side_effect_temps(stmts: [LStmt?]) -> [LStmt?]
+// optimizer.ly:570
 func is_numeric_str(s: string) -> bool
+// optimizer.ly:128
 func is_side_effect_expr(e: LExpr) -> bool
+// optimizer.ly:8
 func optimize(prog: LProgram)
+// optimizer.ly:16
 func optimize_func(mut fn: LFuncDecl)
+// optimizer.ly:424
 func optimize_nested_stmts_structural(s: LStmt, return_type: LType?)
+// optimizer.ly:38
 func optimize_stmts_structural(stmts: [LStmt?], return_type: LType?) -> [LStmt?]
+// optimizer.ly:583
 func parse_temp_id(name: string) -> i32
+// optimizer.ly:736
 func recurse_blank_unused(stmt: LStmt, used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
+// optimizer.ly:397
 func zero_value_for_type(t: LType) -> LValue?
 
 // --- index ---

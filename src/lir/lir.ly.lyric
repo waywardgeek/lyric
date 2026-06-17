@@ -100,21 +100,47 @@
 
 // LValueKind = enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
 
+
+// lir.ly:174
+// LBinOpKind = enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
+
+// lir.ly:105
+// LExprKind = enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
+
+// lir.ly:574
+// LSelectKind = enum { SelRecv, SelSend, SelDefault }
+
+// lir.ly:397
+// LStmtKind = enum { StTempDef, StVarDecl, StAssign, StStructSet, StClassSet, StIndexSet, StIf, StWhile, StFor, StSwitch, StBlock, StReturn, StBreak, StContinue, StExpr, StDefer, StSpawn, StLock, StSend, StSelect, StYield, StSideEffect, StMultiAssign, StTypeSwitch, StSlabSet, StSlabFree, StSliceFree, StSliceRetain, StRefIncr, StRefDecr }
+
+// lir.ly:7
+// LTypeKind = enum { TyI8, TyI16, TyI32, TyI64, TyU8, TyU16, TyU32, TyU64, TyF32, TyF64, TyBool, TyString, TyUnit, TyError, TyPlatformInt, TyPlatformUint, TyStruct, TyClassHandle, TyTuple, TySlice, TyMap, TyChannel, TyGenerator, TyMutex, TyOptional, TyTaggedUnion, TyFuncPtr, TyErrorResult, TyAny, TyTypeVar, TyUnion }
+
+// lir.ly:195
+// LUnOpKind = enum { UnNeg, UnNot, UnBitNot }
+
+// lir.ly:73
+// LValueKind = enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
+
+// lir.ly:475
 struct LAssignData {
   target: string
   value: LValue?
 }
 
+// lir.ly:201
 struct LBinOpData {
   left: LValue?
   op: LBinOpKind
   right: LValue?
 }
 
+// lir.ly:547
 struct LBlockData {
   stmts: [LStmt?]
 }
 
+// lir.ly:257
 struct LBuiltinData {
   args: [LValue?]
   file: string
@@ -122,7 +148,8 @@ struct LBuiltinData {
   name: string
 }
 
-struct LCallData {
+// lir.ly:239
+class LCallData {
   args: [LValue?]
   func_name: string
   is_exported: bool
@@ -130,18 +157,21 @@ struct LCallData {
   type_args: [LType?]
 }
 
+// lir.ly:212
 struct LCastData {
   operand: LValue?
   target: LType?
 }
 
-struct LClassAllocData {
+// lir.ly:273
+class LClassAllocData {
   class_name: string
   fields: [LFieldInit]
   type_args: [LType?]
 }
 
-struct LClassDecl {
+// lir.ly:633
+class LClassDecl {
   fields: [LField]
   implements: [string]
   is_exported: bool
@@ -151,12 +181,14 @@ struct LClassDecl {
   type_params: [LTypeParam]
 }
 
+// lir.ly:222
 struct LClassGetData {
   class_name: string
   field: string
   handle: LValue?
 }
 
+// lir.ly:486
 struct LClassSetData {
   class_name: string
   field: string
@@ -164,22 +196,26 @@ struct LClassSetData {
   value: LValue?
 }
 
+// lir.ly:555
 struct LDeferData {
   body: [LStmt?]
 }
 
-struct LEnumDecl {
+// lir.ly:643
+class LEnumDecl {
   is_exported: bool
   name: string
   variants: [LVariant]
 }
 
+// lir.ly:327
 struct LEnvGetData {
   env: LValue?
   field: string
 }
 
-struct LExpr {
+// lir.ly:138
+class LExpr {
   bin_op: LBinOpData?
   builtin: LBuiltinData?
   call: LCallData?
@@ -212,28 +248,34 @@ struct LExpr {
   wrap_opt: LWrapOptionalData?
 }
 
+// lir.ly:551
 struct LExprStmtData {
   temp_id: i32
 }
 
+// lir.ly:318
 struct LExtractErrorData {
   value: LValue?
 }
 
+// lir.ly:314
 struct LExtractValueData {
   value: LValue?
 }
 
+// lir.ly:41
 struct LField {
   name: string
   typ: LType?
 }
 
+// lir.ly:264
 struct LFieldInit {
   name: string
   value: LValue?
 }
 
+// lir.ly:512
 struct LForData {
   body: [LStmt?]
   collection: LValue?
@@ -242,10 +284,12 @@ struct LForData {
   var_type: LType?
 }
 
+// lir.ly:344
 struct LFormatData {
   parts: [LFormatPart]
 }
 
+// lir.ly:337
 struct LFormatPart {
   format: string
   is_literal: bool
@@ -253,7 +297,8 @@ struct LFormatPart {
   value: LValue?
 }
 
-struct LFuncDecl {
+// lir.ly:669
+class LFuncDecl {
   body: [LStmt?]
   class_rename_map: Dict<Sym, string>?
   is_exported: bool
@@ -266,33 +311,39 @@ struct LFuncDecl {
   type_params: [LTypeParam]
 }
 
+// lir.ly:348
 struct LFuncLitData {
   body: [LStmt?]
   params: [LParam]
   return_type: LType?
 }
 
+// lir.ly:332
 struct LFuncRefData {
   env: LValue?
   name: string
 }
 
+// lir.ly:500
 struct LIfData {
   cond: LValue?
   else_body: [LStmt?]
   then_body: [LStmt?]
 }
 
+// lir.ly:621
 struct LImport {
   alias: string
   path: string
 }
 
+// lir.ly:228
 struct LIndexGetData {
   collection: LValue?
   index: LValue?
 }
 
+// lir.ly:493
 struct LIndexSetData {
   collection: LValue?
   field: string
@@ -300,7 +351,8 @@ struct LIndexSetData {
   value: LValue?
 }
 
-struct LInterfaceDecl {
+// lir.ly:656
+class LInterfaceDecl {
   embeds: [string]
   is_exported: bool
   methods: [LInterfaceMethod]
@@ -308,6 +360,7 @@ struct LInterfaceDecl {
   type_params: [LTypeParam]
 }
 
+// lir.ly:649
 struct LInterfaceMethod {
   name: string
   params: [LParam]
@@ -315,26 +368,31 @@ struct LInterfaceMethod {
   return_type: LType?
 }
 
+// lir.ly:292
 struct LIsNullData {
   value: LValue?
 }
 
+// lir.ly:564
 struct LLockData {
   body: [LStmt?]
   mutex: LValue?
 }
 
+// lir.ly:279
 struct LMakeChannelData {
   buf_size: LValue?
   elem_type: LType?
 }
 
+// lir.ly:322
 struct LMakeResultData {
   err: LValue?
   value: LValue?
 }
 
-struct LMethodCallData {
+// lir.ly:247
+class LMethodCallData {
   args: [LValue?]
   is_exported: bool
   method: string
@@ -344,19 +402,22 @@ struct LMethodCallData {
   type_args: [LType?]
 }
 
+// lir.ly:600
 struct LMultiAssignData {
   expr: LExpr?
   names: [string]
   types: [LType?]
 }
 
+// lir.ly:610
 struct LParam {
   mutable: bool
   name: string
   typ: LType?
 }
 
-struct LProgram {
+// lir.ly:688
+class LProgram {
   class_renames: Dict<Sym, string>?
   classes: [LClassDecl]
   detect_uaf: bool
@@ -374,27 +435,33 @@ struct LProgram {
   structs: [LStructDecl]
   type_defs: [LTypeDef]
 }
+// lir.ly:710
 func LProgram.resolve_class_types(self)
 
+// lir.ly:388
 struct LRefDecrData {
   class_name: string
   handle: LValue?
 }
 
+// lir.ly:383
 struct LRefIncrData {
   class_name: string
   handle: LValue?
 }
 
+// lir.ly:664
 struct LRelationalConstraint {
   interface_name: string
   type_args: [string]
 }
 
+// lir.ly:543
 struct LReturnData {
   values: [LValue?]
 }
 
+// lir.ly:580
 struct LSelectCase {
   binding: string
   body: [LStmt?]
@@ -403,35 +470,42 @@ struct LSelectCase {
   value: LValue?
 }
 
+// lir.ly:588
 struct LSelectData {
   cases: [LSelectCase]
 }
 
+// lir.ly:569
 struct LSendData {
   channel: LValue?
   value: LValue?
 }
 
+// lir.ly:596
 struct LSideEffectData {
   expr: LExpr?
 }
 
+// lir.ly:361
 struct LSlabAllocData {
   class_name: string
   fields: [LFieldInit]
 }
 
+// lir.ly:373
 struct LSlabFreeData {
   class_name: string
   handle: LValue?
 }
 
+// lir.ly:355
 struct LSlabGetData {
   class_name: string
   field: string
   handle: LValue?
 }
 
+// lir.ly:366
 struct LSlabSetData {
   class_name: string
   field: string
@@ -439,23 +513,27 @@ struct LSlabSetData {
   value: LValue?
 }
 
+// lir.ly:233
 struct LSliceData {
   collection: LValue?
   high: LValue?
   low: LValue?
 }
 
+// lir.ly:378
 struct LSliceFreeData {
   name: string
   typ: LType?
 }
 
+// lir.ly:559
 struct LSpawnData {
   body: [LStmt?]
   captures: [string]
 }
 
-struct LStmt {
+// lir.ly:430
+class LStmt {
   assign: LAssignData?
   block: LBlockData?
   class_set: LClassSetData?
@@ -487,46 +565,54 @@ struct LStmt {
   yield_data: LYieldData?
 }
 
-struct LStructDecl {
+// lir.ly:626
+class LStructDecl {
   fields: [LField]
   is_exported: bool
   name: string
   type_params: [LTypeParam]
 }
 
+// lir.ly:217
 struct LStructFieldData {
   field: string
   receiver: LValue?
 }
 
+// lir.ly:269
 struct LStructLitData {
   fields: [LFieldInit]
 }
 
+// lir.ly:480
 struct LStructSetData {
   field: string
   receiver: LValue?
   value: LValue?
 }
 
+// lir.ly:520
 struct LSwitchCase {
   binding: string
   body: [LStmt?]
   tag: i32
 }
 
+// lir.ly:526
 struct LSwitchData {
   cases: [LSwitchCase]
   enum_name: string
   tag: LValue?
 }
 
+// lir.ly:463
 struct LTempDef {
   expr: LExpr?
   id: i32
 }
 
-struct LType {
+// lir.ly:52
+class LType {
   bits: i32
   class_decl: LClassDecl?
   elem: LType?
@@ -543,38 +629,45 @@ struct LType {
   variants: [LVariant]
 }
 
-struct LTypeDef {
+// lir.ly:682
+class LTypeDef {
   is_exported: bool
   name: string
   typ: LType?
 }
 
+// lir.ly:616
 struct LTypeParam {
   constraint: string
   name: string
 }
 
+// lir.ly:532
 struct LTypeSwitchCase {
   binding: string
   body: [LStmt?]
   typ: LType?
 }
 
+// lir.ly:538
 struct LTypeSwitchData {
   cases: [LTypeSwitchCase]
   value: LValue?
 }
 
+// lir.ly:207
 struct LUnOpData {
   op: LUnOpKind
   operand: LValue?
 }
 
+// lir.ly:288
 struct LUnwrapOptionalData {
   value: LValue?
 }
 
-struct LValue {
+// lir.ly:87
+class LValue {
   bool_val: bool
   collection: LValue?
   float_val: f64
@@ -588,6 +681,7 @@ struct LValue {
   uint_val: u64
 }
 
+// lir.ly:468
 struct LVarDeclData {
   init: LValue?
   mutable: bool
@@ -595,12 +689,14 @@ struct LVarDeclData {
   typ: LType?
 }
 
+// lir.ly:46
 struct LVariant {
   fields: [LField]
   name: string
   tag: i32
 }
 
+// lir.ly:296
 struct LVariantConstructData {
   enum_name: string
   fields: [LValue?]
@@ -608,6 +704,7 @@ struct LVariantConstructData {
   variant: string
 }
 
+// lir.ly:307
 struct LVariantDataData {
   enum_name: string
   field: string
@@ -615,28 +712,37 @@ struct LVariantDataData {
   variant: string
 }
 
+// lir.ly:303
 struct LVariantTagData {
   value: LValue?
 }
 
+// lir.ly:506
 struct LWhileData {
   body: [LStmt?]
   cond_block: [LStmt?]
   cond_var: LValue?
 }
 
+// lir.ly:284
 struct LWrapOptionalData {
   value: LValue?
 }
 
+// lir.ly:592
 struct LYieldData {
   value: LValue?
 }
 
+// lir.ly:878
 func resolve_expr(expr: LExpr?, index: Dict<Sym, LClassDecl>)
+// lir.ly:811
 func resolve_stmt(s: LStmt, index: Dict<Sym, LClassDecl>)
+// lir.ly:798
 func resolve_stmts(stmts: [LStmt?], index: Dict<Sym, LClassDecl>)
+// lir.ly:771
 func resolve_type(typ: LType?, index: Dict<Sym, LClassDecl>)
+// lir.ly:929
 func resolve_value(val: LValue?, index: Dict<Sym, LClassDecl>)
 
 // --- index ---

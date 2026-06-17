@@ -132,7 +132,12 @@
 
 // TypeKind = enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
 
-struct Checker {
+
+// checker.ly:19
+// TypeKind = enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
+
+// checker.ly:147
+class Checker {
   current_func_name: string
   current_func_return: Type?
   errors: [string]
@@ -142,116 +147,209 @@ struct Checker {
   scope: Scope
   type_var_methods: Dict<Sym, Dict<Sym, Type>>?
 }
+// checker.ly:2649
 func Checker.bind_pattern(self, pat: Pattern, val_type: Type)
+// checker.ly:3473
 func Checker.build_type_arg_subst(self, recv_type: Type) -> Dict<Sym, Type>?
+// checker.ly:2502
 func Checker.check_assign(self, target: Expr, value: Expr)
+// checker.ly:2814
 func Checker.check_binary(self, left: Expr, op: BinaryOp, right: Expr) -> Type
+// checker.ly:2313
 func Checker.check_block(self, block: Block)
+// checker.ly:2937
 func Checker.check_block_expr_type(self, block: Block) -> Type
+// checker.ly:3355
 func Checker.check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type?
+// checker.ly:3689
 func Checker.check_builtin_method(self, recv_type: Type, method: string, arg_types: [Type]) -> Type?
+// checker.ly:3198
 func Checker.check_call(self, call_expr: Expr, func_expr: Expr, type_args: [TypeExpr], args: [Expr]) -> Type
+// checker.ly:2874
 func Checker.check_cast(self, target_type: TypeExpr, operand: Expr) -> Type
+// checker.ly:3736
 func Checker.check_channel_method(self, elem: Type, method: string) -> Type?
+// checker.ly:2709
 func Checker.check_expr(self, expr: Expr) -> Type
+// checker.ly:2714
 func Checker.check_expr_inner(self, expr: Expr) -> Type
+// checker.ly:3760
 func Checker.check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type
+// checker.ly:2572
 func Checker.check_for(self, var_name: Sym, index_var: Sym?, collection: Expr, body: Block)
+// checker.ly:2196
 func Checker.check_func_body(self, f: FuncDecl)
+// checker.ly:2550
 func Checker.check_if(self, condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?)
+// checker.ly:2912
 func Checker.check_if_else_expr(self, cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) -> Type
+// checker.ly:1856
 func Checker.check_implements(self, cls: ClassDecl)
+// checker.ly:2853
 func Checker.check_index(self, receiver: Expr, index: Expr) -> Type
+// checker.ly:2907
 func Checker.check_is(self, operand: Expr, variant: Sym) -> Type
+// checker.ly:3119
 func Checker.check_lambda(self, params: [Param], return_type: TypeExpr?, body: Block) -> Type
+// checker.ly:2963
 func Checker.check_list_lit(self, elems: [Expr]) -> Type
+// checker.ly:3708
 func Checker.check_list_method(self, elem: Type, method: string) -> Type?
+// checker.ly:2088
 func Checker.check_lyric_block_bodies(self, block: LyricBlock)
+// checker.ly:2974
 func Checker.check_map_lit(self, keys: [Expr], values: [Expr]) -> Type
+// checker.ly:3743
 func Checker.check_map_method(self, key: Type, value: Type, method: string) -> Type?
+// checker.ly:2625
 func Checker.check_match(self, value: Expr, arms: [MatchArm])
+// checker.ly:3141
 func Checker.check_match_expr(self, value: Expr, arms: [MatchArm]) -> Type
+// checker.ly:3492
 func Checker.check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type
+// checker.ly:2530
 func Checker.check_return(self, value: Expr?)
+// checker.ly:2867
 func Checker.check_slice(self, receiver: Expr, low: Expr?, high: Expr?) -> Type
+// checker.ly:2320
 func Checker.check_stmt(self, stmt: Stmt)
+// checker.ly:3723
 func Checker.check_string_method(self, method: string) -> Type?
+// checker.ly:2996
 func Checker.check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type
+// checker.ly:2887
 func Checker.check_try(self, operand: Expr) -> Type
+// checker.ly:2954
 func Checker.check_tuple_lit(self, elems: [Expr]) -> Type
+// checker.ly:2805
 func Checker.check_unary(self, op: UnaryOp, operand: Expr) -> Type
+// checker.ly:2879
 func Checker.check_unwrap(self, operand: Expr) -> Type
+// checker.ly:2433
 func Checker.check_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
+// checker.ly:2618
 func Checker.check_while(self, condition: Expr, body: Block)
+// checker.ly:915
 func Checker.error(self, msg: string)
+// checker.ly:919
 func Checker.error_at(self, span: Span, msg: string)
+// checker.ly:4141
 func Checker.find_typevar_name(self, te: TypeExpr) -> string
+// checker.ly:1205
 func Checker.func_decl_to_type(self, f: FuncDecl) -> Type
+// checker.ly:2045
 func Checker.func_decl_to_type_with_subst(self, f: FuncDecl, subst: Dict<Sym, string>) -> Type
+// checker.ly:1992
 func Checker.grant_relational_methods(self, iface_name: string, type_args: [TypeExpr])
+// checker.ly:883
 func Checker.infer_type_args(self, func_type: Type, arg_types: [Type]) -> Dict<Sym, Type>
+// checker.ly:548
 func Checker.is_assignable(self, src: Type, to: Type) -> bool
+// checker.ly:176
 func Checker.pop_scope(self)
+// checker.ly:1251
 func Checker.preregister_type_names(self, block: LyricBlock)
+// checker.ly:172
 func Checker.push_scope(self)
+// checker.ly:292
 func Checker.register_builtins(self)
+// checker.ly:1670
 func Checker.register_class(self, cls: ClassDecl)
+// checker.ly:1787
 func Checker.register_enum(self, e: EnumDecl)
+// checker.ly:1961
 func Checker.register_func(self, f: FuncDecl)
+// checker.ly:330
 func Checker.register_go_stdlib_modules(self)
+// checker.ly:1869
 func Checker.register_impl_methods(self, ib: ImplBlock)
+// checker.ly:1535
 func Checker.register_interface(self, iface: InterfaceDecl)
+// checker.ly:1423
 func Checker.register_interface_methods(self, file: File)
+// checker.ly:1335
 func Checker.register_lyric_block(self, block: LyricBlock)
+// checker.ly:315
 func Checker.register_primitive_type(self, name: string, t: Type)
+// checker.ly:1604
 func Checker.register_struct(self, s: StructDecl)
+// checker.ly:3800
 func Checker.resolve_field_type(self, recv_type: Type, field_str: string) -> Type
+// checker.ly:3313
 func Checker.resolve_module_func(self, mod_name: string, func_name: string) -> Type
+// checker.ly:1155
 func Checker.resolve_named_type(self, name: string, args: [TypeExpr], span: Span) -> Type
+// checker.ly:1091
 func Checker.resolve_type_expr(self, te: TypeExpr) -> Type
+// checker.ly:4086
 func Checker.type_expr_has_typevar(self, te: TypeExpr) -> bool
+// checker.ly:4456
 func Checker.validate_access_block(self, block: Block)
+// checker.ly:4531
 func Checker.validate_access_expr(self, expr: Expr)
+// checker.ly:4463
 func Checker.validate_access_stmt(self, stmt: Stmt)
+// checker.ly:4187
 func Checker.validate_all_exprs_resolved(self, file: File)
+// checker.ly:4678
 func Checker.validate_all_types_resolved(self, file: File)
+// checker.ly:4606
 func Checker.validate_field_access(self, receiver: Expr, field_name: Sym)
+// checker.ly:4428
 func Checker.validate_field_and_method_access(self, file: File)
+// checker.ly:4638
 func Checker.validate_method_access(self, receiver: Expr, method: Sym)
+// checker.ly:4222
 func Checker.vwalk_block(self, block: Block, ctx: string)
+// checker.ly:4322
 func Checker.vwalk_expr(self, expr: Expr, ctx: string)
+// checker.ly:4307
 func Checker.vwalk_pattern(self, pat: Pattern, ctx: string)
+// checker.ly:4229
 func Checker.vwalk_stmt(self, stmt: Stmt, ctx: string)
-func Checker.walk_block(self, block: Block, callback: (Expr) -> unit)
-func Checker.walk_expr(self, expr: Expr, callback: (Expr) -> unit)
-func Checker.walk_pattern(self, pat: Pattern, callback: (Expr) -> unit)
-func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> unit)
+// checker.ly:4041
+func Checker.walk_block(self, block: Block, callback: (Expr) -> ())
+// checker.ly:3884
+func Checker.walk_expr(self, expr: Expr, callback: (Expr) -> ())
+// checker.ly:4046
+func Checker.walk_pattern(self, pat: Pattern, callback: (Expr) -> ())
+// checker.ly:3969
+func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> ())
 
-struct Registry {
+// checker.ly:112
+class Registry {
   types: Dict<Sym, TypeInfo>
 }
+// checker.ly:135
 func Registry.lookup(self, name: string) -> TypeInfo?
+// checker.ly:120
 func Registry.register(self, name: string, info: TypeInfo)
 
-struct Scope {
+// checker.ly:84
+class Scope {
   parent: Scope?
   vars: Dict<Sym, Type>
 }
+// checker.ly:104
 func Scope.define(self, name: string, t: Type)
+// checker.ly:93
 func Scope.lookup(self, name: string) -> Type?
 
+// checker.ly:47
 struct TupleFieldType {
   name: string
   type_val: Type?
 }
 
-struct Type {
+// checker.ly:52
+class Type {
   bits: i32
   kind: TypeKind
   type_args: [Type]
 }
 
-struct TypeInfo {
+// checker.ly:59
+class TypeInfo {
   field_order: [string]
   fields: Dict<Sym, Type>
   implements_list: [string]
@@ -262,61 +360,109 @@ struct TypeInfo {
   variants: Dict<Sym, VariantInfo>
 }
 
+// checker.ly:75
 struct VariantField {
   name: string
   type_val: Type
 }
 
-struct VariantInfo {
+// checker.ly:70
+class VariantInfo {
   enum_name: string
   fields: [VariantField]
 }
 
+// checker.ly:1054
 func annotate(expr: Expr, t: Type) -> Type
+// checker.ly:4695
 func check_file(file: File) -> Checker
+// checker.ly:3865
 func coerce_numeric(a: Type, b: Type) -> Type
+// checker.ly:696
 func is_error_type(t: Type) -> bool
+// checker.ly:689
 func is_integer(t: Type) -> bool
+// checker.ly:682
 func is_numeric(t: Type) -> bool
+// checker.ly:4063
 func is_primitive_name(n: string) -> bool
+// checker.ly:214
 func make_any_type() -> Type
+// checker.ly:198
 func make_bool_type() -> Type
+// checker.ly:250
 func make_channel_type(elem: Type) -> Type
+// checker.ly:272
 func make_class_type(name: string) -> Type
+// checker.ly:276
 func make_enum_type(name: string) -> Type
+// checker.ly:260
 func make_error_result_type(ok: Type, err: Type) -> Type
+// checker.ly:218
 func make_error_type() -> Type
+// checker.ly:194
 func make_float_type(bits: i32) -> Type
+// checker.ly:246
 func make_func_type(params: [Type], ret: Type, tpnames: [string]) -> Type
+// checker.ly:254
 func make_generator_type(elem: Type) -> Type
+// checker.ly:186
 func make_int_type(bits: i32) -> Type
+// checker.ly:280
 func make_interface_type(name: string) -> Type
+// checker.ly:222
 func make_lock_type() -> Type
+// checker.ly:238
 func make_map_type(key: Type, value: Type) -> Type
+// checker.ly:284
 func make_module_type(name: string) -> Type
+// checker.ly:210
 func make_nil_type() -> Type
+// checker.ly:230
 func make_optional_type(inner: Type) -> Type
+// checker.ly:234
 func make_sequence_type(elem: Type) -> Type
+// checker.ly:202
 func make_string_type() -> Type
+// checker.ly:268
 func make_struct_type(name: string) -> Type
+// checker.ly:242
 func make_tuple_type(fields: [TupleFieldType]) -> Type
+// checker.ly:264
 func make_typevar_type(name: string) -> Type
+// checker.ly:190
 func make_uint_type(bits: i32) -> Type
+// checker.ly:226
 func make_union_type(variants: [Type]) -> Type
+// checker.ly:206
 func make_void_type() -> Type
+// checker.ly:710
 func match_type_vars(pattern: Type, concrete: Type, bindings: Dict<Sym, Type>) -> bool
+// checker.ly:158
 func new_checker() -> Checker
+// checker.ly:116
 func new_registry() -> Registry
+// checker.ly:89
 func new_scope(parent: Scope?) -> Scope
+// checker.ly:510
 func numeric_widens(src: Type, to: Type) -> bool
+// checker.ly:3175
 func propagate_arg_types(args: [Expr], param_types: [Type])
+// checker.ly:899
 func satisfies_constraint(t: Type, constraint: string) -> bool
+// checker.ly:2064
 func subst_type_var_names(t: Type, subst: Dict<Sym, string>) -> Type
+// checker.ly:813
 func substitute_type(t: Type, bindings: Dict<Sym, Type>) -> Type
+// checker.ly:4687
 func sym_to_string(s: Sym) -> string
+// checker.ly:1060
 func type_contains_var(t: Type) -> bool
+// checker.ly:342
 func type_name(t: Type) -> string
+// checker.ly:928
 func type_to_type_expr(t: Type) -> TypeExpr
+// checker.ly:375
 func types_equal(a: Type, b: Type) -> bool
 
 // --- index ---

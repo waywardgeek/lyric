@@ -87,98 +87,181 @@
 // implicit block name derived from the filename (e.g. math.ly → math).
 // The parser handles this in do_parse_file.
 
+
+// expr_parser.ly:305
 struct ArgListResult {
   elems: [Expr]
   end_pos: Pos
   mut_args: [bool]
 }
 
-struct Parser {
+// parser.ly:13
+class Parser {
   expr_depth: i32
   lex: Lexer?
   no_struct_lit: bool
   pushed: Token?
 }
+// parser.ly:110
 func Parser.consume_annotation(self, kind: TokenKind) -> bool
+// parser.ly:122
 func Parser.do_parse_file(self) -> (File?, error)
+// parser.ly:62
 func Parser.expect(self, kind: TokenKind) -> (Token?, error)
+// parser.ly:70
 func Parser.expect_ident(self) -> (Token?, error)
+// expr_parser.ly:668
 func Parser.is_paren_lambda_ahead(self) -> bool
+// expr_parser.ly:848
 func Parser.is_pattern_let_ahead(self) -> bool
+// expr_parser.ly:1320
 func Parser.is_struct_lit_ahead(self) -> bool
+// parser.ly:58
 func Parser.make_error(self, span: Span, msg: string) -> Error
+// parser.ly:90
 func Parser.make_span(self, start: Pos) -> Span
+// parser.ly:39
 func Parser.next(self) -> Token
+// expr_parser.ly:311
 func Parser.parse_arg_list(self) -> (ArgListResult?, error)
+// parser.ly:1181
 func Parser.parse_base_type(self) -> (TypeExpr?, error)
+// expr_parser.ly:732
 func Parser.parse_block(self) -> (Block?, error)
+// expr_parser.ly:1159
 func Parser.parse_cascade(self) -> (Stmt?, error)
+// parser.ly:832
 func Parser.parse_class(self) -> (ClassDecl?, error)
+// parser.ly:982
 func Parser.parse_const_decl(self) -> (ConstDecl?, error)
+// parser.ly:631
 func Parser.parse_destructor_block(self) -> (DestructorBlock?, error)
+// expr_parser.ly:508
 func Parser.parse_dict_lit(self, lbrace: Token) -> (Expr?, error)
+// parser.ly:470
 func Parser.parse_enum(self) -> (EnumDecl?, error)
+// parser.ly:497
 func Parser.parse_enum_variant(self) -> (EnumVariant?, error)
+// expr_parser.ly:79
 func Parser.parse_expr(self) -> (Expr?, error)
+// expr_parser.ly:86
 func Parser.parse_expr_no_struct_lit(self) -> (Expr?, error)
+// expr_parser.ly:1252
 func Parser.parse_expr_or_assign(self) -> (Stmt?, error)
+// parser.ly:331
 func Parser.parse_field(self) -> (Field?, error)
+// expr_parser.ly:966
 func Parser.parse_for(self) -> (Stmt?, error)
+// expr_parser.ly:1390
 func Parser.parse_fstring(self, tok: Token) -> (Expr?, error)
+// parser.ly:914
 func Parser.parse_func(self) -> (FuncDecl?, error)
+// expr_parser.ly:905
 func Parser.parse_if(self) -> (Stmt?, error)
+// expr_parser.ly:590
 func Parser.parse_if_expr(self) -> (Expr?, error)
+// expr_parser.ly:945
 func Parser.parse_if_let(self, start: Pos) -> (Stmt?, error)
+// parser.ly:645
 func Parser.parse_impl(self) -> (ImplBlock?, error)
+// parser.ly:759
 func Parser.parse_impl_mapping(self) -> (ImplMapping?, error)
+// parser.ly:697
 func Parser.parse_impl_mapping_short(self, for_type: Sym) -> (ImplMapping?, error)
+// parser.ly:280
 func Parser.parse_import(self) -> (ImportDecl?, error)
+// parser.ly:522
 func Parser.parse_interface(self) -> (InterfaceDecl?, error)
+// parser.ly:609
 func Parser.parse_interface_embed(self) -> (InterfaceEmbed?, error)
+// parser.ly:593
 func Parser.parse_interface_field(self) -> (InterfaceFieldDecl?, error)
+// expr_parser.ly:624
 func Parser.parse_lambda_expr(self) -> (Expr?, error)
+// expr_parser.ly:864
 func Parser.parse_let_else(self, start: Pos, is_mut: bool) -> (Stmt?, error)
+// expr_parser.ly:1237
 func Parser.parse_lock(self) -> (Stmt?, error)
+// parser.ly:141
 func Parser.parse_lyric_block(self) -> (LyricBlock?, error)
+// parser.ly:188
 func Parser.parse_lyric_item(self, block: LyricBlock) -> (bool, error)
+// expr_parser.ly:532
 func Parser.parse_map_lit(self, lbrace: Token) -> (Expr?, error)
+// expr_parser.ly:1024
 func Parser.parse_match_arms(self) -> ([MatchArm], error)
+// expr_parser.ly:573
 func Parser.parse_match_expr(self) -> (Expr?, error)
+// expr_parser.ly:1010
 func Parser.parse_match_stmt(self) -> (Stmt?, error)
+// parser.ly:359
 func Parser.parse_param(self) -> (Param?, error)
+// expr_parser.ly:703
 func Parser.parse_paren_lambda(self, start: Pos) -> (Expr?, error)
+// expr_parser.ly:1051
 func Parser.parse_pattern(self) -> (Pattern?, error)
+// expr_parser.ly:139
 func Parser.parse_postfix_expr(self) -> (Expr?, error)
+// expr_parser.ly:94
 func Parser.parse_prec_expr(self, min_prec: i32) -> (Expr?, error)
+// expr_parser.ly:343
 func Parser.parse_primary_expr(self) -> (Expr?, error)
+// parser.ly:1047
 func Parser.parse_relation(self) -> (RelationDecl?, error)
+// parser.ly:1097
 func Parser.parse_relation_side(self, first: Token) -> RelationSide
+// expr_parser.ly:878
 func Parser.parse_return(self) -> (Stmt?, error)
+// expr_parser.ly:1183
 func Parser.parse_select(self) -> (Stmt?, error)
+// expr_parser.ly:1201
 func Parser.parse_select_case(self) -> (SelectCase?, error)
+// expr_parser.ly:1171
 func Parser.parse_spawn(self) -> (Stmt?, error)
+// expr_parser.ly:749
 func Parser.parse_stmt(self) -> (Stmt?, error)
+// parser.ly:438
 func Parser.parse_struct(self) -> (StructDecl?, error)
+// expr_parser.ly:1349
 func Parser.parse_struct_lit(self, name: Sym, type_args: [TypeExpr], start: Pos) -> (Expr?, error)
+// parser.ly:396
 func Parser.parse_tuple_field(self) -> (TupleField?, error)
+// parser.ly:315
 func Parser.parse_type_alias(self) -> (TypeAliasDecl?, error)
+// parser.ly:1129
 func Parser.parse_type_expr(self) -> (TypeExpr?, error)
+// parser.ly:415
 func Parser.parse_type_params(self) -> ([TypeParam], error)
+// expr_parser.ly:112
 func Parser.parse_unary_expr(self) -> (Expr?, error)
+// expr_parser.ly:787
 func Parser.parse_var_decl(self) -> (Stmt?, error)
+// parser.ly:1012
 func Parser.parse_where_clause(self) -> (WhereClause?, error)
+// expr_parser.ly:997
 func Parser.parse_while(self) -> (Stmt?, error)
+// expr_parser.ly:893
 func Parser.parse_yield(self) -> (Stmt?, error)
+// parser.ly:32
 func Parser.peek(self) -> Token
+// parser.ly:97
 func Parser.peek_annotation(self) -> TokenKind?
+// parser.ly:48
 func Parser.push_back(self, t: Token)
+// parser.ly:52
 func Parser.skip_newlines(self)
+// expr_parser.ly:1446
 func Parser.try_parse_type_args(self) -> [TypeExpr]?
 
+// expr_parser.ly:22
 func binary_prec(kind: TokenKind) -> i32
+// expr_parser.ly:70
 func is_ident_kind(kind: ExprKind) -> bool
+// parser.ly:20
 func new_parser(src_text: string, filename: string) -> Parser
+// parser.ly:25
 func parse_file(src_text: string, filename: string) -> (File?, error)
+// expr_parser.ly:46
 func token_to_binary_op(kind: TokenKind) -> BinaryOp
 
 // --- index ---
