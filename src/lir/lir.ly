@@ -681,7 +681,7 @@ lyric lir {
     is_exported: bool
   }
 
-  class LProgram {
+  permanent class LProgram {
     package_name: string
     imports: [LImport]
     structs: [LStructDecl]

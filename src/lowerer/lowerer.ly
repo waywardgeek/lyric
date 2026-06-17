@@ -569,6 +569,16 @@ lyric lowerer {
       "main"
     }
 
+    // Warn if any permanent class is also owned (contradictory)
+    for c in classes {
+      if c.is_permanent {
+        let entry = owned_classes.get(sym(c.name))
+        if !isnull(entry) {
+          eprint(f"warning: class '{c.name}' is marked permanent but is owned by a relation\n")
+        }
+      }
+    }
+
     return LProgram {
       package_name: pname,
       imports: imports,

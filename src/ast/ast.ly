@@ -374,7 +374,7 @@ lyric ast {
   relation ArrayList LyricBlock:ta owns [TypeAliasDecl:ta]
   relation ArrayList LyricBlock:con owns [ConstDecl:con]
 
-  class File {
+  permanent class File {
     filename: string
     span: Span
   }
