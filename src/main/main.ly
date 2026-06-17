@@ -699,7 +699,7 @@ func cmd_compile(args: [string]) -> bool {
   let mut lir_dump = ""
   let mut soa = false
   let mut detect_uaf = false
-  let mut rc_free = false
+  let mut rc_free = true
   let mut i = 0  while i < len(args) {
     if args[i] == "-o" {
       i = i + 1
@@ -719,6 +719,8 @@ func cmd_compile(args: [string]) -> bool {
       detect_uaf = true
     } else if args[i] == "--rc-free" {
       rc_free = true
+    } else if args[i] == "--no-rc" {
+      rc_free = false
     } else {
       inputs = append(inputs, args[i])
     }
@@ -789,7 +791,7 @@ func cmd_test(args: [string]) -> bool {
   let mut lir_dump = ""
   let mut soa = false
   let mut detect_uaf = false
-  let mut rc_free = false
+  let mut rc_free = true
   let mut i = 0
   while i < len(args) {
     if args[i] == "-o" {
@@ -808,6 +810,8 @@ func cmd_test(args: [string]) -> bool {
       detect_uaf = true
     } else if args[i] == "--rc-free" {
       rc_free = true
+    } else if args[i] == "--no-rc" {
+      rc_free = false
     } else {
       inputs = append(inputs, args[i])
     }
