@@ -700,6 +700,8 @@ lyric lir {
     owned_classes: Dict<Sym, bool>?
     slab_mode: bool
     slab_mode_soa: bool
+    detect_uaf: bool
+    rc_free: bool
   }
 
   // Resolve class_decl, is_permanent, is_owned on all LType nodes in the program.

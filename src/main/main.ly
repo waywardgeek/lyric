@@ -581,7 +581,7 @@ func dump_lir_to_file(prog: LProgram, path: string) {
 // compile_pipeline — shared parse/check/lower/emit pipeline
 // ---------------------------------------------------------------------------
 
-func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool) -> bool {
+func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool {
   // Parse all input files
   let mut all_files: [File?] = []
   let mut i = 0
@@ -648,6 +648,7 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
     return false
   }
   prog!.resolve_class_types()
+  prog!.resolve_class_types()
 
   if lir_dump != "" {
     dump_lir_to_file(prog!, lir_dump)
@@ -665,6 +666,12 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
   eprintln("phase: slab")
   if soa {
     prog!.slab_mode_soa = true
+  }
+  if detect_uaf {
+    prog!.detect_uaf = true
+  }
+  if rc_free {
+    prog!.rc_free = true
   }
   slab_rewrite(prog!)
 
@@ -691,6 +698,8 @@ func cmd_compile(args: [string]) -> bool {
   let mut output = ""
   let mut lir_dump = ""
   let mut soa = false
+  let mut detect_uaf = false
+  let mut rc_free = false
   let mut i = 0  while i < len(args) {
     if args[i] == "-o" {
       i = i + 1
@@ -706,6 +715,10 @@ func cmd_compile(args: [string]) -> bool {
       // accepted for backwards compat
     } else if args[i] == "--soa" {
       soa = true
+    } else if args[i] == "--detect-uaf" {
+      detect_uaf = true
+    } else if args[i] == "--rc-free" {
+      rc_free = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -763,7 +776,7 @@ func cmd_compile(args: [string]) -> bool {
     }
   }
 
-  return compile_pipeline(inputs, output, module_root, lir_dump, soa)
+  return compile_pipeline(inputs, output, module_root, lir_dump, soa, detect_uaf, rc_free)
 }
 
 // ---------------------------------------------------------------------------
@@ -775,6 +788,8 @@ func cmd_test(args: [string]) -> bool {
   let mut output = ""
   let mut lir_dump = ""
   let mut soa = false
+  let mut detect_uaf = false
+  let mut rc_free = false
   let mut i = 0
   while i < len(args) {
     if args[i] == "-o" {
@@ -789,6 +804,10 @@ func cmd_test(args: [string]) -> bool {
       }
     } else if args[i] == "--soa" {
       soa = true
+    } else if args[i] == "--detect-uaf" {
+      detect_uaf = true
+    } else if args[i] == "--rc-free" {
+      rc_free = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -862,10 +881,17 @@ func cmd_test(args: [string]) -> bool {
   // Optimize + mono
   optimize(prog!)
   monomorphize(prog)
+  prog!.resolve_class_types()
   validate_post_mono(prog)
   rewrite_impl_renames(prog)
   if soa {
     prog!.slab_mode_soa = true
+  }
+  if detect_uaf {
+    prog!.detect_uaf = true
+  }
+  if rc_free {
+    prog!.rc_free = true
   }
   slab_rewrite(prog!)
 

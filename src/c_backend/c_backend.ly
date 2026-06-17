@@ -2767,13 +2767,23 @@ func CGen.emit_stmt(self, s: LStmt?) {
       let d = s!.ref_incr!
       let ref = self.emit_value(d.handle)
       let cname = self.resolve_class_name(d.class_name, "ref_incr")
-      self.line(f"/* rc_incr({cname}, {ref}) */")
+      if self.prog!.slab_mode_soa {
+        self.line(f"if ({ref}) _lyric_slab_{cname}._rc[{ref}]++;")
+      } else {
+        self.line(f"if ({ref}) {ref}->_rc++;")
+      }
     }
     StRefDecr => {
       let d = s!.ref_decr!
       let ref = self.emit_value(d.handle)
       let cname = self.resolve_class_name(d.class_name, "ref_decr")
-      self.line(f"/* rc_free({cname}, {ref}) */")
+      if self.prog!.rc_free {
+        if self.prog!.slab_mode_soa {
+          self.line(f"if ({ref} && --_lyric_slab_{cname}._rc[{ref}] == 0) _lyric_slab_free_{cname}({ref});")
+        } else {
+          self.line(f"if ({ref} && --{ref}->_rc == 0) _lyric_slab_free_{cname}({ref});")
+        }
+      }
     }
     StIndexSet => {
       let d = s!.index_set!
@@ -4233,6 +4243,10 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line(f"static void _lyric_slab_free_{name}({name}* p) {{")
     self.indent = self.indent + 1
     self.line("if (!p) return;")
+    if self.prog!.detect_uaf && !classes[i].is_permanent {
+      self.line(f"if (p->_rc != 0) {{ fprintf(stderr, \"UAF: freeing {name} with rc=%u\\n\", p->_rc); abort(); }}")
+      self.line(f"memset(p, 0xDE, sizeof({name}));")
+    }
     self.line(f"p->lyric_next = _lyric_slab_{name}.free;")
     self.line(f"_lyric_slab_{name}.free = p;")
     self.indent = self.indent - 1
@@ -4339,6 +4353,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.line(f"static void _lyric_slab_free_{name}({name} h) {{")
     self.indent = self.indent + 1
     self.line("if (!h) return;")
+    if self.prog!.detect_uaf && !classes[i].is_permanent {
+      self.line(f"if (_lyric_slab_{name}._rc[h] != 0) {{ fprintf(stderr, \"UAF: freeing {name} handle %u with rc=%u\\n\", h, _lyric_slab_{name}._rc[h]); abort(); }}")
+    }
     self.line(f"_lyric_slab_{name}.lyric_next[h] = _lyric_slab_{name}.free_head;")
     self.line(f"_lyric_slab_{name}.free_head = h;")
     self.indent = self.indent - 1
