@@ -1,6 +1,37 @@
 //ldd:source main.ly
 //ldd:why "CLI entry point: compile, test, fmt commands. Orchestrates the full pipeline from parsing to C output."
 
+// ## Architecture — Compilation Pipeline
+//
+// compile_pipeline executes passes in strict order:
+// 1. Parse all input files → merge into single AST
+// 2. Resolve module imports (if lyric.mod found)
+// 3. Merge stdlib (selective, transitive)
+// 4. Desugar (5 passes: embeds → fields → relations → destructors → defaults)
+// 5. Check (3 phases: preregister → register → check bodies)
+// 6. Lower (AST → LIR)
+// 7. Optimize (structural transforms + DCE)
+// 8. Monomorphize (specialize generics)
+// 9. Resolve class types (post-mono metadata)
+// 10. Memory pass: slab rewrite + RC injection (gated by flags)
+// 11. C backend emission
+//
+// CLI flags: -o (output), --lir-dump (diagnostic), --soa (SoA slabs),
+// --detect-uaf (poison checks), --rc-free (enable frees on rc=0),
+// --mono (monomorphize without emitting C)
+
+// ## Architecture — Command Resolution
+//
+// resolve_command implements unique-prefix matching:
+// `lyric c` → compile, `lyric t` → test, `lyric f` → fmt.
+// Ambiguous prefixes are rejected with an error listing matches.
+
+// ## Architecture — Test Discovery
+//
+// cmd_test compiles normally, then scans LIR functions for test_* names.
+// Generates a C test runner using emit_test_runner (setjmp/longjmp isolation).
+// Compiles + runs in a temp directory; cleans up after.
+
 struct DeclItem {
   idx: i32
   line: i32

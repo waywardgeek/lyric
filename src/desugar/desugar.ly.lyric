@@ -52,8 +52,22 @@
 //
 // When copying interface fields/methods/destructors to concrete classes,
 // type parameters must be substituted with concrete types from the
-// relation declaration. substituteTypeParamsInBlock recursively rewrites
-// all type references in a block's statements and expressions.
+// relation declaration. Two substitution strategies:
+// - Simple (Dict<Sym, string>): replaces type names as strings. Used for
+//   field injection and basic rewrites.
+// - Rich (Dict<Sym, TypeExpr>): preserves full type arguments through
+//   substitution. Required for destructors where generic types like
+//   Dict<K,V> must keep their type args intact.
+//
+// The rich variant (substitute_type_params_rich_*) is used in
+// DesugarDestructors; the simple variant elsewhere.
+
+// ## Invariants — Lock Statement Limitation
+//
+// deep_copy_stmt cannot reconstruct Lock statements due to a name
+// collision in the checker between Lock() and TypeKind.Lock. This is
+// a known limitation but doesn't affect destructors (they don't
+// typically contain lock statements).
 
 // ## Invariants — Impl Block Merging
 //

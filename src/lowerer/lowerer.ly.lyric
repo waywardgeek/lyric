@@ -74,6 +74,22 @@
 // registration. During struct literal lowering for class allocations,
 // any field not explicitly provided is filled with its default value.
 
+// ## Invariants — Short-Circuit Lowering
+//
+// Logical && and || are NOT lowered as binary ops (would cause eager
+// evaluation). Instead they're lowered to if-statements:
+// - `a && b` → `let mut t = a; if t { t = b }`
+// - `a || b` → `let mut t = a; if !t { t = b }`
+// This prevents segfaults from null access on short-circuit paths.
+
+// ## Invariants — Statement Buffer Management
+//
+// The lowerer uses save_stmts()/restore_stmts() to temporarily redirect
+// emitted statements to a sub-buffer (e.g. for if-else bodies, while
+// conditions, match arms). The previous buffer is restored after the
+// nested processing completes. This is analogous to the checker's
+// push_scope()/pop_scope() pattern.
+
 struct Lowerer {
   class_defaults: Dict<Sym, Expr>?
   class_fields: Dict<Sym, Dict<Sym, LType>>?

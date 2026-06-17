@@ -28,6 +28,19 @@
 // {} braces do NOT increment bracketDepth (they delimit blocks with statements).
 // bracketDepth is included in LexerState save/restore.
 
+// ## Invariants — F-String Sentinels
+//
+// In f-strings, escaped braces {{ and }} are stored as sentinel bytes
+// \x01 and \x02 respectively, to distinguish them from interpolation
+// boundaries { and }. The parser must decode these back to { and }.
+
+// ## Invariants — Comment Collection
+//
+// Comments are NOT emitted as tokens. They are collected into an
+// ArrayList relation owned by the Lexer instance. Each Comment has
+// text and Pos. This keeps the token stream clean for parsing while
+// preserving comments for tooling.
+
 // ## Invariants — Contextual Keywords
 //
 // doc, why, source, fake, field, lock, implements, embed are contextual

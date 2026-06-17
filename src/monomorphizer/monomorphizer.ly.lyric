@@ -22,6 +22,21 @@
 // - Generic classes that were never instantiated are also filtered out
 // - Methods of generic classes are filtered alongside the class
 
+// ## Invariants — Name Mangling
+//
+// type_to_mangle converts types to C-compatible name fragments:
+// primitives → name (i32, string), classes → C+name, structs → S+name,
+// slices → slice_+elem, maps → map_+key_+val, optionals → opt_+inner.
+// A type_key is comma-separated mangled fragments identifying a unique
+// instantiation. mangle_name joins base + mangled args with underscores.
+
+// ## Invariants — Impl Method Renames
+//
+// impl_method_renames uses @-delimited keys: "IfaceName@TypeArgs@Method".
+// rewrite_impl_renames expands these to cover all monomorphized variants
+// before walking the program. rewrite_impl_method_calls uses relational
+// constraints on functions to find and apply the correct renames.
+
 struct ImplRenameEntry {
   class_name: string
   new_method: string

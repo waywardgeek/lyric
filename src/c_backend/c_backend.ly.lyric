@@ -26,6 +26,20 @@
 // "Type mapping: c_type() handles all LType→C type conversions"
 // "Composite types (slice/opt/result/chan) registered on first use"
 // "Interface vtable dispatch for named LTyAny names"
+//
+// Emission order (dependency-safe):
+// 1. Forward declarations (all structs, classes, enums)
+// 2. Slice/channel type defs (use pointers, can precede struct defs)
+// 3. Struct definitions (topologically sorted via Kahn's algorithm)
+// 4. Optional/result type defs (AFTER structs, BEFORE classes)
+// 5. Class definitions + slab allocator infrastructure
+// 6. Interface vtable structs + static vtable instances per impl
+// 7. Function forward declarations
+// 8. Function bodies (with hoisted lambdas/spawn blocks)
+//
+// Interface dispatch: each interface → C struct of function pointers.
+// Each implementing class → static const vtable instance. Interface
+// values boxed as { void* _data, const Iface_vtable* _vtable }.
 
 // ## Slab Allocator Emission
 //

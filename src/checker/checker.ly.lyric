@@ -113,6 +113,23 @@
 // No cross-kind coercion (int→float requires explicit cast).
 // coerce_numeric returns the wider type for binary operations.
 
+// ## Invariants — Assignability Rules (is_assignable)
+//
+// - Nil → Optional, Class, Interface, Error (null assignable to nullable types)
+// - Any → anything and anything → Any (top type, bidirectional)
+// - TypeVar → anything (unresolved generics are compatible during inference)
+// - Interface ← Class/Struct: structural subtyping — all required methods must exist
+// - Union: a type is assignable to a union if assignable to ANY variant
+// - ErrorResult: (T, error) tuples checked component-wise
+// - Numeric widening: smaller to larger same-sign (see above)
+
+// ## Invariants — Phase 1.5 (Interface Methods)
+//
+// register_interface_methods runs between Phase 1 and Phase 2. It
+// links impl blocks to concrete types across block boundaries —
+// essential when methods defined in one module implement interfaces
+// from another (e.g. impl Hashable for concrete types in stdlib).
+
 // TypeKind = enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
 
 struct Checker {

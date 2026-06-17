@@ -20,15 +20,20 @@
 
 // ## Invariants
 //
-// // PROCEDURAL — structural transforms run BEFORE elimination
-// // Elimination runs on transformed stmts, then re-collects after
-// // elimination to catch names freed by VarDecl removal.
-// //
-// // collectUsedTemps and collectUsedVarNames must walk ALL stmt/expr/value
-// // variants exhaustively — missing a variant silently drops live references.
-// //
-// // parseTempID strips _val/_err suffixes to map multi-assign names
-// // back to their source temp IDs.
+// PROCEDURAL — structural transforms run BEFORE elimination.
+// Elimination runs on transformed stmts, then re-collects after
+// elimination to catch names freed by VarDecl removal.
+//
+// collectUsedTemps and collectUsedVarNames must walk ALL stmt/expr/value
+// variants exhaustively — missing a variant silently drops live references.
+//
+// parseTempID strips _val/_err suffixes to map multi-assign names
+// back to their source temp IDs.
+//
+// SAFETY: When eliminating unused temps, if the temp's expression is
+// side-effecting (is_side_effect_expr: calls, method calls, push, append,
+// sort, reverse, remove, extend), it's converted to StSideEffect rather
+// than deleted. This prevents accidentally optimizing away function calls.
 
 func blank_unused_multi_assign_names(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
 func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>)

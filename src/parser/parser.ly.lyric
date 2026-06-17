@@ -74,6 +74,19 @@
 // Compound assignment (+=, -=, *=, /=) is desugared in the parser:
 // `x += y` becomes `x = x + y` at the AST level.
 
+// ## Invariants — F-String Sub-Parsing
+//
+// F-strings are parsed by splitting the raw lexer token into literal
+// segments and expressions. For each {expr} segment, a NEW sub-parser
+// is instantiated to parse the Lyric expression within the braces.
+// This allows nested expressions and even nested f-strings.
+
+// ## Invariants — Implicit Module Naming
+//
+// Files without an explicit `lyric block_name { }` wrapper get an
+// implicit block name derived from the filename (e.g. math.ly → math).
+// The parser handles this in do_parse_file.
+
 struct ArgListResult {
   elems: [Expr]
   end_pos: Pos
