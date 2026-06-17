@@ -1,0 +1,558 @@
+//ldd:source lir.ly
+//ldd:why "Low-level Intermediate Representation types. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST. Structured control flow (not basic blocks), flat expressions (SSA-like temps)."
+
+// LBinOpKind = enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
+
+// LExprKind = enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
+
+// LSelectKind = enum { SelRecv, SelSend, SelDefault }
+
+// LStmtKind = enum { StTempDef, StVarDecl, StAssign, StStructSet, StClassSet, StIndexSet, StIf, StWhile, StFor, StSwitch, StBlock, StReturn, StBreak, StContinue, StExpr, StDefer, StSpawn, StLock, StSend, StSelect, StYield, StSideEffect, StMultiAssign, StTypeSwitch, StSlabSet, StSlabFree, StSliceFree, StSliceRetain, StRefIncr, StRefDecr }
+
+// LTypeKind = enum { TyI8, TyI16, TyI32, TyI64, TyU8, TyU16, TyU32, TyU64, TyF32, TyF64, TyBool, TyString, TyUnit, TyError, TyPlatformInt, TyPlatformUint, TyStruct, TyClassHandle, TyTuple, TySlice, TyMap, TyChannel, TyGenerator, TyMutex, TyOptional, TyTaggedUnion, TyFuncPtr, TyErrorResult, TyAny, TyTypeVar, TyUnion }
+
+// LUnOpKind = enum { UnNeg, UnNot, UnBitNot }
+
+// LValueKind = enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
+
+struct LAssignData {
+  target: string
+  value: LValue?
+}
+
+struct LBinOpData {
+  left: LValue?
+  op: LBinOpKind
+  right: LValue?
+}
+
+struct LBlockData {
+  stmts: [LStmt?]
+}
+
+struct LBuiltinData {
+  args: [LValue?]
+  file: string
+  line: i32
+  name: string
+}
+
+struct LCallData {
+  args: [LValue?]
+  func_name: string
+  is_exported: bool
+  mut_args: [bool]
+  type_args: [LType?]
+}
+
+struct LCastData {
+  operand: LValue?
+  target: LType?
+}
+
+struct LClassAllocData {
+  class_name: string
+  fields: [LFieldInit]
+  type_args: [LType?]
+}
+
+struct LClassDecl {
+  fields: [LField]
+  implements: [string]
+  is_exported: bool
+  is_owned: bool
+  is_permanent: bool
+  name: string
+  type_params: [LTypeParam]
+}
+
+struct LClassGetData {
+  class_name: string
+  field: string
+  handle: LValue?
+}
+
+struct LClassSetData {
+  class_name: string
+  field: string
+  handle: LValue?
+  value: LValue?
+}
+
+struct LDeferData {
+  body: [LStmt?]
+}
+
+struct LEnumDecl {
+  is_exported: bool
+  name: string
+  variants: [LVariant]
+}
+
+struct LEnvGetData {
+  env: LValue?
+  field: string
+}
+
+struct LExpr {
+  bin_op: LBinOpData?
+  builtin: LBuiltinData?
+  call: LCallData?
+  cast: LCastData?
+  class_alloc: LClassAllocData?
+  class_get: LClassGetData?
+  env_get: LEnvGetData?
+  extract_error: LExtractErrorData?
+  extract_value: LExtractValueData?
+  format: LFormatData?
+  func_lit: LFuncLitData?
+  func_ref: LFuncRefData?
+  index_get: LIndexGetData?
+  is_null: LIsNullData?
+  kind: LExprKind
+  make_channel: LMakeChannelData?
+  make_result: LMakeResultData?
+  method_call: LMethodCallData?
+  slab_alloc: LSlabAllocData?
+  slab_get: LSlabGetData?
+  slice_data: LSliceData?
+  struct_field: LStructFieldData?
+  struct_lit: LStructLitData?
+  typ: LType?
+  un_op: LUnOpData?
+  unwrap_opt: LUnwrapOptionalData?
+  variant_construct: LVariantConstructData?
+  variant_data: LVariantDataData?
+  variant_tag: LVariantTagData?
+  wrap_opt: LWrapOptionalData?
+}
+
+struct LExprStmtData {
+  temp_id: i32
+}
+
+struct LExtractErrorData {
+  value: LValue?
+}
+
+struct LExtractValueData {
+  value: LValue?
+}
+
+struct LField {
+  name: string
+  typ: LType?
+}
+
+struct LFieldInit {
+  name: string
+  value: LValue?
+}
+
+struct LForData {
+  body: [LStmt?]
+  collection: LValue?
+  index_var: string
+  var_name: string
+  var_type: LType?
+}
+
+struct LFormatData {
+  parts: [LFormatPart]
+}
+
+struct LFormatPart {
+  format: string
+  is_literal: bool
+  text: string
+  value: LValue?
+}
+
+struct LFuncDecl {
+  body: [LStmt?]
+  class_rename_map: Dict<Sym, string>?
+  is_exported: bool
+  name: string
+  params: [LParam]
+  receiver: string
+  receiver_type_params: [LTypeParam]
+  relational_constraints: [LRelationalConstraint]
+  return_type: LType?
+  type_params: [LTypeParam]
+}
+
+struct LFuncLitData {
+  body: [LStmt?]
+  params: [LParam]
+  return_type: LType?
+}
+
+struct LFuncRefData {
+  env: LValue?
+  name: string
+}
+
+struct LIfData {
+  cond: LValue?
+  else_body: [LStmt?]
+  then_body: [LStmt?]
+}
+
+struct LImport {
+  alias: string
+  path: string
+}
+
+struct LIndexGetData {
+  collection: LValue?
+  index: LValue?
+}
+
+struct LIndexSetData {
+  collection: LValue?
+  field: string
+  index: LValue?
+  value: LValue?
+}
+
+struct LInterfaceDecl {
+  embeds: [string]
+  is_exported: bool
+  methods: [LInterfaceMethod]
+  name: string
+  type_params: [LTypeParam]
+}
+
+struct LInterfaceMethod {
+  name: string
+  params: [LParam]
+  receiver_type: string
+  return_type: LType?
+}
+
+struct LIsNullData {
+  value: LValue?
+}
+
+struct LLockData {
+  body: [LStmt?]
+  mutex: LValue?
+}
+
+struct LMakeChannelData {
+  buf_size: LValue?
+  elem_type: LType?
+}
+
+struct LMakeResultData {
+  err: LValue?
+  value: LValue?
+}
+
+struct LMethodCallData {
+  args: [LValue?]
+  is_exported: bool
+  method: string
+  mut_args: [bool]
+  param_types: [LType?]
+  receiver: LValue?
+  type_args: [LType?]
+}
+
+struct LMultiAssignData {
+  expr: LExpr?
+  names: [string]
+  types: [LType?]
+}
+
+struct LParam {
+  mutable: bool
+  name: string
+  typ: LType?
+}
+
+struct LProgram {
+  class_renames: Dict<Sym, string>?
+  classes: [LClassDecl]
+  detect_uaf: bool
+  enums: [LEnumDecl]
+  functions: [LFuncDecl]
+  globals: [LVarDeclData]
+  impl_method_renames: Dict<Sym, string>?
+  imports: [LImport]
+  interfaces: [LInterfaceDecl]
+  owned_classes: Dict<Sym, bool>?
+  package_name: string
+  rc_free: bool
+  slab_mode: bool
+  slab_mode_soa: bool
+  structs: [LStructDecl]
+  type_defs: [LTypeDef]
+}
+func LProgram.resolve_class_types(self)
+
+struct LRefDecrData {
+  class_name: string
+  handle: LValue?
+}
+
+struct LRefIncrData {
+  class_name: string
+  handle: LValue?
+}
+
+struct LRelationalConstraint {
+  interface_name: string
+  type_args: [string]
+}
+
+struct LReturnData {
+  values: [LValue?]
+}
+
+struct LSelectCase {
+  binding: string
+  body: [LStmt?]
+  channel: LValue?
+  kind: LSelectKind
+  value: LValue?
+}
+
+struct LSelectData {
+  cases: [LSelectCase]
+}
+
+struct LSendData {
+  channel: LValue?
+  value: LValue?
+}
+
+struct LSideEffectData {
+  expr: LExpr?
+}
+
+struct LSlabAllocData {
+  class_name: string
+  fields: [LFieldInit]
+}
+
+struct LSlabFreeData {
+  class_name: string
+  handle: LValue?
+}
+
+struct LSlabGetData {
+  class_name: string
+  field: string
+  handle: LValue?
+}
+
+struct LSlabSetData {
+  class_name: string
+  field: string
+  handle: LValue?
+  value: LValue?
+}
+
+struct LSliceData {
+  collection: LValue?
+  high: LValue?
+  low: LValue?
+}
+
+struct LSliceFreeData {
+  name: string
+  typ: LType?
+}
+
+struct LSpawnData {
+  body: [LStmt?]
+  captures: [string]
+}
+
+struct LStmt {
+  assign: LAssignData?
+  block: LBlockData?
+  class_set: LClassSetData?
+  defer_data: LDeferData?
+  expr_stmt: LExprStmtData?
+  for_data: LForData?
+  if_data: LIfData?
+  index_set: LIndexSetData?
+  kind: LStmtKind
+  lock_data: LLockData?
+  multi_assign: LMultiAssignData?
+  ref_decr: LRefDecrData?
+  ref_incr: LRefIncrData?
+  ret: LReturnData?
+  select_data: LSelectData?
+  send_data: LSendData?
+  side_effect: LSideEffectData?
+  slab_free: LSlabFreeData?
+  slab_set: LSlabSetData?
+  slice_free: LSliceFreeData?
+  slice_retain: LSliceFreeData?
+  spawn_data: LSpawnData?
+  struct_set: LStructSetData?
+  switch_data: LSwitchData?
+  temp_def: LTempDef?
+  type_switch: LTypeSwitchData?
+  var_decl: LVarDeclData?
+  while_data: LWhileData?
+  yield_data: LYieldData?
+}
+
+struct LStructDecl {
+  fields: [LField]
+  is_exported: bool
+  name: string
+  type_params: [LTypeParam]
+}
+
+struct LStructFieldData {
+  field: string
+  receiver: LValue?
+}
+
+struct LStructLitData {
+  fields: [LFieldInit]
+}
+
+struct LStructSetData {
+  field: string
+  receiver: LValue?
+  value: LValue?
+}
+
+struct LSwitchCase {
+  binding: string
+  body: [LStmt?]
+  tag: i32
+}
+
+struct LSwitchData {
+  cases: [LSwitchCase]
+  enum_name: string
+  tag: LValue?
+}
+
+struct LTempDef {
+  expr: LExpr?
+  id: i32
+}
+
+struct LType {
+  bits: i32
+  class_decl: LClassDecl?
+  elem: LType?
+  fields: [LField]
+  is_exported: bool
+  is_owned: bool
+  is_permanent: bool
+  key: LType?
+  kind: LTypeKind
+  name: string
+  params: [LType?]
+  ret: LType?
+  type_args: [LType?]
+  variants: [LVariant]
+}
+
+struct LTypeDef {
+  is_exported: bool
+  name: string
+  typ: LType?
+}
+
+struct LTypeParam {
+  constraint: string
+  name: string
+}
+
+struct LTypeSwitchCase {
+  binding: string
+  body: [LStmt?]
+  typ: LType?
+}
+
+struct LTypeSwitchData {
+  cases: [LTypeSwitchCase]
+  value: LValue?
+}
+
+struct LUnOpData {
+  op: LUnOpKind
+  operand: LValue?
+}
+
+struct LUnwrapOptionalData {
+  value: LValue?
+}
+
+struct LValue {
+  bool_val: bool
+  collection: LValue?
+  float_val: f64
+  index: LValue?
+  int_val: i64
+  kind: LValueKind
+  name: string
+  str_val: string
+  temp_id: i32
+  typ: LType?
+  uint_val: u64
+}
+
+struct LVarDeclData {
+  init: LValue?
+  mutable: bool
+  name: string
+  typ: LType?
+}
+
+struct LVariant {
+  fields: [LField]
+  name: string
+  tag: i32
+}
+
+struct LVariantConstructData {
+  enum_name: string
+  fields: [LValue?]
+  tag: i32
+  variant: string
+}
+
+struct LVariantDataData {
+  enum_name: string
+  field: string
+  value: LValue?
+  variant: string
+}
+
+struct LVariantTagData {
+  value: LValue?
+}
+
+struct LWhileData {
+  body: [LStmt?]
+  cond_block: [LStmt?]
+  cond_var: LValue?
+}
+
+struct LWrapOptionalData {
+  value: LValue?
+}
+
+struct LYieldData {
+  value: LValue?
+}
+
+func resolve_expr(expr: LExpr?, index: Dict<Sym, LClassDecl>)
+func resolve_stmt(s: LStmt, index: Dict<Sym, LClassDecl>)
+func resolve_stmts(stmts: [LStmt?], index: Dict<Sym, LClassDecl>)
+func resolve_type(typ: LType?, index: Dict<Sym, LClassDecl>)
+func resolve_value(val: LValue?, index: Dict<Sym, LClassDecl>)
+
+// --- index ---
+// DO NOT EDIT below this line — regenerated by `lyre update`.

@@ -1,0 +1,183 @@
+//ldd:source c_backend.ly
+//ldd:why "LIR to C code generation. Emits GNU C11 with slab allocator, tagged unions, reference counting."
+
+struct CCapture {
+  name: string
+  typ: string
+}
+
+struct CGen {
+  buf: StringBuilder?
+  chan_types: Dict<Sym, string>?
+  class_by_name: Dict<Sym, LClassDecl>?
+  current_func: LFuncDecl?
+  func_by_name: Dict<Sym, LFuncDecl>?
+  gen_funcs: Dict<Sym, bool>?
+  gen_struct_name: string
+  gen_yield_count: i32
+  iface_by_name: Dict<Sym, LInterfaceDecl>?
+  impl_map: Dict<Sym, [string]>?
+  in_generator: bool
+  indent: i32
+  lambda_id: i32
+  lambdas: [CLambda]
+  method_to_receiver: Dict<Sym, string>?
+  mut_params: Dict<Sym, bool>?
+  needs_exec_cmd: bool
+  needs_os_args: bool
+  needs_path_join: bool
+  opt_count: i32
+  opt_types: Dict<Sym, string>?
+  prog: LProgram?
+  result_count: i32
+  result_types: Dict<Sym, string>?
+  select_id: i32
+  simple_enums: Dict<Sym, bool>?
+  slice_count: i32
+  slice_types: Dict<Sym, string>?
+  spawn_captures: Dict<Sym, bool>?
+  spawn_funcs: [CSpawnFunc]
+  spawn_id: i32
+  struct_by_name: Dict<Sym, LStructDecl>?
+  temp_types: Dict<Sym, LType?>?
+  temp_used: Dict<Sym, bool>?
+  tuple_count: i32
+  tuple_types: Dict<Sym, string>?
+  var_types: Dict<Sym, LType?>?
+}
+func CGen.c_field_decl(self, t: LType?, name: string) -> string
+func CGen.c_param_list(self, f: LFuncDecl) -> string
+func CGen.c_return_type(self, t: LType?) -> string
+func CGen.c_tuple_type(self, t: LType?) -> string
+func CGen.c_type(self, t: LType?) -> string
+func CGen.c_wrap_union(self, expr: string, src_type: LType?) -> string
+func CGen.chan_suffix(self, elem: LType?) -> string
+func CGen.collect_composite_types(self)
+func CGen.collect_gen_vars(self, stmts: [LStmt?]) -> [LVarDeclData]
+func CGen.contains_type_var(self, t: LType?) -> bool
+func CGen.count_yields(self, stmts: [LStmt?]) -> i32
+func CGen.emit_args(self, args: [LValue?]) -> string
+func CGen.emit_args_boxed(self, func_name: string, args: [LValue?]) -> string
+func CGen.emit_args_boxed_mut(self, func_name: string, args: [LValue?], mut_args: [bool]) -> string
+func CGen.emit_args_with_mut(self, args: [LValue?], mut_args: [bool]) -> string
+func CGen.emit_bin_op_expr(self, e: LExpr?) -> string
+func CGen.emit_builtin(self, d: LBuiltinData?) -> string
+func CGen.emit_call_expr(self, e: LExpr?) -> string
+func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string
+func CGen.emit_class_decl(self, c: LClassDecl)
+func CGen.emit_class_msg_data(self, v: LValue?, class_name: string) -> string
+func CGen.emit_enum_decl(self, e: LEnumDecl)
+func CGen.emit_expr_str(self, e: LExpr?) -> string
+func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string, suffix: string)
+func CGen.emit_for_stmt(self, s: LStmt?)
+func CGen.emit_format(self, d: LFormatData?) -> string
+func CGen.emit_fprint(self, stream: string, args: [LValue?], newline: bool) -> string
+func CGen.emit_func_decl(self, f: LFuncDecl)
+func CGen.emit_func_forward_decl(self, f: LFuncDecl)
+func CGen.emit_func_lit_expr(self, e: LExpr?) -> string
+func CGen.emit_generator_forward_decls(self, f: LFuncDecl)
+func CGen.emit_generator_func_decl(self, f: LFuncDecl)
+func CGen.emit_generator_struct_decl(self, f: LFuncDecl)
+func CGen.emit_method_call_expr(self, e: LExpr?) -> string
+func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?)
+func CGen.emit_os_helpers(self)
+func CGen.emit_printf(self, args: [LValue?]) -> string
+func CGen.emit_println(self, args: [LValue?]) -> string
+func CGen.emit_return_stmt(self, s: LStmt?)
+func CGen.emit_side_effect(self, e: LExpr?) -> string
+func CGen.emit_simple_enum_decl(self, e: LEnumDecl)
+func CGen.emit_slab_infrastructure(self, classes: [LClassDecl])
+func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl])
+func CGen.emit_sprintf(self, args: [LValue?]) -> string
+func CGen.emit_stmt(self, s: LStmt?)
+func CGen.emit_stmts(self, stmts: [LStmt?])
+func CGen.emit_struct_decl(self, s: LStructDecl)
+func CGen.emit_struct_field_expr(self, e: LExpr?) -> string
+func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string
+func CGen.emit_switch_stmt(self, s: LStmt?)
+func CGen.emit_to_string_functions(self)
+func CGen.emit_type_switch_stmt(self, s: LStmt?)
+func CGen.emit_value(self, v: LValue?) -> string
+func CGen.emit_value_as_cstr(self, v: LValue?) -> string
+func CGen.emit_variant_construct_expr(self, e: LExpr?) -> string
+func CGen.eq_expr(self, a: LValue?, b: LValue?) -> string
+func CGen.extract_func_name_from_expr(self, e: LExpr?) -> string
+func CGen.field_to_string_expr(self, t: LType?, val: string) -> string
+func CGen.find_class_field(self, fields: [LField], name: string) -> LType?
+func CGen.find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> string
+func CGen.func_name(self, f: LFuncDecl) -> string
+func CGen.has_destroy_func(self, class_name: string) -> bool
+func CGen.infer_expr_type(self, e: LExpr?) -> LType?
+func CGen.infer_lval_type(self, v: LValue?) -> LType?
+func CGen.is_class_optional(self, t: LType?) -> bool
+func CGen.is_gen_func_by_name(self, name: string) -> bool
+func CGen.is_generator_func(self, f: LFuncDecl) -> bool
+func CGen.is_rc_class(self, class_name: string) -> bool
+func CGen.line(self, s: string)
+func CGen.next_temp(self) -> i32
+func CGen.opt_type_name(self, elem: LType?) -> string
+func CGen.opt_type_name_from_expr(self, e: LExpr?) -> string
+func CGen.printf_spec_and_arg(self, v: LValue?) -> (string, string)
+func CGen.resolve_class_name(self, name: string, caller: string) -> string
+func CGen.resolve_class_name_from_type(self, t: LType?, caller: string) -> string
+func CGen.resolve_concrete_class(self, v: LValue?) -> string
+func CGen.resolve_field_type(self, owner_type: LType?, field: string) -> LType?
+func CGen.resolve_gen_base_name(self, v: LValue?) -> string
+func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> string
+func CGen.resolve_type_name(self, name: string) -> string
+func CGen.resolve_value_type(self, v: LValue?) -> LType?
+func CGen.result_type_name(self, elem: LType?) -> string
+func CGen.result_type_name_from_expr(self, e: LExpr?) -> string
+func CGen.slice_type_name(self, elem: LType?) -> string
+func CGen.slice_type_name_from_type(self, t: LType?) -> string
+func CGen.slice_type_name_from_value(self, v: LValue?) -> string
+func CGen.to_string_expr(self, v: LValue?) -> string
+func CGen.union_tag_for_type(self, t: LType?) -> string
+func CGen.walk_expr_for_composite(self, e: LExpr?)
+func CGen.walk_stmts_for_composite(self, stmts: [LStmt?])
+func CGen.walk_type_for_composite(self, t: LType?)
+func CGen.walk_val_for_composite(self, v: LValue?)
+func CGen.write_raw(self, s: string)
+func CGen.zero_value(self, t: LType?) -> string
+
+struct CLambda {
+  body_str: string
+  name: string
+  params: string
+  ret_type: string
+}
+
+struct CSpawnFunc {
+  body_str: string
+  captures: [CCapture]
+  name: string
+}
+
+func c_bin_op(op: LBinOpKind) -> string
+func c_safe_name(name: string) -> string
+func c_un_op(op: LUnOpKind) -> string
+func collect_declared_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
+func collect_declared_vars_stmts(stmts: [LStmt?], decl: Dict<Sym, bool>?)
+func collect_expr_vars(e: LExpr?, used: Dict<Sym, bool>?)
+func collect_used_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
+func collect_used_vars_stmts(stmts: [LStmt?], used: Dict<Sym, bool>?)
+func collect_val_vars(v: LValue?, used: Dict<Sym, bool>?)
+func dedup_classes(items: [LClassDecl]) -> [LClassDecl]
+func dedup_enums(items: [LEnumDecl]) -> [LEnumDecl]
+func dedup_funcs(items: [LFuncDecl]) -> [LFuncDecl]
+func dedup_structs(items: [LStructDecl]) -> [LStructDecl]
+func emit_c(prog: LProgram?) -> string
+func emit_test_runner(test_funcs: [string]) -> string
+func escape_c(s: string) -> string
+func escape_printf(s: string) -> string
+func is_c_reserved(name: string) -> bool
+func is_simple_enum(e: LEnumDecl) -> bool
+func lc_first(s: string) -> string
+func new_cgen(prog: LProgram?) -> CGen?
+func sanitize_c_type_name(s: string) -> string
+func str_to_lower(s: string) -> string
+func struct_type_name(t: LType?) -> string
+func topo_sort_structs(structs: [LStructDecl]) -> [LStructDecl]
+
+// --- index ---
+// DO NOT EDIT below this line — regenerated by `lyre update`.

@@ -1,0 +1,281 @@
+//ldd:source ast.ly, modules.ly
+//ldd:why "Defines all AST node types for the Lyric language. Leaf package — no dependencies on other bootstrap packages. Shared by parser, checker, desugar, and lowerer."
+
+// BinaryOp = enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
+
+// ExprKind = enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }
+
+// ImplMappingKind = enum { Alias, FieldBind, Inline }
+
+// PatternKind = enum { Ident(name: Sym), Literal(expr: Expr), Variant(name: Sym, bindings: [Pattern]), Wildcard, Tuple(elems: [Pattern]) }
+
+// RelationKind = enum { Owns, Refs }
+
+// StmtKind = enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block) }
+
+// TypeExprKind = enum { Named(name: Sym, args: [TypeExpr]), Optional(inner: TypeExpr), Union(variants: [TypeExpr]), Sequence(elem: TypeExpr), Map(key: TypeExpr, value: TypeExpr), Tuple(fields: [TupleField]), Func(params: [TypeExpr], ret: TypeExpr), Channel(elem: TypeExpr), Generator(elem: TypeExpr), Lock, Unit }
+
+// UnaryOp = enum { Neg, Not }
+
+struct Block {
+  span: Span
+}
+
+struct ClassDecl {
+  implements: [Sym]
+  is_permanent: bool
+  is_public: bool
+  name: Sym?
+  span: Span
+}
+
+struct Comment {
+  pos: Pos
+  text: string
+}
+
+struct ConstDecl {
+  is_public: bool
+  name: Sym?
+  span: Span
+  type_expr: TypeExpr?
+  value: Expr?
+}
+
+struct DestructorBlock {
+  body: Block?
+  span: Span
+  type_param: Sym?
+}
+
+struct ElseIf {
+  body: Block?
+  condition: Expr?
+  span: Span
+}
+
+struct EnumDecl {
+  is_public: bool
+  name: Sym?
+  span: Span
+}
+
+struct EnumVariant {
+  name: Sym?
+  span: Span
+}
+
+struct Expr {
+  inferred_type_args: [TypeExpr]
+  kind: ExprKind
+  resolved_type: TypeExpr?
+  span: Span
+}
+
+struct Field {
+  default_value: Expr?
+  guarded_by: Sym?
+  is_public: bool
+  name: Sym?
+  span: Span
+  type_expr: TypeExpr?
+}
+
+struct File {
+  filename: string
+  span: Span
+}
+
+struct FuncDecl {
+  body: Block?
+  is_public: bool
+  name: Sym?
+  receiver_type: Sym?
+  return_type: TypeExpr?
+  span: Span
+}
+
+struct ImplBlock {
+  for_type: Sym?
+  interface_name: Sym?
+  label: Sym?
+  span: Span
+}
+
+struct ImplMapping {
+  inline_func: FuncDecl?
+  kind: ImplMappingKind
+  method_name: Sym?
+  span: Span
+  target_class: Sym?
+  target_member: Sym?
+  type_param: Sym?
+}
+
+struct ImportDecl {
+  alias: Sym?
+  path: string
+  span: Span
+}
+
+struct InterfaceDecl {
+  implements: [Sym]
+  is_public: bool
+  name: Sym?
+  span: Span
+}
+
+struct InterfaceEmbed {
+  name: Sym?
+  span: Span
+}
+
+struct InterfaceFieldDecl {
+  name: Sym?
+  span: Span
+  type_expr: TypeExpr?
+  type_param: Sym?
+}
+
+struct LyricBlock {
+  name: Sym?
+  span: Span
+}
+
+struct MatchArm {
+  body: Block?
+  guard: Expr?
+  pattern: Pattern?
+  patterns: [Pattern]
+  span: Span
+}
+
+struct Param {
+  is_mut: bool
+  is_self: bool
+  name: Sym?
+  span: Span
+  type_expr: TypeExpr?
+}
+
+struct Pattern {
+  kind: PatternKind
+  span: Span
+}
+
+struct Pos {
+  column: i32
+  file: Sym?
+  line: i32
+}
+
+struct RelationDecl {
+  child: RelationSide
+  hint: Sym?
+  is_many: bool
+  kind: RelationKind
+  parent: RelationSide
+  span: Span
+}
+
+struct RelationSide {
+  label: Sym?
+  type_args: [Sym]
+  type_name: Sym?
+}
+
+struct SelectCase {
+  bind_var: Sym?
+  body: Block?
+  expr: Expr?
+  is_default: bool
+  span: Span
+}
+
+struct Span {
+  end: Pos
+  start: Pos
+}
+
+struct Stmt {
+  kind: StmtKind
+  span: Span
+}
+
+struct StructDecl {
+  is_public: bool
+  name: Sym?
+  span: Span
+}
+
+struct StructLitField {
+  name: Sym?
+  value: Expr?
+}
+
+struct TupleField {
+  name: Sym?
+  type_expr: TypeExpr?
+}
+
+struct TypeAliasDecl {
+  is_public: bool
+  name: Sym?
+  span: Span
+  type_expr: TypeExpr?
+}
+
+struct TypeExpr {
+  kind: TypeExprKind
+  span: Span
+}
+
+struct TypeParam {
+  constraint: Sym?
+  name: Sym?
+  span: Span
+}
+
+struct WhereClause {
+  constraint: Sym?
+  span: Span
+  variable: Sym?
+}
+
+func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>)
+func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>)
+func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>)
+func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool>
+func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool>
+func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>)
+func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>)
+func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bool
+func find_alias_index(name: string, alias_names: [string]) -> i32
+func find_stdlib_dir() -> string
+func is_primitive_type(name: string) -> bool
+func load_stdlib(dir: string) -> File?
+func lookup_name(name: string, orig: [string], prefixed: [string]) -> string
+func merge_files(files: [File?]) -> File?
+func merge_stdlib(file: File?, std_file: File?)
+func prefix_block_declarations(block: LyricBlock, prefix: string, orig: mut [string], prefixed: mut [string])
+func prefix_sym(s: Sym?, prefix: string) -> Sym?
+func resolve_module_imports(module_root: string, root_file: File?) -> (File?, string)
+func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string])
+func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string])
+func rewrite_expr(expr: Expr?, orig: [string], prefixed: [string])
+func rewrite_func_references(f: FuncDecl, orig: [string], prefixed: [string])
+func rewrite_pattern(pat: Pattern?, orig: [string], prefixed: [string])
+func rewrite_qualified_access(block: LyricBlock, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_qualified_block(block: Block, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_qualified_expr(expr: Expr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_qualified_in_func(f: FuncDecl, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_qualified_stmt(stmt: Stmt, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_qualified_type_expr(te: TypeExpr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+func rewrite_stmt(stmt: Stmt, orig: [string], prefixed: [string])
+func rewrite_type_expr(te: TypeExpr?, orig: [string], prefixed: [string])
+func strip_imports(block: LyricBlock)
+
+// --- index ---
+// DO NOT EDIT below this line — regenerated by `lyre update`.

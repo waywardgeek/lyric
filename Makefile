@@ -28,12 +28,24 @@ BOOTSTRAP_FILES = \
   src/c_backend/c_backend.ly \
   src/main/main.ly
 
-.PHONY: all test self-test update clean
+.PHONY: all test self-test update clean tools
 
 all: lyric
 
 lyric: lyric.c runtime/lyric_runtime.h
 	$(CC) $(CFLAGS) -I $(RUNTIME) -o $@ lyric.c -lm
+
+EXTRACT_FILES = \
+  src/ast/ast.ly src/ast/modules.ly \
+  src/lexer/lexer.ly \
+  src/parser/parser.ly src/parser/expr_parser.ly \
+  tools/extract_api.ly
+
+tools: lyric tools/extract_api
+tools/extract_api: lyric tools/extract_api.ly $(wildcard src/ast/*.ly src/lexer/*.ly src/parser/*.ly)
+	./lyric compile $(EXTRACT_FILES) -o tools/extract_api.c
+	$(CC) $(CFLAGS) -I $(RUNTIME) -o $@ tools/extract_api.c -lm
+	@rm -f tools/extract_api.c
 
 test: lyric
 	@bash test_lyric.sh

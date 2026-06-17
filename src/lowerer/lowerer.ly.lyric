@@ -1,0 +1,114 @@
+//ldd:source lowerer.ly
+//ldd:why "AST → LIR translation. Flattens expressions into SSA-like temp definitions, resolves type sugar, handles error results. Two-phase architecture matching Go implementation."
+
+struct Lowerer {
+  class_defaults: Dict<Sym, Expr>?
+  class_fields: Dict<Sym, Dict<Sym, LType>>?
+  classes: Dict<Sym, ClassDecl>?
+  current_func_return: LType?
+  enum_variant_fields: Dict<Sym, [TupleField]>?
+  enum_variant_tags: Dict<Sym, i32>?
+  enums: Dict<Sym, EnumDecl>?
+  func_sigs: Dict<Sym, FuncDecl>?
+  impl_method_renames: Dict<Sym, string>?
+  import_aliases: Dict<Sym, string>?
+  interfaces: Dict<Sym, InterfaceDecl>?
+  lowered_ifaces: Dict<Sym, LInterfaceDecl>?
+  scope: Dict<Sym, LType>?
+  stmts: [LStmt?]
+  structs: Dict<Sym, StructDecl>?
+  temp_id: i32
+  type_aliases: Dict<Sym, TypeExpr>?
+  unit_variants: Dict<Sym, bool>?
+  variant_to_enum: Dict<Sym, string>?
+}
+func Lowerer.arm_has_nested_variant(self, arm: MatchArm) -> bool
+func Lowerer.define_var(self, name: string, typ: LType?)
+func Lowerer.emit(self, stmt: LStmt?)
+func Lowerer.emit_nested_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm], result_name: string, result_type: LType?)
+func Lowerer.emit_temp(self, expr: LExpr?) -> LValue?
+func Lowerer.emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
+func Lowerer.emit_variant_bindings(self, val: LValue?, enum_name: string, variant: string, bindings: [Pattern])
+func Lowerer.expr_type(self, e: Expr?) -> LType?
+func Lowerer.find_variant_enum(self, variant_name: string) -> string
+func Lowerer.find_variant_field_name(self, enum_name: string, variant_name: string, field_idx: i32) -> string
+func Lowerer.find_variant_tag(self, enum_name: string, variant_name: string) -> i32
+func Lowerer.get_variant_field_type(self, enum_name: string, variant_name: string, field_idx: i32) -> LType?
+func Lowerer.has_nested_variant_patterns(self, arms: [MatchArm]) -> bool
+func Lowerer.is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool
+func Lowerer.lookup_var(self, name: string) -> LType?
+func Lowerer.lower_arm_body(self, body: Block?, result_name: string, rt: LType?)
+func Lowerer.lower_assign(self, target: Expr?, value: Expr?)
+func Lowerer.lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue?
+func Lowerer.lower_block(self, block: Block?)
+func Lowerer.lower_block_as_stmts(self, block: Block?) -> [LStmt?]
+func Lowerer.lower_call(self, orig: Expr?, func_expr: Expr?, type_args: [TypeExpr], args: [Expr], call_mut_args: [bool]) -> LValue?
+func Lowerer.lower_cast(self, orig: Expr?, target_type: TypeExpr?, operand: Expr?) -> LValue?
+func Lowerer.lower_class_decl(self, cd: ClassDecl?) -> LClassDecl
+func Lowerer.lower_else_ifs(self, else_ifs: [ElseIf], final_else: Block?) -> [LStmt?]
+func Lowerer.lower_else_ifs_with_result(self, else_ifs: [ElseIf], final_else: Block?, result_name: string, result_type: LType?)
+func Lowerer.lower_enum_decl(self, ed: EnumDecl?) -> LEnumDecl
+func Lowerer.lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm])
+func Lowerer.lower_expr(self, e: Expr?) -> LValue?
+func Lowerer.lower_field_access(self, orig: Expr?, receiver: Expr?, field_name: Sym) -> LValue?
+func Lowerer.lower_file(self, file: File?) -> LProgram?
+func Lowerer.lower_float_lit(self, value: string) -> LValue?
+func Lowerer.lower_for(self, var_name: Sym, index_var: Sym?, collection: Expr?, body: Block?)
+func Lowerer.lower_func(self, fd: FuncDecl?) -> LFuncDecl?
+func Lowerer.lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl?
+func Lowerer.lower_ident(self, orig: Expr?, name: Sym) -> LValue?
+func Lowerer.lower_if(self, condition: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?)
+func Lowerer.lower_if_else_expr(self, orig: Expr?, cond: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?) -> LValue?
+func Lowerer.lower_if_let(self, pattern: Pattern?, value: Expr?, then_block: Block?, else_block: Block?)
+func Lowerer.lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl]
+func Lowerer.lower_index(self, orig: Expr?, receiver: Expr?, index: Expr?) -> LValue?
+func Lowerer.lower_int_lit(self, value: string, type_hint: Sym?) -> LValue?
+func Lowerer.lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl
+func Lowerer.lower_is(self, orig: Expr?, operand: Expr?, variant: Sym) -> LValue?
+func Lowerer.lower_lambda(self, orig: Expr?, params: [Param], return_type: TypeExpr?, body: Block?) -> LValue?
+func Lowerer.lower_let_else(self, pattern: Pattern?, value: Expr?, else_block: Block?)
+func Lowerer.lower_list_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
+func Lowerer.lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue?
+func Lowerer.lower_match(self, value: Expr?, arms: [MatchArm])
+func Lowerer.lower_match_as_if_else(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
+func Lowerer.lower_match_expr(self, orig: Expr?, value: Expr?, arms: [MatchArm]) -> LValue?
+func Lowerer.lower_method_call(self, orig: Expr?, receiver: Expr?, method: Sym, type_args: [TypeExpr], args: [Expr], mc_mut_args: [bool]) -> LValue?
+func Lowerer.lower_mut_arg(self, e: Expr?) -> LValue?
+func Lowerer.lower_named_type(self, name: Sym, args: [TypeExpr]) -> LType?
+func Lowerer.lower_return(self, value: Expr?)
+func Lowerer.lower_select(self, cases: [SelectCase])
+func Lowerer.lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue?
+func Lowerer.lower_stmt(self, s: Stmt?)
+func Lowerer.lower_string_interp(self, orig: Expr?, parts: [Expr]) -> LValue?
+func Lowerer.lower_struct_decl(self, sd: StructDecl?) -> LStructDecl
+func Lowerer.lower_struct_lit(self, orig: Expr?, type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> LValue?
+func Lowerer.lower_try(self, orig: Expr?, operand: Expr?) -> LValue?
+func Lowerer.lower_tuple_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
+func Lowerer.lower_type(self, te: TypeExpr?) -> LType?
+func Lowerer.lower_unary(self, orig: Expr?, op: UnaryOp, operand: Expr?) -> LValue?
+func Lowerer.lower_unwrap(self, orig: Expr?, operand: Expr?) -> LValue?
+func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
+func Lowerer.lower_while(self, condition: Expr?, body: Block?)
+func Lowerer.lyric_name_to_ltype(self, name: string) -> LType?
+func Lowerer.next_temp(self) -> i32
+func Lowerer.primitive_type_for_name(self, name: string) -> LType?
+func Lowerer.register_block(self, block: LyricBlock)
+func Lowerer.restore_stmts(self, old: [LStmt?])
+func Lowerer.save_stmts(self) -> [LStmt?]
+func Lowerer.subst_impl_type(self, t: LType?, argmap: Dict<Sym, LType>) -> LType?
+
+func is_builtin_func(name: string) -> bool
+func is_map_method(name: string) -> bool
+func is_numeric_type(t: LType) -> bool
+func lir_int_type(bits: i32) -> LType?
+func lir_uint_type(bits: i32) -> LType?
+func make_bool_val(v: bool) -> LValue?
+func make_int_val(v: i64, bits: i32) -> LValue?
+func make_null_val(typ: LType?) -> LValue?
+func make_string_val(s: string) -> LValue?
+func make_var_val(name: string, typ: LType?) -> LValue?
+func new_lowerer() -> Lowerer
+func wider_numeric_type(a: LType, b: LType) -> LType?
+
+// --- index ---
+// DO NOT EDIT below this line — regenerated by `lyre update`.
