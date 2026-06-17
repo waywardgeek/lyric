@@ -618,7 +618,7 @@ func slab_rewrite(prog: LProgram) {
   let mut fi = 0
   while fi < len(prog.functions) {
     let f = prog.functions[fi]
-    let new_body = slab_rewrite_stmts(f.body, f.body, escape_map, prog)
+    let new_body = slab_rewrite_stmts(f.body, f.body, escape_map, prog, f.params)
     prog.functions[fi].body = new_body
 
     // Inject slab_free(self) at end of destroy methods
@@ -655,7 +655,7 @@ func slab_rewrite(prog: LProgram) {
 // Also injects StSliceFree at scope exits for locally-declared slice/string variables
 // that own their backing data and don't escape.
 // `all_stmts` is the full function body (for escape-via-call checking).
-func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?] {
+func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam]) -> [LStmt?] {
   let mut result: [LStmt?] = []
   // Track slice-typed locals declared in THIS scope that OWN their data
   let mut slice_locals: [string] = []
@@ -721,21 +721,46 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
               class_types.push(s.var_decl!.typ)
             }
             // If init is NOT a fresh alloc (i.e. copying an existing handle), retain
+            // UNLESS the source is dead after this point (move semantics — no inc/dec)
             if !isnull(s.var_decl!.init) && !is_fresh_class_init(s.var_decl!.init, fresh_class_temps) {
-              // Emit the VarDecl first, then the retain
-              let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
+              let init_val = s.var_decl!.init!
+              // Move semantics disabled — use_count approach is too aggressive.
+              // The LIR has temps that are single-use by definition, but the source
+              // variable they reference may be needed for scope-exit release.
+              let is_move = false
+              // Emit the VarDecl first
+              let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog, params)
               let mut j = 0
               while j < len(expanded) {
                 result.push(expanded[j])
                 j = j + 1
               }
-              let handle = LValue {
-                kind: ValVar,
-                name: s.var_decl!.name,
-                temp_id: 0,
-                typ: s.var_decl!.typ,
+              if is_move {
+                // Move: transfer ownership, no retain needed.
+                // Remove source from scope-exit release list by rebuilding.
+                let source_name = init_val.name
+                let mut new_locals: [string] = []
+                let mut new_types: [LType?] = []
+                let mut mi = 0
+                while mi < len(class_locals) {
+                  if class_locals[mi] != source_name {
+                    new_locals.push(class_locals[mi])
+                    new_types.push(class_types[mi])
+                  }
+                  mi = mi + 1
+                }
+                class_locals = new_locals
+                class_types = new_types
+              } else {
+                // Copy: retain the new handle
+                let handle = LValue {
+                  kind: ValVar,
+                  name: s.var_decl!.name,
+                  temp_id: 0,
+                  typ: s.var_decl!.typ,
+                }
+                emit_ref_incr(handle, s.var_decl!.typ!.name, mut result)
               }
-              emit_ref_incr(handle, s.var_decl!.typ!.name, mut result)
               i = i + 1
               continue
             }
@@ -765,7 +790,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
             }
             emit_ref_decr(old_handle, ctype!.name, mut result)
             // Emit the assignment
-            let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
+            let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog, params)
             let mut j = 0
             while j < len(expanded) {
               result.push(expanded[j])
@@ -818,14 +843,34 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
 
       // Before returns, free all in-scope owned slice locals (except the returned one)
       // and release all class handle locals (except the returned one)
+      // Also: if returning a borrowed ref (function parameter), retain before return
       if s.kind is StReturn {
         let ret_names = get_return_var_names(s)
+        // Retain borrowed refs being returned (params are borrowed — caller expects owned)
+        let mut ri = 0
+        while ri < len(ret_names) {
+          let rn = ret_names[ri]
+          let mut pi = 0
+          while pi < len(params) {
+            if params[pi].name == rn && is_rc_class_type(prog, params[pi].typ) {
+              let handle = LValue {
+                kind: ValVar,
+                name: rn,
+                temp_id: 0,
+                typ: params[pi].typ,
+              }
+              emit_ref_incr(handle, params[pi].typ!.name, mut result)
+            }
+            pi = pi + 1
+          }
+          ri = ri + 1
+        }
         emit_slice_frees(slice_locals, slice_types, ret_names, mut result)
         emit_class_releases(class_locals, class_types, ret_names, mut result)
       }
 
       // Process each statement; may expand to multiple
-      let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
+      let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog, params)
       let mut j = 0
       while j < len(expanded) {
         result.push(expanded[j])
@@ -843,12 +888,15 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
   // This catches intermediate temps from function calls that aren't assigned to locals.
   result = insert_temp_releases(result, prog)
 
+  // Post-pass: cancel adjacent retain+release pairs (delta folding)
+  result = delta_fold(result)
+
   return result
 }
 
 // Rewrite a single statement, returning one or more stmts.
 // StTempDef with ExClassAlloc expands into alloc + field sets (StSlabSet).
-func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?] {
+func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam]) -> [LStmt?] {
   let mut out: [LStmt?] = []
 
   // StTempDef with ExClassAlloc → slab alloc + StSlabSet for each field
@@ -899,7 +947,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
         }
         return out
       } else {
-        slab_rewrite_expr(e, all_stmts, escape_map, prog)
+        slab_rewrite_expr(e, all_stmts, escape_map, prog, params)
       }
     }
   }
@@ -929,7 +977,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
   // Recurse into sub-statements that contain expressions
   if s.kind is StSideEffect {
     if !isnull(s.side_effect) && !isnull(s.side_effect!.expr) {
-      slab_rewrite_expr(s.side_effect!.expr!, all_stmts, escape_map, prog)
+      slab_rewrite_expr(s.side_effect!.expr!, all_stmts, escape_map, prog, params)
     }
   }
 
@@ -942,19 +990,19 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.cond) {
         slab_rewrite_value(d.cond!)
       }
-      d.then_body = slab_rewrite_stmts(d.then_body, all_stmts, escape_map, prog)
-      d.else_body = slab_rewrite_stmts(d.else_body, all_stmts, escape_map, prog)
+      d.then_body = slab_rewrite_stmts(d.then_body, all_stmts, escape_map, prog, params)
+      d.else_body = slab_rewrite_stmts(d.else_body, all_stmts, escape_map, prog, params)
       s.if_data = d
     }
   }
   if s.kind is StWhile {
     if !isnull(s.while_data) {
       let mut d = s.while_data!
-      d.cond_block = slab_rewrite_stmts(d.cond_block, all_stmts, escape_map, prog)
+      d.cond_block = slab_rewrite_stmts(d.cond_block, all_stmts, escape_map, prog, params)
       if !isnull(d.cond_var) {
         slab_rewrite_value(d.cond_var!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog, params)
       s.while_data = d
     }
   }
@@ -964,14 +1012,14 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.collection) {
         slab_rewrite_value(d.collection!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog, params)
       s.for_data = d
     }
   }
   if s.kind is StBlock {
     if !isnull(s.block) {
       let mut d = s.block!
-      d.stmts = slab_rewrite_stmts(d.stmts, all_stmts, escape_map, prog)
+      d.stmts = slab_rewrite_stmts(d.stmts, all_stmts, escape_map, prog, params)
       s.block = d
     }
   }
@@ -983,7 +1031,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       }
       let mut ci = 0
       while ci < len(d.cases) {
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog, params)
         ci = ci + 1
       }
       s.switch_data = d
@@ -997,7 +1045,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       }
       let mut ci = 0
       while ci < len(d.cases) {
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog, params)
         ci = ci + 1
       }
       s.type_switch = d
@@ -1006,7 +1054,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
   if s.kind is StSpawn {
     if !isnull(s.spawn_data) {
       let mut d = s.spawn_data!
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog, params)
       s.spawn_data = d
     }
   }
@@ -1022,7 +1070,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
         if !isnull(c.value) {
           slab_rewrite_value(c.value!)
         }
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog, params)
         ci = ci + 1
       }
       s.select_data = d
@@ -1034,18 +1082,18 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.mutex) {
         slab_rewrite_value(d.mutex!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog, params)
       s.lock_data = d
     }
   }
   if s.kind is StDefer {
     if !isnull(s.defer_data) {
-      s.defer_data!.body = slab_rewrite_stmts(s.defer_data!.body, all_stmts, escape_map, prog)
+      s.defer_data!.body = slab_rewrite_stmts(s.defer_data!.body, all_stmts, escape_map, prog, params)
     }
   }
   if s.kind is StMultiAssign {
     if !isnull(s.multi_assign) && !isnull(s.multi_assign!.expr) {
-      slab_rewrite_expr(s.multi_assign!.expr!, all_stmts, escape_map, prog)
+      slab_rewrite_expr(s.multi_assign!.expr!, all_stmts, escape_map, prog, params)
     }
   }
   if s.kind is StSend {
@@ -1093,7 +1141,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
 }
 
 // Rewrite a single expression, converting class allocs to slab allocs
-func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) {
+func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam]) {
   match e.kind {
     ExClassAlloc => {
       if !isnull(e.class_alloc) {
@@ -1337,7 +1385,7 @@ func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool
     }
     ExFuncLit => {
       if !isnull(e.func_lit) {
-        e.func_lit!.body = slab_rewrite_stmts(e.func_lit!.body, e.func_lit!.body, escape_map, prog)
+        e.func_lit!.body = slab_rewrite_stmts(e.func_lit!.body, e.func_lit!.body, escape_map, prog, e.func_lit!.params)
       }
     }
     ExMakeChannel => {
@@ -1909,6 +1957,549 @@ func expr_uses_temp(e: LExpr, temp_id: i32) -> bool {
 func value_is_temp(v: LValue, temp_id: i32) -> bool {
   if v.kind is ValTemp {
     return v.temp_id == temp_id
+  }
+  return false
+}
+
+// ==========================================================================
+// Move Semantics — Liveness Analysis
+// ==========================================================================
+// Check if a variable is used in stmts[start_idx+1..].
+// Returns true if the variable is live (used later), false if dead (safe to move).
+func var_is_live_after(var_name: string, stmts: [LStmt?], start_idx: i32) -> bool {
+  let mut i = start_idx + 1
+  while i < len(stmts) {
+    if !isnull(stmts[i]) && var_used_in_stmt(var_name, stmts[i]!) {
+      return true
+    }
+    i = i + 1
+  }
+  return false
+}
+
+// Check if a variable is used anywhere in a statement (including nested blocks).
+func var_used_in_stmt(var_name: string, s: LStmt) -> bool {
+  if s.kind is StVarDecl {
+    if !isnull(s.var_decl) && !isnull(s.var_decl!.init) {
+      if var_used_in_value(var_name, s.var_decl!.init!) { return true }
+    }
+  }
+  if s.kind is StAssign {
+    if !isnull(s.assign) {
+      if s.assign!.target == var_name { return true }
+      if !isnull(s.assign!.value) && var_used_in_value(var_name, s.assign!.value!) { return true }
+    }
+  }
+  if s.kind is StTempDef {
+    if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
+      if var_used_in_expr(var_name, s.temp_def!.expr!) { return true }
+    }
+  }
+  if s.kind is StReturn {
+    if !isnull(s.ret) {
+      let mut i = 0
+      while i < len(s.ret!.values) {
+        if !isnull(s.ret!.values[i]) && var_used_in_value(var_name, s.ret!.values[i]!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if s.kind is StSlabSet {
+    if !isnull(s.slab_set) {
+      if !isnull(s.slab_set!.handle) && var_used_in_value(var_name, s.slab_set!.handle!) { return true }
+      if !isnull(s.slab_set!.value) && var_used_in_value(var_name, s.slab_set!.value!) { return true }
+    }
+  }
+  if s.kind is StClassSet {
+    if !isnull(s.class_set) {
+      if !isnull(s.class_set!.handle) && var_used_in_value(var_name, s.class_set!.handle!) { return true }
+      if !isnull(s.class_set!.value) && var_used_in_value(var_name, s.class_set!.value!) { return true }
+    }
+  }
+  if s.kind is StStructSet {
+    if !isnull(s.struct_set) {
+      if !isnull(s.struct_set!.value) && var_used_in_value(var_name, s.struct_set!.value!) { return true }
+    }
+  }
+  if s.kind is StExpr {
+    if !isnull(s.expr_stmt) {
+      // StExpr holds a temp_id, not a variable reference — skip
+    }
+  }
+  if s.kind is StRefIncr {
+    if !isnull(s.ref_incr) && !isnull(s.ref_incr!.handle) {
+      if var_used_in_value(var_name, s.ref_incr!.handle!) { return true }
+    }
+  }
+  if s.kind is StRefDecr {
+    if !isnull(s.ref_decr) && !isnull(s.ref_decr!.handle) {
+      if var_used_in_value(var_name, s.ref_decr!.handle!) { return true }
+    }
+  }
+  if s.kind is StSlabFree {
+    if !isnull(s.slab_free) && !isnull(s.slab_free!.handle) {
+      if var_used_in_value(var_name, s.slab_free!.handle!) { return true }
+    }
+  }
+  if s.kind is StSliceFree {
+    if !isnull(s.slice_free) {
+      if s.slice_free!.name == var_name { return true }
+    }
+  }
+  if s.kind is StIndexSet {
+    if !isnull(s.index_set) {
+      if !isnull(s.index_set!.collection) && var_used_in_value(var_name, s.index_set!.collection!) { return true }
+      if !isnull(s.index_set!.index) && var_used_in_value(var_name, s.index_set!.index!) { return true }
+      if !isnull(s.index_set!.value) && var_used_in_value(var_name, s.index_set!.value!) { return true }
+    }
+  }
+  // Recurse into nested blocks
+  if s.kind is StIf {
+    if !isnull(s.if_data) {
+      if !isnull(s.if_data!.cond) && var_used_in_value(var_name, s.if_data!.cond!) { return true }
+      if var_used_in_stmts(var_name, s.if_data!.then_body) { return true }
+      if var_used_in_stmts(var_name, s.if_data!.else_body) { return true }
+    }
+  }
+  if s.kind is StWhile {
+    if !isnull(s.while_data) {
+      if !isnull(s.while_data!.cond_var) && var_used_in_value(var_name, s.while_data!.cond_var!) { return true }
+      if var_used_in_stmts(var_name, s.while_data!.body) { return true }
+    }
+  }
+  if s.kind is StFor {
+    if !isnull(s.for_data) {
+      if var_used_in_stmts(var_name, s.for_data!.body) { return true }
+    }
+  }
+  if s.kind is StTypeSwitch {
+    if !isnull(s.type_switch) {
+      if !isnull(s.type_switch!.value) && var_used_in_value(var_name, s.type_switch!.value!) { return true }
+      let mut i = 0
+      while i < len(s.type_switch!.cases) {
+        if var_used_in_stmts(var_name, s.type_switch!.cases[i].body) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if s.kind is StSwitch {
+    if !isnull(s.switch_data) {
+      if !isnull(s.switch_data!.tag) && var_used_in_value(var_name, s.switch_data!.tag!) { return true }
+      let mut i = 0
+      while i < len(s.switch_data!.cases) {
+        if var_used_in_stmts(var_name, s.switch_data!.cases[i].body) { return true }
+        i = i + 1
+      }
+    }
+  }
+  return false
+}
+
+func var_used_in_stmts(var_name: string, stmts: [LStmt?]) -> bool {
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) && var_used_in_stmt(var_name, stmts[i]!) { return true }
+    i = i + 1
+  }
+  return false
+}
+
+// Check if a variable is used in an expression.
+func var_used_in_expr(var_name: string, e: LExpr) -> bool {
+  if e.kind is ExCall {
+    if !isnull(e.call) {
+      let mut i = 0
+      while i < len(e.call!.args) {
+        if !isnull(e.call!.args[i]) && var_used_in_value(var_name, e.call!.args[i]!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExMethodCall {
+    if !isnull(e.method_call) {
+      if !isnull(e.method_call!.receiver) && var_used_in_value(var_name, e.method_call!.receiver!) { return true }
+      let mut i = 0
+      while i < len(e.method_call!.args) {
+        if !isnull(e.method_call!.args[i]) && var_used_in_value(var_name, e.method_call!.args[i]!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExBinOp {
+    if !isnull(e.bin_op) {
+      if !isnull(e.bin_op!.left) && var_used_in_value(var_name, e.bin_op!.left!) { return true }
+      if !isnull(e.bin_op!.right) && var_used_in_value(var_name, e.bin_op!.right!) { return true }
+    }
+  }
+  if e.kind is ExCast {
+    if !isnull(e.cast) && !isnull(e.cast!.operand) {
+      return var_used_in_value(var_name, e.cast!.operand!)
+    }
+  }
+  if e.kind is ExClassGet {
+    if !isnull(e.class_get) && !isnull(e.class_get!.handle) {
+      return var_used_in_value(var_name, e.class_get!.handle!)
+    }
+  }
+  if e.kind is ExSlabGet {
+    if !isnull(e.slab_get) && !isnull(e.slab_get!.handle) {
+      return var_used_in_value(var_name, e.slab_get!.handle!)
+    }
+  }
+  if e.kind is ExIsNull {
+    if !isnull(e.is_null) && !isnull(e.is_null!.value) {
+      return var_used_in_value(var_name, e.is_null!.value!)
+    }
+  }
+  if e.kind is ExUnwrapOptional {
+    if !isnull(e.unwrap_opt) && !isnull(e.unwrap_opt!.value) {
+      return var_used_in_value(var_name, e.unwrap_opt!.value!)
+    }
+  }
+  if e.kind is ExMakeSlice {
+    if !isnull(e.builtin) {
+      let mut i = 0
+      while i < len(e.builtin!.args) {
+        if !isnull(e.builtin!.args[i]) && var_used_in_value(var_name, e.builtin!.args[i]!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExFormat {
+    if !isnull(e.format) {
+      let mut i = 0
+      while i < len(e.format!.parts) {
+        if !isnull(e.format!.parts[i].value) && var_used_in_value(var_name, e.format!.parts[i].value!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExIndexGet {
+    if !isnull(e.index_get) {
+      if !isnull(e.index_get!.collection) && var_used_in_value(var_name, e.index_get!.collection!) { return true }
+      if !isnull(e.index_get!.index) && var_used_in_value(var_name, e.index_get!.index!) { return true }
+    }
+  }
+  if e.kind is ExVariantConstruct {
+    if !isnull(e.variant_construct) {
+      let mut i = 0
+      while i < len(e.variant_construct!.fields) {
+        if !isnull(e.variant_construct!.fields[i]) && var_used_in_value(var_name, e.variant_construct!.fields[i]!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExClassAlloc {
+    if !isnull(e.class_alloc) {
+      let mut i = 0
+      while i < len(e.class_alloc!.fields) {
+        if !isnull(e.class_alloc!.fields[i].value) && var_used_in_value(var_name, e.class_alloc!.fields[i].value!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExSlabAlloc {
+    if !isnull(e.slab_alloc) {
+      let mut i = 0
+      while i < len(e.slab_alloc!.fields) {
+        if !isnull(e.slab_alloc!.fields[i].value) && var_used_in_value(var_name, e.slab_alloc!.fields[i].value!) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExUnOp {
+    if !isnull(e.un_op) && !isnull(e.un_op!.operand) {
+      return var_used_in_value(var_name, e.un_op!.operand!)
+    }
+  }
+  return false
+}
+
+func var_used_in_value(var_name: string, v: LValue) -> bool {
+  if v.kind is ValVar {
+    return v.name == var_name
+  }
+  return false
+}
+
+// Count how many times a variable is used (read) in a statement list.
+// Used for move detection — if a variable is used exactly once (the init), it's safe to move.
+func count_var_uses(var_name: string, stmts: [LStmt?]) -> i32 {
+  let mut count = 0
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) {
+      count = count + count_var_uses_in_stmt(var_name, stmts[i]!)
+    }
+    i = i + 1
+  }
+  return count
+}
+
+func count_var_uses_in_stmt(var_name: string, s: LStmt) -> i32 {
+  let mut count = 0
+  if s.kind is StVarDecl {
+    if !isnull(s.var_decl) && !isnull(s.var_decl!.init) {
+      count = count + count_var_uses_in_value(var_name, s.var_decl!.init!)
+    }
+  }
+  if s.kind is StAssign {
+    if !isnull(s.assign) && !isnull(s.assign!.value) {
+      count = count + count_var_uses_in_value(var_name, s.assign!.value!)
+    }
+  }
+  if s.kind is StTempDef {
+    if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
+      count = count + count_var_uses_in_expr(var_name, s.temp_def!.expr!)
+    }
+  }
+  if s.kind is StReturn {
+    if !isnull(s.ret) {
+      let mut i = 0
+      while i < len(s.ret!.values) {
+        if !isnull(s.ret!.values[i]) { count = count + count_var_uses_in_value(var_name, s.ret!.values[i]!) }
+        i = i + 1
+      }
+    }
+  }
+  if s.kind is StSlabSet {
+    if !isnull(s.slab_set) {
+      if !isnull(s.slab_set!.handle) { count = count + count_var_uses_in_value(var_name, s.slab_set!.handle!) }
+      if !isnull(s.slab_set!.value) { count = count + count_var_uses_in_value(var_name, s.slab_set!.value!) }
+    }
+  }
+  if s.kind is StClassSet {
+    if !isnull(s.class_set) {
+      if !isnull(s.class_set!.handle) { count = count + count_var_uses_in_value(var_name, s.class_set!.handle!) }
+      if !isnull(s.class_set!.value) { count = count + count_var_uses_in_value(var_name, s.class_set!.value!) }
+    }
+  }
+  if s.kind is StStructSet {
+    if !isnull(s.struct_set) {
+      if !isnull(s.struct_set!.value) { count = count + count_var_uses_in_value(var_name, s.struct_set!.value!) }
+    }
+  }
+  if s.kind is StRefIncr {
+    if !isnull(s.ref_incr) && !isnull(s.ref_incr!.handle) {
+      count = count + count_var_uses_in_value(var_name, s.ref_incr!.handle!)
+    }
+  }
+  if s.kind is StRefDecr {
+    if !isnull(s.ref_decr) && !isnull(s.ref_decr!.handle) {
+      count = count + count_var_uses_in_value(var_name, s.ref_decr!.handle!)
+    }
+  }
+  if s.kind is StSlabFree {
+    if !isnull(s.slab_free) && !isnull(s.slab_free!.handle) {
+      count = count + count_var_uses_in_value(var_name, s.slab_free!.handle!)
+    }
+  }
+  if s.kind is StSliceFree {
+    if !isnull(s.slice_free) && s.slice_free!.name == var_name { count = count + 1 }
+  }
+  if s.kind is StIndexSet {
+    if !isnull(s.index_set) {
+      if !isnull(s.index_set!.collection) { count = count + count_var_uses_in_value(var_name, s.index_set!.collection!) }
+      if !isnull(s.index_set!.index) { count = count + count_var_uses_in_value(var_name, s.index_set!.index!) }
+      if !isnull(s.index_set!.value) { count = count + count_var_uses_in_value(var_name, s.index_set!.value!) }
+    }
+  }
+  // Recurse into nested blocks
+  if s.kind is StIf {
+    if !isnull(s.if_data) {
+      if !isnull(s.if_data!.cond) { count = count + count_var_uses_in_value(var_name, s.if_data!.cond!) }
+      count = count + count_var_uses(var_name, s.if_data!.then_body)
+      count = count + count_var_uses(var_name, s.if_data!.else_body)
+    }
+  }
+  if s.kind is StWhile {
+    if !isnull(s.while_data) {
+      if !isnull(s.while_data!.cond_var) { count = count + count_var_uses_in_value(var_name, s.while_data!.cond_var!) }
+      count = count + count_var_uses(var_name, s.while_data!.body)
+    }
+  }
+  if s.kind is StFor {
+    if !isnull(s.for_data) {
+      count = count + count_var_uses(var_name, s.for_data!.body)
+    }
+  }
+  if s.kind is StTypeSwitch {
+    if !isnull(s.type_switch) {
+      if !isnull(s.type_switch!.value) { count = count + count_var_uses_in_value(var_name, s.type_switch!.value!) }
+      let mut i = 0
+      while i < len(s.type_switch!.cases) {
+        count = count + count_var_uses(var_name, s.type_switch!.cases[i].body)
+        i = i + 1
+      }
+    }
+  }
+  if s.kind is StSwitch {
+    if !isnull(s.switch_data) {
+      if !isnull(s.switch_data!.tag) { count = count + count_var_uses_in_value(var_name, s.switch_data!.tag!) }
+      let mut i = 0
+      while i < len(s.switch_data!.cases) {
+        count = count + count_var_uses(var_name, s.switch_data!.cases[i].body)
+        i = i + 1
+      }
+    }
+  }
+  return count
+}
+
+func count_var_uses_in_expr(var_name: string, e: LExpr) -> i32 {
+  let mut count = 0
+  if e.kind is ExCall {
+    if !isnull(e.call) {
+      let mut i = 0
+      while i < len(e.call!.args) {
+        if !isnull(e.call!.args[i]) { count = count + count_var_uses_in_value(var_name, e.call!.args[i]!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExMethodCall {
+    if !isnull(e.method_call) {
+      if !isnull(e.method_call!.receiver) { count = count + count_var_uses_in_value(var_name, e.method_call!.receiver!) }
+      let mut i = 0
+      while i < len(e.method_call!.args) {
+        if !isnull(e.method_call!.args[i]) { count = count + count_var_uses_in_value(var_name, e.method_call!.args[i]!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExBinOp {
+    if !isnull(e.bin_op) {
+      if !isnull(e.bin_op!.left) { count = count + count_var_uses_in_value(var_name, e.bin_op!.left!) }
+      if !isnull(e.bin_op!.right) { count = count + count_var_uses_in_value(var_name, e.bin_op!.right!) }
+    }
+  }
+  if e.kind is ExCast {
+    if !isnull(e.cast) && !isnull(e.cast!.operand) { count = count + count_var_uses_in_value(var_name, e.cast!.operand!) }
+  }
+  if e.kind is ExClassGet {
+    if !isnull(e.class_get) && !isnull(e.class_get!.handle) { count = count + count_var_uses_in_value(var_name, e.class_get!.handle!) }
+  }
+  if e.kind is ExSlabGet {
+    if !isnull(e.slab_get) && !isnull(e.slab_get!.handle) { count = count + count_var_uses_in_value(var_name, e.slab_get!.handle!) }
+  }
+  if e.kind is ExIsNull {
+    if !isnull(e.is_null) && !isnull(e.is_null!.value) { count = count + count_var_uses_in_value(var_name, e.is_null!.value!) }
+  }
+  if e.kind is ExUnwrapOptional {
+    if !isnull(e.unwrap_opt) && !isnull(e.unwrap_opt!.value) { count = count + count_var_uses_in_value(var_name, e.unwrap_opt!.value!) }
+  }
+  if e.kind is ExMakeSlice {
+    if !isnull(e.builtin) {
+      let mut i = 0
+      while i < len(e.builtin!.args) {
+        if !isnull(e.builtin!.args[i]) { count = count + count_var_uses_in_value(var_name, e.builtin!.args[i]!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExFormat {
+    if !isnull(e.format) {
+      let mut i = 0
+      while i < len(e.format!.parts) {
+        if !isnull(e.format!.parts[i].value) { count = count + count_var_uses_in_value(var_name, e.format!.parts[i].value!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExIndexGet {
+    if !isnull(e.index_get) {
+      if !isnull(e.index_get!.collection) { count = count + count_var_uses_in_value(var_name, e.index_get!.collection!) }
+      if !isnull(e.index_get!.index) { count = count + count_var_uses_in_value(var_name, e.index_get!.index!) }
+    }
+  }
+  if e.kind is ExVariantConstruct {
+    if !isnull(e.variant_construct) {
+      let mut i = 0
+      while i < len(e.variant_construct!.fields) {
+        if !isnull(e.variant_construct!.fields[i]) { count = count + count_var_uses_in_value(var_name, e.variant_construct!.fields[i]!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExClassAlloc {
+    if !isnull(e.class_alloc) {
+      let mut i = 0
+      while i < len(e.class_alloc!.fields) {
+        if !isnull(e.class_alloc!.fields[i].value) { count = count + count_var_uses_in_value(var_name, e.class_alloc!.fields[i].value!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExSlabAlloc {
+    if !isnull(e.slab_alloc) {
+      let mut i = 0
+      while i < len(e.slab_alloc!.fields) {
+        if !isnull(e.slab_alloc!.fields[i].value) { count = count + count_var_uses_in_value(var_name, e.slab_alloc!.fields[i].value!) }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExUnOp {
+    if !isnull(e.un_op) && !isnull(e.un_op!.operand) { count = count + count_var_uses_in_value(var_name, e.un_op!.operand!) }
+  }
+  return count
+}
+
+func count_var_uses_in_value(var_name: string, v: LValue) -> i32 {
+  if v.kind is ValVar && v.name == var_name { return 1 }
+  return 0
+}
+
+// ==========================================================================
+// Delta Folding
+// ==========================================================================
+// Post-pass that cancels paired StRefIncr/StRefDecr on the same variable/temp
+// that are adjacent or nearby with no intervening use.
+func delta_fold(stmts: [LStmt?]) -> [LStmt?] {
+  let mut out: [LStmt?] = []
+  let mut i = 0
+  while i < len(stmts) {
+    if isnull(stmts[i]) {
+      out.push(stmts[i])
+      i = i + 1
+      continue
+    }
+    let s = stmts[i]!
+    // Look for StRefIncr followed by StRefDecr on same value (or vice versa)
+    if i + 1 < len(stmts) && !isnull(stmts[i + 1]) {
+      let next = stmts[i + 1]!
+      // Pattern 1: incr(x) then decr(x) — cancel both
+      if s.kind is StRefIncr && next.kind is StRefDecr {
+        if rc_handles_match(s.ref_incr, next.ref_decr) {
+          i = i + 2
+          continue
+        }
+      }
+      // Pattern 2: decr(x) then incr(x) — cancel both
+      if s.kind is StRefDecr && next.kind is StRefIncr {
+        if rc_handles_match(next.ref_incr, s.ref_decr) {
+          i = i + 2
+          continue
+        }
+      }
+    }
+    out.push(stmts[i])
+    i = i + 1
+  }
+  return out
+}
+
+// Check if a ref_incr and ref_decr operate on the same handle.
+func rc_handles_match(incr: LRefIncrData?, decr: LRefDecrData?) -> bool {
+  if isnull(incr) || isnull(decr) { return false }
+  if isnull(incr!.handle) || isnull(decr!.handle) { return false }
+  let a = incr!.handle!
+  let b = decr!.handle!
+  if a.kind is ValVar && b.kind is ValVar {
+    return a.name == b.name
+  }
+  if a.kind is ValTemp && b.kind is ValTemp {
+    return a.temp_id == b.temp_id
   }
   return false
 }
