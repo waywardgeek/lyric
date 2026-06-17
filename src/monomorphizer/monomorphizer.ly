@@ -3694,8 +3694,11 @@ func rewrite_impl_renames(prog: LProgram?) {
   let rename_keys = prog!.impl_method_renames!.keys()
   if len(rename_keys) == 0 { return }
 
-  // Build flat (className + "@" + methodName) -> concreteName lookup
+  // Build flat (className + "@" + methodName) -> concreteName lookup.
+  // When multiple interfaces map the same class+method to different concrete
+  // names, skip that entry — the per-specialization rewrite already handled it.
   let renames = Dict<Sym, string>()
+  let conflicts = Dict<Sym, bool>()
   let mut i = 0
   while i < len(rename_keys) {
     let key = rename_keys[i]
@@ -3707,9 +3710,25 @@ func rewrite_impl_renames(prog: LProgram?) {
         let class_name = parts[len(parts) - 2]
         let method_name = parts[len(parts) - 1]
         let flat_key = f"{class_name}@{method_name}"
-        renames.set(sym(flat_key), new_name_entry!.value)
+        let existing = renames.get(sym(flat_key))
+        if !isnull(existing) {
+          if existing!.value != new_name_entry!.value {
+            // Conflict: two interfaces map same class+method to different targets.
+            // Mark as conflicting — per-specialization rewrite handles these.
+            conflicts.set(sym(flat_key), true)
+          }
+        } else {
+          renames.set(sym(flat_key), new_name_entry!.value)
+        }
       }
     }
+    i = i + 1
+  }
+  // Remove conflicting entries
+  let conflict_keys = conflicts.keys()
+  i = 0
+  while i < len(conflict_keys) {
+    renames.remove(conflict_keys[i])
     i = i + 1
   }
 

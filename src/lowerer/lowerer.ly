@@ -773,9 +773,17 @@ lyric lowerer {
           }
           let rt = self.subst_impl_type(iface_method.return_type, type_arg_ltype_map)
 
-          // Wrapper name and target
-          let wrapper_name = class_name + "_" + method_name
+          // Wrapper name includes interface to avoid collisions when
+          // two interfaces map the same class+method to different targets
+          let wrapper_name = iface_name + "_" + method_name
           let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
+
+          // Register rename with @-delimited key (all prefixes including embeds)
+          for rp in all_rename_prefixes {
+            let rename_key = rp + "@" + class_name + "@" + method_name
+            self.impl_method_renames!.set(sym(rename_key), wrapper_name)
+          }
+          self.impl_method_renames!.set(sym(class_name + "." + method_name), wrapper_name)
 
           // Build forwarding call body — use method call on self (not static call)
           let mut call_args: [LValue?] = []
@@ -805,7 +813,7 @@ lyric lowerer {
           self.restore_stmts(saved)
 
           append(result, LFuncDecl {
-            name: method_name,
+            name: iface_name + "_" + method_name,
             params: params,
             return_type: rt,
             body: body,
@@ -815,7 +823,7 @@ lyric lowerer {
         }
         Inline => {
           if !isnull(mapping.inline_func) {
-            let wrapper_name = class_name + "_" + method_name
+            let wrapper_name = iface_name + "_" + method_name
             for rp in all_rename_prefixes {
               let rename_key = rp + "@" + class_name + "@" + method_name
               self.impl_method_renames!.set(sym(rename_key), wrapper_name)
