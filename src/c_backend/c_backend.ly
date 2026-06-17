@@ -166,6 +166,9 @@ func new_cgen(prog: LProgram?) -> CGen? {
   return g
 }
 
+// Global counter for unique RC loop index variable names
+let mut _rc_loop_counter: i32 = 0
+
 // ---------------------------------------------------------------------------
 // Output helpers
 // ---------------------------------------------------------------------------
@@ -2625,6 +2628,51 @@ func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?
 // Statement emission
 // ---------------------------------------------------------------------------
 
+// Emit RC release for a single element expression (C code string).
+// For direct class handles: emit --_rc / slab_free.
+// For structs with RC fields: recursively emit for each class-handle field.
+func CGen.emit_element_rc_release(self, elem_expr: string, typ: LType?) {
+  if isnull(typ) { return }
+  if typ!.kind is TyClassHandle {
+    // Skip permanent and owned classes (no RC)
+    if typ!.is_permanent || typ!.is_owned { return }
+    if !isnull(typ!.class_decl) {
+      if typ!.class_decl!.is_permanent || typ!.class_decl!.is_owned { return }
+    }
+    let cname = self.resolve_class_name(typ!.name, "slice_rc_release")
+    if self.prog!.slab_mode_soa {
+      self.line(f"if ({elem_expr}) {{ if (--_lyric_slab_{cname}._rc[{elem_expr}] == 0) _lyric_slab_free_{cname}({elem_expr}); }}")
+    } else {
+      self.line(f"if ({elem_expr}) {{ if (--{elem_expr}->_rc == 0) _lyric_slab_free_{cname}({elem_expr}); }}")
+    }
+    return
+  }
+  if typ!.kind is TyStruct {
+    // Look up struct declaration to get field info
+    let mut si = 0
+    while si < len(self.prog!.structs) {
+      if self.prog!.structs[si].name == typ!.name {
+        let sd = self.prog!.structs[si]
+        let mut fi = 0
+        while fi < len(sd.fields) {
+          let ft = sd.fields[fi].typ
+          let fname = sd.fields[fi].name
+          if !isnull(ft) {
+            if ft!.kind is TyClassHandle {
+              self.emit_element_rc_release(f"{elem_expr}.{fname}", ft)
+            } else if ft!.kind is TyStruct {
+              self.emit_element_rc_release(f"{elem_expr}.{fname}", ft)
+            }
+          }
+          fi = fi + 1
+        }
+        return
+      }
+      si = si + 1
+    }
+  }
+}
+
 func CGen.emit_stmts(self, stmts: [LStmt?]) {
   let mut i = 0
   while i < len(stmts) {
@@ -2797,6 +2845,18 @@ func CGen.emit_stmt(self, s: LStmt?) {
     StSliceFree => {
       let d = s!.slice_free!
       self.line(f"if ({d.name}.cap > 0 && {d.name}.data) free({d.name}.data);")
+    }
+    StSliceRcRelease => {
+      let d = s!.slice_rc_release!
+      // Emit a loop that releases RC on each element before slice free
+      let idx_name = f"_rc_i_{_rc_loop_counter}"
+      _rc_loop_counter = _rc_loop_counter + 1
+      self.line(f"for (int {idx_name} = 0; {idx_name} < {d.slice_name}.len; {idx_name}++) {{")
+      self.indent = self.indent + 1
+      let elem_expr = f"{d.slice_name}.data[{idx_name}]"
+      self.emit_element_rc_release(elem_expr, d.elem_type)
+      self.indent = self.indent - 1
+      self.line("}")
     }
     StSliceRetain => {
       // TODO: slice RC retain — for now no-op (slices still use scope-exit free)

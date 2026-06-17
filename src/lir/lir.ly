@@ -380,6 +380,12 @@ lyric lir {
     typ: LType?
   }
 
+  // Data for StSliceRcRelease: release RC on each element before slice free
+  struct LSliceRcReleaseData {
+    slice_name: string   // variable name of the slice
+    elem_type: LType?    // element type (class handle or struct with RC fields)
+  }
+
   struct LRefIncrData {
     handle: LValue?
     class_name: string
@@ -425,6 +431,7 @@ lyric lir {
     StSliceRetain
     StRefIncr
     StRefDecr
+    StSliceRcRelease  // Release RC on each element of a slice before freeing
   }
 
   permanent class LStmt {
@@ -458,6 +465,7 @@ lyric lir {
     slice_retain: LSliceFreeData?
     ref_incr: LRefIncrData?
     ref_decr: LRefDecrData?
+    slice_rc_release: LSliceRcReleaseData?
   }
 
   struct LTempDef {

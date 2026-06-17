@@ -947,7 +947,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
           }
           ri = ri + 1
         }
-        emit_slice_frees(slice_locals, slice_types, ret_names, mut result)
+        emit_slice_frees(slice_locals, slice_types, ret_names, prog, mut result)
         emit_class_releases(class_locals, class_types, ret_names, mut result)
         emit_struct_releases(struct_rc_locals, struct_rc_types, ret_names, prog, mut result)
       }
@@ -964,7 +964,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
   }
   // At scope exit, free all owned slice locals and release all class locals
   let no_skip: [string] = []
-  emit_slice_frees(slice_locals, slice_types, no_skip, mut result)
+  emit_slice_frees(slice_locals, slice_types, no_skip, prog, mut result)
   emit_class_releases(class_locals, class_types, no_skip, mut result)
   emit_struct_releases(struct_rc_locals, struct_rc_types, no_skip, prog, mut result)
 
@@ -1574,10 +1574,27 @@ func get_return_var_names(s: LStmt) -> [string] {
 }
 
 // Emit StSliceFree statements for all tracked slice locals, skipping skip_name.
-func emit_slice_frees(names: [string], types: [LType?], skip_names: [string], mut out: [LStmt?]) {
+// Also emits StSliceRcRelease before the free when elements are RC class handles
+// or structs containing RC class handles.
+func emit_slice_frees(names: [string], types: [LType?], skip_names: [string], prog: LProgram, mut out: [LStmt?]) {
   let mut i = 0
   while i < len(names) {
     if !should_skip(names[i], skip_names) {
+      // Check if element type needs RC release
+      if !isnull(types[i]) {
+        let elem_type = types[i]!.elem
+        if !isnull(elem_type) {
+          if is_rc_class_type(prog, elem_type) || type_has_rc_fields(prog, elem_type) {
+            out.push(LStmt {
+              kind: StSliceRcRelease,
+              slice_rc_release: LSliceRcReleaseData {
+                slice_name: names[i],
+                elem_type: elem_type,
+              },
+            })
+          }
+        }
+      }
       let free_stmt = LStmt {
         kind: StSliceFree,
         slice_free: LSliceFreeData {
