@@ -268,6 +268,19 @@ func scan_escapes_in_expr(e: LExpr, func_name: string, params: [LParam], param_n
   }
 
   // Enum variant construction: if any field value is a param, that param escapes
+  if e.kind is ExBuiltin {
+    if !isnull(e.builtin) {
+      let mut i = 0
+      while i < len(e.builtin!.args) {
+        if !isnull(e.builtin!.args[i]) {
+          if mark_value_escape(e.builtin!.args[i]!, func_name, params, param_names, mut escape_map) {
+            changed = true
+          }
+        }
+        i = i + 1
+      }
+    }
+  }
   if e.kind is ExVariantConstruct {
     if !isnull(e.variant_construct) {
       let mut i = 0
@@ -825,6 +838,11 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
   let no_skip: [string] = []
   emit_slice_frees(slice_locals, slice_types, no_skip, mut result)
   emit_class_releases(class_locals, class_types, no_skip, mut result)
+
+  // Post-pass: insert StRefDecr for RC-typed temps after their last use.
+  // This catches intermediate temps from function calls that aren't assigned to locals.
+  result = insert_temp_releases(result, prog)
+
   return result
 }
 
@@ -1526,4 +1544,371 @@ func emit_class_releases(names: [string], types: [LType?], skip_names: [string],
     }
     i = i + 1
   }
+}
+
+
+// ==========================================================================
+// Temp Last-Use Release
+// ==========================================================================
+
+// Insert StRefDecr for RC-typed temps after their last use in a flat block.
+// Only handles temps from function/method calls (not allocs — those are
+// tracked by VarDecl ownership).
+func insert_temp_releases(stmts: [LStmt?], prog: LProgram) -> [LStmt?] {
+  // Phase 1: collect RC-typed temp defs from function/method calls
+  let mut rc_temps: [i32] = []
+  let mut rc_temp_types: [LType?] = []
+  let mut consumed_by_vardecl: [i32] = []
+
+  let mut i = 0
+  while i < len(stmts) {
+    if !isnull(stmts[i]) {
+      let s = stmts[i]!
+      if s.kind is StTempDef {
+        if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
+          let e = s.temp_def!.expr!
+          if e.kind is ExCall || e.kind is ExMethodCall {
+            if is_rc_class_type(prog, e.typ) {
+              rc_temps.push(s.temp_def!.id)
+              rc_temp_types.push(e.typ)
+            }
+          }
+        }
+      }
+      // Track temps consumed by VarDecl (ownership transferred to local)
+      if s.kind is StVarDecl {
+        if !isnull(s.var_decl) && !isnull(s.var_decl!.init) {
+          let v = s.var_decl!.init!
+          if v.kind is ValTemp {
+            consumed_by_vardecl.push(v.temp_id)
+          }
+        }
+      }
+      // Track temps stored into fields (ownership transferred to container)
+      if s.kind is StSlabSet {
+        if !isnull(s.slab_set) && !isnull(s.slab_set!.value) {
+          if s.slab_set!.value!.kind is ValTemp {
+            consumed_by_vardecl.push(s.slab_set!.value!.temp_id)
+          }
+        }
+      }
+      if s.kind is StClassSet {
+        if !isnull(s.class_set) && !isnull(s.class_set!.value) {
+          if s.class_set!.value!.kind is ValTemp {
+            consumed_by_vardecl.push(s.class_set!.value!.temp_id)
+          }
+        }
+      }
+      if s.kind is StStructSet {
+        if !isnull(s.struct_set) && !isnull(s.struct_set!.value) {
+          if s.struct_set!.value!.kind is ValTemp {
+            consumed_by_vardecl.push(s.struct_set!.value!.temp_id)
+          }
+        }
+      }
+      // Track temps passed to StRefIncr (already retained — ownership managed elsewhere)
+      if s.kind is StRefIncr {
+        if !isnull(s.ref_incr) && !isnull(s.ref_incr!.handle) {
+          if s.ref_incr!.handle!.kind is ValTemp {
+            consumed_by_vardecl.push(s.ref_incr!.handle!.temp_id)
+          }
+        }
+      }
+      // Track temps that are returned (ownership transferred to caller)
+      if s.kind is StReturn {
+        if !isnull(s.ret) {
+          let mut ri = 0
+          while ri < len(s.ret!.values) {
+            if !isnull(s.ret!.values[ri]) && s.ret!.values[ri]!.kind is ValTemp {
+              consumed_by_vardecl.push(s.ret!.values[ri]!.temp_id)
+            }
+            ri = ri + 1
+          }
+        }
+      }
+    }
+    i = i + 1
+  }
+
+  if len(rc_temps) == 0 {
+    return stmts
+  }
+
+  // Phase 2: for each RC temp, find last use index (flat level only)
+  // Skip temps consumed by VarDecl (ownership transferred)
+  let mut release_after: [i32] = []  // stmt index after which to insert release
+  let mut release_temp: [i32] = []   // temp ID to release
+  let mut release_type: [LType?] = [] // type for class name
+
+  let mut ti = 0
+  while ti < len(rc_temps) {
+    let temp_id = rc_temps[ti]
+    let typ = rc_temp_types[ti]
+
+    // Skip if consumed by VarDecl
+    if i32_in_list(temp_id, consumed_by_vardecl) {
+      ti = ti + 1
+      continue
+    }
+
+    // Scan backward to find last use
+    let mut last_use = -1
+    let mut si = len(stmts) - 1
+    while si >= 0 {
+      if !isnull(stmts[si]) {
+        if stmt_uses_temp_flat(stmts[si]!, temp_id) {
+          last_use = si
+          si = -1  // break
+          continue
+        }
+      }
+      si = si - 1
+    }
+
+    if last_use >= 0 {
+      release_after.push(last_use)
+      release_temp.push(temp_id)
+      release_type.push(typ)
+    }
+    ti = ti + 1
+  }
+
+  if len(release_after) == 0 {
+    return stmts
+  }
+
+  // Phase 3: build new stmt list with releases inserted
+  let mut out: [LStmt?] = []
+  i = 0
+  while i < len(stmts) {
+    out.push(stmts[i])
+    // Check if any releases should go after this statement
+    let mut ri = 0
+    while ri < len(release_after) {
+      if release_after[ri] == i {
+        let handle = LValue {
+          kind: ValTemp,
+          name: "",
+          temp_id: release_temp[ri],
+          typ: release_type[ri],
+        }
+        emit_ref_decr(handle, release_type[ri]!.name, mut out)
+      }
+      ri = ri + 1
+    }
+    i = i + 1
+  }
+  return out
+}
+
+func i32_in_list(val: i32, list: [i32]) -> bool {
+  let mut i = 0
+  while i < len(list) {
+    if list[i] == val { return true }
+    i = i + 1
+  }
+  return false
+}
+
+// Check if a statement uses a temp ID at the flat level (not in nested blocks).
+func stmt_uses_temp_flat(s: LStmt, temp_id: i32) -> bool {
+  // Check all value positions in the statement
+  if s.kind is StTempDef {
+    if !isnull(s.temp_def) && !isnull(s.temp_def!.expr) {
+      return expr_uses_temp(s.temp_def!.expr!, temp_id)
+    }
+  }
+  if s.kind is StVarDecl {
+    if !isnull(s.var_decl) && !isnull(s.var_decl!.init) {
+      return value_is_temp(s.var_decl!.init!, temp_id)
+    }
+  }
+  if s.kind is StAssign {
+    if !isnull(s.assign) && !isnull(s.assign!.value) {
+      return value_is_temp(s.assign!.value!, temp_id)
+    }
+  }
+  if s.kind is StSlabSet {
+    if !isnull(s.slab_set) {
+      if !isnull(s.slab_set!.handle) && value_is_temp(s.slab_set!.handle!, temp_id) { return true }
+      if !isnull(s.slab_set!.value) && value_is_temp(s.slab_set!.value!, temp_id) { return true }
+    }
+  }
+  if s.kind is StClassSet {
+    if !isnull(s.class_set) {
+      if !isnull(s.class_set!.handle) && value_is_temp(s.class_set!.handle!, temp_id) { return true }
+      if !isnull(s.class_set!.value) && value_is_temp(s.class_set!.value!, temp_id) { return true }
+    }
+  }
+  if s.kind is StStructSet {
+    if !isnull(s.struct_set) {
+      if !isnull(s.struct_set!.value) && value_is_temp(s.struct_set!.value!, temp_id) { return true }
+    }
+  }
+  if s.kind is StReturn {
+    if !isnull(s.ret) {
+      let mut i = 0
+      while i < len(s.ret!.values) {
+        if !isnull(s.ret!.values[i]) && value_is_temp(s.ret!.values[i]!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if s.kind is StExpr {
+    // StExpr just stores a temp_id reference
+    if !isnull(s.expr_stmt) {
+      return s.expr_stmt!.temp_id == temp_id
+    }
+  }
+  if s.kind is StRefIncr {
+    if !isnull(s.ref_incr) && !isnull(s.ref_incr!.handle) {
+      return value_is_temp(s.ref_incr!.handle!, temp_id)
+    }
+  }
+  if s.kind is StRefDecr {
+    if !isnull(s.ref_decr) && !isnull(s.ref_decr!.handle) {
+      return value_is_temp(s.ref_decr!.handle!, temp_id)
+    }
+  }
+  // For control flow (StIf, StWhile, etc.), check the condition but NOT bodies
+  // (nested block analysis is conservative — we don't release temps used in nested blocks)
+  if s.kind is StIf {
+    if !isnull(s.if_data) && !isnull(s.if_data!.cond) {
+      return value_is_temp(s.if_data!.cond!, temp_id)
+    }
+  }
+  if s.kind is StWhile {
+    if !isnull(s.while_data) && !isnull(s.while_data!.cond_var) {
+      return value_is_temp(s.while_data!.cond_var!, temp_id)
+    }
+  }
+  if s.kind is StSliceFree {
+    return false
+  }
+  if s.kind is StSlabFree {
+    if !isnull(s.slab_free) && !isnull(s.slab_free!.handle) {
+      return value_is_temp(s.slab_free!.handle!, temp_id)
+    }
+  }
+  if s.kind is StIndexSet {
+    if !isnull(s.index_set) {
+      if !isnull(s.index_set!.collection) && value_is_temp(s.index_set!.collection!, temp_id) { return true }
+      if !isnull(s.index_set!.index) && value_is_temp(s.index_set!.index!, temp_id) { return true }
+      if !isnull(s.index_set!.value) && value_is_temp(s.index_set!.value!, temp_id) { return true }
+    }
+  }
+  return false
+}
+
+// Check if an expression uses a temp ID.
+func expr_uses_temp(e: LExpr, temp_id: i32) -> bool {
+  if e.kind is ExCall {
+    if !isnull(e.call) {
+      let mut i = 0
+      while i < len(e.call!.args) {
+        if !isnull(e.call!.args[i]) && value_is_temp(e.call!.args[i]!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExMethodCall {
+    if !isnull(e.method_call) {
+      if !isnull(e.method_call!.receiver) && value_is_temp(e.method_call!.receiver!, temp_id) { return true }
+      let mut i = 0
+      while i < len(e.method_call!.args) {
+        if !isnull(e.method_call!.args[i]) && value_is_temp(e.method_call!.args[i]!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExClassGet {
+    if !isnull(e.class_get) && !isnull(e.class_get!.handle) {
+      return value_is_temp(e.class_get!.handle!, temp_id)
+    }
+  }
+  if e.kind is ExSlabGet {
+    if !isnull(e.slab_get) && !isnull(e.slab_get!.handle) {
+      return value_is_temp(e.slab_get!.handle!, temp_id)
+    }
+  }
+  if e.kind is ExBinOp {
+    if !isnull(e.bin_op) {
+      if !isnull(e.bin_op!.left) && value_is_temp(e.bin_op!.left!, temp_id) { return true }
+      if !isnull(e.bin_op!.right) && value_is_temp(e.bin_op!.right!, temp_id) { return true }
+    }
+  }
+  if e.kind is ExCast {
+    if !isnull(e.cast) && !isnull(e.cast!.operand) {
+      return value_is_temp(e.cast!.operand!, temp_id)
+    }
+  }
+  if e.kind is ExMakeSlice {
+    if !isnull(e.builtin) {
+      let mut i = 0
+      while i < len(e.builtin!.args) {
+        if !isnull(e.builtin!.args[i]) && value_is_temp(e.builtin!.args[i]!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExFormat {
+    if !isnull(e.format) {
+      let mut i = 0
+      while i < len(e.format!.parts) {
+        if !isnull(e.format!.parts[i].value) && value_is_temp(e.format!.parts[i].value!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExIndexGet {
+    if !isnull(e.index_get) {
+      if !isnull(e.index_get!.collection) && value_is_temp(e.index_get!.collection!, temp_id) { return true }
+      if !isnull(e.index_get!.index) && value_is_temp(e.index_get!.index!, temp_id) { return true }
+    }
+  }
+  if e.kind is ExIsNull {
+    if !isnull(e.is_null) && !isnull(e.is_null!.value) {
+      return value_is_temp(e.is_null!.value!, temp_id)
+    }
+  }
+  if e.kind is ExUnwrapOptional {
+    if !isnull(e.unwrap_opt) && !isnull(e.unwrap_opt!.value) {
+      return value_is_temp(e.unwrap_opt!.value!, temp_id)
+    }
+  }
+  if e.kind is ExVariantConstruct {
+    if !isnull(e.variant_construct) {
+      let mut i = 0
+      while i < len(e.variant_construct!.fields) {
+        if !isnull(e.variant_construct!.fields[i]) && value_is_temp(e.variant_construct!.fields[i]!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExClassAlloc {
+    if !isnull(e.class_alloc) {
+      let mut i = 0
+      while i < len(e.class_alloc!.fields) {
+        if !isnull(e.class_alloc!.fields[i].value) && value_is_temp(e.class_alloc!.fields[i].value!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  if e.kind is ExSlabAlloc {
+    if !isnull(e.slab_alloc) {
+      let mut i = 0
+      while i < len(e.slab_alloc!.fields) {
+        if !isnull(e.slab_alloc!.fields[i].value) && value_is_temp(e.slab_alloc!.fields[i].value!, temp_id) { return true }
+        i = i + 1
+      }
+    }
+  }
+  return false
+}
+
+func value_is_temp(v: LValue, temp_id: i32) -> bool {
+  if v.kind is ValTemp {
+    return v.temp_id == temp_id
+  }
+  return false
 }
