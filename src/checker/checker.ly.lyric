@@ -205,10 +205,10 @@ func Checker.vwalk_block(self, block: Block, ctx: string)
 func Checker.vwalk_expr(self, expr: Expr, ctx: string)
 func Checker.vwalk_pattern(self, pat: Pattern, ctx: string)
 func Checker.vwalk_stmt(self, stmt: Stmt, ctx: string)
-func Checker.walk_block(self, block: Block, callback: fn(Expr) -> ())
-func Checker.walk_expr(self, expr: Expr, callback: fn(Expr) -> ())
-func Checker.walk_pattern(self, pat: Pattern, callback: fn(Expr) -> ())
-func Checker.walk_stmt(self, stmt: Stmt, callback: fn(Expr) -> ())
+func Checker.walk_block(self, block: Block, callback: (Expr) -> unit)
+func Checker.walk_expr(self, expr: Expr, callback: (Expr) -> unit)
+func Checker.walk_pattern(self, pat: Pattern, callback: (Expr) -> unit)
+func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> unit)
 
 struct Registry {
   types: Dict<Sym, TypeInfo>

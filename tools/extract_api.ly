@@ -87,7 +87,7 @@ func type_expr_to_string(te: TypeExpr?) -> string {
     }
     Func(params, ret) => {
       let sb = new_string_builder()
-      sb.write("fn(")
+      sb.write("(")
       let mut i = 0
       while i < len(params) {
         if i > 0 { sb.write(", ") }
@@ -115,7 +115,7 @@ func type_expr_to_string(te: TypeExpr?) -> string {
       return sb.to_string()
     }
     Lock => { return "lock" }
-    Unit => { return "()" }
+    Unit => { return "unit" }
   }
   return "any"
 }
@@ -142,12 +142,12 @@ func emit_func_json(sb: StringBuilder, fn_: FuncDecl) {
       sb.write(json_escape(p.name!.name))
     }
     sb.write("\",\"type\":\"")
-    let mut type_str = type_expr_to_string(p.type_expr)
+    sb.write(json_escape(type_expr_to_string(p.type_expr)))
+    sb.write("\"")
     if p.is_mut {
-      type_str = "mut " + type_str
+      sb.write(",\"mut\":true")
     }
-    sb.write(json_escape(type_str))
-    sb.write("\"}")
+    sb.write("}")
     pi = pi + 1
   }
   sb.write("],\"returns\":[")
@@ -458,15 +458,15 @@ func main() {
   while i < len(args) {
     let result = read_file(args[i])
     let src = result._0
-    let err = result._1
-    if err != null {
+    if !result._1 {
       eprintln(f"error: cannot read {args[i]}")
       exit(1)
     }
     let parse_result = parse_file(src, args[i])
     let file = parse_result._0
+    let parse_err = parse_result._1
     if file == null {
-      eprintln(f"error: cannot parse {args[i]}")
+      eprintln(f"error: cannot parse {args[i]}: {parse_err}")
       exit(1)
     }
     files = append(files, file)

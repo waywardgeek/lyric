@@ -331,7 +331,7 @@ func load_stdlib(dir: string) -> File?
 func lookup_name(name: string, orig: [string], prefixed: [string]) -> string
 func merge_files(files: [File?]) -> File?
 func merge_stdlib(file: File?, std_file: File?)
-func prefix_block_declarations(block: LyricBlock, prefix: string, orig: mut [string], prefixed: mut [string])
+func prefix_block_declarations(block: LyricBlock, prefix: string, mut orig: [string], mut prefixed: [string])
 func prefix_sym(s: Sym?, prefix: string) -> Sym?
 func resolve_module_imports(module_root: string, root_file: File?) -> (File?, string)
 func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string])

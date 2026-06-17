@@ -48,7 +48,7 @@ func fuse_side_effect_temps(stmts: [LStmt?]) -> [LStmt?]
 func is_numeric_str(s: string) -> bool
 func is_side_effect_expr(e: LExpr) -> bool
 func optimize(prog: LProgram)
-func optimize_func(fn: mut LFuncDecl)
+func optimize_func(mut fn: LFuncDecl)
 func optimize_nested_stmts_structural(s: LStmt, return_type: LType?)
 func optimize_stmts_structural(stmts: [LStmt?], return_type: LType?) -> [LStmt?]
 func parse_temp_id(name: string) -> i32
