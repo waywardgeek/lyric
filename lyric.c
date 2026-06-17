@@ -70862,315 +70862,323 @@ LyricSlice_LStmtptr slab_rewrite_stmts(LyricSlice_LStmtptr stmts, LyricSlice_LSt
                         LyricOpt_LVarDeclData _t144 = s->var_decl;
                         LVarDeclData _t145 = lyric_unwrap(_t144);
                         lyric_string _t146 = _t145.name;
-                        ({ lyric_push(&class_locals, _t146, LyricSlice_lyric_string); class_locals; });
-                        LyricOpt_LVarDeclData _t148 = s->var_decl;
-                        LVarDeclData _t149 = lyric_unwrap(_t148);
-                        LType* _t150 = _t149.typ;
-                        ({ lyric_push(&class_types, _t150, LyricSlice_LTypeptr); class_types; });
-                        LyricOpt_LVarDeclData _t152 = s->var_decl;
-                        LVarDeclData _t153 = lyric_unwrap(_t152);
-                        LValue* _t154 = _t153.init;
-                        bool _t155 = (_t154 == NULL);
-                        bool _t156 = (!_t155);
-                        bool _sc157 = false;
-                        _sc157 = _t156;
-                        if (_sc157) {
-                            LyricOpt_LVarDeclData _t158 = s->var_decl;
-                            LVarDeclData _t159 = lyric_unwrap(_t158);
-                            LValue* _t160 = _t159.init;
-                            bool _t161 = is_fresh_class_init(_t160, fresh_class_temps);
-                            bool _t162 = (!_t161);
-                            _sc157 = _t162;
+                        bool _t147 = var_escapes_via_call(_t146, all_stmts, escape_map);
+                        bool escapes = _t147;
+                        bool _t148 = (!escapes);
+                        if (_t148) {
+                            LyricOpt_LVarDeclData _t149 = s->var_decl;
+                            LVarDeclData _t150 = lyric_unwrap(_t149);
+                            lyric_string _t151 = _t150.name;
+                            ({ lyric_push(&class_locals, _t151, LyricSlice_lyric_string); class_locals; });
+                            LyricOpt_LVarDeclData _t153 = s->var_decl;
+                            LVarDeclData _t154 = lyric_unwrap(_t153);
+                            LType* _t155 = _t154.typ;
+                            ({ lyric_push(&class_types, _t155, LyricSlice_LTypeptr); class_types; });
                         }
-                        if (_sc157) {
-                            LyricSlice_LStmtptr _t163 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
-                            LyricSlice_LStmtptr expanded = _t163;
+                        LyricOpt_LVarDeclData _t157 = s->var_decl;
+                        LVarDeclData _t158 = lyric_unwrap(_t157);
+                        LValue* _t159 = _t158.init;
+                        bool _t160 = (_t159 == NULL);
+                        bool _t161 = (!_t160);
+                        bool _sc162 = false;
+                        _sc162 = _t161;
+                        if (_sc162) {
+                            LyricOpt_LVarDeclData _t163 = s->var_decl;
+                            LVarDeclData _t164 = lyric_unwrap(_t163);
+                            LValue* _t165 = _t164.init;
+                            bool _t166 = is_fresh_class_init(_t165, fresh_class_temps);
+                            bool _t167 = (!_t166);
+                            _sc162 = _t167;
+                        }
+                        if (_sc162) {
+                            LyricSlice_LStmtptr _t168 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
+                            LyricSlice_LStmtptr expanded = _t168;
                             int32_t j = 0;
                             while (1) {
-                                int32_t _t164 = expanded.len;
-                                bool _t165 = (j < _t164);
-                                if (!(_t165)) break;
-                                LStmt* _t166 = expanded.data[j];
-                                ({ lyric_push(&result, _t166, LyricSlice_LStmtptr); result; });
-                                int32_t _t168 = (j + 1);
-                                j = _t168;
+                                int32_t _t169 = expanded.len;
+                                bool _t170 = (j < _t169);
+                                if (!(_t170)) break;
+                                LStmt* _t171 = expanded.data[j];
+                                ({ lyric_push(&result, _t171, LyricSlice_LStmtptr); result; });
+                                int32_t _t173 = (j + 1);
+                                j = _t173;
                             }
-                            LValueKind _t169 = LValueKind_ValVar;
-                            LyricOpt_LVarDeclData _t170 = s->var_decl;
-                            LVarDeclData _t171 = lyric_unwrap(_t170);
-                            lyric_string _t172 = _t171.name;
-                            LyricOpt_LVarDeclData _t173 = s->var_decl;
-                            LVarDeclData _t174 = lyric_unwrap(_t173);
-                            LType* _t175 = _t174.typ;
-                            LValue* _t176 = _lyric_slab_alloc_LValue();
-                            _t176->kind = _t169;
-                            _t176->name = _t172;
-                            _t176->temp_id = 0;
-                            _t176->typ = _t175;
-                            LValue* handle = _t176;
-                            LyricOpt_LVarDeclData _t177 = s->var_decl;
-                            LVarDeclData _t178 = lyric_unwrap(_t177);
-                            LType* _t179 = _t178.typ;
-                            LType* _t180 = _t179;
-                            lyric_string _t181 = _t180->name;
-                            emit_ref_incr(handle, _t181, &result);
-                            int32_t _t183 = (i + 1);
-                            i = _t183;
+                            LValueKind _t174 = LValueKind_ValVar;
+                            LyricOpt_LVarDeclData _t175 = s->var_decl;
+                            LVarDeclData _t176 = lyric_unwrap(_t175);
+                            lyric_string _t177 = _t176.name;
+                            LyricOpt_LVarDeclData _t178 = s->var_decl;
+                            LVarDeclData _t179 = lyric_unwrap(_t178);
+                            LType* _t180 = _t179.typ;
+                            LValue* _t181 = _lyric_slab_alloc_LValue();
+                            _t181->kind = _t174;
+                            _t181->name = _t177;
+                            _t181->temp_id = 0;
+                            _t181->typ = _t180;
+                            LValue* handle = _t181;
+                            LyricOpt_LVarDeclData _t182 = s->var_decl;
+                            LVarDeclData _t183 = lyric_unwrap(_t182);
+                            LType* _t184 = _t183.typ;
+                            LType* _t185 = _t184;
+                            lyric_string _t186 = _t185->name;
+                            emit_ref_incr(handle, _t186, &result);
+                            int32_t _t188 = (i + 1);
+                            i = _t188;
                             continue;
                         }
                     }
                 }
             }
-            LStmtKind _t184 = s->kind;
-            int32_t _t185 = _t184;
-            bool _t186 = (_t185 == 2);
-            if (_t186) {
-                LyricOpt_LAssignData _t187 = s->assign;
-                bool _t188 = lyric_isnull(_t187);
-                bool _t189 = (!_t188);
-                bool _sc190 = false;
-                _sc190 = _t189;
-                if (_sc190) {
-                    LyricOpt_LAssignData _t191 = s->assign;
-                    LAssignData _t192 = lyric_unwrap(_t191);
-                    LValue* _t193 = _t192.value;
-                    bool _t194 = (_t193 == NULL);
-                    bool _t195 = (!_t194);
-                    _sc190 = _t195;
+            LStmtKind _t189 = s->kind;
+            int32_t _t190 = _t189;
+            bool _t191 = (_t190 == 2);
+            if (_t191) {
+                LyricOpt_LAssignData _t192 = s->assign;
+                bool _t193 = lyric_isnull(_t192);
+                bool _t194 = (!_t193);
+                bool _sc195 = false;
+                _sc195 = _t194;
+                if (_sc195) {
+                    LyricOpt_LAssignData _t196 = s->assign;
+                    LAssignData _t197 = lyric_unwrap(_t196);
+                    LValue* _t198 = _t197.value;
+                    bool _t199 = (_t198 == NULL);
+                    bool _t200 = (!_t199);
+                    _sc195 = _t200;
                 }
-                if (_sc190) {
-                    int32_t _t196 = (-1);
-                    int32_t found_idx = _t196;
+                if (_sc195) {
+                    int32_t _t201 = (-1);
+                    int32_t found_idx = _t201;
                     int32_t ci = 0;
                     while (1) {
-                        int32_t _t197 = class_locals.len;
-                        bool _t198 = (ci < _t197);
-                        if (!(_t198)) break;
-                        lyric_string _t199 = class_locals.data[ci];
-                        LyricOpt_LAssignData _t200 = s->assign;
-                        LAssignData _t201 = lyric_unwrap(_t200);
-                        lyric_string _t202 = _t201.target;
-                        bool _t203 = lyric_str_eq(_t199, _t202);
-                        if (_t203) {
+                        int32_t _t202 = class_locals.len;
+                        bool _t203 = (ci < _t202);
+                        if (!(_t203)) break;
+                        lyric_string _t204 = class_locals.data[ci];
+                        LyricOpt_LAssignData _t205 = s->assign;
+                        LAssignData _t206 = lyric_unwrap(_t205);
+                        lyric_string _t207 = _t206.target;
+                        bool _t208 = lyric_str_eq(_t204, _t207);
+                        if (_t208) {
                             found_idx = ci;
                         }
-                        int32_t _t204 = (ci + 1);
-                        ci = _t204;
+                        int32_t _t209 = (ci + 1);
+                        ci = _t209;
                     }
-                    bool _t205 = (found_idx >= 0);
-                    if (_t205) {
-                        LType* _t206 = class_types.data[found_idx];
-                        LType* ctype = _t206;
-                        LValueKind _t207 = LValueKind_ValVar;
-                        LyricOpt_LAssignData _t208 = s->assign;
-                        LAssignData _t209 = lyric_unwrap(_t208);
-                        lyric_string _t210 = _t209.target;
-                        LValue* _t211 = _lyric_slab_alloc_LValue();
-                        _t211->kind = _t207;
-                        _t211->name = _t210;
-                        _t211->temp_id = 0;
-                        _t211->typ = ctype;
-                        LValue* old_handle = _t211;
-                        LType* _t212 = ctype;
-                        lyric_string _t213 = _t212->name;
-                        emit_ref_decr(old_handle, _t213, &result);
-                        LyricSlice_LStmtptr _t215 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
-                        LyricSlice_LStmtptr expanded = _t215;
+                    bool _t210 = (found_idx >= 0);
+                    if (_t210) {
+                        LType* _t211 = class_types.data[found_idx];
+                        LType* ctype = _t211;
+                        LValueKind _t212 = LValueKind_ValVar;
+                        LyricOpt_LAssignData _t213 = s->assign;
+                        LAssignData _t214 = lyric_unwrap(_t213);
+                        lyric_string _t215 = _t214.target;
+                        LValue* _t216 = _lyric_slab_alloc_LValue();
+                        _t216->kind = _t212;
+                        _t216->name = _t215;
+                        _t216->temp_id = 0;
+                        _t216->typ = ctype;
+                        LValue* old_handle = _t216;
+                        LType* _t217 = ctype;
+                        lyric_string _t218 = _t217->name;
+                        emit_ref_decr(old_handle, _t218, &result);
+                        LyricSlice_LStmtptr _t220 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
+                        LyricSlice_LStmtptr expanded = _t220;
                         int32_t j = 0;
                         while (1) {
-                            int32_t _t216 = expanded.len;
-                            bool _t217 = (j < _t216);
-                            if (!(_t217)) break;
-                            LStmt* _t218 = expanded.data[j];
-                            ({ lyric_push(&result, _t218, LyricSlice_LStmtptr); result; });
-                            int32_t _t220 = (j + 1);
-                            j = _t220;
+                            int32_t _t221 = expanded.len;
+                            bool _t222 = (j < _t221);
+                            if (!(_t222)) break;
+                            LStmt* _t223 = expanded.data[j];
+                            ({ lyric_push(&result, _t223, LyricSlice_LStmtptr); result; });
+                            int32_t _t225 = (j + 1);
+                            j = _t225;
                         }
-                        LyricOpt_LAssignData _t221 = s->assign;
-                        LAssignData _t222 = lyric_unwrap(_t221);
-                        LValue* _t223 = _t222.value;
-                        bool _t224 = is_fresh_class_init(_t223, fresh_class_temps);
-                        bool _t225 = (!_t224);
-                        if (_t225) {
-                            LValueKind _t226 = LValueKind_ValVar;
-                            LyricOpt_LAssignData _t227 = s->assign;
-                            LAssignData _t228 = lyric_unwrap(_t227);
-                            lyric_string _t229 = _t228.target;
-                            LValue* _t230 = _lyric_slab_alloc_LValue();
-                            _t230->kind = _t226;
-                            _t230->name = _t229;
-                            _t230->temp_id = 0;
-                            _t230->typ = ctype;
-                            LValue* new_handle = _t230;
-                            LType* _t231 = ctype;
-                            lyric_string _t232 = _t231->name;
-                            emit_ref_incr(new_handle, _t232, &result);
+                        LyricOpt_LAssignData _t226 = s->assign;
+                        LAssignData _t227 = lyric_unwrap(_t226);
+                        LValue* _t228 = _t227.value;
+                        bool _t229 = is_fresh_class_init(_t228, fresh_class_temps);
+                        bool _t230 = (!_t229);
+                        if (_t230) {
+                            LValueKind _t231 = LValueKind_ValVar;
+                            LyricOpt_LAssignData _t232 = s->assign;
+                            LAssignData _t233 = lyric_unwrap(_t232);
+                            lyric_string _t234 = _t233.target;
+                            LValue* _t235 = _lyric_slab_alloc_LValue();
+                            _t235->kind = _t231;
+                            _t235->name = _t234;
+                            _t235->temp_id = 0;
+                            _t235->typ = ctype;
+                            LValue* new_handle = _t235;
+                            LType* _t236 = ctype;
+                            lyric_string _t237 = _t236->name;
+                            emit_ref_incr(new_handle, _t237, &result);
                         }
-                        int32_t _t234 = (i + 1);
-                        i = _t234;
+                        int32_t _t239 = (i + 1);
+                        i = _t239;
                         continue;
                     }
                 }
             }
-            LStmtKind _t235 = s->kind;
-            int32_t _t236 = _t235;
-            bool _t237 = (_t236 == 24);
-            if (_t237) {
-                LyricOpt_LSlabSetData _t238 = s->slab_set;
-                bool _t239 = lyric_isnull(_t238);
-                bool _t240 = (!_t239);
-                bool _sc241 = false;
-                _sc241 = _t240;
-                if (_sc241) {
-                    LyricOpt_LSlabSetData _t242 = s->slab_set;
-                    LSlabSetData _t243 = lyric_unwrap(_t242);
-                    LValue* _t244 = _t243.value;
-                    bool _t245 = (_t244 == NULL);
-                    bool _t246 = (!_t245);
-                    _sc241 = _t246;
-                }
-                if (_sc241) {
+            LStmtKind _t240 = s->kind;
+            int32_t _t241 = _t240;
+            bool _t242 = (_t241 == 24);
+            if (_t242) {
+                LyricOpt_LSlabSetData _t243 = s->slab_set;
+                bool _t244 = lyric_isnull(_t243);
+                bool _t245 = (!_t244);
+                bool _sc246 = false;
+                _sc246 = _t245;
+                if (_sc246) {
                     LyricOpt_LSlabSetData _t247 = s->slab_set;
                     LSlabSetData _t248 = lyric_unwrap(_t247);
                     LValue* _t249 = _t248.value;
-                    LValue* _t250 = _t249;
-                    LValue* val = _t250;
-                    LType* _t251 = val->typ;
-                    bool _t252 = (_t251 == NULL);
-                    bool _t253 = (!_t252);
-                    bool _sc254 = false;
-                    _sc254 = _t253;
-                    if (_sc254) {
-                        LType* _t255 = val->typ;
-                        bool _t256 = is_rc_class_type(prog, _t255);
-                        _sc254 = _t256;
-                    }
-                    if (_sc254) {
-                        LyricOpt_LSlabSetData _t257 = s->slab_set;
-                        LSlabSetData _t258 = lyric_unwrap(_t257);
-                        LValue* _t259 = _t258.value;
+                    bool _t250 = (_t249 == NULL);
+                    bool _t251 = (!_t250);
+                    _sc246 = _t251;
+                }
+                if (_sc246) {
+                    LyricOpt_LSlabSetData _t252 = s->slab_set;
+                    LSlabSetData _t253 = lyric_unwrap(_t252);
+                    LValue* _t254 = _t253.value;
+                    LValue* _t255 = _t254;
+                    LValue* val = _t255;
+                    LType* _t256 = val->typ;
+                    bool _t257 = (_t256 == NULL);
+                    bool _t258 = (!_t257);
+                    bool _sc259 = false;
+                    _sc259 = _t258;
+                    if (_sc259) {
                         LType* _t260 = val->typ;
-                        LType* _t261 = _t260;
-                        lyric_string _t262 = _t261->name;
-                        emit_ref_incr(_t259, _t262, &result);
+                        bool _t261 = is_rc_class_type(prog, _t260);
+                        _sc259 = _t261;
+                    }
+                    if (_sc259) {
+                        LyricOpt_LSlabSetData _t262 = s->slab_set;
+                        LSlabSetData _t263 = lyric_unwrap(_t262);
+                        LValue* _t264 = _t263.value;
+                        LType* _t265 = val->typ;
+                        LType* _t266 = _t265;
+                        lyric_string _t267 = _t266->name;
+                        emit_ref_incr(_t264, _t267, &result);
                     }
                 }
             }
-            LStmtKind _t264 = s->kind;
-            int32_t _t265 = _t264;
-            bool _t266 = (_t265 == 4);
-            if (_t266) {
-                LyricOpt_LClassSetData _t267 = s->class_set;
-                bool _t268 = lyric_isnull(_t267);
-                bool _t269 = (!_t268);
-                bool _sc270 = false;
-                _sc270 = _t269;
-                if (_sc270) {
-                    LyricOpt_LClassSetData _t271 = s->class_set;
-                    LClassSetData _t272 = lyric_unwrap(_t271);
-                    LValue* _t273 = _t272.value;
-                    bool _t274 = (_t273 == NULL);
-                    bool _t275 = (!_t274);
-                    _sc270 = _t275;
-                }
-                if (_sc270) {
+            LStmtKind _t269 = s->kind;
+            int32_t _t270 = _t269;
+            bool _t271 = (_t270 == 4);
+            if (_t271) {
+                LyricOpt_LClassSetData _t272 = s->class_set;
+                bool _t273 = lyric_isnull(_t272);
+                bool _t274 = (!_t273);
+                bool _sc275 = false;
+                _sc275 = _t274;
+                if (_sc275) {
                     LyricOpt_LClassSetData _t276 = s->class_set;
                     LClassSetData _t277 = lyric_unwrap(_t276);
                     LValue* _t278 = _t277.value;
-                    LValue* _t279 = _t278;
-                    LValue* val = _t279;
-                    LType* _t280 = val->typ;
-                    bool _t281 = (_t280 == NULL);
-                    bool _t282 = (!_t281);
-                    bool _sc283 = false;
-                    _sc283 = _t282;
-                    if (_sc283) {
-                        LType* _t284 = val->typ;
-                        bool _t285 = is_rc_class_type(prog, _t284);
-                        _sc283 = _t285;
-                    }
-                    if (_sc283) {
-                        LyricOpt_LClassSetData _t286 = s->class_set;
-                        LClassSetData _t287 = lyric_unwrap(_t286);
-                        LValue* _t288 = _t287.value;
+                    bool _t279 = (_t278 == NULL);
+                    bool _t280 = (!_t279);
+                    _sc275 = _t280;
+                }
+                if (_sc275) {
+                    LyricOpt_LClassSetData _t281 = s->class_set;
+                    LClassSetData _t282 = lyric_unwrap(_t281);
+                    LValue* _t283 = _t282.value;
+                    LValue* _t284 = _t283;
+                    LValue* val = _t284;
+                    LType* _t285 = val->typ;
+                    bool _t286 = (_t285 == NULL);
+                    bool _t287 = (!_t286);
+                    bool _sc288 = false;
+                    _sc288 = _t287;
+                    if (_sc288) {
                         LType* _t289 = val->typ;
-                        LType* _t290 = _t289;
-                        lyric_string _t291 = _t290->name;
-                        emit_ref_incr(_t288, _t291, &result);
+                        bool _t290 = is_rc_class_type(prog, _t289);
+                        _sc288 = _t290;
+                    }
+                    if (_sc288) {
+                        LyricOpt_LClassSetData _t291 = s->class_set;
+                        LClassSetData _t292 = lyric_unwrap(_t291);
+                        LValue* _t293 = _t292.value;
+                        LType* _t294 = val->typ;
+                        LType* _t295 = _t294;
+                        lyric_string _t296 = _t295->name;
+                        emit_ref_incr(_t293, _t296, &result);
                     }
                 }
             }
-            LStmtKind _t293 = s->kind;
-            int32_t _t294 = _t293;
-            bool _t295 = (_t294 == 3);
-            if (_t295) {
-                LyricOpt_LStructSetData _t296 = s->struct_set;
-                bool _t297 = lyric_isnull(_t296);
-                bool _t298 = (!_t297);
-                bool _sc299 = false;
-                _sc299 = _t298;
-                if (_sc299) {
-                    LyricOpt_LStructSetData _t300 = s->struct_set;
-                    LStructSetData _t301 = lyric_unwrap(_t300);
-                    LValue* _t302 = _t301.value;
-                    bool _t303 = (_t302 == NULL);
-                    bool _t304 = (!_t303);
-                    _sc299 = _t304;
-                }
-                if (_sc299) {
+            LStmtKind _t298 = s->kind;
+            int32_t _t299 = _t298;
+            bool _t300 = (_t299 == 3);
+            if (_t300) {
+                LyricOpt_LStructSetData _t301 = s->struct_set;
+                bool _t302 = lyric_isnull(_t301);
+                bool _t303 = (!_t302);
+                bool _sc304 = false;
+                _sc304 = _t303;
+                if (_sc304) {
                     LyricOpt_LStructSetData _t305 = s->struct_set;
                     LStructSetData _t306 = lyric_unwrap(_t305);
                     LValue* _t307 = _t306.value;
-                    LValue* _t308 = _t307;
-                    LValue* val = _t308;
-                    LType* _t309 = val->typ;
-                    bool _t310 = (_t309 == NULL);
-                    bool _t311 = (!_t310);
-                    bool _sc312 = false;
-                    _sc312 = _t311;
-                    if (_sc312) {
-                        LType* _t313 = val->typ;
-                        bool _t314 = is_rc_class_type(prog, _t313);
-                        _sc312 = _t314;
-                    }
-                    if (_sc312) {
-                        LyricOpt_LStructSetData _t315 = s->struct_set;
-                        LStructSetData _t316 = lyric_unwrap(_t315);
-                        LValue* _t317 = _t316.value;
+                    bool _t308 = (_t307 == NULL);
+                    bool _t309 = (!_t308);
+                    _sc304 = _t309;
+                }
+                if (_sc304) {
+                    LyricOpt_LStructSetData _t310 = s->struct_set;
+                    LStructSetData _t311 = lyric_unwrap(_t310);
+                    LValue* _t312 = _t311.value;
+                    LValue* _t313 = _t312;
+                    LValue* val = _t313;
+                    LType* _t314 = val->typ;
+                    bool _t315 = (_t314 == NULL);
+                    bool _t316 = (!_t315);
+                    bool _sc317 = false;
+                    _sc317 = _t316;
+                    if (_sc317) {
                         LType* _t318 = val->typ;
-                        LType* _t319 = _t318;
-                        lyric_string _t320 = _t319->name;
-                        emit_ref_incr(_t317, _t320, &result);
+                        bool _t319 = is_rc_class_type(prog, _t318);
+                        _sc317 = _t319;
+                    }
+                    if (_sc317) {
+                        LyricOpt_LStructSetData _t320 = s->struct_set;
+                        LStructSetData _t321 = lyric_unwrap(_t320);
+                        LValue* _t322 = _t321.value;
+                        LType* _t323 = val->typ;
+                        LType* _t324 = _t323;
+                        lyric_string _t325 = _t324->name;
+                        emit_ref_incr(_t322, _t325, &result);
                     }
                 }
             }
-            LStmtKind _t322 = s->kind;
-            int32_t _t323 = _t322;
-            bool _t324 = (_t323 == 11);
-            if (_t324) {
-                LyricSlice_lyric_string _t325 = get_return_var_names(s);
-                LyricSlice_lyric_string ret_names = _t325;
+            LStmtKind _t327 = s->kind;
+            int32_t _t328 = _t327;
+            bool _t329 = (_t328 == 11);
+            if (_t329) {
+                LyricSlice_lyric_string _t330 = get_return_var_names(s);
+                LyricSlice_lyric_string ret_names = _t330;
                 emit_slice_frees(slice_locals, slice_types, ret_names, &result);
                 emit_class_releases(class_locals, class_types, ret_names, &result);
             }
-            LyricSlice_LStmtptr _t328 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
-            LyricSlice_LStmtptr expanded = _t328;
+            LyricSlice_LStmtptr _t333 = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog);
+            LyricSlice_LStmtptr expanded = _t333;
             int32_t j = 0;
             while (1) {
-                int32_t _t329 = expanded.len;
-                bool _t330 = (j < _t329);
-                if (!(_t330)) break;
-                LStmt* _t331 = expanded.data[j];
-                ({ lyric_push(&result, _t331, LyricSlice_LStmtptr); result; });
-                int32_t _t333 = (j + 1);
-                j = _t333;
+                int32_t _t334 = expanded.len;
+                bool _t335 = (j < _t334);
+                if (!(_t335)) break;
+                LStmt* _t336 = expanded.data[j];
+                ({ lyric_push(&result, _t336, LyricSlice_LStmtptr); result; });
+                int32_t _t338 = (j + 1);
+                j = _t338;
             }
         }
-        int32_t _t334 = (i + 1);
-        i = _t334;
+        int32_t _t339 = (i + 1);
+        i = _t339;
     }
-    LyricSlice_lyric_string _t335 = lyric_slice_empty(LyricSlice_lyric_string);
-    LyricSlice_lyric_string no_skip = _t335;
+    LyricSlice_lyric_string _t340 = lyric_slice_empty(LyricSlice_lyric_string);
+    LyricSlice_lyric_string no_skip = _t340;
     emit_slice_frees(slice_locals, slice_types, no_skip, &result);
     emit_class_releases(class_locals, class_types, no_skip, &result);
     if (slice_locals.cap > 0 && slice_locals.data) free(slice_locals.data);

@@ -700,8 +700,13 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
           }
           // Track non-owned class handle locals for ref counting
           if is_rc_class_type(prog, s.var_decl!.typ) {
-            class_locals.push(s.var_decl!.name)
-            class_types.push(s.var_decl!.typ)
+            // Skip scope-exit release if variable escapes via function call
+            // (callee may store it, so we can't safely release)
+            let escapes = var_escapes_via_call(s.var_decl!.name, all_stmts, escape_map)
+            if !escapes {
+              class_locals.push(s.var_decl!.name)
+              class_types.push(s.var_decl!.typ)
+            }
             // If init is NOT a fresh alloc (i.e. copying an existing handle), retain
             if !isnull(s.var_decl!.init) && !is_fresh_class_init(s.var_decl!.init, fresh_class_temps) {
               // Emit the VarDecl first, then the retain
