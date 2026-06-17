@@ -724,10 +724,29 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
             // UNLESS the source is dead after this point (move semantics — no inc/dec)
             if !isnull(s.var_decl!.init) && !is_fresh_class_init(s.var_decl!.init, fresh_class_temps) {
               let init_val = s.var_decl!.init!
-              // Move semantics disabled — use_count approach is too aggressive.
-              // The LIR has temps that are single-use by definition, but the source
-              // variable they reference may be needed for scope-exit release.
-              let is_move = false
+              // Move semantics: if source is a local variable (not a param) that is
+              // never used again, transfer ownership instead of retain+release.
+              let mut is_move = false
+              if init_val.kind is ValVar {
+                // Check source is not a function parameter (params are borrowed)
+                let mut is_param = false
+                let mut pi = 0
+                while pi < len(params) {
+                  if params[pi].name == init_val.name {
+                    is_param = true
+                  }
+                  pi = pi + 1
+                }
+                // Skip synthetic intermediaries (__ifexpr_, __match_, etc.) —
+                // they may hold borrowed refs from expression branches.
+                let is_synthetic = len(init_val.name) >= 2 && init_val.name[0] == '_' && init_val.name[1] == '_'
+                if !is_param && !is_synthetic {
+                  let use_count = count_var_uses(init_val.name, all_stmts)
+                  if use_count <= 1 {
+                    is_move = true
+                  }
+                }
+              }
               // Emit the VarDecl first
               let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog, params)
               let mut j = 0
