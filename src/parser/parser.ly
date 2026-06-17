@@ -195,6 +195,13 @@ lyric parser {
       self.next()
     }
 
+    // Handle `permanent` modifier for classes
+    let mut is_permanent = false
+    if self.peek().kind == LIdent && self.peek().text == "permanent" {
+      is_permanent = true
+      self.next()
+    }
+
     match self.peek().kind {
       KImport => {
         if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to import")) }
@@ -229,6 +236,7 @@ lyric parser {
       KClass => {
         let cls = self.parse_class()?
         cls!.is_public = is_pub
+        cls!.is_permanent = is_permanent
         array_append<LyricBlock, ClassDecl>(block, cls!)
         return (true, null)
       }
@@ -257,6 +265,9 @@ lyric parser {
         return (true, null)
       }
       _ => {
+        if is_permanent {
+          return (false, self.make_error(tok.span, "permanent can only be applied to class"))
+        }
         return (false, self.make_error(tok.span, f"unexpected token in lyric block"))
       }
     }

@@ -629,7 +629,8 @@ lyric lowerer {
     }
     let name = if !isnull(cd) && !isnull(cd!.name) { cd!.name!.name } else { "" }
     let exported = if !isnull(cd) { cd!.is_public } else { false }
-    return LClassDecl { name: name, fields: fields, type_params: tps, is_exported: exported, implements: impls }
+    let perm = if !isnull(cd) { cd!.is_permanent } else { false }
+    return LClassDecl { name: name, fields: fields, type_params: tps, is_exported: exported, is_permanent: perm, implements: impls }
   }
 
   func Lowerer.lower_enum_decl(self, ed: EnumDecl?) -> LEnumDecl {

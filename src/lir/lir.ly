@@ -632,6 +632,7 @@ lyric lir {
     fields: [LField]
     type_params: [LTypeParam]
     is_exported: bool
+    is_permanent: bool
     implements: [string]
   }
 

@@ -102,6 +102,7 @@ lyric ast {
   class ClassDecl {
     name: Sym?
     is_public: bool
+    is_permanent: bool
     implements: [Sym]
     span: Span
   }

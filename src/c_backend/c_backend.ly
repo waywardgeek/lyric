@@ -4144,8 +4144,10 @@ func CGen.emit_class_decl(self, c: LClassDecl) {
     i = i + 1
   }
   if self.prog!.slab_mode {
-    // Ref count for non-owned classes
-    self.line("uint32_t _rc;")
+    // Ref count for non-permanent, non-owned classes
+    if !c.is_permanent {
+      self.line("uint32_t _rc;")
+    }
     // Free-list linkage: lyric_next at end so field offsets are unchanged
     self.line(f"struct {c.name}* lyric_next;")
   }
@@ -4198,7 +4200,9 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line(f"{name}* p = _lyric_slab_{name}.free;")
     self.line(f"_lyric_slab_{name}.free = p->lyric_next;")
     self.line(f"memset(p, 0, sizeof({name}));")
-    self.line("p->_rc = 1;")
+    if !classes[i].is_permanent {
+      self.line("p->_rc = 1;")
+    }
     self.line("return p;")
     self.indent = self.indent - 1
     self.line("}")
@@ -4212,7 +4216,9 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line("}")
     // Allocate from current block (calloc zeroed the block, so _rc is 0)
     self.line(f"{name}* p = &_lyric_slab_{name}.cur->data[_lyric_slab_{name}.cur->used++];")
-    self.line("p->_rc = 1;")
+    if !classes[i].is_permanent {
+      self.line("p->_rc = 1;")
+    }
     self.line("return p;")
     self.indent = self.indent - 1
     self.line("}")
@@ -4253,7 +4259,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       j = j + 1
     }
     self.line("uint32_t* lyric_next;")
-    self.line("uint32_t* _rc;")
+    if !classes[i].is_permanent {
+      self.line("uint32_t* _rc;")
+    }
     self.line("uint32_t used;")
     self.line("uint32_t cap;")
     self.line("uint32_t free_head;")
@@ -4292,8 +4300,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       j = j + 1
     }
     self.line(f"_lyric_slab_{name}.lyric_next = (uint32_t*)realloc(_lyric_slab_{name}.lyric_next, new_cap * sizeof(uint32_t));")
-    self.line(f"_lyric_slab_{name}._rc = (uint32_t*)realloc(_lyric_slab_{name}._rc, new_cap * sizeof(uint32_t));")
-    self.line(f"_lyric_slab_{name}.cap = new_cap;")
+    if !classes[i].is_permanent {
+      self.line(f"_lyric_slab_{name}._rc = (uint32_t*)realloc(_lyric_slab_{name}._rc, new_cap * sizeof(uint32_t));")
+    }    self.line(f"_lyric_slab_{name}.cap = new_cap;")
     self.indent = self.indent - 1
     self.line("}")
     self.line(f"h = _lyric_slab_{name}.used++;")
@@ -4312,7 +4321,9 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       }
       j = j + 1
     }
-    self.line(f"_lyric_slab_{name}._rc[h] = 1;")
+    if !classes[i].is_permanent {
+      self.line(f"_lyric_slab_{name}._rc[h] = 1;")
+    }
     self.line("return h;")
     self.indent = self.indent - 1
     self.line("}")

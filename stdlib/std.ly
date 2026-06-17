@@ -398,7 +398,7 @@ lyric std {
   // Sym: an interned symbol with pre-computed hash.
   // Hash is computed once at creation; all subsequent lookups use the u64.
   // Reference equality — sym("foo") == sym("foo") is always true.
-  pub class Sym {
+  pub permanent class Sym {
     name: string
     hash: u64
 

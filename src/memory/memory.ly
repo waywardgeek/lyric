@@ -1454,10 +1454,23 @@ func is_owned_class(prog: LProgram, class_name: string) -> bool {
   return !isnull(entry)
 }
 
+// Check if a class is marked permanent (never freed).
+func is_permanent_class(prog: LProgram, class_name: string) -> bool {
+  let mut i = 0
+  while i < len(prog.classes) {
+    if prog.classes[i].name == class_name {
+      return prog.classes[i].is_permanent
+    }
+    i = i + 1
+  }
+  return false
+}
+
 // Check if a type is a non-owned class handle (needs RC).
 func is_rc_class_type(prog: LProgram, typ: LType?) -> bool {
   if isnull(typ) { return false }
   if !(typ!.kind is TyClassHandle) { return false }
+  if is_permanent_class(prog, typ!.name) { return false }
   return !is_owned_class(prog, typ!.name)
 }
 

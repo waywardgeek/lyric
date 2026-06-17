@@ -764,6 +764,7 @@ func MonoPass.specialize_class(self, orig: LClassDecl, subst: Dict<Sym, LType?>?
     type_params: [],
     fields: fields,
     is_exported: orig.is_exported,
+    is_permanent: orig.is_permanent,
     implements: [],
   }
 }
