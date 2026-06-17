@@ -12,9 +12,49 @@ lyric memory {
   }
 
   doc "Architecture" {
-    "LIR→LIR transformation pass: rewrites class allocation to slab allocation"
+    "LIR→LIR transformation pass: rewrites class allocation to slab allocation + RC instrumentation"
     "Entry point: slab_rewrite(prog: LProgram)"
     "Runs after monomorphization, before C backend emission"
     "C backend emits slab infrastructure: block structs, alloc/free functions per class"
+    "Pipeline: escape analysis (fixed-point) → slab rewrite + scope-exit frees + RC insertion"
   }
+
+  doc "Reference Counting" {
+    "Only non-permanent, non-owned classes get RC (currently StringBuilder + Dict variants)"
+    "RC design: every reference is OWNED except function params (which are BORROWED)"
+    "Owned refs (must decrement when done): return from any call, field/global read, copy from local"
+    "Borrowed refs (no decrement): function parameters — caller holds ref for call duration"
+    "Alloc (via call return): rc = 1, caller owns the reference"
+    "Field store (obj.field = x): always emit retain — reference escapes into another lifetime"
+    "Return owned ref: transfer ownership, skip scope-exit decrement (net zero)"
+    "Return borrowed ref (param): must increment before return (creates new owned ref for caller)"
+    "Move optimization: if source is dead after assign, transfer ownership without inc/dec"
+    "StRefIncr/StRefDecr emitted by memory pass; C backend emits p->_rc++ / conditional decrement+free"
+  }
+
+  doc "Escape Analysis" {
+    "Fixed-point iteration: marks which function params escape (stored in fields, returned, etc.)"
+    "escape_key_idx(func_name, param_index) → Dict key for tracking"
+    "mark_value_escape propagates escape from callee params to caller params"
+    "var_escapes_via_call checks if a local is passed to an escaping param position"
+    "Used by scope-exit free for slices and class locals — escaped refs skip scope-exit free"
+    "KNOWN WORKAROUND: class locals that escape via function calls skip RC tracking entirely"
+    "This prevents UAF but leaks — needs proper fix via field-store retains inside callee bodies"
+  }
+
+  doc "Scope-Exit Frees" {
+    "Three kinds: StSliceFree (slice backing), StSlabFree (class handle), StRefDecr (RC classes)"
+    "Escape analysis gates eligibility — escaped locals are not freed at scope exit"
+    "Only tracks locals allocated in the current scope (ExClassAlloc / fresh alloc)"
+    "Owned classes (relation children) skip scope-exit free — parent destructor handles them"
+  }
+
+  doc "UAF Detection (--detect-uaf)" {
+    "On free: sets _rc = UINT32_MAX (poison value)"
+    "On every ExClassGet/ValClassFieldRef of RC classes: checks for poison, aborts with message"
+    "Uses is_rc_class() name-based lookup (not class_decl which may be null)"
+    "Caught Dict_CSym_CType UAF — checker's type Dict freed while still referenced"
+  }
+
+  source: ["memory.ly"]
 }

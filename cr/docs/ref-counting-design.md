@@ -1,7 +1,7 @@
 # Lyric Reference Counting — Design & Implementation
 
-**Date**: 2026-06-13
-**Status**: Draft — for Bill's review
+**Date**: 2026-06-13 (original), 2026-06-17 (revised)
+**Status**: Design finalized, implementation in progress
 **Goal**: Deterministic memory management that wins benchmarks. Zero GC pauses, minimal overhead, maximum elision.
 
 ---
@@ -19,32 +19,149 @@ Both domains share the same optimization strategy: **elide ref counting whenever
 
 ## 1. Class Reference Counting
 
-### 1.1 Mechanism
+### 1.1 The Core Model: Owned vs Borrowed References
 
-Every non-owned class gets a hidden `_rc: u32` field (injected by the memory pass, not visible in source). Owned classes (those appearing as children in `owns` relations) get NO ref counting — their lifetime is managed by their owner's destructor.
+Every reference to an RC-eligible class instance is either **owned** or **borrowed**.
 
-**Operations (inserted by memory pass at LIR level):**
-- **Retain**: `_rc++` — on assignment, copy, capture
-- **Release**: `_rc--` — on scope exit, overwrite, function return (for non-returned refs)
-- **Free**: when `_rc` hits 0 → call `destroy()` if it exists, then `slab_free()`
+**Owned references** — the holder must decrement `_rc` when done:
+1. **Return from any call** — includes constructors, factory functions, everything. Calling a constructor IS calling a function; no special case needed.
+2. **Field/global read** — copying a ref out of another object's storage. Must retain on read (the source object might be destroyed while we still hold the ref).
+3. **Copy from local** — `let y = x` where x is still live afterward. Must retain.
 
-### 1.2 Insertion Points
+**Borrowed references** — the holder does NOT touch `_rc`:
+4. **Function parameters** — the caller holds an owned ref for the duration of the call. Zero-cost calling convention: no retain on call, no release on return.
 
-The memory pass walks each function body and inserts retain/release at these points:
+**Returning references:**
+- Returning an **owned** ref → transfers ownership to caller, skip scope-exit decrement (net zero).
+- Returning a **borrowed** ref (a function parameter) → must increment before returning (creating a new owned ref for the caller, since the caller's original ref will be released independently).
+
+**Restriction:** Users cannot directly call the destructor of an RC-eligible class. Only the RC machinery triggers destruction when `_rc` hits 0. The checker enforces this.
+
+### 1.2 Move Semantics
+
+When a reference is assigned and the source is **dead afterward** (never used again), the assignment is a **move**, not a copy:
+
+```lyric
+let x = make_widget()    // owned, rc=1
+let y = x                // x is never used again → MOVE
+                          // no retain on y, no release on x
+                          // y inherits x's ownership
+```
+
+vs:
+
+```lyric
+let x = make_widget()    // owned, rc=1
+let y = x                // x IS used again → COPY, retain y
+do_something(x)          // both release at scope exit
+```
+
+Move detection requires a liveness check: is the source variable used after this point? If not, it's a move. This eliminates the most common inc/dec pairs — most locals are created, used briefly, and passed along.
+
+**Inlining mental model:** If the compiler inlined all non-recursive function calls, there would be zero RC overhead for parameter passing. The only reason RC exists is because separate function scopes can't see each other's lifetimes. Parameters are the one case where we CAN see the lifetime (caller is provably alive for the call duration), so we skip bookkeeping.
+
+### 1.3 Temp Variable Tracking
+
+In LIR, everything is single-assignment temps. Each temp has exactly one def and a clear last-use point:
+
+```
+_t1 = SlabAlloc(Matrix)         // rc = 1
+StSlabSet(_t1, "rows", _t3)
+_t5 = Call(determinant, _t1)    // last use of _t1
+// Insert StRefDecr(_t1) here   // rc → 0 → free
+StVarDecl(volume, _t5)
+```
+
+The memory pass can:
+1. For each temp of RC class type, find its **last use** in the statement sequence
+2. Insert `StRefDecr` right after that last use
+3. Skip if the temp is returned or stored in a field (ownership transferred)
+
+**Stack allocation optimization (future):** Temp arrays of size computed on the fly that do not resize can be allocated on the stack via GCC VLAs/alloca. No malloc/free needed. The same stack-based temp tracking covers both class refs and array temps.
+
+### 1.4 Delta Folding
+
+Within a single function, if you can compute the **net delta** to each `_rc` at compile time, you only need to emit the net effect. Most common pattern: alloc (+1) followed by scope-exit release (-1) with no intermediate copies = just emit the decrement. No intermediate inc/dec pairs.
+
+Field stores are the exception — the retain must happen eagerly because the reference escapes into another object's lifetime that may outlive the current scope.
+
+### 1.5 Insertion Points (Memory Pass)
 
 | Site | Action |
 |------|--------|
-| `let x = class_expr` | retain (initial ref) |
-| `let y = x` (class handle copy) | retain y |
-| `x = new_val` (overwrite) | release old x, retain new_val |
-| Scope exit (block/if/while/for end) | release all class locals declared in that scope |
-| `return x` | NO release — ownership transfers to caller |
-| Function param (class type) | NO retain on entry (caller holds ref); NO release on exit |
-| `spawn` capture | retain at capture; release when spawned routine exits |
+| Return from any call (including constructors) | Caller owns result (rc already 1 from alloc) |
+| `let y = x` (copy, x still live) | Retain y |
+| `let y = x` (move, x dead after) | Transfer ownership, no inc/dec |
+| `x = new_val` (overwrite) | Release old x, retain new_val (unless fresh) |
+| Field read (`let m = obj.field`) | Retain m (copies ref from heap) |
+| Field store (`obj.field = x`) | Retain x (escape into another lifetime) |
+| Scope exit | Release all owned refs declared in that scope |
+| `return x` (owned ref) | Transfer ownership, skip release |
+| `return x` (borrowed ref / param) | Increment before returning |
+| Function param | Nothing (borrowed, zero-cost) |
+| `spawn` capture | Retain at capture; release when spawned routine exits |
 
-### 1.3 `trusted` Exemption
+### 1.6 `permanent` Classes
 
-Functions/blocks marked `trusted` get NO auto-inserted retain/release. Manual `ref(x)` and `unref(x)` primitives are available inside `trusted` code only. This is for stdlib containers (ArrayList, Dict, HashedList, DoublyLinkedList).
+Classes marked `permanent` skip ALL RC instrumentation — no `_rc` field, no alloc init, no inc/dec. Used for compiler-internal classes (AST nodes, LIR nodes, CGen, etc.) that live for the entire compilation and are freed by slab destruction, not individual RC. Currently 34 compiler classes are permanent.
+
+### 1.7 Owned Classes
+
+Classes that are children in `owns` relations skip RC entirely. Their lifetime is managed by the parent's destructor. `is_owned` is set on `LClassDecl` during `resolve_class_types()`.
+
+### 1.8 `trusted` Exemption and `ref`/`unref` Primitives
+
+Functions/blocks marked `trusted` get NO auto-inserted retain/release. Inside `trusted` code, two primitive statements are available:
+
+```lyric
+trusted func Dict.set(self, key: Sym, value: V) {
+    // ... find or create entry ...
+    ref value          // manually increment rc — we're storing it
+    entry.value = value
+}
+
+trusted func Dict.remove(self, key: Sym) {
+    // ... find entry ...
+    unref entry.value  // manually decrement rc — we're releasing it
+    // ... remove entry from table ...
+}
+```
+
+**`ref x`** — increment `_rc` on x. Used when storing a reference into a container's internal storage (the container is taking ownership of an additional reference).
+
+**`unref x`** — decrement `_rc` on x. If `_rc` hits 0, triggers destruction + slab free. Used when removing a reference from a container's internal storage.
+
+These are **statements**, not expressions. The checker rejects `ref`/`unref` outside `trusted` context. The lowerer emits `StRefIncr`/`StRefDecr` directly.
+
+**Relation-generated code** is implicitly `trusted` — the compiler does zero automatic RC there. When a child is inserted into a relationship, the generated insert/append method calls `ref child` once.
+
+### 1.9 Breaking Reference Cycles via Non-Owning Back-Pointers
+
+Lyric's relation system generates parent back-pointers on child classes (e.g. `Node.graph`, `Edge.node`). With naive RC, these create cycles: Graph refs Node, Node refs Graph → neither ever reaches rc=0.
+
+The solution: **back-pointers are non-owning — no `ref` on the parent**. Only the forward direction (parent→child) holds a counted reference. The back-pointer is a raw handle that is valid only as long as the parent is alive.
+
+This is safe because Lyric's ownership model guarantees the parent outlives its children:
+- The parent's destructor destroys all owned children (via relation-generated teardown)
+- Children cannot exist without a parent — insertion into a relation is the only way to set the back-pointer
+- If a child is removed from a relation, its back-pointer is cleared
+
+Example:
+```
+relation Graph owns Node      // Graph.nodes: HashedList<Node>, Node.graph: Graph
+relation Node refs Edge        // Node.edges: [Edge], Edge.node: Node
+
+// Generated trusted code for Graph.add_node(child):
+//   ref child          // forward ref: Graph holds counted ref to Node
+//   child.graph = self // back-pointer: NO ref on Graph (non-owning)
+
+// When Graph is destroyed:
+//   for each node in self.nodes:
+//     unref node       // rc→0 → destroy Node
+//                      // Node's destructor does NOT unref node.graph (non-owning)
+```
+
+Without non-owning back-pointers, every parent↔child pair would be a cycle that RC alone can never collect. This convention eliminates cycles by construction — no cycle detector needed.
 
 ---
 
@@ -92,36 +209,31 @@ If a class handle is:
 - Never stored in a field of another object
 - Never stored in a global
 - Never captured by `spawn`
-- Only passed to functions as non-`mut` parameters (or `mut` but not stored)
+- Only passed to functions as parameters (zero-cost convention covers this)
 
 Then: **skip all retain/release**. The object lives exactly as long as the scope. Free it at scope exit without ever touching `_rc`.
-
-**Detection**: Walk the function body. For each `let x = ClassName {}`:
-1. Track all uses of `x`
-2. If `x` is only used as: local reads, function args (non-`mut` or `mut` without field-store), method calls on `x` → **elide**
-3. If `x` appears in: field assignment (`other.field = x`), global assignment, spawn capture, return → **cannot elide**
 
 ### 3.2 Function Parameters
 
 Function parameters are NEVER retained/released by the callee. The caller holds the reference. This is always safe because:
 - Lyric has no closures that outlive the function
 - `spawn` captures by value (which does its own retain)
-- The callee cannot store the parameter anywhere that outlives the call without going through an assignment (which the memory pass handles)
+- The callee cannot store the parameter anywhere that outlives the call without going through a field store (which emits an eager retain)
 
-This is a **zero-cost calling convention** for class references.
+This is a **zero-cost calling convention** for class references. Even for recursive calls — the call stack itself acts as a "holds" guarantee. The original caller's owned ref sits at the bottom of the stack and can't be released until the recursive chain fully unwinds.
 
 ### 3.3 Temporary Expressions
 
-In `foo(Bar {})`, the `Bar` instance is a temporary. It's allocated, passed to `foo`, and freed when the statement ends. No retain/release needed — just alloc before the call, free after.
+In `foo(Bar {})`, the `Bar` instance is a temporary. It's allocated, passed to `foo`, and freed when the statement ends. No retain/release needed — just alloc before the call, free after (last-use release on the temp).
 
 ### 3.4 Last-Use Optimization
 
-If a variable's last use is as a function argument, skip the release at scope exit — the function "consumes" the reference. This avoids the retain-on-call/release-at-scope-exit pair.
+If a variable's last use is as a function argument, skip the release at scope exit — insert the release right after the call instead. This keeps the object alive only as long as needed.
 
 ```lyric
 let x = Widget {}     // alloc, rc=1
-process(x)            // last use of x — no release needed
-                      // (process doesn't retain either, if it doesn't store x)
+process(x)            // last use of x
+                      // release x here (rc→0→free)
 ```
 
 ### 3.5 Dynamic Arrays — Stack Lifetime
@@ -131,45 +243,59 @@ For slices allocated on the stack that never escape:
 - Even when passed to functions: the backing data survives the call (caller's scope)
 - No ref counting needed — just scope-exit free
 
-**Detection**: Same escape analysis as classes. If the slice is never stored in a field, global, or spawn capture → just free at scope exit.
+**Future optimization:** Temp arrays whose size is computed on the fly and that do not resize can be allocated on the stack via GCC VLAs/alloca. Zero malloc/free overhead.
 
 ---
 
 ## 4. LIR Representation
 
-### 4.1 New LIR Nodes
+### 4.1 LIR Nodes (implemented)
 
-Add to `LStmtKind`:
-```
-StRefIncr    // increment _rc
-StRefDecr    // decrement _rc; if 0, destroy + free
-StSliceFree  // free slice backing array
-```
+`LStmtKind` RC variants:
+- `StRefIncr` — increment `_rc` on a class handle (`LRefIncrData`: handle + class_name)
+- `StRefDecr` — decrement `_rc`, free if 0 (`LRefDecrData`: handle + class_name)
+- `StSliceRetain` — increment `_rc` on all class handles in a slice
 
-Add to `LStmt` fields:
-```
-ref_incr: LRefIncrData?    // { handle: LValue }
-ref_decr: LRefDecrData?    // { handle: LValue, class_name: string }
-slice_free: LSliceFreeData? // { slice: LValue }
-```
+Scope-exit free variants:
+- `StSlabFree` — free a class handle via slab
+- `StSliceFree` — free a slice's backing memory
 
-**Why LIR, not C backend:** The memory pass already does slab rewrite at LIR level (`memory.ly`). Ref counting is the same kind of transformation — rewrite the LIR, let the C backend be a dumb emitter. This also enables future optimization passes (elision, motion) to operate on the LIR.
+### 4.2 LType Metadata (implemented)
 
-### 4.2 C Backend Emission
+`LType` has class metadata fields populated by `resolve_class_types()`:
+- `class_decl: LClassDecl?` — link to the class declaration
+- `is_permanent: bool` — class uses `permanent` keyword, skips RC
+- `is_owned: bool` — class is child in an `owns` relation, RC managed by parent
+
+`resolve_class_types()` must be called post-lowering AND post-monomorphization.
+
+### 4.3 LProgram Flags (implemented)
+
+- `slab_mode` / `slab_mode_soa` — AoS vs SoA slab allocation
+- `detect_uaf` — sets `_rc = UINT32_MAX` on free, checks on every field access
+- `rc_free` — enables actual `slab_free` calls when rc drops to 0 (opt-in)
+- `owned_classes: Dict<Sym, bool>` — tracks which classes are relation children
+
+### 4.4 C Backend Emission (implemented)
 
 ```c
-// StRefIncr
-_lyric_slab_Widget._rc[h]++;              // SoA
-_lyric_slab_Widget.data[h]._rc++;         // AoS (block-based, pointer)
+// StRefIncr (AoS)
+p->_rc++;
 
-// StRefDecr
-if (--_lyric_slab_Widget._rc[h] == 0) {   // SoA
-    Widget_destroy(h);                      // calls slab_free internally
+// StRefIncr (SoA)
+_lyric_slab_Widget._rc[h]++;
+
+// StRefDecr (AoS, with --rc-free)
+if (--p->_rc == 0) {
+    destroy_Widget(p);   // if has destructor
+    lyric_slab_free_Widget(p);
 }
 
+// --detect-uaf: on free, _rc = UINT32_MAX; on access, check for poison
+if (p->_rc == UINT32_MAX) { fprintf(stderr, "UAF: ..."); abort(); }
+
 // StSliceFree
-free(arr.data);                            // Phase 1: unconditional free
-// Phase 2: if (--((uint32_t*)arr.data)[-1] == 0) free(backing);
+free(arr.data);
 ```
 
 ---
@@ -194,56 +320,39 @@ let q = p                       // retain q.a, retain q.b
 
 ---
 
-## 6. Implementation Phases — Ordered for Benchmark Impact
+## 6. Memory Pass Implementation
 
-### Phase 1: Scope-Exit Free for Slices (biggest benchmark win)
+### 6.1 Scope Stack
 
-The compiler currently leaks every dynamic array. Freeing them at scope exit will dramatically reduce RSS.
+The memory pass uses a scope stack. Each call to `slab_rewrite_stmts` is implicitly a scope. Per-scope tracking:
 
-**Work:**
-1. Add `StSliceFree` to LIR (`lir.ly`)
-2. In `memory.ly`: for every `StVarDecl` with a slice type, record it. At block/function exit, emit `StSliceFree` for each.
-3. In `c_backend.ly`: emit `free(var.data)` for `StSliceFree`
-4. Handle nested scopes (if/while/for/match — variables declared inside die at block exit)
-5. Handle `return` — don't free returned slices
-6. Handle reassignment — free old backing before assigning new
+- `owned_refs: Dict<Sym, RefInfo>` — locals that own references (name → type, live flag)
+- At scope exit: release all owned refs that are still live
 
-**Expected impact:** The compiler allocates millions of short-lived arrays (string processing, AST building). Freeing them should cut RSS by 50%+ and improve cache behavior → faster.
+RefInfo per variable:
+- `type`: the LType (for emitting the right StRefDecr)
+- `live`: bool — set false when moved (consumed by assign where source is dead afterward)
 
-**Test:** Self-compile under Valgrind or `leaks` to verify no use-after-free.
+### 6.2 Statement Processing
 
-### Phase 2: Scope-Exit Free for Strings
+| Statement | Action |
+|-----------|--------|
+| `StVarDecl` init from call/alloc result | Push owned ref (no retain — call returns rc=1) |
+| `StVarDecl` init from field read | Emit retain, push owned ref |
+| `StVarDecl` init from local var | Liveness check: source dead? → move (mark source not-live). Source still used? → emit retain, push owned ref |
+| `StAssign` overwrite | Release old, same logic as VarDecl for new value |
+| `StSlabSet`/`StClassSet` (field store) | Emit retain on the stored value (eager — cannot defer) |
+| `StReturn` | Skip release for returned ref; release all others |
+| `StTempDef` with RC class type | Track temp, insert StRefDecr after last use |
+| Scope exit | Release all still-live owned refs |
 
-Strings are `[u8]`. Same treatment as slices.
-
-**Work:** String literals are `const char*` (no free). Only dynamically built strings (f-strings, concat, StringBuilder output) need freeing. The memory pass must distinguish:
-- `ValLitString` → no free (static data)
-- Computed strings (from `ExFormat`, `ExCall` returning string, etc.) → free at scope exit
-
-### Phase 3: Class Reference Counting
-
-**Work:**
-1. Add `_rc` field to non-owned classes (injected in memory pass, not source)
-2. Add `StRefIncr` / `StRefDecr` to LIR
-3. Insert retain at assignment, release at scope exit/overwrite
-4. `StRefDecr` emission: decrement, if 0 → call destroy + slab_free
-5. Escape analysis for elision (§3.1-3.5)
-
-**Test:** `destroy_shared.ly` already tests cascade destruction. Add test for ref-counted class going to zero.
-
-### Phase 4: Struct Copy Hooks
-
-Retain/release for class references embedded in structs. Deferred until Phase 3 is solid.
-
-### Phase 5: `trusted` + `ref`/`unref` Primitives
-
-Parser + checker support for `trusted` keyword. Manual ref/unref inside trusted blocks. Update stdlib containers.
+Function params never enter the owned_refs map — they're invisible to RC.
 
 ---
 
-## 7. Escape Analysis Algorithm (for elision)
+## 7. Escape Analysis Algorithm
 
-Per-function, per-variable:
+Per-function, per-variable (fixed-point iteration for inter-procedural):
 
 ```
 for each local variable v of class or slice type:
@@ -251,22 +360,54 @@ for each local variable v of class or slice type:
     for each use of v:
         if use is:
             field_store(other.field = v)  → escapes = true
-            global_store(GLOBAL = v)      → escapes = true  
+            global_store(GLOBAL = v)      → escapes = true
             spawn_capture                 → escapes = true
             return v                      → escapes = true (but don't free — transfer)
-            func_arg (non-mut)            → ok (callee can't store it)
-            func_arg (mut)                → check if callee stores it (conservative: escapes = true)
+            struct/class literal field    → escapes = true
+            func_arg                      → ok (zero-cost convention)
             method_call on v              → ok
             local read/write              → ok
     if !escapes:
-        mark v as "scope-managed" — free at scope exit, no retain/release
+        mark v as "scope-managed" — free at scope exit, no retain/release needed
 ```
-
-For Phase 1 (slices), the conservative approach is fine: just free everything at scope exit that isn't returned. The only danger is double-free from aliasing, which copy-on-assign semantics prevents.
 
 ---
 
-## 8. Interaction with Existing Passes
+## 8. Implementation Phases — Ordered for Benchmark Impact
+
+### Phase 1: Scope-Exit Free for Slices ✅ DONE
+Escape analysis, `StSliceFree` at scope exit. 138 slice frees inserted.
+
+### Phase 2: Scope-Exit Free for Strings ✅ DONE
+`TyString` locals from f-strings/concat only. `LYRIC_STR` cap=0 marks static strings. 30 string frees.
+
+### Phase 3: Class Reference Counting 🔧 IN PROGRESS
+
+**Done:**
+- `_rc` field on non-permanent, non-owned classes (AoS + SoA)
+- `StRefIncr` / `StRefDecr` LIR nodes and C backend emission
+- 34 compiler classes marked `permanent`
+- `owned_classes` tracking from relation declarations
+- `--detect-uaf` poison-on-free + access checks
+- `--rc-free` flag for opt-in live frees
+- `resolve_class_types()` for LType metadata
+
+**Remaining:**
+- Implement owned-vs-borrowed model (replace escape workaround)
+- Move semantics (liveness-based elision)
+- Temp last-use tracking and release
+- Fix: StSlabSet statements generated by ExClassAlloc expansion need RC retains
+- Test: `make test` (81/81), `make self-test` (fixed point), `--rc-free --detect-uaf` self-compile
+
+### Phase 4: Struct Copy Hooks
+Retain/release for class references embedded in structs. Deferred until Phase 3 is solid.
+
+### Phase 5: `trusted` + `ref`/`unref` Primitives
+Parser + checker support for `trusted` keyword. Manual ref/unref inside trusted blocks. Update stdlib containers. Relation-generated code marked `trusted` with explicit ref on insert, no ref on back-pointers.
+
+---
+
+## 9. Interaction with Existing Passes
 
 **Pipeline:**
 ```
@@ -280,31 +421,28 @@ The memory pass (`memory.ly`) already runs after monomorphization. Ref counting 
 
 ---
 
-## 9. What We're NOT Doing (Yet)
+## 10. What We're NOT Doing (Yet)
 
-- **Cycle detection** — deferred. The compiler's class graph is acyclic. Warn on cycles later.
-- **`destroys` annotation** — deferred to Sprint 3 of the memory management plan.
-- **`mut resize` / provenance tracking** — deferred to Sprint 4.
+- **Cycle detection** — deferred. The compiler's class graph is acyclic. Back-pointer convention (non-owning) prevents cycles.
+- **`destroys` annotation** — deferred.
+- **`mut resize` / provenance tracking** — deferred.
 - **Slice ref counting (sharing)** — Phase 1 uses copy + free. Sharing is Phase 2.
 - **Weak references** — deferred indefinitely.
 - **Per-slab mutexes** — deferred until concurrency is hardened.
+- **User-callable destructors on RC classes** — forbidden by design. Checker must reject.
 
 ---
 
-## 10. Benchmark Strategy
+## 11. Benchmark Strategy
 
-**Target:** Self-compile (15K Lyric → 101K C) as the primary benchmark.
+**Target:** Self-compile (15K Lyric → 105K C) as the primary benchmark.
 
 **Current:** SoA 0.20s / 295 MB, AoS 0.22s / 344 MB.
 
-**Expected after Phase 1+2 (slice/string free):**
-- RSS should drop dramatically (maybe 100-150 MB) — freed memory gets reused by malloc
-- Time might improve from better cache locality (less memory pressure)
-- Or might slow slightly from free() calls — measure and optimize
-
 **Expected after Phase 3 (class ref counting with elision):**
-- Most class refs in the compiler are stack-local (AST nodes, LIR nodes created and consumed in same function)
-- With good elision, <5% of refs need actual retain/release
+- Most class refs in the compiler are permanent (skip RC) or stack-local (scope-exit free, no retain/release)
+- Only StringBuilder and Dict variants (~256 sites) currently RC'd
+- With move semantics and last-use optimization, expect minimal actual inc/dec operations
 - The slab free list gets populated → alloc speedup from reuse
 
 **Key metric:** Run `time lyric compile ...` and `vmmap` / `leaks` before and after each phase.

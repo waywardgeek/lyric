@@ -18,14 +18,31 @@ lyric c_backend {
   }
 
   doc "Architecture" {
-    "Port of pkg/lir/c_backend.go (~4057 lines Go → ~3800 lines Lyric)"
     "Entry point: emit_c(prog: LProgram?) -> string"
     "CGen class holds all generator state"
     "Expression emission returns string, statement emission writes directly"
     "Type mapping: c_type() handles all LType→C type conversions"
     "Composite types (slice/opt/result/chan) registered on first use"
-    "Interface vtable dispatch for named LTyAny types"
+    "Interface vtable dispatch for named LTyAny names"
   }
 
-  source: ["pkg/lir/c_backend.go"]
+  doc "Slab Allocator Emission" {
+    "AoS mode: struct ClassName with lyric_next free-list pointer, block-based malloc"
+    "SoA mode: parallel arrays per field, uint32_t handles, slot 0 wasted (used starts at 1)"
+    "Per-class: _lyric_slab_ClassName struct + alloc/free functions emitted"
+    "Block size: LYRIC_SLAB_BLOCK (256)"
+  }
+
+  doc "Reference Counting Emission" {
+    "RC classes get _rc field in AoS struct / _rc parallel array in SoA"
+    "Alloc functions set _rc = 1 for RC classes"
+    "StRefIncr: emits p->_rc++ (AoS) or _lyric_slab_Name._rc[h]++ (SoA)"
+    "StRefDecr: emits conditional decrement + slab_free when rc hits 0 (gated by --rc-free flag)"
+    "is_rc_class(name): checks class is not permanent and not owned — name-based lookup"
+    "has_destroy_func(name): checks if class has a destroy_ClassName function"
+    "--detect-uaf: sets _rc = UINT32_MAX on free; ExClassGet/ValClassFieldRef emit poison checks"
+    "--rc-free: enables actual slab_free on rc=0; without it, StRefDecr is a no-op (retains only)"
+  }
+
+  source: ["c_backend.ly"]
 }
