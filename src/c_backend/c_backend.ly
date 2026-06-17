@@ -663,6 +663,20 @@ func CGen.resolve_class_name_from_type(self, t: LType?, caller: string) -> strin
   return "unknown"
 }
 
+// Check if a class is RC-eligible (not permanent, not owned)
+func CGen.is_rc_class(self, class_name: string) -> bool {
+  let mut i = 0
+  while i < len(self.prog!.classes) {
+    if self.prog!.classes[i].name == class_name {
+      if self.prog!.classes[i].is_permanent { return false }
+      if self.prog!.classes[i].is_owned { return false }
+      return true
+    }
+    i = i + 1
+  }
+  return false
+}
+
 // Check if a destroy function exists for a class
 func CGen.has_destroy_func(self, class_name: string) -> bool {
   let target = class_name + "_destroy"
@@ -828,7 +842,24 @@ func CGen.emit_value(self, v: LValue?) -> string {
           }
           cname = inner!.name
         }
+        if self.prog!.detect_uaf && cname != "" && self.is_rc_class(cname) {
+          self.line(f"if ({handle} && _lyric_slab_{cname}._rc[{handle}] == UINT32_MAX) {{ fprintf(stderr, \"UAF: access to freed {cname} handle %u field {v!.name}\\n\", {handle}); abort(); }}")
+        }
         return f"_lyric_slab_{cname}.{v!.name}[{handle}]"
+      }
+      if self.prog!.detect_uaf {
+        let recv_type = v!.collection!.typ
+        let mut cname = ""
+        if !isnull(recv_type) {
+          let mut inner = recv_type
+          if inner!.kind is TyOptional && !isnull(inner!.elem) {
+            inner = inner!.elem
+          }
+          cname = inner!.name
+        }
+        if cname != "" && self.is_rc_class(cname) {
+          self.line(f"if ({handle} && {handle}->_rc == UINT32_MAX) {{ fprintf(stderr, \"UAF: access to freed {cname} %p field {v!.name}\\n\", (void*){handle}); abort(); }}")
+        }
       }
       return f"{handle}->{v!.name}"
     }
@@ -1809,11 +1840,18 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExClassGet => {
       let d = e!.class_get!
+      let handle_str = self.emit_value(d.handle)
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "ExClassGet")
-        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{self.emit_value(d.handle)}]"
+        if self.prog!.detect_uaf && self.is_rc_class(d.class_name) {
+          self.line(f"if ({handle_str} && _lyric_slab_{cname}._rc[{handle_str}] == UINT32_MAX) {{ fprintf(stderr, \"UAF: access to freed {cname} handle %u field {d.field}\\n\", {handle_str}); abort(); }}")
+        }
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{handle_str}]"
       }
-      return f"{self.emit_value(d.handle)}->{d.field}"
+      if self.prog!.detect_uaf && self.is_rc_class(d.class_name) {
+        self.line(f"if ({handle_str} && {handle_str}->_rc == UINT32_MAX) {{ fprintf(stderr, \"UAF: access to freed {d.class_name} %p field {d.field}\\n\", (void*){handle_str}); abort(); }}")
+      }
+      return f"{handle_str}->{d.field}"
     }
     ExIndexGet => {
       let d = e!.index_get!
@@ -4244,8 +4282,7 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.indent = self.indent + 1
     self.line("if (!p) return;")
     if self.prog!.detect_uaf && !classes[i].is_permanent {
-      self.line(f"if (p->_rc != 0) {{ fprintf(stderr, \"UAF: freeing {name} with rc=%u\\n\", p->_rc); abort(); }}")
-      self.line(f"memset(p, 0xDE, sizeof({name}));")
+      self.line("p->_rc = UINT32_MAX;")
     }
     self.line(f"p->lyric_next = _lyric_slab_{name}.free;")
     self.line(f"_lyric_slab_{name}.free = p;")
@@ -4354,7 +4391,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
     self.indent = self.indent + 1
     self.line("if (!h) return;")
     if self.prog!.detect_uaf && !classes[i].is_permanent {
-      self.line(f"if (_lyric_slab_{name}._rc[h] != 0) {{ fprintf(stderr, \"UAF: freeing {name} handle %u with rc=%u\\n\", h, _lyric_slab_{name}._rc[h]); abort(); }}")
+      self.line(f"_lyric_slab_{name}._rc[h] = UINT32_MAX;")
     }
     self.line(f"_lyric_slab_{name}.lyric_next[h] = _lyric_slab_{name}.free_head;")
     self.line(f"_lyric_slab_{name}.free_head = h;")
