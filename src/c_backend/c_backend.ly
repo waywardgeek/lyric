@@ -4,7 +4,7 @@
 
 // --- C code generator state ---
 
-class CGen {
+permanent class CGen {
   prog: LProgram?
   buf: StringBuilder?
   indent: i32

@@ -36,7 +36,7 @@ lyric lexer {
 
   // ---- Token ----
 
-  class Token {
+  permanent class Token {
     kind: TokenKind
     text: string
     span: Span
@@ -112,7 +112,7 @@ lyric lexer {
     bracket_depth: i32
   }
 
-  class Lexer {
+  permanent class Lexer {
     src: string
     filename: Sym?
     pos: i32

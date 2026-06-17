@@ -10,7 +10,7 @@ lyric parser {
 
   // ---- Parser ----
 
-  class Parser {
+  permanent class Parser {
     lex: Lexer?
     no_struct_lit: bool
     pushed: Token?

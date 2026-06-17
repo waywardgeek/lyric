@@ -49,14 +49,14 @@ lyric checker {
     type_val: Type?
   }
 
-  class Type {
+  permanent class Type {
     kind: TypeKind
     bits: i32  // for Int/Uint/Float: 8,16,32,64; -1 for platform-width int/uint
     type_args: [Type]  // for generic class/struct instances (e.g., Stack<i32> → [i32])
   }
 
   // ---- TypeInfo: registry entry for named types ----
-  class TypeInfo {
+  permanent class TypeInfo {
     type_val: Type
     fields: Dict<Sym, Type>        // field name -> type
     field_order: [string]     // field names in declaration order
@@ -67,7 +67,7 @@ lyric checker {
     implements_list: [string]   // interface names this class implements
   }
 
-  class VariantInfo {
+  permanent class VariantInfo {
     enum_name: string
     fields: [VariantField]
   }
@@ -81,7 +81,7 @@ lyric checker {
   // Scope
   // =====================================================================
 
-  class Scope {
+  permanent class Scope {
     parent: Scope?
     vars: Dict<Sym, Type>
   }
@@ -109,7 +109,7 @@ lyric checker {
   // Registry
   // =====================================================================
 
-  class Registry {
+  permanent class Registry {
     types: Dict<Sym, TypeInfo>
   }
 
@@ -144,7 +144,7 @@ lyric checker {
   // Checker state
   // =====================================================================
 
-  class Checker {
+  permanent class Checker {
     registry: Registry
     scope: Scope
     errors: [string]

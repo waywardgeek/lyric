@@ -8,7 +8,7 @@
 // Value is the mangled name. Separate dicts for func/class/struct instances.
 // Type args stored in a parallel dict keyed the same way.
 
-class MonoPass {
+permanent class MonoPass {
   prog: LProgram?
 
   // Instance tracking: "name|typekey" → mangled name

@@ -409,7 +409,7 @@ lyric std {
 
   // SymTable: global intern table for Sym instances.
   // Uses HashedList for O(1) lookup by hash.
-  pub class SymTable { }
+  pub permanent class SymTable { }
   relation HashedList SymTable:st owns [Sym:st]
 
   // Global symbol table instance.

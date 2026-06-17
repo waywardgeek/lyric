@@ -280,7 +280,7 @@ lyric ast {
     IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block)
   }
 
-  class Expr {
+  permanent class Expr {
     kind: ExprKind
     span: Span
     resolved_type: TypeExpr?  // Set by checker — used by lowerer to determine expression types
@@ -297,12 +297,12 @@ lyric ast {
     Tuple(elems: [Pattern])
   }
 
-  class Pattern {
+  permanent class Pattern {
     kind: PatternKind
     span: Span
   }
 
-  class MatchArm {
+  permanent class MatchArm {
     pattern: Pattern?
     patterns: [Pattern]  // additional alternative patterns (pat1 | pat2 | pat3)
     guard: Expr?
@@ -338,13 +338,13 @@ lyric ast {
     span: Span
   }
 
-  class ElseIf {
+  permanent class ElseIf {
     condition: Expr?
     body: Block?
     span: Span
   }
 
-  class SelectCase {
+  permanent class SelectCase {
     is_default: bool
     bind_var: Sym?
     expr: Expr?
@@ -352,7 +352,7 @@ lyric ast {
     span: Span
   }
 
-  class Block {
+  permanent class Block {
     span: Span
   }
   relation ArrayList Block:bs owns [Stmt:bs]

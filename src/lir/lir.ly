@@ -49,7 +49,7 @@ lyric lir {
     fields: [LField]
   }
 
-  class LType {
+  permanent class LType {
     kind: LTypeKind
     name: string
     elem: LType?
@@ -81,7 +81,7 @@ lyric lir {
     ValClassFieldRef
   }
 
-  class LValue {
+  permanent class LValue {
     kind: LValueKind
     name: string
     temp_id: i32
@@ -132,7 +132,7 @@ lyric lir {
     ExSlabAlloc
   }
 
-  class LExpr {
+  permanent class LExpr {
     kind: LExprKind
     typ: LType?
     // Data is one of the L*Data classes below, stored by kind.
@@ -233,7 +233,7 @@ lyric lir {
     high: LValue?
   }
 
-  class LCallData {
+  permanent class LCallData {
     func_name: string
     args: [LValue?]
     mut_args: [bool]
@@ -241,7 +241,7 @@ lyric lir {
     is_exported: bool
   }
 
-  class LMethodCallData {
+  permanent class LMethodCallData {
     receiver: LValue?
     method: string
     args: [LValue?]
@@ -267,7 +267,7 @@ lyric lir {
     fields: [LFieldInit]
   }
 
-  class LClassAllocData {
+  permanent class LClassAllocData {
     class_name: string
     fields: [LFieldInit]
     type_args: [LType?]
@@ -424,7 +424,7 @@ lyric lir {
     StRefDecr
   }
 
-  class LStmt {
+  permanent class LStmt {
     kind: LStmtKind
     // Data variant fields — one is set based on kind.
     temp_def: LTempDef?
@@ -620,14 +620,14 @@ lyric lir {
     path: string
   }
 
-  class LStructDecl {
+  permanent class LStructDecl {
     name: string
     fields: [LField]
     type_params: [LTypeParam]
     is_exported: bool
   }
 
-  class LClassDecl {
+  permanent class LClassDecl {
     name: string
     fields: [LField]
     type_params: [LTypeParam]
@@ -636,7 +636,7 @@ lyric lir {
     implements: [string]
   }
 
-  class LEnumDecl {
+  permanent class LEnumDecl {
     name: string
     variants: [LVariant]
     is_exported: bool
@@ -649,7 +649,7 @@ lyric lir {
     return_type: LType?
   }
 
-  class LInterfaceDecl {
+  permanent class LInterfaceDecl {
     name: string
     type_params: [LTypeParam]
     methods: [LInterfaceMethod]
@@ -662,7 +662,7 @@ lyric lir {
     type_args: [string]
   }
 
-  class LFuncDecl {
+  permanent class LFuncDecl {
     name: string
     type_params: [LTypeParam]
     params: [LParam]
@@ -675,7 +675,7 @@ lyric lir {
     class_rename_map: Dict<Sym, string>?
   }
 
-  class LTypeDef {
+  permanent class LTypeDef {
     name: string
     typ: LType?
     is_exported: bool

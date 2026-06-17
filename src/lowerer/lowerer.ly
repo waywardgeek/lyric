@@ -10,7 +10,7 @@ lyric lowerer {
   // Key invariant: every expression is flattened into temp chains.
   // ==========================================================================
 
-  class Lowerer {
+  permanent class Lowerer {
     temp_id: i32
     structs: Dict<Sym, StructDecl>?
     classes: Dict<Sym, ClassDecl>?
