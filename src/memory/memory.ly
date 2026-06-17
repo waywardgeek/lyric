@@ -663,6 +663,9 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
   // Track class-handle locals for ref counting (non-owned classes only)
   let mut class_locals: [string] = []
   let mut class_types: [LType?] = []
+  // Track struct-typed locals whose fields transitively contain RC class handles
+  let mut struct_rc_locals: [string] = []
+  let mut struct_rc_types: [LType?] = []
   // Track temp IDs that come from ExMakeSlice (fresh allocations)
   let mut fresh_temps: [i32] = []
   // Track temp IDs from ExSlabAlloc (fresh class allocations — rc=1 from alloc)
@@ -784,6 +787,66 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
               continue
             }
           }
+          // Track struct-typed locals with RC class handle fields
+          if typ_kind is TyStruct && type_has_rc_fields(prog, s.var_decl!.typ) {
+            let escapes = var_escapes_via_call(s.var_decl!.name, all_stmts, escape_map)
+            if !escapes {
+              struct_rc_locals.push(s.var_decl!.name)
+              struct_rc_types.push(s.var_decl!.typ)
+            }
+            // If init is a copy from another struct var, retain all embedded refs
+            // unless it's a move (source is dead after this point).
+            if !isnull(s.var_decl!.init) {
+              let init_val = s.var_decl!.init!
+              // Check for move semantics
+              let mut is_move = false
+              if init_val.kind is ValVar {
+                let mut is_param = false
+                let mut pi = 0
+                while pi < len(params) {
+                  if params[pi].name == init_val.name {
+                    is_param = true
+                  }
+                  pi = pi + 1
+                }
+                let is_synthetic = len(init_val.name) >= 2 && init_val.name[0] == '_' && init_val.name[1] == '_'
+                if !is_param && !is_synthetic {
+                  let use_count = count_var_uses(init_val.name, all_stmts)
+                  if use_count <= 1 {
+                    is_move = true
+                  }
+                }
+              }
+              // Emit the VarDecl first
+              let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog, params)
+              let mut j = 0
+              while j < len(expanded) {
+                result.push(expanded[j])
+                j = j + 1
+              }
+              if is_move {
+                // Move: remove source from struct_rc_locals
+                let source_name = init_val.name
+                let mut new_locals: [string] = []
+                let mut new_types: [LType?] = []
+                let mut mi = 0
+                while mi < len(struct_rc_locals) {
+                  if struct_rc_locals[mi] != source_name {
+                    new_locals.push(struct_rc_locals[mi])
+                    new_types.push(struct_rc_types[mi])
+                  }
+                  mi = mi + 1
+                }
+                struct_rc_locals = new_locals
+                struct_rc_types = new_types
+              } else {
+                // Copy: retain all embedded class refs in the new struct
+                emit_struct_field_rc(s.var_decl!.name, s.var_decl!.typ, prog, true, mut result)
+              }
+              i = i + 1
+              continue
+            }
+          }
         }
       }
 
@@ -886,6 +949,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
         }
         emit_slice_frees(slice_locals, slice_types, ret_names, mut result)
         emit_class_releases(class_locals, class_types, ret_names, mut result)
+        emit_struct_releases(struct_rc_locals, struct_rc_types, ret_names, prog, mut result)
       }
 
       // Process each statement; may expand to multiple
@@ -902,6 +966,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
   let no_skip: [string] = []
   emit_slice_frees(slice_locals, slice_types, no_skip, mut result)
   emit_class_releases(class_locals, class_types, no_skip, mut result)
+  emit_struct_releases(struct_rc_locals, struct_rc_types, no_skip, prog, mut result)
 
   // Post-pass: insert StRefDecr for RC-typed temps after their last use.
   // This catches intermediate temps from function calls that aren't assigned to locals.
@@ -1572,6 +1637,169 @@ func is_rc_class_type(prog: LProgram, typ: LType?) -> bool {
   // Final fallback: dict lookup
   if is_permanent_class(prog, typ!.name) { return false }
   return !is_owned_class(prog, typ!.name)
+}
+
+// ==========================================================================
+// Struct Copy Hooks — Phase 4 RC
+// ==========================================================================
+// When a struct/tuple contains class handle fields (transitively), copying
+// the struct must retain all embedded class refs, and scope exit must release them.
+
+// Global temp counter for struct copy hook temps (high range to avoid conflicts)
+let mut _rc_temp_counter: i32 = 900000
+
+// Find a struct declaration by name in the program.
+func find_struct_decl(prog: LProgram, name: string) -> LStructDecl? {
+  let mut i = 0
+  while i < len(prog.structs) {
+    if prog.structs[i].name == name {
+      return prog.structs[i]
+    }
+    i = i + 1
+  }
+  return null
+}
+
+// Check if a type transitively contains RC class handle fields.
+// Returns true for:
+//   - TyClassHandle that is RC (non-permanent, non-owned)
+//   - TyStruct whose fields transitively contain RC class handles
+//   - TyTuple whose elements transitively contain RC class handles
+//   - TyOptional wrapping any of the above
+func type_has_rc_fields(prog: LProgram, typ: LType?) -> bool {
+  if isnull(typ) { return false }
+  // Direct class handle
+  if typ!.kind is TyClassHandle {
+    return is_rc_class_type(prog, typ)
+  }
+  // Struct: check each field
+  if typ!.kind is TyStruct {
+    let sd = find_struct_decl(prog, typ!.name)
+    if isnull(sd) { return false }
+    let mut i = 0
+    while i < len(sd!.fields) {
+      if type_has_rc_fields(prog, sd!.fields[i].typ) {
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+  // Tuple: check each element
+  if typ!.kind is TyTuple {
+    let mut i = 0
+    while i < len(typ!.params) {
+      if type_has_rc_fields(prog, typ!.params[i]) {
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+  // Optional wrapping a type with RC fields
+  if typ!.kind is TyOptional {
+    return type_has_rc_fields(prog, typ!.elem)
+  }
+  return false
+}
+
+// Emit retain or release for all RC class handle fields in a struct value.
+// `is_retain` = true emits StRefIncr, false emits StRefDecr.
+// `var_name` is the name of the struct-typed local variable.
+// Generates TempDefs to read struct fields, then RC ops on those temps.
+func emit_struct_field_rc(var_name: string, typ: LType?, prog: LProgram, is_retain: bool, mut out: [LStmt?]) {
+  if isnull(typ) { return }
+  if typ!.kind is TyStruct {
+    let sd = find_struct_decl(prog, typ!.name)
+    if isnull(sd) { return }
+    let mut i = 0
+    while i < len(sd!.fields) {
+      let ft = sd!.fields[i].typ
+      if isnull(ft) {
+        i = i + 1
+        continue
+      }
+      if ft!.kind is TyClassHandle && is_rc_class_type(prog, ft) {
+        // Direct class handle field: emit temp = var.field, then RC op on temp
+        let temp_id = _rc_temp_counter
+        _rc_temp_counter = _rc_temp_counter + 1
+        let field_val = LValue {
+          kind: ValVar,
+          name: var_name,
+          temp_id: 0,
+          typ: typ,
+        }
+        // TempDef: _tN = var.field
+        out.push(LStmt {
+          kind: StTempDef,
+          temp_def: LTempDef {
+            id: temp_id,
+            expr: LExpr {
+              kind: ExStructField,
+              typ: ft,
+              struct_field: LStructFieldData {
+                receiver: field_val,
+                field: sd!.fields[i].name,
+              },
+            },
+          },
+        })
+        // RC op on the temp
+        let handle = LValue {
+          kind: ValTemp,
+          name: "",
+          temp_id: temp_id,
+          typ: ft,
+        }
+        if is_retain {
+          emit_ref_incr(handle, ft!.name, mut out)
+        } else {
+          emit_ref_decr(handle, ft!.name, mut out)
+        }
+      } else if type_has_rc_fields(prog, ft) {
+        // Nested struct/tuple: recurse with qualified name
+        // For nested structs, we need a temp to read the field first
+        let temp_id = _rc_temp_counter
+        _rc_temp_counter = _rc_temp_counter + 1
+        let field_val = LValue {
+          kind: ValVar,
+          name: var_name,
+          temp_id: 0,
+          typ: typ,
+        }
+        // TempDef: _tN = var.field (reads the nested struct)
+        out.push(LStmt {
+          kind: StTempDef,
+          temp_def: LTempDef {
+            id: temp_id,
+            expr: LExpr {
+              kind: ExStructField,
+              typ: ft,
+              struct_field: LStructFieldData {
+                receiver: field_val,
+                field: sd!.fields[i].name,
+              },
+            },
+          },
+        })
+        // Recurse using the temp name for the nested struct
+        let temp_name = f"_t{temp_id}"
+        emit_struct_field_rc(temp_name, ft, prog, is_retain, mut out)
+      }
+      i = i + 1
+    }
+  }
+}
+
+// Emit StRefDecr for all class fields in tracked struct locals, skipping skip_names.
+func emit_struct_releases(names: [string], types: [LType?], skip_names: [string], prog: LProgram, mut out: [LStmt?]) {
+  let mut i = 0
+  while i < len(names) {
+    if !should_skip(names[i], skip_names) {
+      emit_struct_field_rc(names[i], types[i], prog, false, mut out)
+    }
+    i = i + 1
+  }
 }
 
 // Emit StRefIncr for a class handle value.
