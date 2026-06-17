@@ -1,6 +1,35 @@
 //ldd:source optimizer.ly
 //ldd:why "LIR-to-LIR optimization: structural transforms, dead code elimination, unused temp/var removal."
 
+// ## Purpose
+//
+// Post-lowering LIR→LIR optimization pass. Fixes semantic issues that
+// are easier to handle as transforms on the flat LIR representation
+// than during initial lowering.
+//
+// Passes (in order):
+// 1. Side-effect temp elimination: fuse void-context builtins into bare statements
+// 2. Multi-return destructuring: split single-temp multi-return into tuple VarDecls
+// 3. Extract pair destructuring: rewrite extractValue/extractError patterns
+// 4. Nil zero value fixing: replace nil with proper zero values for value types
+// 5. For-range index coercion (stub)
+// 6. Optional return wrapping (stub)
+// 7. Append reassign rewriting (stub)
+// Then: recursive nested block optimization
+// Then: collect used temps/vars, eliminate unused, blank unused multi-assign names
+
+// ## Invariants
+//
+// // PROCEDURAL — structural transforms run BEFORE elimination
+// // Elimination runs on transformed stmts, then re-collects after
+// // elimination to catch names freed by VarDecl removal.
+// //
+// // collectUsedTemps and collectUsedVarNames must walk ALL stmt/expr/value
+// // variants exhaustively — missing a variant silently drops live references.
+// //
+// // parseTempID strips _val/_err suffixes to map multi-assign names
+// // back to their source temp IDs.
+
 func blank_unused_multi_assign_names(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
 func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>)
 func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>)

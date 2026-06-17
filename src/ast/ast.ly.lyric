@@ -1,6 +1,78 @@
 //ldd:source ast.ly, modules.ly
 //ldd:why "Defines all AST node types for the Lyric language. Leaf package — no dependencies on other bootstrap packages. Shared by parser, checker, desugar, and lowerer."
 
+// ## Architecture
+//
+// The AST is a strict hierarchy rooted in File. A File contains one or more
+// LyricBlock nodes. Data flows in from the parser; once constructed, the AST
+// is the source of truth for the entire toolchain.
+//
+// Two file formats share the same AST:
+// - .lyric: declaration-only (FuncDecl.body is null)
+// - .ly: full implementation (FuncDecl.body is Block)
+
+// ## Invariants — Nullable Variant Fields
+//
+// Lyric uses nullable fields per variant on class types instead of Go's
+// any-typed Data fields + Kind enum. Expr has one nullable field per
+// ExprKind (call: CallData?, bin_op: BinOpData?, etc.). Only the field
+// matching `kind` is non-null.
+//
+// This is required because Lyric `any` maps to `void*` in C — no type
+// recovery without casts. The nullable field pattern is verbose but
+// fully type-safe in C.
+//
+// Applies to: Expr, Stmt, TypeExpr, Pattern.
+//
+// Exception: Expr.resolved_type is typed as TypeExpr? (not any). TypeExpr
+// is defined earlier in the same file, so proper typing is possible.
+//
+// CRITICAL: When accessing variant data, always check null first. The
+// pattern is: `if expr.call != null { let c = expr.call! ... }`.
+// Do NOT assume a field is non-null based on kind without checking.
+
+// ## Invariants — No If-Expressions
+//
+// Lyric does not support if-as-expression. All conditional assignment
+// must use: let mut x = default; if cond { x = value }
+// This affects match-as-expression too — use mutable variable + match statement.
+
+// ## Invariants — Positions and Spans
+//
+// Every major AST node carries a Span (start Pos, end Pos). Pos has file,
+// line, column. Required for error messages with precise source locations.
+
+// ## Invariants — Expression and Statement Kinds
+//
+// ExprKind enum: Ident, IntLit, FloatLit, StringLit, StringInterp, BoolLit,
+// Nil, Unary, Binary, Call, MethodCall, FieldAccess, Index, ListLit,
+// TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice, Is.
+//
+// StmtKind enum: VarDecl, Assign, Return, Expr, If, For, While, Match,
+// Block, Cascade, Break, Continue, Spawn, Select, Lock, IfLet, LetElse.
+//
+// PatternKind enum: Ident, Literal, Variant, Wildcard, Tuple.
+//
+// TypeExprKind enum: Named, Optional, Union, Sequence, Map, Tuple, Func,
+// Channel, Lock, Unit.
+
+// ## Invariants — Relations
+//
+// RelationDecl models ownership (Owns) and reference (Refs) relationships.
+// Supports cardinality (IsMany), labeled sides, and implementation hints.
+// Relations generate fields and impl blocks during desugaring.
+
+// ## Invariants — Desugaring
+//
+// Five desugar passes run BEFORE the checker, in strict order:
+// 1. InterfaceEmbeds — flatten embedded interfaces
+// 2. InterfaceFields — field decls → getter/setter methods
+// 3. Relations — inject ownership/reference fields + impl blocks
+// 4. Destructors — copy interface destructor bodies to classes
+// 5. DefaultImpls — extract interface methods to top-level functions
+//
+// Each pass creates AST consumed by later passes. Order is critical.
+
 // BinaryOp = enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
 
 // ExprKind = enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }

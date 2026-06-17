@@ -1,6 +1,91 @@
 //ldd:source lir.ly
 //ldd:why "Low-level Intermediate Representation types. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST. Structured control flow (not basic blocks), flat expressions (SSA-like temps)."
 
+// ## Architecture
+//
+// LIR sits between AST and C backend:
+// AST + Checker annotations → Lowerer → LProgram → Optimizer → Monomorphizer → Memory Pass → C Backend
+//
+// Key properties:
+// - All expressions flattened to SSA-like temps (%0, %1, ...)
+// - Structured control flow preserved (StIf, StWhile, StFor, StSwitch)
+// - Enums → tagged unions with integer tags
+// - Classes → heap handles (LTyClassHandle)
+// - Try (?) → extract+check+early-return pattern
+// - Memory pass rewrites ExClassAlloc → ExSlabAlloc, inserts RC instrumentation
+
+// ## Invariants — Nullable Variant Fields
+//
+// Like AST Expr/Stmt, LIR uses nullable fields per variant:
+// LExpr has bin_op: LBinOpData?, call: LCallData?, etc.
+// LStmt has temp_def: LTempDef?, assign: LAssignData?, etc.
+// Same rationale: void* has no type recovery in C.
+
+// ## Invariants — Type System
+//
+// LTypeKind enum covers: LTyInt, LTyUint, LTyFloat, LTyBool, LTyString,
+// LTyUnit, LTySlice, LTyMap, LTyTuple, LTyOptional, LTyChannel,
+// LTyStruct, LTyClassHandle, LTyTaggedUnion, LTyFunc, LTyTypeVar,
+// LTyAny, LTyError, LTyErrorResult, LTyMutex, LTyUnion.
+//
+// LTyAny is the fallback for unresolved types — maps to void* in C.
+// LTyClassHandle means "pointer to heap-allocated class" — already a pointer.
+// LTyErrorResult wraps (T, error) tuples with value/error fields.
+// LTyTaggedUnion represents enum types with integer tag + variant data.
+//
+// LType has class metadata fields populated by resolve_class_types():
+// - class_decl: LClassDecl? — link to the class declaration
+// - is_permanent: bool — class uses permanent keyword, skips RC
+// - is_owned: bool — class is child in an owns relation, RC managed by parent
+
+// ## Invariants — Expression Flattening
+//
+// Every sub-expression is assigned to a unique temp: %0 = b * c; %1 = a + %0.
+// Backends NEVER see nested expressions — all operands are LValue
+// (LValTemp, LValVar, or a literal). The temp counter is per-function.
+
+// ## Invariants — While Loop Conditions
+//
+// While-loop conditions use CondBlock + CondVar: statements in CondBlock
+// compute the condition value into CondVar. The CondBlock is re-evaluated
+// each iteration without code duplication.
+
+// ## Memory Management
+//
+// permanent keyword: contextual modifier on class declarations. Permanent classes
+// skip all RC instrumentation — no _rc field, no alloc init, no inc/dec. Used for
+// compiler-internal classes (AST nodes, LIR nodes, CGen, etc.) that live for the
+// entire compilation and are freed by slab destruction, not individual RC.
+// 34 compiler classes are permanent; stdlib types (Dict, StringBuilder) are NOT.
+//
+// Owned classes: child classes in owns relations. Their lifetime is managed by the
+// parent's destructor, not by RC. is_owned set on LClassDecl during resolve_class_types().
+//
+// RC-eligible classes: non-permanent AND non-owned. Currently StringBuilder and Dict
+// variants. Get _rc field in AoS struct / _rc parallel array in SoA.
+//
+// LStmtKind RC variants:
+// - StRefIncr: increment _rc on a class handle (LRefIncrData: handle + class_name)
+// - StRefDecr: decrement _rc, free if 0 (LRefDecrData: handle + class_name)
+// - StSliceRetain: increment _rc on all class handles in a slice
+//
+// LStmtKind scope-exit free variants:
+// - StSlabFree: free a class handle via slab
+// - StSliceFree: free a slice's backing memory
+//
+// LProgram flags:
+// - slab_mode / slab_mode_soa: AoS vs SoA slab allocation
+// - detect_uaf: sets _rc = UINT32_MAX on free, checks on every field access
+// - rc_free: enables actual slab_free calls when rc drops to 0 (opt-in)
+// - owned_classes: Dict<Sym, bool> tracking which classes are relation children
+
+// ## resolve_class_types()
+//
+// Called post-lowering AND post-monomorphization. Walks all LType nodes in the
+// program (struct fields, class fields, function params, return types, all
+// expressions) and populates class_decl, is_permanent, is_owned metadata.
+// Essential for the memory pass to determine which types need RC.
+
 // LBinOpKind = enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
 
 // LExprKind = enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
