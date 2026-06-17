@@ -1470,6 +1470,16 @@ func is_permanent_class(prog: LProgram, class_name: string) -> bool {
 func is_rc_class_type(prog: LProgram, typ: LType?) -> bool {
   if isnull(typ) { return false }
   if !(typ!.kind is TyClassHandle) { return false }
+  // Fast path: resolved class_decl reference
+  if !isnull(typ!.class_decl) {
+    if typ!.class_decl!.is_permanent { return false }
+    if typ!.class_decl!.is_owned { return false }
+    return true
+  }
+  // Fallback: direct flag check (set by resolve_class_types)
+  if typ!.is_permanent { return false }
+  if typ!.is_owned { return false }
+  // Final fallback: dict lookup
   if is_permanent_class(prog, typ!.name) { return false }
   return !is_owned_class(prog, typ!.name)
 }

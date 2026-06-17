@@ -647,6 +647,7 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
     eprintln("error: lowering failed")
     return false
   }
+  prog!.resolve_class_types()
 
   if lir_dump != "" {
     dump_lir_to_file(prog!, lir_dump)
@@ -656,6 +657,7 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
   optimize(prog!)
   eprintln("phase: mono")
   monomorphize(prog)
+  prog!.resolve_class_types()
   eprintln("phase: validate")
   validate_post_mono(prog)
   eprintln("phase: rewrite")

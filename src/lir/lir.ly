@@ -61,6 +61,9 @@ lyric lir {
     type_args: [LType?]
     bits: i32
     is_exported: bool
+    is_permanent: bool
+    is_owned: bool
+    class_decl: LClassDecl?
   }
 
   // ==========================================================================
@@ -633,6 +636,7 @@ lyric lir {
     type_params: [LTypeParam]
     is_exported: bool
     is_permanent: bool
+    is_owned: bool
     implements: [string]
   }
 
@@ -698,4 +702,229 @@ lyric lir {
     slab_mode_soa: bool
   }
 
+  // Resolve class_decl, is_permanent, is_owned on all LType nodes in the program.
+  // Must be called after lowering (to wire up initial references) and again after
+  // monomorphization (to wire up specialized class references).
+  func LProgram.resolve_class_types(self) {
+    // Build name → LClassDecl index
+    let index = Dict<Sym, LClassDecl>()
+    let mut i = 0
+    while i < len(self.classes) {
+      index.set(sym(self.classes[i].name), self.classes[i])
+      // Also set is_owned on the class decl from owned_classes dict
+      if !isnull(self.owned_classes) {
+        let entry = self.owned_classes!.get(sym(self.classes[i].name))
+        if !isnull(entry) {
+          self.classes[i].is_owned = true
+        }
+      }
+      i = i + 1
+    }
+
+    // Walk all types in functions
+    i = 0
+    while i < len(self.functions) {
+      let f = self.functions[i]
+      resolve_type(f.return_type, index)
+      let mut j = 0
+      while j < len(f.params) {
+        resolve_type(f.params[j].typ, index)
+        j = j + 1
+      }
+      resolve_stmts(f.body, index)
+      i = i + 1
+    }
+
+    // Walk struct and class field types
+    i = 0
+    while i < len(self.structs) {
+      let mut j = 0
+      while j < len(self.structs[i].fields) {
+        resolve_type(self.structs[i].fields[j].typ, index)
+        j = j + 1
+      }
+      i = i + 1
+    }
+    i = 0
+    while i < len(self.classes) {
+      let mut j = 0
+      while j < len(self.classes[i].fields) {
+        resolve_type(self.classes[i].fields[j].typ, index)
+        j = j + 1
+      }
+      i = i + 1
+    }
+
+    // Walk globals
+    i = 0
+    while i < len(self.globals) {
+      resolve_type(self.globals[i].typ, index)
+      i = i + 1
+    }
+  }
+
+}
+
+// Helper: resolve a single LType's class_decl, is_permanent, is_owned
+func resolve_type(typ: LType?, index: Dict<Sym, LClassDecl>) {
+  if isnull(typ) { return }
+  if typ!.kind is TyClassHandle {
+    let entry = index.get(sym(typ!.name))
+    if !isnull(entry) {
+      typ!.class_decl = entry!.value
+      typ!.is_permanent = entry!.value.is_permanent
+      typ!.is_owned = entry!.value.is_owned
+    }
+  }
+  // Recurse into nested types
+  resolve_type(typ!.elem, index)
+  resolve_type(typ!.key, index)
+  resolve_type(typ!.ret, index)
+  let mut i = 0
+  while i < len(typ!.type_args) {
+    resolve_type(typ!.type_args[i], index)
+    i = i + 1
+  }
+  i = 0
+  while i < len(typ!.params) {
+    resolve_type(typ!.params[i], index)
+    i = i + 1
+  }
+}
+
+// Walk statements to resolve all embedded LTypes
+func resolve_stmts(stmts: [LStmt?], index: Dict<Sym, LClassDecl>) {
+  let mut i = 0
+  while i < len(stmts) {
+    let s = stmts[i]
+    if isnull(s) {
+      i = i + 1
+      continue
+    }
+    resolve_stmt(s!, index)
+    i = i + 1
+  }
+}
+
+func resolve_stmt(s: LStmt, index: Dict<Sym, LClassDecl>) {
+  match s.kind {
+    StVarDecl => {
+      if !isnull(s.var_decl) {
+        resolve_type(s.var_decl!.typ, index)
+        resolve_value(s.var_decl!.init, index)
+      }
+    }
+    StTempDef => {
+      if !isnull(s.temp_def) {
+        resolve_expr(s.temp_def!.expr, index)
+      }
+    }
+    StAssign => {
+      if !isnull(s.assign) {
+        resolve_value(s.assign!.value, index)
+      }
+    }
+    StReturn => {
+      if !isnull(s.ret) {
+        let mut j = 0
+        while j < len(s.ret!.values) {
+          resolve_value(s.ret!.values[j], index)
+          j = j + 1
+        }
+      }
+    }
+    StIf => {
+      if !isnull(s.if_data) {
+        resolve_value(s.if_data!.cond, index)
+        resolve_stmts(s.if_data!.then_body, index)
+        resolve_stmts(s.if_data!.else_body, index)
+      }
+    }
+    StWhile => {
+      if !isnull(s.while_data) {
+        resolve_value(s.while_data!.cond_var, index)
+        resolve_stmts(s.while_data!.cond_block, index)
+        resolve_stmts(s.while_data!.body, index)
+      }
+    }
+    StFor => {
+      if !isnull(s.for_data) {
+        resolve_type(s.for_data!.var_type, index)
+        resolve_value(s.for_data!.collection, index)
+        resolve_stmts(s.for_data!.body, index)
+      }
+    }
+    StSwitch => {
+      if !isnull(s.switch_data) {
+        resolve_value(s.switch_data!.tag, index)
+        let mut j = 0
+        while j < len(s.switch_data!.cases) {
+          resolve_stmts(s.switch_data!.cases[j].body, index)
+          j = j + 1
+        }
+      }
+    }
+    StBlock => {
+      if !isnull(s.block) {
+        resolve_stmts(s.block!.stmts, index)
+      }
+    }
+    _ => { }
+  }
+}
+
+func resolve_expr(expr: LExpr?, index: Dict<Sym, LClassDecl>) {
+  if isnull(expr) { return }
+  resolve_type(expr!.typ, index)
+  match expr!.kind {
+    ExCall => {
+      if !isnull(expr!.call) {
+        let mut j = 0
+        while j < len(expr!.call!.args) {
+          resolve_value(expr!.call!.args[j], index)
+          j = j + 1
+        }
+        j = 0
+        while j < len(expr!.call!.type_args) {
+          resolve_type(expr!.call!.type_args[j], index)
+          j = j + 1
+        }
+      }
+    }
+    ExMethodCall => {
+      if !isnull(expr!.method_call) {
+        resolve_value(expr!.method_call!.receiver, index)
+        let mut j = 0
+        while j < len(expr!.method_call!.args) {
+          resolve_value(expr!.method_call!.args[j], index)
+          j = j + 1
+        }
+        j = 0
+        while j < len(expr!.method_call!.type_args) {
+          resolve_type(expr!.method_call!.type_args[j], index)
+          j = j + 1
+        }
+        j = 0
+        while j < len(expr!.method_call!.param_types) {
+          resolve_type(expr!.method_call!.param_types[j], index)
+          j = j + 1
+        }
+      }
+    }
+    ExClassAlloc => {
+      if !isnull(expr!.class_alloc) {
+        let mut j = 0
+        while j < len(expr!.class_alloc!.fields) {
+          resolve_value(expr!.class_alloc!.fields[j].value, index)
+          j = j + 1
+        }
+      }
+    }
+    _ => { }
+  }
+}
+
+func resolve_value(val: LValue?, index: Dict<Sym, LClassDecl>) {
+  if isnull(val) { return }
+  resolve_type(val!.typ, index)
 }
