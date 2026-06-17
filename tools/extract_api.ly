@@ -156,10 +156,18 @@ func emit_func_json(sb: StringBuilder, fn_: FuncDecl) {
     sb.write(json_escape(type_expr_to_string(fn_.return_type)))
     sb.write("\"")
   }
-  sb.write("]}")
+  sb.write("]")
+  // file:line from span
+  if fn_.span.start.file != null {
+    sb.write(",\"file\":\"")
+    sb.write(json_escape(fn_.span.start.file!.name))
+    sb.write("\"")
+  }
+  sb.write(f",\"line\":{fn_.span.start.line}")
+  sb.write("}")
 }
 
-func emit_struct_json(sb: StringBuilder, name: string, fields: [Field], methods: [FuncDecl]) {
+func emit_struct_json(sb: StringBuilder, name: string, fields: [Field], methods: [FuncDecl], span: Span, is_class: bool) {
   sb.write("\"")
   sb.write(json_escape(name))
   sb.write("\":{\"fields\":{")
@@ -191,13 +199,24 @@ func emit_struct_json(sb: StringBuilder, name: string, fields: [Field], methods:
     }
     mi = mi + 1
   }
-  sb.write("}}")
+  sb.write("}")
+  // file:line
+  if span.start.file != null {
+    sb.write(",\"file\":\"")
+    sb.write(json_escape(span.start.file!.name))
+    sb.write("\"")
+  }
+  sb.write(f",\"line\":{span.start.line}")
+  if is_class {
+    sb.write(",\"is_class\":true")
+  }
+  sb.write("}")
 }
 
 func emit_enum_json(sb: StringBuilder, name: string, decl: EnumDecl) {
   sb.write("\"")
   sb.write(json_escape(name))
-  sb.write("\":\"enum { ")
+  sb.write("\":{\"underlying\":\"enum { ")
   let variants = decl.ev_children()
   let mut vi = 0
   while vi < len(variants) {
@@ -224,6 +243,14 @@ func emit_enum_json(sb: StringBuilder, name: string, decl: EnumDecl) {
     vi = vi + 1
   }
   sb.write(" }\"")
+  // file:line
+  if decl.span.start.file != null {
+    sb.write(",\"file\":\"")
+    sb.write(json_escape(decl.span.start.file!.name))
+    sb.write("\"")
+  }
+  sb.write(f",\"line\":{decl.span.start.line}")
+  sb.write("}")
 }
 
 func emit_interface_json(sb: StringBuilder, name: string, decl: InterfaceDecl) {
@@ -244,7 +271,15 @@ func emit_interface_json(sb: StringBuilder, name: string, decl: InterfaceDecl) {
     emit_func_json(sb, methods[mi])
     mi = mi + 1
   }
-  sb.write("}}")
+  sb.write("}")
+  // file:line
+  if decl.span.start.file != null {
+    sb.write(",\"file\":\"")
+    sb.write(json_escape(decl.span.start.file!.name))
+    sb.write("\"")
+  }
+  sb.write(f",\"line\":{decl.span.start.line}")
+  sb.write("}")
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +361,7 @@ func extract_file(file: File?) -> string {
         if ext_entry != null {
           ext_list = ext_entry!.value
         }
-        emit_struct_json(sb, s.name!.name, all_fields, ext_list)
+        emit_struct_json(sb, s.name!.name, all_fields, ext_list, s.span, false)
       }
       si = si + 1
     }
@@ -363,7 +398,7 @@ func extract_file(file: File?) -> string {
             ei = ei + 1
           }
         }
-        emit_struct_json(sb, cls.name!.name, all_fields, all_methods)
+        emit_struct_json(sb, cls.name!.name, all_fields, all_methods, cls.span, true)
       }
       ci = ci + 1
     }
