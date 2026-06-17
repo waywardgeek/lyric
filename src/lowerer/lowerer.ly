@@ -464,6 +464,7 @@ lyric lowerer {
     let mut globals: [LVarDeclData] = []
     let mut imports: [LImport] = []
     let mut type_defs: [LTypeDef] = []
+    let mut owned_classes = Dict<Sym, bool>()
 
     for block in file!.fb_children() {
 
@@ -536,6 +537,15 @@ lyric lowerer {
         }
       }
 
+      // Collect owned class names from relations
+      for rel in block.rd_children() {
+        if rel.kind is Owns {
+          if !isnull(rel.child.type_name) {
+            owned_classes.set(sym(rel.child.type_name!.name), true)
+          }
+        }
+      }
+
       // Constants as globals
       for c in block.con_children() {
         if !isnull(c.name) {
@@ -569,6 +579,7 @@ lyric lowerer {
       functions: functions,
       globals: globals,
       type_defs: type_defs,
+      owned_classes: owned_classes,
       impl_method_renames: self.impl_method_renames
     }
   }

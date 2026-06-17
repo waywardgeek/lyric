@@ -663,6 +663,29 @@ func CGen.resolve_class_name_from_type(self, t: LType?, caller: string) -> strin
   return "unknown"
 }
 
+// Check if a destroy function exists for a class
+func CGen.has_destroy_func(self, class_name: string) -> bool {
+  let target = class_name + "_destroy"
+  let mut i = 0
+  while i < len(self.prog!.functions) {
+    if self.prog!.functions[i].name == target {
+      return true
+    }
+    // Also check "destroy" with receiver matching class_name
+    if self.prog!.functions[i].name == "destroy" {
+      if len(self.prog!.functions[i].params) > 0 {
+        if !isnull(self.prog!.functions[i].params[0].typ) {
+          if self.prog!.functions[i].params[0].typ!.name == class_name {
+            return true
+          }
+        }
+      }
+    }
+    i = i + 1
+  }
+  return false
+}
+
 
 func CGen.contains_type_var(self, t: LType?) -> bool {
   if isnull(t) {
@@ -2737,6 +2760,21 @@ func CGen.emit_stmt(self, s: LStmt?) {
       let d = s!.slice_free!
       self.line(f"if ({d.name}.cap > 0 && {d.name}.data) free({d.name}.data);")
     }
+    StSliceRetain => {
+      // TODO: slice RC retain — for now no-op (slices still use scope-exit free)
+    }
+    StRefIncr => {
+      let d = s!.ref_incr!
+      let ref = self.emit_value(d.handle)
+      let cname = self.resolve_class_name(d.class_name, "ref_incr")
+      self.line(f"/* rc_incr({cname}, {ref}) */")
+    }
+    StRefDecr => {
+      let d = s!.ref_decr!
+      let ref = self.emit_value(d.handle)
+      let cname = self.resolve_class_name(d.class_name, "ref_decr")
+      self.line(f"/* rc_free({cname}, {ref}) */")
+    }
     StIndexSet => {
       let d = s!.index_set!
       if d.field != "" {
@@ -4106,6 +4144,8 @@ func CGen.emit_class_decl(self, c: LClassDecl) {
     i = i + 1
   }
   if self.prog!.slab_mode {
+    // Ref count for non-owned classes
+    self.line("uint32_t _rc;")
     // Free-list linkage: lyric_next at end so field offsets are unchanged
     self.line(f"struct {c.name}* lyric_next;")
   }
@@ -4158,6 +4198,7 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line(f"{name}* p = _lyric_slab_{name}.free;")
     self.line(f"_lyric_slab_{name}.free = p->lyric_next;")
     self.line(f"memset(p, 0, sizeof({name}));")
+    self.line("p->_rc = 1;")
     self.line("return p;")
     self.indent = self.indent - 1
     self.line("}")
@@ -4169,8 +4210,10 @@ func CGen.emit_slab_infrastructure(self, classes: [LClassDecl]) {
     self.line(f"_lyric_slab_{name}.cur = b;")
     self.indent = self.indent - 1
     self.line("}")
-    // Allocate from current block
-    self.line(f"return &_lyric_slab_{name}.cur->data[_lyric_slab_{name}.cur->used++];")
+    // Allocate from current block (calloc zeroed the block, so _rc is 0)
+    self.line(f"{name}* p = &_lyric_slab_{name}.cur->data[_lyric_slab_{name}.cur->used++];")
+    self.line("p->_rc = 1;")
+    self.line("return p;")
     self.indent = self.indent - 1
     self.line("}")
     self.line("")
@@ -4210,6 +4253,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       j = j + 1
     }
     self.line("uint32_t* lyric_next;")
+    self.line("uint32_t* _rc;")
     self.line("uint32_t used;")
     self.line("uint32_t cap;")
     self.line("uint32_t free_head;")
@@ -4248,6 +4292,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       j = j + 1
     }
     self.line(f"_lyric_slab_{name}.lyric_next = (uint32_t*)realloc(_lyric_slab_{name}.lyric_next, new_cap * sizeof(uint32_t));")
+    self.line(f"_lyric_slab_{name}._rc = (uint32_t*)realloc(_lyric_slab_{name}._rc, new_cap * sizeof(uint32_t));")
     self.line(f"_lyric_slab_{name}.cap = new_cap;")
     self.indent = self.indent - 1
     self.line("}")
@@ -4267,6 +4312,7 @@ func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl]) {
       }
       j = j + 1
     }
+    self.line(f"_lyric_slab_{name}._rc[h] = 1;")
     self.line("return h;")
     self.indent = self.indent - 1
     self.line("}")

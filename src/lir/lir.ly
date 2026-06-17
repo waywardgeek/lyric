@@ -377,6 +377,16 @@ lyric lir {
     typ: LType?
   }
 
+  struct LRefIncrData {
+    handle: LValue?
+    class_name: string
+  }
+
+  struct LRefDecrData {
+    handle: LValue?
+    class_name: string
+  }
+
   // ==========================================================================
   // LIR Statements
   // ==========================================================================
@@ -409,6 +419,9 @@ lyric lir {
     StSlabSet
     StSlabFree
     StSliceFree
+    StSliceRetain
+    StRefIncr
+    StRefDecr
   }
 
   class LStmt {
@@ -439,6 +452,9 @@ lyric lir {
     slab_set: LSlabSetData?
     slab_free: LSlabFreeData?
     slice_free: LSliceFreeData?
+    slice_retain: LSliceFreeData?
+    ref_incr: LRefIncrData?
+    ref_decr: LRefDecrData?
   }
 
   struct LTempDef {
@@ -676,6 +692,7 @@ lyric lir {
     type_defs: [LTypeDef]
     class_renames: Dict<Sym, string>?
     impl_method_renames: Dict<Sym, string>?
+    owned_classes: Dict<Sym, bool>?
     slab_mode: bool
     slab_mode_soa: bool
   }

@@ -605,7 +605,7 @@ func slab_rewrite(prog: LProgram) {
   let mut fi = 0
   while fi < len(prog.functions) {
     let f = prog.functions[fi]
-    let new_body = slab_rewrite_stmts(f.body, f.body, escape_map)
+    let new_body = slab_rewrite_stmts(f.body, f.body, escape_map, prog)
     prog.functions[fi].body = new_body
 
     // Inject slab_free(self) at end of destroy methods
@@ -642,13 +642,18 @@ func slab_rewrite(prog: LProgram) {
 // Also injects StSliceFree at scope exits for locally-declared slice/string variables
 // that own their backing data and don't escape.
 // `all_stmts` is the full function body (for escape-via-call checking).
-func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>) -> [LStmt?] {
+func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?] {
   let mut result: [LStmt?] = []
   // Track slice-typed locals declared in THIS scope that OWN their data
   let mut slice_locals: [string] = []
   let mut slice_types: [LType?] = []
+  // Track class-handle locals for ref counting (non-owned classes only)
+  let mut class_locals: [string] = []
+  let mut class_types: [LType?] = []
   // Track temp IDs that come from ExMakeSlice (fresh allocations)
   let mut fresh_temps: [i32] = []
+  // Track temp IDs from ExSlabAlloc (fresh class allocations — rc=1 from alloc)
+  let mut fresh_class_temps: [i32] = []
   let mut i = 0
   while i < len(stmts) {
     if isnull(stmts[i]) {
@@ -665,6 +670,16 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
           }
           if is_fresh_string_expr(s.temp_def!.expr!) {
             fresh_temps.push(s.temp_def!.id)
+          }
+          // Track fresh class allocs (ExSlabAlloc after slab rewrite, ExClassAlloc before)
+          if s.temp_def!.expr!.kind is ExSlabAlloc || s.temp_def!.expr!.kind is ExClassAlloc {
+            fresh_class_temps.push(s.temp_def!.id)
+          }
+          // Function/method calls returning class handles transfer ownership (rc=1)
+          if s.temp_def!.expr!.kind is ExCall || s.temp_def!.expr!.kind is ExMethodCall {
+            if !isnull(s.temp_def!.expr!.typ) && is_rc_class_type(prog, s.temp_def!.expr!.typ) {
+              fresh_class_temps.push(s.temp_def!.id)
+            }
           }
         }
       }
@@ -683,17 +698,116 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
               }
             }
           }
+          // Track non-owned class handle locals for ref counting
+          if is_rc_class_type(prog, s.var_decl!.typ) {
+            class_locals.push(s.var_decl!.name)
+            class_types.push(s.var_decl!.typ)
+            // If init is NOT a fresh alloc (i.e. copying an existing handle), retain
+            if !isnull(s.var_decl!.init) && !is_fresh_class_init(s.var_decl!.init, fresh_class_temps) {
+              // Emit the VarDecl first, then the retain
+              let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
+              let mut j = 0
+              while j < len(expanded) {
+                result.push(expanded[j])
+                j = j + 1
+              }
+              let handle = LValue {
+                kind: ValVar,
+                name: s.var_decl!.name,
+                temp_id: 0,
+                typ: s.var_decl!.typ,
+              }
+              emit_ref_incr(handle, s.var_decl!.typ!.name, mut result)
+              i = i + 1
+              continue
+            }
+          }
         }
       }
 
+      // Handle assignment to class-typed var: release old, retain new
+      if s.kind is StAssign {
+        if !isnull(s.assign) && !isnull(s.assign!.value) {
+          let mut found_idx = -1
+          let mut ci = 0
+          while ci < len(class_locals) {
+            if class_locals[ci] == s.assign!.target {
+              found_idx = ci
+            }
+            ci = ci + 1
+          }
+          if found_idx >= 0 {
+            let ctype = class_types[found_idx]
+            // Release old value
+            let old_handle = LValue {
+              kind: ValVar,
+              name: s.assign!.target,
+              temp_id: 0,
+              typ: ctype,
+            }
+            emit_ref_decr(old_handle, ctype!.name, mut result)
+            // Emit the assignment
+            let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
+            let mut j = 0
+            while j < len(expanded) {
+              result.push(expanded[j])
+              j = j + 1
+            }
+            // Retain new value (unless fresh alloc)
+            if !is_fresh_class_init(s.assign!.value, fresh_class_temps) {
+              let new_handle = LValue {
+                kind: ValVar,
+                name: s.assign!.target,
+                temp_id: 0,
+                typ: ctype,
+              }
+              emit_ref_incr(new_handle, ctype!.name, mut result)
+            }
+            i = i + 1
+            continue
+          }
+        }
+      }
+
+      // Also need to retain when storing a class handle into a field
+      // StSlabSet (class field store): retain the value being stored
+      if s.kind is StSlabSet {
+        if !isnull(s.slab_set) && !isnull(s.slab_set!.value) {
+          let val = s.slab_set!.value!
+          if !isnull(val.typ) && is_rc_class_type(prog, val.typ) {
+            emit_ref_incr(s.slab_set!.value, val.typ!.name, mut result)
+          }
+        }
+      }
+      if s.kind is StClassSet {
+        if !isnull(s.class_set) && !isnull(s.class_set!.value) {
+          let val = s.class_set!.value!
+          if !isnull(val.typ) && is_rc_class_type(prog, val.typ) {
+            emit_ref_incr(s.class_set!.value, val.typ!.name, mut result)
+          }
+        }
+      }
+      if s.kind is StStructSet {
+        if !isnull(s.struct_set) && !isnull(s.struct_set!.value) {
+          let val = s.struct_set!.value!
+          if !isnull(val.typ) && is_rc_class_type(prog, val.typ) {
+            emit_ref_incr(s.struct_set!.value, val.typ!.name, mut result)
+          }
+        }
+      }
+
+
+
       // Before returns, free all in-scope owned slice locals (except the returned one)
+      // and release all class handle locals (except the returned one)
       if s.kind is StReturn {
         let ret_names = get_return_var_names(s)
         emit_slice_frees(slice_locals, slice_types, ret_names, mut result)
+        emit_class_releases(class_locals, class_types, ret_names, mut result)
       }
 
       // Process each statement; may expand to multiple
-      let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map)
+      let expanded = slab_rewrite_one_stmt(s, all_stmts, escape_map, prog)
       let mut j = 0
       while j < len(expanded) {
         result.push(expanded[j])
@@ -702,15 +816,16 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
     }
     i = i + 1
   }
-  // At scope exit, free all owned slice locals declared in this scope
+  // At scope exit, free all owned slice locals and release all class locals
   let no_skip: [string] = []
   emit_slice_frees(slice_locals, slice_types, no_skip, mut result)
+  emit_class_releases(class_locals, class_types, no_skip, mut result)
   return result
 }
 
 // Rewrite a single statement, returning one or more stmts.
 // StTempDef with ExClassAlloc expands into alloc + field sets (StSlabSet).
-func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>) -> [LStmt?] {
+func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?] {
   let mut out: [LStmt?] = []
 
   // StTempDef with ExClassAlloc → slab alloc + StSlabSet for each field
@@ -761,7 +876,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
         }
         return out
       } else {
-        slab_rewrite_expr(e, all_stmts, escape_map)
+        slab_rewrite_expr(e, all_stmts, escape_map, prog)
       }
     }
   }
@@ -791,7 +906,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
   // Recurse into sub-statements that contain expressions
   if s.kind is StSideEffect {
     if !isnull(s.side_effect) && !isnull(s.side_effect!.expr) {
-      slab_rewrite_expr(s.side_effect!.expr!, all_stmts, escape_map)
+      slab_rewrite_expr(s.side_effect!.expr!, all_stmts, escape_map, prog)
     }
   }
 
@@ -804,19 +919,19 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.cond) {
         slab_rewrite_value(d.cond!)
       }
-      d.then_body = slab_rewrite_stmts(d.then_body, all_stmts, escape_map)
-      d.else_body = slab_rewrite_stmts(d.else_body, all_stmts, escape_map)
+      d.then_body = slab_rewrite_stmts(d.then_body, all_stmts, escape_map, prog)
+      d.else_body = slab_rewrite_stmts(d.else_body, all_stmts, escape_map, prog)
       s.if_data = d
     }
   }
   if s.kind is StWhile {
     if !isnull(s.while_data) {
       let mut d = s.while_data!
-      d.cond_block = slab_rewrite_stmts(d.cond_block, all_stmts, escape_map)
+      d.cond_block = slab_rewrite_stmts(d.cond_block, all_stmts, escape_map, prog)
       if !isnull(d.cond_var) {
         slab_rewrite_value(d.cond_var!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
       s.while_data = d
     }
   }
@@ -826,14 +941,14 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.collection) {
         slab_rewrite_value(d.collection!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
       s.for_data = d
     }
   }
   if s.kind is StBlock {
     if !isnull(s.block) {
       let mut d = s.block!
-      d.stmts = slab_rewrite_stmts(d.stmts, all_stmts, escape_map)
+      d.stmts = slab_rewrite_stmts(d.stmts, all_stmts, escape_map, prog)
       s.block = d
     }
   }
@@ -845,7 +960,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       }
       let mut ci = 0
       while ci < len(d.cases) {
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
         ci = ci + 1
       }
       s.switch_data = d
@@ -859,7 +974,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       }
       let mut ci = 0
       while ci < len(d.cases) {
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
         ci = ci + 1
       }
       s.type_switch = d
@@ -868,7 +983,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
   if s.kind is StSpawn {
     if !isnull(s.spawn_data) {
       let mut d = s.spawn_data!
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
       s.spawn_data = d
     }
   }
@@ -884,7 +999,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
         if !isnull(c.value) {
           slab_rewrite_value(c.value!)
         }
-        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map)
+        d.cases[ci].body = slab_rewrite_stmts(d.cases[ci].body, all_stmts, escape_map, prog)
         ci = ci + 1
       }
       s.select_data = d
@@ -896,18 +1011,18 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
       if !isnull(d.mutex) {
         slab_rewrite_value(d.mutex!)
       }
-      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map)
+      d.body = slab_rewrite_stmts(d.body, all_stmts, escape_map, prog)
       s.lock_data = d
     }
   }
   if s.kind is StDefer {
     if !isnull(s.defer_data) {
-      s.defer_data!.body = slab_rewrite_stmts(s.defer_data!.body, all_stmts, escape_map)
+      s.defer_data!.body = slab_rewrite_stmts(s.defer_data!.body, all_stmts, escape_map, prog)
     }
   }
   if s.kind is StMultiAssign {
     if !isnull(s.multi_assign) && !isnull(s.multi_assign!.expr) {
-      slab_rewrite_expr(s.multi_assign!.expr!, all_stmts, escape_map)
+      slab_rewrite_expr(s.multi_assign!.expr!, all_stmts, escape_map, prog)
     }
   }
   if s.kind is StSend {
@@ -955,7 +1070,7 @@ func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, 
 }
 
 // Rewrite a single expression, converting class allocs to slab allocs
-func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>) {
+func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) {
   match e.kind {
     ExClassAlloc => {
       if !isnull(e.class_alloc) {
@@ -1199,7 +1314,7 @@ func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool
     }
     ExFuncLit => {
       if !isnull(e.func_lit) {
-        e.func_lit!.body = slab_rewrite_stmts(e.func_lit!.body, e.func_lit!.body, escape_map)
+        e.func_lit!.body = slab_rewrite_stmts(e.func_lit!.body, e.func_lit!.body, escape_map, prog)
       }
     }
     ExMakeChannel => {
@@ -1262,6 +1377,28 @@ func is_fresh_slice_init(init: LValue?, fresh_temps: [i32]) -> bool {
   return false
 }
 
+// Check if a VarDecl/Assign init value points to a fresh class alloc (ExSlabAlloc/ExClassAlloc temp).
+func is_fresh_class_init(init: LValue?, fresh_class_temps: [i32]) -> bool {
+  if isnull(init) {
+    return false
+  }
+  let v = init!
+  if v.kind is ValTemp {
+    let mut i = 0
+    while i < len(fresh_class_temps) {
+      if fresh_class_temps[i] == v.temp_id {
+        return true
+      }
+      i = i + 1
+    }
+  }
+  // Null literal — no retain needed
+  if v.kind is ValLitNull {
+    return true
+  }
+  return false
+}
+
 // Get the variable name being returned (if it's a simple variable return).
 // Returns "" if it's not a simple variable or if there are multiple return values.
 func get_return_var_names(s: LStmt) -> [string] {
@@ -1308,4 +1445,57 @@ func should_skip(name: string, skip_names: [string]) -> bool {
     i = i + 1
   }
   return false
+}
+
+// Check if a class is owned (lifetime managed by parent destructor, no RC).
+func is_owned_class(prog: LProgram, class_name: string) -> bool {
+  if isnull(prog.owned_classes) { return false }
+  let entry = prog.owned_classes!.get(sym(class_name))
+  return !isnull(entry)
+}
+
+// Check if a type is a non-owned class handle (needs RC).
+func is_rc_class_type(prog: LProgram, typ: LType?) -> bool {
+  if isnull(typ) { return false }
+  if !(typ!.kind is TyClassHandle) { return false }
+  return !is_owned_class(prog, typ!.name)
+}
+
+// Emit StRefIncr for a class handle value.
+func emit_ref_incr(handle: LValue?, class_name: string, mut out: [LStmt?]) {
+  out.push(LStmt {
+    kind: StRefIncr,
+    ref_incr: LRefIncrData {
+      handle: handle,
+      class_name: class_name,
+    },
+  })
+}
+
+// Emit StRefDecr for a class handle value.
+func emit_ref_decr(handle: LValue?, class_name: string, mut out: [LStmt?]) {
+  out.push(LStmt {
+    kind: StRefDecr,
+    ref_decr: LRefDecrData {
+      handle: handle,
+      class_name: class_name,
+    },
+  })
+}
+
+// Emit StRefDecr for all tracked class locals, skipping skip_names.
+func emit_class_releases(names: [string], types: [LType?], skip_names: [string], mut out: [LStmt?]) {
+  let mut i = 0
+  while i < len(names) {
+    if !should_skip(names[i], skip_names) {
+      let handle = LValue {
+        kind: ValVar,
+        name: names[i],
+        temp_id: 0,
+        typ: types[i],
+      }
+      emit_ref_decr(handle, types[i]!.name, mut out)
+    }
+    i = i + 1
+  }
 }

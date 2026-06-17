@@ -3534,6 +3534,14 @@ func monomorphize(prog: LProgram?) {
       }
       append(new_classes, spec)
 
+      // Propagate owned status to specialized class
+      if !isnull(prog!.owned_classes) {
+        let owned_entry = prog!.owned_classes!.get(sym(orig.name))
+        if !isnull(owned_entry) {
+          prog!.owned_classes!.set(sym(mangled), true)
+        }
+      }
+
       // Specialize methods
       let methods_entry = m.methods_by_class!.get(sym(class_name))
       if !isnull(methods_entry) {
