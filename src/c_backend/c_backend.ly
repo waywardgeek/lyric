@@ -2013,11 +2013,9 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
         return f"_lyric_slab_alloc_{cname}()"
       }
       // Has inline field inits (from slab_rewrite_expr path): emit compound stmt expr
-      let mut class_fields: [LField] = []
       let c_entry = self.class_by_name!.get(sym(cname))
-      if !isnull(c_entry) {
-        class_fields = c_entry!.value.fields
-      }
+      let empty_fields: [LField] = []
+      let ref class_fields = if !isnull(c_entry) { c_entry!.value.fields } else { empty_fields }
       let sb = new_string_builder()
       if self.prog!.slab_mode_soa {
         sb.write(f"({{ uint32_t _p = _lyric_slab_alloc_{cname}(); ")
@@ -2186,11 +2184,9 @@ func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string {
   let d = e!.class_alloc!
   let name = d.class_name
   // Look up class fields for optional wrapping
-  let mut class_fields: [LField] = []
   let c_entry = self.class_by_name!.get(sym(name))
-  if !isnull(c_entry) {
-    class_fields = c_entry!.value.fields
-  }
+  let empty_fields: [LField] = []
+  let ref class_fields = if !isnull(c_entry) { c_entry!.value.fields } else { empty_fields }
   let sb = new_string_builder()
   sb.write(f"({{ {name}* _p = malloc(sizeof({name})); *_p = ({name}){{")
   let mut j = 0

@@ -15,7 +15,8 @@ lyric std {
     field C.index: i32
 
     // Append child to end of parent's array
-    pub func array_append(parent: P, child: C) {
+    pub trusted func array_append(parent: P, child: C) {
+      ref child
       let kids = parent.children()
       let num: i32 = len(kids)
       child.set_index(num)
@@ -24,7 +25,7 @@ lyric std {
     }
 
     // Remove child from parent's array using swap-remove (O(1))
-    pub func array_remove(child: C) {
+    pub trusted func array_remove(child: C) {
       let p = child.parent()
       if isnull(p) {
         return
@@ -42,10 +43,12 @@ lyric std {
       p!.set_children(kids[0:last_idx])
       child.set_parent(null)
       child.set_index(0)
+      unref child
     }
 
     // Method-style append: p.append(c)
-    pub func P.append(self, child: C) {
+    pub trusted func P.append(self, child: C) {
+      ref child
       child.index = len(self.children)
       child.parent = self
       let mut kids = self.children
@@ -54,7 +57,7 @@ lyric std {
     }
 
     // Method-style remove: c.remove()
-    pub func C.remove(self) {
+    pub trusted func C.remove(self) {
       let p = self.parent
       if isnull(p) {
         return
@@ -70,6 +73,7 @@ lyric std {
       p!.children = kids[0:last_idx]
       self.parent = null
       self.index = 0
+      unref self
     }
   }
 
@@ -125,7 +129,8 @@ lyric std {
     field C.parent: P?
 
     // Append child to end of parent's list
-    pub func dll_append(parent: P, child: C) {
+    pub trusted func dll_append(parent: P, child: C) {
+      ref child
       child.set_parent(parent)
       child.set_next(null)
       let old_last = parent.last()
@@ -140,7 +145,7 @@ lyric std {
     }
 
     // Remove child from parent's list
-    pub func dll_remove(child: C) {
+    pub trusted func dll_remove(child: C) {
       let p = child.parent()
       if isnull(p) {
         return
@@ -160,6 +165,7 @@ lyric std {
       child.set_parent(null)
       child.set_prev(null)
       child.set_next(null)
+      unref child
     }
   }
 
@@ -532,7 +538,14 @@ lyric std {
   relation HashedList Dict<K, V>:d owns [DictEntry<K, V>:d]
 
   // Core methods
-  pub func Dict.set<K, V>(self, key: K, value: V) where K: Hashable {
+  pub trusted func Dict.set<K, V>(self, key: K, value: V) where K: Hashable {
+    // ref the value before storing — callee takes ownership of a new ref
+    ref value
+    // Check if key already exists — if so, unref the old value
+    let existing = self.get(key)
+    if !isnull(existing) {
+      unref existing!.value
+    }
     let entry = DictEntry<K, V> { key: key, value: value }
     hash_insert<Dict<K, V>, DictEntry<K, V>>(self, entry)
   }
@@ -546,7 +559,11 @@ lyric std {
     return !isnull(self.get(key))
   }
 
-  pub func Dict.remove<K, V>(self, key: K) -> bool where K: Hashable {
+  pub trusted func Dict.remove<K, V>(self, key: K) -> bool where K: Hashable {
+    let existing = self.get(key)
+    if !isnull(existing) {
+      unref existing!.value
+    }
     let h = key.get_hash()
     return hash_remove<Dict<K, V>, DictEntry<K, V>>(self, h)
   }
