@@ -46,11 +46,11 @@ lyric std {
 
     // Method-style append: p.append(c)
     pub func P.append(self, child: C) {
-      let kids = self.children()
-      let num: i32 = len(kids)
-      child.set_index(num)
+      child.set_index(len(self.children()))
       child.set_parent(self)
-      self.set_children(append(kids, child))
+      let mut kids = self.children()
+      kids.push(child)
+      self.set_children(kids)
     }
 
     // Method-style remove: c.remove()
@@ -59,8 +59,8 @@ lyric std {
       if isnull(p) {
         return
       }
-      let kids = p!.children()
       let idx = self.index()
+      let kids = p!.children()
       let last_idx: i32 = len(kids) - 1
       if idx < last_idx {
         let last_child = kids[last_idx]
