@@ -1531,6 +1531,94 @@ lyric checker {
         }
       }
     }
+
+    // Phase 1.5b: Register interface body methods (P.method syntax) on concrete types.
+    // For each interface with body methods that have a receiver_type matching a type param,
+    // find all impl blocks for that interface and register the method on the concrete type.
+    let iface_keys = self.iface_decls.keys()
+    for ik in iface_keys {
+      let iface_entry = self.iface_decls.get(ik)
+      if iface_entry == null { continue }
+      let iface_decl = iface_entry!.value
+      if iface_decl.name == null { continue }
+      let iface_name = sym_to_string(iface_decl.name!)
+
+      let itp = iface_decl.itp_children()
+      let imethods = iface_decl.im_children()
+
+      // Only process interfaces that have body methods with receiver types
+      let mut has_recv_methods = false
+      for m in imethods {
+        if m.receiver_type != null {
+          has_recv_methods = true
+        }
+      }
+      if !has_recv_methods { continue }
+
+      // Find all impl blocks for this interface
+      for ib in all_impls {
+        if ib.interface_name == null { continue }
+        if sym_to_string(ib.interface_name!) != iface_name { continue }
+
+        let impl_args = ib.ib_arg_children()
+
+        // Build substitution: interface type param → concrete type
+        let subst = Dict<Sym, Type>()
+        let mut param_to_concrete = Dict<Sym, string>()
+        let mut si = 0
+        let mut slimit = len(itp)
+        if len(impl_args) < slimit { slimit = len(impl_args) }
+        while si < slimit as i32 {
+          if itp[si].name != null {
+            let param_name = sym_to_string(itp[si].name!)
+            let concrete = self.resolve_type_expr(impl_args[si])
+            subst.set(sym(param_name), concrete)
+            param_to_concrete.set(sym(param_name), type_name(concrete))
+          }
+          si = si + 1
+        }
+
+        // Register each receiver-typed method on its concrete type
+        for m in imethods {
+          if m.name == null { continue }
+          if m.receiver_type == null { continue }
+          let recv_param = sym_to_string(m.receiver_type!)
+          let concrete_name_entry = param_to_concrete.get(sym(recv_param))
+          if concrete_name_entry == null { continue }
+          let concrete_name = concrete_name_entry!.value
+          if concrete_name == "" { continue }
+
+          let cinfo = self.registry.lookup(concrete_name)
+          if cinfo == null { continue }
+
+          let mname = sym_to_string(m.name!)
+          let existing = cinfo!.methods.get(sym(mname))
+          if existing != null { continue }
+
+          let ft = self.func_decl_to_type(m)
+          let substituted = substitute_type(ft, subst)
+
+          // Strip substituted type params from func's type_param_names
+          let mut final_type = substituted
+          match substituted.kind {
+            Func(sp, sr, stpn) => {
+              let mut remaining: [string] = []
+              for tpn in stpn {
+                if subst.get(sym(tpn)) == null {
+                  append(remaining, tpn)
+                }
+              }
+              final_type = make_func_type(sp, sr, remaining)
+            }
+            _ => {}
+          }
+
+          let method_key = concrete_name + "." + mname
+          cinfo!.methods.set(sym(mname), final_type)
+          self.scope.define(method_key, final_type)
+        }
+      }
+    }
   }
 
   func Checker.register_interface(self, iface: InterfaceDecl) {

@@ -14,9 +14,9 @@ lyric ref_list {
     let g2 = Guest { name: "Bob" }
     let g3 = Guest { name: "Carol" }
 
-    dll_append<Room, Guest>(r, g1)
-    dll_append<Room, Guest>(r, g2)
-    dll_append<Room, Guest>(r, g3)
+    r.append(g1)
+    r.append(g2)
+    r.append(g3)
 
     // Walk the list
     let mut cur = r.room_first
@@ -26,7 +26,7 @@ lyric ref_list {
     }
 
     // Remove middle element
-    dll_remove<Room, Guest>(g2)
+    r.remove(g2)
     println("after remove:")
     cur = r.room_first
     while !isnull(cur) {

@@ -56,25 +56,22 @@ lyric std {
       self.children = kids
     }
 
-    // Method-style remove: c.remove()
-    pub trusted func C.remove(self) {
-      let p = self.parent
-      if isnull(p) {
-        return
-      }
-      let idx = self.index
-      let kids = p!.children
+    // Method-style remove: p.remove(c)
+    pub trusted func P.remove(self, child: C) {
+      let idx = child.index
+      let kids = self.children
       let last_idx: i32 = len(kids) - 1
       if idx < last_idx {
         let last_child = kids[last_idx]
         last_child.index = idx
         kids[idx] = last_child
       }
-      p!.children = kids[0:last_idx]
-      self.parent = null
-      self.index = 0
-      unref self
+      self.children = kids[0:last_idx]
+      child.parent = null
+      child.index = 0
+      unref child
     }
+
   }
 
   // ArrayList: parent owns children, cascade-destroys on parent death.
@@ -161,6 +158,42 @@ lyric std {
         next_node!.set_prev(prev_node)
       } else {
         p!.set_last(prev_node)
+      }
+      child.set_parent(null)
+      child.set_prev(null)
+      child.set_next(null)
+      unref child
+    }
+
+    // Method-style append: p.append(c)
+    pub trusted func P.append(self, child: C) {
+      ref child
+      child.set_parent(self)
+      child.set_next(null)
+      let old_last = self.last()
+      child.set_prev(old_last)
+      if !isnull(old_last) {
+        old_last!.set_next(child)
+      }
+      self.set_last(child)
+      if isnull(self.first()) {
+        self.set_first(child)
+      }
+    }
+
+    // Method-style remove: p.remove(c)
+    pub trusted func P.remove(self, child: C) {
+      let prev_node = child.prev()
+      let next_node = child.next()
+      if !isnull(prev_node) {
+        prev_node!.set_next(next_node)
+      } else {
+        self.set_first(next_node)
+      }
+      if !isnull(next_node) {
+        next_node!.set_prev(prev_node)
+      } else {
+        self.set_last(prev_node)
       }
       child.set_parent(null)
       child.set_prev(null)
