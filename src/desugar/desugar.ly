@@ -700,7 +700,7 @@ lyric desugar {
         rewrite_field_access_expr(target, field_names)
         rewrite_field_access_expr(value, field_names)
       }
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         if !isnull(value) {
           rewrite_field_access_expr(value!, field_names)
         }
@@ -949,7 +949,7 @@ lyric desugar {
       ExprStmt(expr) => {
         result.kind = ExprStmt(deep_copy_expr(expr))
       }
-      VarDecl(name, names, type_expr, is_mut, value) => {
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         let mut new_value: Expr? = null
         if !isnull(value) {
           new_value = deep_copy_expr(value!)
@@ -958,7 +958,7 @@ lyric desugar {
         if !isnull(type_expr) {
           new_te = deep_copy_type_expr(type_expr!)
         }
-        result.kind = VarDecl(name, names, new_te, is_mut, new_value)
+        result.kind = VarDecl(name, names, new_te, is_mut, is_ref, new_value)
       }
       Assign(target, value) => {
         result.kind = Assign(deep_copy_expr(target), deep_copy_expr(value))
@@ -1199,7 +1199,7 @@ lyric desugar {
       Assign(target, value) => {
         substitute_type_params_in_expr(value, type_map)
       }
-      VarDecl(name, names, type_expr, is_mut, value) => {
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         if !isnull(value) {
           substitute_type_params_in_expr(value!, type_map)
         }
@@ -1306,7 +1306,7 @@ lyric desugar {
         substitute_type_params_rich_in_expr(target, type_map)
         substitute_type_params_rich_in_expr(value, type_map)
       }
-      VarDecl(name, names, type_expr, is_mut, value) => {
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         if !isnull(value) { substitute_type_params_rich_in_expr(value!, type_map) }
       }
       Return(value) => {
@@ -1438,7 +1438,7 @@ lyric desugar {
         rename_method_calls_in_expr(target, renames)
         rename_method_calls_in_expr(value, renames)
       }
-      VarDecl(name, names, type_expr, is_mut, value) => {
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         if !isnull(value) { rename_method_calls_in_expr(value!, renames) }
       }
       If(condition, then_block, else_ifs, else_block) => {

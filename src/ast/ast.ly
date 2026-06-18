@@ -315,7 +315,7 @@ lyric ast {
   // ---- Statements ----
 
   enum StmtKind {
-    VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
+    VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?)
     Assign(target: Expr, value: Expr)
     Return(value: Expr?)
     ExprStmt(expr: Expr)
@@ -699,7 +699,7 @@ func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>) {
 
 func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
     match stmt.kind {
-        VarDecl(name, names_list, type_expr, is_mut, value) => {
+        VarDecl(name, names_list, type_expr, is_mut, is_ref, value) => {
             ast_collect_call_names_expr(value, names)
         }
         Assign(target, value) => {
@@ -896,7 +896,7 @@ func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>) {
 
 func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
     match stmt.kind {
-        VarDecl(name, names_list, type_expr, is_mut, value) => {
+        VarDecl(name, names_list, type_expr, is_mut, is_ref, value) => {
             if value != null {
                 ast_collect_var_refs_in_expr(value, names)
             }

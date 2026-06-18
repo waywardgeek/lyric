@@ -1582,6 +1582,7 @@ func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt? {
             typ: subst_type(s.var_decl!.typ, subst),
             init: init_val,
             mutable: s.var_decl!.mutable,
+            is_ref: s.var_decl!.is_ref,
           },
           temp_def: null, assign: null, struct_set: null, class_set: null,
           index_set: null, if_data: null, while_data: null, for_data: null,

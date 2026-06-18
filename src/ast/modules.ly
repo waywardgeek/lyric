@@ -336,7 +336,7 @@ func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string]) {
 
 func rewrite_stmt(stmt: Stmt, orig: [string], prefixed: [string]) {
   match stmt.kind {
-    VarDecl(name, names, type_expr, is_mut, value) => {
+    VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
       rewrite_type_expr(type_expr, orig, prefixed)
       rewrite_expr(value, orig, prefixed)
     }
@@ -663,7 +663,7 @@ func rewrite_qualified_block(block: Block,
 func rewrite_qualified_stmt(stmt: Stmt,
     alias_names: [string], orig_names: [[string]], prefixed_names: [[string]]) {
   match stmt.kind {
-    VarDecl(name, names, type_expr, is_mut, value) => {
+    VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
       rewrite_qualified_type_expr(type_expr, alias_names, orig_names, prefixed_names)
       rewrite_qualified_expr(value, alias_names, orig_names, prefixed_names)
     }

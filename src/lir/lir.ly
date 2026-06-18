@@ -478,6 +478,7 @@ lyric lir {
     typ: LType?
     init: LValue?
     mutable: bool
+    is_ref: bool
   }
 
   struct LAssignData {

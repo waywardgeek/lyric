@@ -1999,12 +1999,12 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     }
     ExSlabGet => {
       let d = e!.slab_get!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "ExSlabGet")
-        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}]"
+        return f"_lyric_slab_{cname}.{lc_first(d.field)}[{handle_ref}]"
       }
-      return f"{ref}->{d.field}"
+      return f"{handle_ref}->{d.field}"
     }
     ExSlabAlloc => {
       let d = e!.slab_alloc!
@@ -2776,7 +2776,7 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StClassSet => {
       let d = s!.class_set!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       let val = self.emit_value(d.value)
       // Auto-wrap non-optional value when field type is optional struct
       let mut wrapped_val = val
@@ -2800,14 +2800,14 @@ func CGen.emit_stmt(self, s: LStmt?) {
       }
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "StClassSet")
-        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}] = {wrapped_val};")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{handle_ref}] = {wrapped_val};")
       } else {
-        self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
+        self.line(f"{handle_ref}->{lc_first(d.field)} = {wrapped_val};")
       }
     }
     StSlabSet => {
       let d = s!.slab_set!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       let val = self.emit_value(d.value)
       // Auto-wrap non-optional value when field type is optional struct
       let mut wrapped_val = val
@@ -2831,16 +2831,16 @@ func CGen.emit_stmt(self, s: LStmt?) {
       }
       if self.prog!.slab_mode_soa {
         let cname = self.resolve_class_name(d.class_name, "StSlabSet")
-        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{ref}] = {wrapped_val};")
+        self.line(f"_lyric_slab_{cname}.{lc_first(d.field)}[{handle_ref}] = {wrapped_val};")
       } else {
-        self.line(f"{ref}->{lc_first(d.field)} = {wrapped_val};")
+        self.line(f"{handle_ref}->{lc_first(d.field)} = {wrapped_val};")
       }
     }
     StSlabFree => {
       let d = s!.slab_free!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       let cname = self.resolve_class_name(d.class_name, "field_to_string")
-      self.line(f"_lyric_slab_free_{cname}({ref});")
+      self.line(f"_lyric_slab_free_{cname}({handle_ref});")
     }
     StSliceFree => {
       let d = s!.slice_free!
@@ -2863,23 +2863,23 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StRefIncr => {
       let d = s!.ref_incr!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       let cname = self.resolve_class_name(d.class_name, "ref_incr")
       if self.prog!.slab_mode_soa {
-        self.line(f"if ({ref}) _lyric_slab_{cname}._rc[{ref}]++;")
+        self.line(f"if ({handle_ref}) _lyric_slab_{cname}._rc[{handle_ref}]++;")
       } else {
-        self.line(f"if ({ref}) {ref}->_rc++;")
+        self.line(f"if ({handle_ref}) {handle_ref}->_rc++;")
       }
     }
     StRefDecr => {
       let d = s!.ref_decr!
-      let ref = self.emit_value(d.handle)
+      let handle_ref = self.emit_value(d.handle)
       let cname = self.resolve_class_name(d.class_name, "ref_decr")
       if self.prog!.rc_free {
         if self.prog!.slab_mode_soa {
-          self.line(f"if ({ref} && --_lyric_slab_{cname}._rc[{ref}] == 0) {cname}_destroy({ref});")
+          self.line(f"if ({handle_ref} && --_lyric_slab_{cname}._rc[{handle_ref}] == 0) {cname}_destroy({handle_ref});")
         } else {
-          self.line(f"if ({ref} && --{ref}->_rc == 0) {cname}_destroy({ref});")
+          self.line(f"if ({handle_ref} && --{handle_ref}->_rc == 0) {cname}_destroy({handle_ref});")
         }
       }
     }

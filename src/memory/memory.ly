@@ -786,7 +786,7 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
 
       // Track slice/string-typed variable declarations, but only if they own data
       if s.kind is StVarDecl {
-        if !isnull(s.var_decl) && !isnull(s.var_decl!.typ) {
+        if !isnull(s.var_decl) && !isnull(s.var_decl!.typ) && !s.var_decl!.is_ref {
           let typ_kind = s.var_decl!.typ!.kind
           if typ_kind is TySlice || typ_kind is TyString {
             // Only free if initialized from a fresh allocation

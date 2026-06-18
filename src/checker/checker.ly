@@ -2323,7 +2323,7 @@ lyric checker {
 
   func Checker.check_stmt(self, stmt: Stmt) {
     match stmt.kind {
-      VarDecl(name, names, type_expr, is_mut, value) => {
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         self.check_var_decl(name, names, type_expr, is_mut, value)
       }
       Assign(target, value) => {
@@ -3982,7 +3982,7 @@ lyric checker {
 
   func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> ()) {
     match stmt.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         if value != null { self.walk_expr(value!, callback) }
       }
       Assign(target, value) => {
@@ -4243,7 +4243,7 @@ lyric checker {
 
   func Checker.vwalk_stmt(self, stmt: Stmt, ctx: string) {
     match stmt.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         if value != null { self.vwalk_expr(value!, ctx) }
       }
       Assign(target, value) => {
@@ -4478,7 +4478,7 @@ lyric checker {
 
   func Checker.validate_access_stmt(self, stmt: Stmt) {
     match stmt.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         if value != null { self.validate_access_expr(value!) }
       }
       Assign(target, value) => {

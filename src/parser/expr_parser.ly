@@ -803,6 +803,12 @@ lyric parser {
       is_mut = true
       self.next()
     }
+    // Check for 'ref' keyword (contextual — lex as LIdent)
+    let mut is_ref = false
+    if self.peek().kind == LIdent && self.peek().text == "ref" {
+      is_ref = true
+      self.next()
+    }
 
     // Check for pattern let: let Variant(x, y) = expr else { ... }
     // Detected by: uppercase Ident followed by '('
@@ -827,7 +833,7 @@ lyric parser {
       self.expect(OAssign)?
       let val = self.parse_expr()?
       return (Stmt {
-        VarDecl(sym(""), names, null, is_mut, val),
+        VarDecl(sym(""), names, null, is_mut, is_ref, val),
         span: Span { start: start, end: self.peek().span.start }
       }, null)
     }
@@ -849,7 +855,7 @@ lyric parser {
     }
 
     return (Stmt {
-      VarDecl(sym(name!.text), [], type_ann, is_mut, val),
+      VarDecl(sym(name!.text), [], type_ann, is_mut, is_ref, val),
       span: Span { start: start, end: self.peek().span.start }
     }, null)
   }

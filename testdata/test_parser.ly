@@ -28,7 +28,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = 42 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(name, _, _, _, _) => {
+      VarDecl(name, _, _, _, _, _) => {
         assert_eq(name.name, "x", "var name")
       }
       _ => { assert(false, "expected VarDecl") }
@@ -39,7 +39,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x: i32 = 42 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(name, _, type_expr, _, _) => {
+      VarDecl(name, _, type_expr, _, _, _) => {
         assert_eq(name.name, "x", "var name")
         assert(type_expr != null, "has type")
       }
@@ -51,7 +51,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let mut x = 0 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, is_mut, _) => {
+      VarDecl(_, _, _, is_mut, _, _) => {
         assert(is_mut, "is_mut")
       }
       _ => { assert(false, "expected VarDecl") }
@@ -218,7 +218,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = 1 + 2 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         assert(value != null, "has value")
         match value!.kind {
           Binary(_, op, _) => {
@@ -236,7 +236,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = 1 + 2 * 3 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Binary(_, op, right) => {
             assert_eq(op, Add, "top-level is Add")
@@ -258,7 +258,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = -42 } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Unary(op, _) => {
             assert_eq(op, Neg, "unary Neg")
@@ -274,7 +274,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = a.foo(1) } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           MethodCall(_, method, _, args) => {
             assert_eq(method.name, "foo", "method name")
@@ -291,7 +291,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = a.b } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           FieldAccess(_, field_name) => {
             assert_eq(field_name.name, "b", "field name")
@@ -307,7 +307,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = a[0] } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Index(_, _) => { }
           _ => { assert(false, "expected Index") }
@@ -321,7 +321,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = foo(1, 2) } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Call(_, _, args) => {
             assert_eq(len(args), 2, "two args")
@@ -337,7 +337,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = [1, 2, 3] } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           ListLit(elems) => {
             assert_eq(len(elems), 3, "three elems")
@@ -353,7 +353,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = f\"hello {name}\" } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           StringInterp(_) => { }
           _ => { assert(false, "expected StringInterp") }
@@ -367,7 +367,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = (a: i32) -> i32 { return a } } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Lambda(params, _, _) => {
             assert_eq(len(params), 1, "one param")
@@ -383,7 +383,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = null } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Nil => { }
           _ => { assert(false, "expected Nil") }
@@ -397,7 +397,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = true } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           BoolLit(v) => {
             assert(v, "true literal")
@@ -543,7 +543,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() -> (i32, error) { let x = do_thing()?\n return (x, null) } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Try(_) => { }
           _ => { assert(false, "expected Try") }
@@ -559,7 +559,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { func f() { let x = match 1 { 1 => { 10 } _ => { 0 } } } }")
     let s = tp_first_stmt(b)
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           Match(_, arms) => {
             assert_eq(len(arms), 2, "two arms")
@@ -577,7 +577,7 @@ lyric parser_tests {
     let b = tp_parse("lyric t { struct Point { x: i32\n y: i32 } func f() { let p = Point { x: 1, y: 2 } } }")
     let s = b.fd_children[0].body!.bs_children[0]
     match s.kind {
-      VarDecl(_, _, _, _, value) => {
+      VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
           StructLit(type_name, _, fields) => {
             assert_eq(type_name.name, "Point", "struct type")

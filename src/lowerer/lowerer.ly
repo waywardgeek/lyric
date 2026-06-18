@@ -558,7 +558,7 @@ lyric lowerer {
           } else {
             make_null_val(ct)
           }
-          append(globals, LVarDeclData { name: c.name!.name, typ: ct, init: init, mutable: false })
+          append(globals, LVarDeclData { name: c.name!.name, typ: ct, init: init, mutable: false, is_ref: false })
         }
       }
     }
@@ -1110,8 +1110,8 @@ lyric lowerer {
   func Lowerer.lower_stmt(self, s: Stmt?) {
     if isnull(s) { return }
     match s!.kind {
-      VarDecl(name, names, type_expr, is_mut, value) => {
-        self.lower_var_decl(name, names, type_expr, is_mut, value)
+      VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
+        self.lower_var_decl(name, names, type_expr, is_mut, is_ref, value)
       }
       Assign(target, value) => {
         self.lower_assign(target, value)
@@ -1196,7 +1196,7 @@ lyric lowerer {
 
   // ---------- Variable declaration ----------
 
-  func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?) {
+  func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?) {
     // Multi-var destructuring
     if len(names) > 0 {
       let v = if !isnull(value) { self.lower_expr(value) } else { null }
@@ -1216,7 +1216,7 @@ lyric lowerer {
         // consecutive VarDecls referencing the same temp into StMultiAssign.
         self.emit(LStmt {
           kind: StVarDecl,
-          var_decl: LVarDeclData { name: n.name, typ: ft, init: v, mutable: is_mut }
+          var_decl: LVarDeclData { name: n.name, typ: ft, init: v, mutable: is_mut, is_ref: is_ref }
         })
         self.define_var(n.name, ft)
         i = i + 1
@@ -1267,7 +1267,7 @@ lyric lowerer {
 
     self.emit(LStmt {
       kind: StVarDecl,
-      var_decl: LVarDeclData { name: name.name, typ: typ, init: init, mutable: is_mut }
+      var_decl: LVarDeclData { name: name.name, typ: typ, init: init, mutable: is_mut, is_ref: is_ref }
     })
     self.define_var(name.name, typ)
   }
@@ -1593,7 +1593,7 @@ lyric lowerer {
           unwrap_opt: LUnwrapOptionalData { value: v }
         }
         let uv = self.emit_temp(unwrap_expr)
-        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false } })
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false, is_ref: false } })
         self.define_var(name.name, inner_type)
         self.lower_block(then_block)
         let then_body = self.stmts
@@ -1687,7 +1687,7 @@ lyric lowerer {
           unwrap_opt: LUnwrapOptionalData { value: v }
         }
         let uv = self.emit_temp(unwrap_expr)
-        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false } })
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: inner_type, init: uv, mutable: false, is_ref: false } })
         self.define_var(name.name, inner_type)
       }
       Variant(vname, bindings) => {
@@ -1735,7 +1735,7 @@ lyric lowerer {
             variant_data: LVariantDataData { value: val, enum_name: enum_name, variant: variant, field: fname }
           }
           let dv = self.emit_temp(data_expr)
-          self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ftype, init: dv, mutable: false } })
+          self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ftype, init: dv, mutable: false, is_ref: false } })
           self.define_var(bname.name, ftype)
         }
         Wildcard => {}
@@ -1899,7 +1899,7 @@ lyric lowerer {
           } else {
             // Binding: capture whole value
             let saved = self.save_stmts()
-            self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val!.typ, init: val, mutable: false } })
+            self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val!.typ, init: val, mutable: false, is_ref: false } })
             self.define_var(name.name, val!.typ)
             self.lower_block(arm.body)
             let body = self.stmts
@@ -2185,7 +2185,7 @@ lyric lowerer {
       }
       Ident(name) => {
         // Binding: bind and emit body
-        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val_type, init: val, mutable: false } })
+        self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: val_type, init: val, mutable: false, is_ref: false } })
         self.define_var(name.name, val_type)
 
         if !isnull(arm.guard) {
@@ -2252,7 +2252,7 @@ lyric lowerer {
                 struct_field: LStructFieldData { receiver: val, field: field_name }
               }
               let ev = self.emit_temp(extract)
-              self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ft, init: ev, mutable: false } })
+              self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: bname.name, typ: ft, init: ev, mutable: false, is_ref: false } })
               self.define_var(bname.name, ft)
             }
             Wildcard => {}
@@ -2924,7 +2924,7 @@ lyric lowerer {
       // Allocate result variable
       let result_var = f"_sc{self.temp_id}"
       self.temp_id = self.temp_id + 1
-      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: null, mutable: false } })
+      self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: result_var, typ: bool_type, init: null, mutable: false, is_ref: false } })
       self.emit(LStmt { kind: StAssign, assign: LAssignData { target: result_var, value: lv } })
 
       // Condition: for &&, enter if-block when left is true; for ||, when left is false
@@ -3367,7 +3367,7 @@ lyric lowerer {
 
     self.emit(LStmt {
       kind: StVarDecl,
-      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true }
+      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true, is_ref: false }
     })
     self.define_var(result_name, rt)
 
@@ -3407,7 +3407,7 @@ lyric lowerer {
                 self.restore_stmts(saved)
                 append(cases, LSwitchCase { tag: tag, binding: "", body: body })
               } else {
-                self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: v!.typ, init: v, mutable: false } })
+                self.emit(LStmt { kind: StVarDecl, var_decl: LVarDeclData { name: name.name, typ: v!.typ, init: v, mutable: false, is_ref: false } })
                 self.define_var(name.name, v!.typ)
                 self.lower_arm_body(arm.body, result_name, rt)
                 let body = self.stmts
@@ -3579,7 +3579,7 @@ lyric lowerer {
 
     self.emit(LStmt {
       kind: StVarDecl,
-      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true }
+      var_decl: LVarDeclData { name: result_name, typ: rt, init: make_null_val(rt), mutable: true, is_ref: false }
     })
     self.define_var(result_name, rt)
 

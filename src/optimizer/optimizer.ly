@@ -328,7 +328,7 @@ func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?] {
                   name: val_name,
                   typ: expr.typ
                 },
-                mutable: false
+                mutable: false, is_ref: false
               }
             }
             append(out, vd)
@@ -354,7 +354,7 @@ func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?] {
                   name: err_name,
                   typ: expr.typ
                 },
-                mutable: false
+                mutable: false, is_ref: false
               }
             }
             append(out, vd)
