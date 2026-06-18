@@ -2863,23 +2863,29 @@ func CGen.emit_stmt(self, s: LStmt?) {
     }
     StRefIncr => {
       let d = s!.ref_incr!
-      let handle_ref = self.emit_value(d.handle)
-      let cname = self.resolve_class_name(d.class_name, "ref_incr")
-      if self.prog!.slab_mode_soa {
-        self.line(f"if ({handle_ref}) _lyric_slab_{cname}._rc[{handle_ref}]++;")
-      } else {
-        self.line(f"if ({handle_ref}) {handle_ref}->_rc++;")
+      // Skip ref/unref for non-class types (e.g. after monomorphization of generic containers)
+      if !isnull(d.handle.typ) && d.handle.typ!.kind is TyClassHandle {
+        let handle_ref = self.emit_value(d.handle)
+        let cname = self.resolve_class_name(d.class_name, "ref_incr")
+        if self.prog!.slab_mode_soa {
+          self.line(f"if ({handle_ref}) _lyric_slab_{cname}._rc[{handle_ref}]++;")
+        } else {
+          self.line(f"if ({handle_ref}) {handle_ref}->_rc++;")
+        }
       }
     }
     StRefDecr => {
       let d = s!.ref_decr!
-      let handle_ref = self.emit_value(d.handle)
-      let cname = self.resolve_class_name(d.class_name, "ref_decr")
-      if self.prog!.rc_free {
-        if self.prog!.slab_mode_soa {
-          self.line(f"if ({handle_ref} && --_lyric_slab_{cname}._rc[{handle_ref}] == 0) {cname}_destroy({handle_ref});")
-        } else {
-          self.line(f"if ({handle_ref} && --{handle_ref}->_rc == 0) {cname}_destroy({handle_ref});")
+      // Skip ref/unref for non-class types
+      if !isnull(d.handle.typ) && d.handle.typ!.kind is TyClassHandle {
+        let handle_ref = self.emit_value(d.handle)
+        let cname = self.resolve_class_name(d.class_name, "ref_decr")
+        if self.prog!.rc_free {
+          if self.prog!.slab_mode_soa {
+            self.line(f"if ({handle_ref} && --_lyric_slab_{cname}._rc[{handle_ref}] == 0) {cname}_destroy({handle_ref});")
+          } else {
+            self.line(f"if ({handle_ref} && --{handle_ref}->_rc == 0) {cname}_destroy({handle_ref});")
+          }
         }
       }
     }
