@@ -2431,12 +2431,12 @@ lyric checker {
         self.pop_scope()
       }
       Break | Continue => {}
-      Ref(_ref_name) => {
+      Ref(_ref_expr) => {
         if !self.in_trusted {
           self.error_at(stmt.span, "ref statement can only be used inside a trusted function")
         }
       }
-      Unref(_unref_name) => {
+      Unref(_unref_expr) => {
         if !self.in_trusted {
           self.error_at(stmt.span, "unref statement can only be used inside a trusted function")
         }

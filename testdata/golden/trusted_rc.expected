@@ -1,4 +1,3 @@
-Bob
-Carol
-destroying parent: Bob
-done
+value: 42
+self ref: 99
+trusted ref/unref OK

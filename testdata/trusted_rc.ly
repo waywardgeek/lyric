@@ -1,25 +1,35 @@
-lyric trusted_rc {
+// Test trusted func with ref/unref on expressions
 
-  class Parent { name: string }
-  class Child { name: string }
-  relation RefArrayList Parent refs [Child]
+class Box {
+  value: i32
+}
 
-  final func Parent.on_destroy(self) {
-    println(f"destroying parent: {self.name}")
-  }
+trusted func Box.inc_ref(self) {
+  ref self
+}
 
-  final func Child.on_destroy(self) {
-    println(f"destroying child: {self.name}")
-  }
+trusted func Box.dec_ref(self) {
+  unref self
+}
 
-  func main() {
-    {
-      let p = Parent { name: "Bob" }
-      let c = Child { name: "Carol" }
-      p.append(c)
-      println(p.name)
-      println(c.name)
-    }
-    println("done")
-  }
+trusted func test_basic_ref() {
+  let b = Box { value: 42 }
+  ref b
+  ref b
+  unref b
+  unref b
+  println(f"value: {b.value}")
+}
+
+trusted func test_self_ref() {
+  let b = Box { value: 99 }
+  b.inc_ref()
+  b.dec_ref()
+  println(f"self ref: {b.value}")
+}
+
+func main() {
+  test_basic_ref()
+  test_self_ref()
+  println("trusted ref/unref OK")
 }

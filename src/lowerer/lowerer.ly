@@ -1173,21 +1173,19 @@ lyric lowerer {
         // Lower cascade block inline
         self.lower_block(body)
       }
-      Ref(name) => {
-        let var_name = sym_to_string(name)
-        let typ = self.lookup_var(var_name)
-        let class_name = if !isnull(typ) { typ!.name } else { "" }
+      Ref(expr) => {
+        let val = self.lower_expr(expr)
+        let class_name = if !isnull(val) && !isnull(val!.typ) { val!.typ!.name } else { "" }
         self.emit(LStmt { kind: StRefIncr, ref_incr: LRefIncrData {
-          handle: LValue { kind: ValVar, name: var_name },
+          handle: val!,
           class_name: class_name
         }})
       }
-      Unref(name) => {
-        let var_name = sym_to_string(name)
-        let typ = self.lookup_var(var_name)
-        let class_name = if !isnull(typ) { typ!.name } else { "" }
+      Unref(expr) => {
+        let val = self.lower_expr(expr)
+        let class_name = if !isnull(val) && !isnull(val!.typ) { val!.typ!.name } else { "" }
         self.emit(LStmt { kind: StRefDecr, ref_decr: LRefDecrData {
-          handle: LValue { kind: ValVar, name: var_name },
+          handle: val!,
           class_name: class_name
         }})
       }

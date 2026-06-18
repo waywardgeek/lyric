@@ -780,13 +780,13 @@ lyric parser {
         // Check for ref/unref statements
         if tok.kind == LIdent && tok.text == "ref" {
           self.next()
-          let name_tok = self.expect(LIdent)?
-          return (Stmt { Ref(sym(name_tok!.text)), span: self.make_span(tok.span.start) }, null)
+          let expr = self.parse_expr()?
+          return (Stmt { Ref(expr!), span: self.make_span(tok.span.start) }, null)
         }
         if tok.kind == LIdent && tok.text == "unref" {
           self.next()
-          let name_tok = self.expect(LIdent)?
-          return (Stmt { Unref(sym(name_tok!.text)), span: self.make_span(tok.span.start) }, null)
+          let expr = self.parse_expr()?
+          return (Stmt { Unref(expr!), span: self.make_span(tok.span.start) }, null)
         }
         return self.parse_expr_or_assign()
       }

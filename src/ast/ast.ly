@@ -333,8 +333,8 @@ lyric ast {
     Lock(mutex: Expr, body: Block)
     IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?)
     LetElse(pattern: Pattern, value: Expr, else_block: Block)
-    Ref(name: Sym)
-    Unref(name: Sym)
+    Ref(expr: Expr)
+    Unref(expr: Expr)
   }
 
   class Stmt {
