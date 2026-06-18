@@ -168,36 +168,36 @@ lyric std {
     // Method-style append: p.append(c)
     pub trusted func P.append(self, child: C) {
       ref child
-      child.set_parent(self)
-      child.set_next(null)
-      let old_last = self.last()
-      child.set_prev(old_last)
+      child.parent = self
+      child.next = null
+      let old_last = self.last
+      child.prev = old_last
       if !isnull(old_last) {
-        old_last!.set_next(child)
+        old_last!.next = child
       }
-      self.set_last(child)
-      if isnull(self.first()) {
-        self.set_first(child)
+      self.last = child
+      if isnull(self.first) {
+        self.first = child
       }
     }
 
     // Method-style remove: p.remove(c)
     pub trusted func P.remove(self, child: C) {
-      let prev_node = child.prev()
-      let next_node = child.next()
+      let prev_node = child.prev
+      let next_node = child.next
       if !isnull(prev_node) {
-        prev_node!.set_next(next_node)
+        prev_node!.next = next_node
       } else {
-        self.set_first(next_node)
+        self.first = next_node
       }
       if !isnull(next_node) {
-        next_node!.set_prev(prev_node)
+        next_node!.prev = prev_node
       } else {
-        self.set_last(prev_node)
+        self.last = prev_node
       }
-      child.set_parent(null)
-      child.set_prev(null)
-      child.set_next(null)
+      child.parent = null
+      child.prev = null
+      child.next = null
       unref child
     }
   }
