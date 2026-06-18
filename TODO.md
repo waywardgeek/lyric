@@ -2,6 +2,12 @@
 
 ## Language Bugs
 
+### `ref`/`unref` on non-class types should be no-op at checker level
+- Currently handled by C backend type guard (TyClassHandle check)
+- Ideally the checker would warn and the lowerer would skip emission entirely
+- Low priority since the C backend guard works
+- Found: 2026-06-18
+
 ### `let` inside if-expression body doesn't work
 - `let ref x = if cond { expr1 } else { let y = ...; y }` fails with parse error
 - Workaround: declare the variable before the if-expression
