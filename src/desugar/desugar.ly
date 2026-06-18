@@ -325,6 +325,7 @@ lyric desugar {
           mappings = append(mappings, setter_mapping)
         }
 
+
         // Create or merge impl block
         if len(mappings) > 0 {
           let mut parent_name: string = ""
@@ -352,6 +353,10 @@ lyric desugar {
           }
 
           if !isnull(existing) {
+            // Set label from relation if not already set
+            if isnull(existing!.label) && !isnull(rel.parent.label) {
+              existing!.label = rel.parent.label
+            }
             // Merge: add mappings not already present
             // Collect to_add first to avoid invalidating existing_mappings pointer
             let existing_mappings = existing!.ibm_children()
@@ -371,10 +376,14 @@ lyric desugar {
               array_append<ImplBlock, ImplMapping>(existing!, m)
             }
           } else {
-            // Create new impl block
+            // Create new impl block — set label from parent side of relation
+            let mut rel_label: Sym? = null
+            if !isnull(rel.parent.label) {
+              rel_label = rel.parent.label
+            }
             let new_ib = ImplBlock {
               interface_name: rel.hint,
-              label: null,
+              label: rel_label,
               span: rel.span,
             }
             // Build TypeArgs with type parameters from the relation sides

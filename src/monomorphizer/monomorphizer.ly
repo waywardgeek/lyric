@@ -501,12 +501,44 @@ func MonoPass.collect_from_expr(self, e: LExpr) {
                 if !isnull(direct_entry) && len(direct_entry!.value.type_params) > 0 {
                   self.record_func_instance(direct_key, mc.type_args)
                 } else {
-                  // Search for generic functions with type-param receivers
+                  // Search for generic functions with relational constraints.
+                  // Handle label-prefixed method names like "roster_append" -> "append"
+                  // by finding the last underscore and splitting.
+                  // NOTE: We don't use global _method_aliases because it gets corrupted
+                  // by the lowerer phase (Dict freed by RC, memory reused — see TODO).
+                  let mut search_name = mc.method
+                  let mut label = ""
+                  // Find last underscore to split label from method name
+                  let mut ui = len(mc.method) - 1
+                  while ui > 0 {
+                    if mc.method[ui] == 95 { // '_'
+                      // Build label and search_name from slices
+                      let mut lbl_sb = new_string_builder()
+                      let mut mi = 0
+                      while mi < ui {
+                        lbl_sb.write_byte(mc.method[mi])
+                        mi = mi + 1
+                      }
+                      label = lbl_sb.to_string()
+                      let mut name_sb = new_string_builder()
+                      mi = ui + 1
+                      while mi < len(mc.method) {
+                        name_sb.write_byte(mc.method[mi])
+                        mi = mi + 1
+                      }
+                      search_name = name_sb.to_string()
+                      break
+                    }
+                    ui = ui - 1
+                  }
                   let mut fi2 = 0
                   while fi2 < len(self.prog!.functions) {
                     let f = self.prog!.functions[fi2]
-                    if f.name == mc.method && len(f.type_params) > 0 && len(f.relational_constraints) > 0 {
-                      let fkey = self.func_key(f)
+                    if f.name == search_name && len(f.type_params) > 0 && len(f.relational_constraints) > 0 {
+                      let mut fkey = self.func_key(f)
+                      if label != "" {
+                        fkey = fkey + ":label=" + label
+                      }
                       self.record_func_instance(fkey, mc.type_args)
                     }
                     fi2 = fi2 + 1
@@ -540,7 +572,7 @@ func MonoPass.collect_from_expr(self, e: LExpr) {
 // Phase 2: Specialization (deep clone + type substitution)
 // ---------------------------------------------------------------------------
 
-func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string) -> LFuncDecl {
+func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string, label: string) -> LFuncDecl {
   let mut params: [LParam] = []
   let mut i = 0
   while i < len(orig.params) {
@@ -576,7 +608,7 @@ func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, 
   // Rewrite method calls based on ImplMethodRenames (per-specialization, not post-pass).
   // Matches Go compiler's rewriteImplMethodCalls in specializeFunc.
   if len(orig.relational_constraints) > 0 && !isnull(self.prog!.impl_method_renames) {
-    self.rewrite_impl_method_calls(spec, orig.relational_constraints, subst)
+    self.rewrite_impl_method_calls(spec, orig.relational_constraints, subst, label)
   }
 
   return spec
@@ -595,14 +627,17 @@ struct ImplRenameEntry {
   new_method: string
 }
 
-func MonoPass.rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?) {
+func MonoPass.rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?, label: string) {
   let mut renames: [ImplRenameEntry] = []
 
   let mut ci = 0
   while ci < len(constraints) {
     let rc = constraints[ci]
-    // Build key prefix: "InterfaceName@ConcreteArg0@ConcreteArg1@..."
+    // Build key prefix: "InterfaceName@label?@ConcreteArg0@ConcreteArg1@..."
     let mut prefix = rc.interface_name
+    if label != "" {
+      prefix = prefix + "@" + label
+    }
     let mut ti = 0
     while ti < len(rc.type_args) {
       let ta = rc.type_args[ti]
@@ -3443,13 +3478,20 @@ func monomorphize(prog: LProgram?) {
         fi = fi + 1
         continue
       }
-      // Parse "name|typekey" 
+      // Parse "name|typekey" or "name:label=xxx|typekey"
       let parts = str_split(key.get_name(), "|")
       if len(parts) < 2 {
         fi = fi + 1
         continue
       }
-      let func_name = parts[0]
+      let mut func_name = parts[0]
+      let mut label = ""
+      // Check for label suffix: "funcname:label=xxx"
+      let label_idx = str_index_of(func_name, ":label=")
+      if label_idx >= 0 {
+        label = func_name[label_idx + 7:]
+        func_name = func_name[0:label_idx]
+      }
       let orig_entry = m.func_by_name!.get(sym(func_name))
       if isnull(orig_entry) {
         fi = fi + 1
@@ -3481,8 +3523,12 @@ func monomorphize(prog: LProgram?) {
           new_receiver = recv_type!.value!.name
         }
       }
-      let mangled = if new_receiver != "" { orig.name } else { mangle_name(orig.name, types) }
-      let spec = m.specialize_func(orig, subst, mangled, new_receiver)
+      // Use label-prefixed name when label is present
+      let mut mangled = if new_receiver != "" { orig.name } else { mangle_name(orig.name, types) }
+      if label != "" {
+        mangled = label + "_" + orig.name
+      }
+      let spec = m.specialize_func(orig, subst, mangled, new_receiver, label)
       m.collect_from_stmts(spec.body)
       append(new_funcs, spec)
       fi = fi + 1
@@ -3557,7 +3603,7 @@ func monomorphize(prog: LProgram?) {
           let meth_gen = generated_funcs.get(sym(meth_key))
           if isnull(meth_gen) {
             generated_funcs.set(sym(meth_key), true)
-            let spec_method = m.specialize_func(method, subst, method.name, mangled)
+            let spec_method = m.specialize_func(method, subst, method.name, mangled, "")
             m.collect_from_stmts(spec_method.body)
             append(new_funcs, spec_method)
           }

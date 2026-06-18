@@ -44,3 +44,26 @@
 
 ### Monomorphizer doesn't specialize generic external method return types
 - Known gap, causes void* in some edge cases
+
+## BUG: Global Dict<Sym,string> freed by RC, memory reused by lowerer
+
+**Symptom**: `_method_aliases` global Dict in checker.ly has 2 entries after checker phase.
+After lowerer phase, `get_method_aliases()` returns a Dict with 30 entries — all from
+`impl_method_renames`. The original 2 entries are gone.
+
+**Root cause**: The `_method_aliases` Dict (class, heap-allocated) gets its RC decremented
+to 0 somewhere between checker and lowerer phases, gets freed, and the slab allocator
+reuses the same memory for the lowerer's `impl_method_renames` Dict. The global
+`_method_aliases` pointer still points to the old address → now it aliases `impl_method_renames`.
+
+**Evidence**:
+- `pre-lower aliases count=2`, `post-lower aliases count=30`
+- ASAN found UAF in `lower_impl_block` (fixed with `let ref` for string concat temps)
+- Keys dumped at mono time show `impl_method_renames` content, not alias content
+- Immediate verify after `set()` in checker succeeds (`verify=yes`)
+
+**Workaround**: Monomorphizer uses suffix-based label stripping instead of global alias lookup.
+The `_method_aliases` and `_method_labels` globals still exist but are unused by monomorphizer.
+
+**Likely fix**: Either make the Dict `permanent`, find the RC leak (optional unwrap?),
+or move aliases onto LProgram. Also need `str_substr` in stdlib.

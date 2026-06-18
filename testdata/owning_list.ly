@@ -13,9 +13,9 @@ lyric owning_list {
     let p2 = Player { name: "Bob" }
     let p3 = Player { name: "Carol" }
 
-    t.append(p1)
-    t.append(p2)
-    t.append(p3)
+    t.team_append(p1)
+    t.team_append(p2)
+    t.team_append(p3)
 
     // Walk the list
     let mut cur = t.team_first
@@ -25,7 +25,7 @@ lyric owning_list {
     }
 
     // Remove middle element
-    t.remove(p2)
+    t.team_remove(p2)
     println("after remove:")
     cur = t.team_first
     while !isnull(cur) {

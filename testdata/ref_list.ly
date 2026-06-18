@@ -14,9 +14,9 @@ lyric ref_list {
     let g2 = Guest { name: "Bob" }
     let g3 = Guest { name: "Carol" }
 
-    r.append(g1)
-    r.append(g2)
-    r.append(g3)
+    r.room_append(g1)
+    r.room_append(g2)
+    r.room_append(g3)
 
     // Walk the list
     let mut cur = r.room_first
@@ -26,7 +26,7 @@ lyric ref_list {
     }
 
     // Remove middle element
-    r.remove(g2)
+    r.room_remove(g2)
     println("after remove:")
     cur = r.room_first
     while !isnull(cur) {

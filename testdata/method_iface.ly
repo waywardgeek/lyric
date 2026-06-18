@@ -31,10 +31,10 @@ lyric method_iface_test {
     let w1 = Widget { label: "button" }
     let w2 = Widget { label: "text" }
 
-    panel.add(w1)
-    panel.add(w2)
+    panel.w_add(w1)
+    panel.w_add(w2)
 
-    assert_eq(panel.count(), 2)
+    assert_eq(panel.w_count(), 2)
 
     let kids = panel.w_items()
     assert_eq(kids[0].label, "button")

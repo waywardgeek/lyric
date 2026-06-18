@@ -734,8 +734,12 @@ lyric lowerer {
       i = i + 1
     }
 
-    // Build rename key prefix: iface_name + @ + type_arg_names...
+    // Build rename key prefix: iface_name + @ + label? + @ + type_arg_names...
     let mut rename_prefix = iface_name
+    let mut label_segment = ""
+    if !isnull(ib!.label) {
+      label_segment = "@" + ib!.label!.name
+    }
     let mut type_arg_suffix = ""
     for tp in iface.type_params {
       let ta_entry = type_arg_map.get(sym(tp.name))
@@ -743,13 +747,25 @@ lyric lowerer {
         type_arg_suffix = type_arg_suffix + "@" + ta_entry!.value
       }
     }
-    rename_prefix = iface_name + type_arg_suffix
+    rename_prefix = iface_name + label_segment + type_arg_suffix
 
     // Build additional prefixes for embedded interfaces (e.g., OwningList embeds DoublyLinked)
     // so that where-clause lookups on embedded interfaces find the correct renames.
+    // NOTE: Use let ref on concat temps — slice holds pointers, scope-exit free would UAF
     let mut all_rename_prefixes: [string] = [rename_prefix]
     for embed_name in iface.embeds {
-      all_rename_prefixes = append(all_rename_prefixes, embed_name + type_arg_suffix)
+      let ref ep = embed_name + label_segment + type_arg_suffix
+      all_rename_prefixes = append(all_rename_prefixes, ep)
+    }
+    // Also register under unlabeled prefix so free-function API (array_append etc.) still works
+    if label_segment != "" {
+      // Use let ref to prevent scope-exit freeing — slice holds these pointers
+      let ref unlabeled = iface_name + type_arg_suffix
+      all_rename_prefixes = append(all_rename_prefixes, unlabeled)
+      for embed_name in iface.embeds {
+        let ref embed_unlabeled = embed_name + type_arg_suffix
+        all_rename_prefixes = append(all_rename_prefixes, embed_unlabeled)
+      }
     }
 
     // Lower each mapping

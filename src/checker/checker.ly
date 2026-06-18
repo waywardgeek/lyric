@@ -144,6 +144,25 @@ lyric checker {
   // Checker state
   // =====================================================================
 
+  // Global: maps label-prefixed method names to base method names.
+  // e.g. "c1_append" → "append". Populated by checker, read by monomorphizer.
+  let mut _method_aliases: Dict<Sym, string>? = null
+  let mut _method_labels: Dict<Sym, string>? = null
+
+  func get_method_aliases() -> Dict<Sym, string> {
+    if isnull(_method_aliases) {
+      _method_aliases = Dict<Sym, string>()
+    }
+    return _method_aliases!
+  }
+
+  func get_method_labels() -> Dict<Sym, string> {
+    if isnull(_method_labels) {
+      _method_labels = Dict<Sym, string>()
+    }
+    return _method_labels!
+  }
+
   permanent class Checker {
     registry: Registry
     scope: Scope
@@ -1470,7 +1489,20 @@ lyric checker {
 
           for ib in all_impls {
             if ib.interface_name == null { continue }
-            if sym_to_string(ib.interface_name!) != iface_name { continue }
+            let ib_iface_name = sym_to_string(ib.interface_name!)
+            let mut iface_matches = ib_iface_name == iface_name
+            if !iface_matches {
+              // Check if the impl block's interface embeds the where-clause interface
+              let ib_iface = self.iface_decls.get(sym(ib_iface_name))
+              if ib_iface != null {
+                for emb in ib_iface!.value.ie_children() {
+                  if !isnull(emb.name) && emb.name!.name == iface_name {
+                    iface_matches = true
+                  }
+                }
+              }
+            }
+            if !iface_matches { continue }
 
             let impl_args = ib.ib_arg_children()
             if recv_param_idx >= len(impl_args) as i32 { continue }
@@ -1523,9 +1555,19 @@ lyric checker {
                 }
               }
             }
-            let method_key = concrete_name + "." + fname
+            // If impl block has a label, register with label-prefixed name
+            let mut reg_name = fname
+            if ib.label != null {
+              let label_str = sym_to_string(ib.label!)
+              // Use let ref to prevent scope-exit free — sym() stores pointer to string data
+              let ref label_name = label_str + "_" + fname
+              reg_name = label_name
+              get_method_aliases().set(sym(reg_name), fname)
+              get_method_labels().set(sym(reg_name), label_str)
+            }
+            let method_key = concrete_name + "." + reg_name
             self.method_type_args.set(sym(method_key), ta)
-            cinfo!.methods.set(sym(fname), final_type)
+            cinfo!.methods.set(sym(reg_name), final_type)
             self.scope.define(method_key, final_type)
           }
         }
@@ -1592,7 +1634,17 @@ lyric checker {
           if cinfo == null { continue }
 
           let mname = sym_to_string(m.name!)
-          let existing = cinfo!.methods.get(sym(mname))
+          // If impl block has a label, register with label-prefixed name
+          let mut reg_name = mname
+          if ib.label != null {
+            let label_str = sym_to_string(ib.label!)
+            // Use let ref to prevent scope-exit free — sym() stores pointer to string data
+            let ref label_name = label_str + "_" + mname
+            reg_name = label_name
+            get_method_aliases().set(sym(reg_name), mname)
+            get_method_labels().set(sym(reg_name), label_str)
+          }
+          let existing = cinfo!.methods.get(sym(reg_name))
           if existing != null { continue }
 
           let ft = self.func_decl_to_type(m)
@@ -1613,8 +1665,18 @@ lyric checker {
             _ => {}
           }
 
-          let method_key = concrete_name + "." + mname
-          cinfo!.methods.set(sym(mname), final_type)
+          let method_key = concrete_name + "." + reg_name
+          // Build type args for monomorphizer (like Phase 1.5)
+          let mut ta: [TypeExpr] = []
+          let mut ta_i = 0
+          let mut ta_limit = len(itp)
+          if len(impl_args) < ta_limit { ta_limit = len(impl_args) }
+          while ta_i < ta_limit as i32 {
+            append(ta, impl_args[ta_i])
+            ta_i = ta_i + 1
+          }
+          self.method_type_args.set(sym(method_key), ta)
+          cinfo!.methods.set(sym(reg_name), final_type)
           self.scope.define(method_key, final_type)
         }
       }
