@@ -1,9 +1,12 @@
-// Test: slices of class handles and structs-with-class-handles need element RC
+// Test: verify RC release calls destroy (with finalizer) on class handles
 
-lyric test_slice_rc {
+lyric slice_rc {
 
 class Widget {
     value: i32
+    final func on_destroy(self) {
+        println(f"destroy {self.value}")
+    }
 }
 
 struct Pair {
@@ -11,8 +14,9 @@ struct Pair {
     b: Widget
 }
 
-// Test 1: slice of class handles
+// Test 1: slice of class handles — elements destroyed at scope exit
 func test_slice_of_classes() {
+    println("--- slice of classes ---")
     let w1 = Widget { value: 1 }
     let w2 = Widget { value: 2 }
     let ws: [Widget] = [w1, w2]
@@ -21,6 +25,7 @@ func test_slice_of_classes() {
 
 // Test 2: slice of structs containing class handles
 func test_slice_of_structs() {
+    println("--- slice of structs ---")
     let w1 = Widget { value: 10 }
     let w2 = Widget { value: 20 }
     let w3 = Widget { value: 30 }
@@ -31,6 +36,7 @@ func test_slice_of_structs() {
 
 // Test 3: plain slice — no RC needed
 func test_plain_slice() {
+    println("--- plain slice ---")
     let nums: [i32] = [1, 2, 3]
     println(f"{nums[0]} {nums[2]}")
 }

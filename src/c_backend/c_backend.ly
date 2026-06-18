@@ -2641,9 +2641,9 @@ func CGen.emit_element_rc_release(self, elem_expr: string, typ: LType?) {
     }
     let cname = self.resolve_class_name(typ!.name, "slice_rc_release")
     if self.prog!.slab_mode_soa {
-      self.line(f"if ({elem_expr}) {{ if (--_lyric_slab_{cname}._rc[{elem_expr}] == 0) _lyric_slab_free_{cname}({elem_expr}); }}")
+      self.line(f"if ({elem_expr}) {{ if (--_lyric_slab_{cname}._rc[{elem_expr}] == 0) {cname}_destroy({elem_expr}); }}")
     } else {
-      self.line(f"if ({elem_expr}) {{ if (--{elem_expr}->_rc == 0) _lyric_slab_free_{cname}({elem_expr}); }}")
+      self.line(f"if ({elem_expr}) {{ if (--{elem_expr}->_rc == 0) {cname}_destroy({elem_expr}); }}")
     }
     return
   }
@@ -2877,9 +2877,9 @@ func CGen.emit_stmt(self, s: LStmt?) {
       let cname = self.resolve_class_name(d.class_name, "ref_decr")
       if self.prog!.rc_free {
         if self.prog!.slab_mode_soa {
-          self.line(f"if ({ref} && --_lyric_slab_{cname}._rc[{ref}] == 0) _lyric_slab_free_{cname}({ref});")
+          self.line(f"if ({ref} && --_lyric_slab_{cname}._rc[{ref}] == 0) {cname}_destroy({ref});")
         } else {
-          self.line(f"if ({ref} && --{ref}->_rc == 0) _lyric_slab_free_{cname}({ref});")
+          self.line(f"if ({ref} && --{ref}->_rc == 0) {cname}_destroy({ref});")
         }
       }
     }

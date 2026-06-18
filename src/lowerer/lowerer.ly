@@ -1082,6 +1082,7 @@ lyric lowerer {
       return_type: rt,
       body: body,
       is_exported: fd!.is_public,
+      is_final: fd!.is_final,
       receiver: receiver,
       receiver_type_params: recv_tps,
       relational_constraints: constraints

@@ -1,3 +1,12 @@
+--- slice of classes ---
 1 2
+destroy 1
+destroy 2
+--- slice of structs ---
 10 40
+destroy 10
+destroy 20
+destroy 30
+destroy 40
+--- plain slice ---
 1 3

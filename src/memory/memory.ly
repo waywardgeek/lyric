@@ -606,6 +606,28 @@ func is_var_value(var_name: string, v: LValue) -> bool {
 // Slab Rewrite + Scope-Exit Slice Free
 // ==========================================================================
 
+// Find the finalizer function for a class (a function marked is_final whose
+// first param is a class handle of the given class name).
+// Returns the C-compatible function name (Receiver_name), or "" if none.
+func find_finalizer(prog: LProgram, class_name: string) -> string {
+  let mut i = 0
+  while i < len(prog.functions) {
+    if prog.functions[i].is_final {
+      if len(prog.functions[i].params) > 0 {
+        let pt = prog.functions[i].params[0].typ
+        if !isnull(pt) && pt!.kind is TyClassHandle && pt!.name == class_name {
+          if prog.functions[i].receiver != "" {
+            return prog.functions[i].receiver + "_" + prog.functions[i].name
+          }
+          return prog.functions[i].name
+        }
+      }
+    }
+    i = i + 1
+  }
+  return ""
+}
+
 // Rewrite the entire program from malloc-based classes to slab-based allocation.
 // Also frees locally-created slices at scope exit when safe.
 func slab_rewrite(prog: LProgram) {
@@ -613,6 +635,33 @@ func slab_rewrite(prog: LProgram) {
 
   // Compute escape analysis first
   let escape_map = compute_escape_map(prog)
+
+  // Generate empty destroy methods for non-permanent classes that don't have one.
+  // This ensures every non-permanent class has a destroy method for RC to call.
+  let mut ci = 0
+  while ci < len(prog.classes) {
+    if !prog.classes[ci].is_permanent {
+      let cname = prog.classes[ci].name
+      let mut has_destroy = false
+      let mut di = 0
+      while di < len(prog.functions) {
+        if prog.functions[di].name == "destroy" && prog.functions[di].receiver == cname {
+          has_destroy = true
+        }
+        di = di + 1
+      }
+      if !has_destroy {
+        let self_type = LType { kind: TyClassHandle, name: cname, bits: 0 }
+        let destroy_func = LFuncDecl {
+          name: "destroy",
+          params: [LParam { name: "self", typ: self_type, mutable: false }],
+          receiver: cname,
+        }
+        prog.functions = append(prog.functions, destroy_func)
+      }
+    }
+    ci = ci + 1
+  }
 
   // Rewrite all functions
   let mut fi = 0
@@ -622,12 +671,44 @@ func slab_rewrite(prog: LProgram) {
     prog.functions[fi].body = new_body
 
     // Inject slab_free(self) at end of destroy methods
+    // and finalizer call at the start
     let fname = prog.functions[fi].name
     if fname == "destroy" {
       if len(prog.functions[fi].params) > 0 {
         let p = prog.functions[fi].params[0]
         if !isnull(p.typ) {
           if p.typ!.kind is TyClassHandle {
+            // Find and inject finalizer call at START of destroy
+            let finalizer_name = find_finalizer(prog, p.typ!.name)
+            if finalizer_name != "" {
+              let call_expr = LExpr {
+                kind: ExCall,
+                call: LCallData {
+                  func_name: finalizer_name,
+                  args: [LValue {
+                    kind: ValVar,
+                    name: p.name,
+                    temp_id: 0,
+                    typ: p.typ,
+                  }],
+                  mut_args: [false],
+                },
+              }
+              let call_stmt = LStmt {
+                kind: StSideEffect,
+                side_effect: LSideEffectData { expr: call_expr },
+              }
+              // Prepend finalizer call
+              let mut new_body: [LStmt?] = [call_stmt]
+              let mut bi = 0
+              while bi < len(prog.functions[fi].body) {
+                new_body.push(prog.functions[fi].body[bi])
+                bi = bi + 1
+              }
+              prog.functions[fi].body = new_body
+            }
+
+            // Append slab_free at END of destroy
             let free_stmt = LStmt {
               kind: StSlabFree,
               slab_free: LSlabFreeData {

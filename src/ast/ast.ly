@@ -77,6 +77,7 @@ lyric ast {
   class FuncDecl {
     name: Sym?
     is_public: bool
+    is_final: bool
     receiver_type: Sym?
     return_type: TypeExpr?
     body: Block?

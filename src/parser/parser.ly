@@ -894,8 +894,16 @@ lyric parser {
           array_append<ClassDecl, FuncDecl>(cls, fn!)
         }
         _ => {
-          let field = self.parse_field()?
-          array_append<ClassDecl, Field>(cls, field!)
+          // Check for 'final func' (contextual keyword)
+          if self.peek().kind == LIdent && self.peek().text == "final" {
+            self.next()  // consume 'final'
+            let fn = self.parse_func()?
+            fn!.is_final = true
+            array_append<ClassDecl, FuncDecl>(cls, fn!)
+          } else {
+            let field = self.parse_field()?
+            array_append<ClassDecl, Field>(cls, field!)
+          }
         }
       }
       if self.peek().kind == PComma {
