@@ -581,8 +581,14 @@ lyric parser {
         }
         KPub => {
           self.next()
+          let mut pub_trusted = false
+          if self.peek().kind == LIdent && self.peek().text == "trusted" {
+            pub_trusted = true
+            self.next()
+          }
           let fn = self.parse_func()?
           fn!.is_public = true
+          fn!.is_trusted = pub_trusted
           array_append<InterfaceDecl, FuncDecl>(iface, fn!)
         }
         KFunc => {
