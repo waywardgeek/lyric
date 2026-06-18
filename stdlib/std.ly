@@ -43,6 +43,34 @@ lyric std {
       child.set_index(0)
     }
 
+    // Method-style append: p.append(c)
+    pub func P.append(self, child: C) {
+      let kids = self.children()
+      let num: i32 = len(kids)
+      child.set_index(num)
+      child.set_parent(self)
+      self.set_children(append(kids, child))
+    }
+
+    // Method-style remove: c.remove()
+    pub func C.remove(self) {
+      let p = self.parent()
+      if isnull(p) {
+        return
+      }
+      let kids = p!.children()
+      let idx = self.index()
+      let last_idx: i32 = len(kids) - 1
+      if idx < last_idx {
+        let last_child = kids[last_idx]
+        last_child.set_index(idx)
+        kids[idx] = last_child
+      }
+      p!.set_children(kids[0:last_idx])
+      self.set_parent(null)
+      self.set_index(0)
+    }
+
     // Destructor for parent: cascade destroy all owned children
     destructor P {
       let kids = self.children()

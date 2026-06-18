@@ -8,7 +8,7 @@ lyric trusted_rc {
     {
       let p = Parent { name: "Bob" }
       let c = Child { name: "Carol" }
-      array_append<Parent, Child>(p, c)
+      p.append(c)
       println(p.name)
       println(c.name)
     }
