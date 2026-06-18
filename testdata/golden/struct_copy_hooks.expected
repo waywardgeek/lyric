@@ -1,5 +1,11 @@
 1 2
+destroy 1
+destroy 2
 42 10
+destroy 42
 1 2
 10 20
+destroy 10
+destroy 20
 77 77
+destroy 77

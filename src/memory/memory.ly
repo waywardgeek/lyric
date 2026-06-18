@@ -870,11 +870,11 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
           }
           // Track struct-typed locals with RC class handle fields
           if typ_kind is TyStruct && type_has_rc_fields(prog, s.var_decl!.typ) {
-            let escapes = var_escapes_via_call(s.var_decl!.name, all_stmts, escape_map)
-            if !escapes {
-              struct_rc_locals.push(s.var_decl!.name)
-              struct_rc_types.push(s.var_decl!.typ)
-            }
+            // Struct RC locals always get scope-exit releases for embedded class handles.
+            // Unlike slices (shallow copy = shared backing), struct copies retain all
+            // embedded refs via copy hooks, making copies independent.
+            struct_rc_locals.push(s.var_decl!.name)
+            struct_rc_types.push(s.var_decl!.typ)
             // If init is a copy from another struct var, retain all embedded refs
             // unless it's a move (source is dead after this point).
             if !isnull(s.var_decl!.init) {
@@ -920,10 +920,12 @@ func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<S
                 }
                 struct_rc_locals = new_locals
                 struct_rc_types = new_types
-              } else {
-                // Copy: retain all embedded class refs in the new struct
+              } else if init_val.kind is ValVar {
+                // Copy from another struct var: retain all embedded class refs
                 emit_struct_field_rc(s.var_decl!.name, s.var_decl!.typ, prog, true, mut result)
               }
+              // else: init from temp (fresh struct literal) — no retain needed,
+              // the struct literal already owns the class handles
               i = i + 1
               continue
             }

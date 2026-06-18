@@ -4,6 +4,10 @@ lyric struct_copy_hooks {
 
 class Widget {
     value: i32
+
+    final func on_destroy(self) {
+        println(f"destroy {self.value}")
+    }
 }
 
 // Test 1: Struct with class field — copy must retain, scope exit releases
