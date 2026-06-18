@@ -1,3 +1,5 @@
 Bob
 Carol
+destroying parent: Bob
+destroying child: Carol
 done

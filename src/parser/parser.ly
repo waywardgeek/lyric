@@ -209,6 +209,13 @@ lyric parser {
       self.next()
     }
 
+    // Handle `final` modifier for functions
+    let mut is_final = false
+    if self.peek().kind == LIdent && self.peek().text == "final" {
+      is_final = true
+      self.next()
+    }
+
     match self.peek().kind {
       KImport => {
         if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to import")) }
@@ -251,6 +258,7 @@ lyric parser {
         let fn = self.parse_func()?
         fn!.is_public = is_pub
         fn!.is_trusted = is_trusted
+        fn!.is_final = is_final
         array_append<LyricBlock, FuncDecl>(block, fn!)
         return (true, null)
       }
@@ -278,6 +286,9 @@ lyric parser {
         }
         if is_trusted {
           return (false, self.make_error(tok.span, "trusted can only be applied to func"))
+        }
+        if is_final {
+          return (false, self.make_error(tok.span, "final can only be applied to func"))
         }
         return (false, self.make_error(tok.span, f"unexpected token in lyric block"))
       }
