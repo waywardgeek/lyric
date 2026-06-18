@@ -682,6 +682,7 @@ lyric lir {
     body: [LStmt?]
     is_exported: bool
     is_final: bool
+    is_trusted: bool
     receiver: string
     receiver_type_params: [LTypeParam]
     relational_constraints: [LRelationalConstraint]

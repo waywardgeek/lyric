@@ -78,6 +78,7 @@ lyric ast {
     name: Sym?
     is_public: bool
     is_final: bool
+    is_trusted: bool
     receiver_type: Sym?
     return_type: TypeExpr?
     body: Block?
@@ -332,6 +333,8 @@ lyric ast {
     Lock(mutex: Expr, body: Block)
     IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?)
     LetElse(pattern: Pattern, value: Expr, else_block: Block)
+    Ref(name: Sym)
+    Unref(name: Sym)
   }
 
   class Stmt {

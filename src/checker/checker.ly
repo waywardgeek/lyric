@@ -153,6 +153,7 @@ lyric checker {
     iface_decls: Dict<Sym, InterfaceDecl>  // for checkImplements
     type_var_methods: Dict<Sym, Dict<Sym, Type>>?  // type var name → (method name → method type)
     method_type_args: Dict<Sym, [TypeExpr]>  // "Type.method" → concrete type args for interface methods
+    in_trusted: bool
   }
 
   func new_checker() -> Checker {
@@ -2199,6 +2200,8 @@ lyric checker {
 
     let prev_ret = self.current_func_return
     let prev_name = self.current_func_name
+    let prev_trusted = self.in_trusted
+    self.in_trusted = f.is_trusted
 
     if f.name != null {
       self.current_func_name = sym_to_string(f.name!)
@@ -2303,6 +2306,7 @@ lyric checker {
     self.type_var_methods = prev_tvm
     self.current_func_return = prev_ret
     self.current_func_name = prev_name
+    self.in_trusted = prev_trusted
     self.pop_scope()
   }
 
@@ -2427,6 +2431,16 @@ lyric checker {
         self.pop_scope()
       }
       Break | Continue => {}
+      Ref(_ref_name) => {
+        if !self.in_trusted {
+          self.error_at(stmt.span, "ref statement can only be used inside a trusted function")
+        }
+      }
+      Unref(_unref_name) => {
+        if !self.in_trusted {
+          self.error_at(stmt.span, "unref statement can only be used inside a trusted function")
+        }
+      }
     }
   }
 
@@ -4035,6 +4049,7 @@ lyric checker {
         self.walk_block(else_block, callback)
       }
       Break | Continue => {}
+      Ref(_) | Unref(_) => {}
     }
   }
 
@@ -4301,6 +4316,7 @@ lyric checker {
         self.vwalk_block(else_block, ctx)
       }
       Break | Continue => {}
+      Ref(_) | Unref(_) => {}
     }
   }
 

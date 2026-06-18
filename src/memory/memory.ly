@@ -667,8 +667,11 @@ func slab_rewrite(prog: LProgram) {
   let mut fi = 0
   while fi < len(prog.functions) {
     let f = prog.functions[fi]
-    let new_body = slab_rewrite_stmts(f.body, f.body, escape_map, prog, f.params)
-    prog.functions[fi].body = new_body
+    // Skip RC instrumentation for trusted functions
+    if !f.is_trusted {
+      let new_body = slab_rewrite_stmts(f.body, f.body, escape_map, prog, f.params)
+      prog.functions[fi].body = new_body
+    }
 
     // Inject slab_free(self) at end of destroy methods
     // and finalizer call at the start

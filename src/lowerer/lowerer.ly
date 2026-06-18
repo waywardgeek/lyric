@@ -1083,6 +1083,7 @@ lyric lowerer {
       body: body,
       is_exported: fd!.is_public,
       is_final: fd!.is_final,
+      is_trusted: fd!.is_trusted,
       receiver: receiver,
       receiver_type_params: recv_tps,
       relational_constraints: constraints
@@ -1171,6 +1172,24 @@ lyric lowerer {
       Cascade(body) => {
         // Lower cascade block inline
         self.lower_block(body)
+      }
+      Ref(name) => {
+        let var_name = sym_to_string(name)
+        let typ = self.lookup_var(var_name)
+        let class_name = if !isnull(typ) { typ!.name } else { "" }
+        self.emit(LStmt { kind: StRefIncr, ref_incr: LRefIncrData {
+          handle: LValue { kind: ValVar, name: var_name },
+          class_name: class_name
+        }})
+      }
+      Unref(name) => {
+        let var_name = sym_to_string(name)
+        let typ = self.lookup_var(var_name)
+        let class_name = if !isnull(typ) { typ!.name } else { "" }
+        self.emit(LStmt { kind: StRefDecr, ref_decr: LRefDecrData {
+          handle: LValue { kind: ValVar, name: var_name },
+          class_name: class_name
+        }})
       }
     }
   }

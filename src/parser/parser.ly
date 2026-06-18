@@ -202,6 +202,13 @@ lyric parser {
       self.next()
     }
 
+    // Handle `trusted` modifier for functions
+    let mut is_trusted = false
+    if self.peek().kind == LIdent && self.peek().text == "trusted" {
+      is_trusted = true
+      self.next()
+    }
+
     match self.peek().kind {
       KImport => {
         if is_pub { return (false, self.make_error(tok.span, "pub cannot be applied to import")) }
@@ -243,6 +250,7 @@ lyric parser {
       KFunc => {
         let fn = self.parse_func()?
         fn!.is_public = is_pub
+        fn!.is_trusted = is_trusted
         array_append<LyricBlock, FuncDecl>(block, fn!)
         return (true, null)
       }
@@ -267,6 +275,9 @@ lyric parser {
       _ => {
         if is_permanent {
           return (false, self.make_error(tok.span, "permanent can only be applied to class"))
+        }
+        if is_trusted {
+          return (false, self.make_error(tok.span, "trusted can only be applied to func"))
         }
         return (false, self.make_error(tok.span, f"unexpected token in lyric block"))
       }
@@ -879,9 +890,15 @@ lyric parser {
       match self.peek().kind {
         KPub => {
           self.next()
+          let mut pub_trusted = false
+          if self.peek().kind == LIdent && self.peek().text == "trusted" {
+            pub_trusted = true
+            self.next()
+          }
           if self.peek().kind == KFunc {
             let fn = self.parse_func()?
             fn!.is_public = true
+            fn!.is_trusted = pub_trusted
             array_append<ClassDecl, FuncDecl>(cls, fn!)
           } else {
             let field = self.parse_field()?
@@ -894,11 +911,16 @@ lyric parser {
           array_append<ClassDecl, FuncDecl>(cls, fn!)
         }
         _ => {
-          // Check for 'final func' (contextual keyword)
+          // Check for 'final func' or 'trusted func' (contextual keywords)
           if self.peek().kind == LIdent && self.peek().text == "final" {
             self.next()  // consume 'final'
             let fn = self.parse_func()?
             fn!.is_final = true
+            array_append<ClassDecl, FuncDecl>(cls, fn!)
+          } else if self.peek().kind == LIdent && self.peek().text == "trusted" {
+            self.next()  // consume 'trusted'
+            let fn = self.parse_func()?
+            fn!.is_trusted = true
             array_append<ClassDecl, FuncDecl>(cls, fn!)
           } else {
             let field = self.parse_field()?
