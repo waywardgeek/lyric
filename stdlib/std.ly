@@ -46,30 +46,30 @@ lyric std {
 
     // Method-style append: p.append(c)
     pub func P.append(self, child: C) {
-      child.set_index(len(self.children()))
-      child.set_parent(self)
-      let mut kids = self.children()
+      child.index = len(self.children)
+      child.parent = self
+      let mut kids = self.children
       kids.push(child)
-      self.set_children(kids)
+      self.children = kids
     }
 
     // Method-style remove: c.remove()
     pub func C.remove(self) {
-      let p = self.parent()
+      let p = self.parent
       if isnull(p) {
         return
       }
-      let idx = self.index()
-      let kids = p!.children()
+      let idx = self.index
+      let kids = p!.children
       let last_idx: i32 = len(kids) - 1
       if idx < last_idx {
         let last_child = kids[last_idx]
-        last_child.set_index(idx)
+        last_child.index = idx
         kids[idx] = last_child
       }
-      p!.set_children(kids[0:last_idx])
-      self.set_parent(null)
-      self.set_index(0)
+      p!.children = kids[0:last_idx]
+      self.parent = null
+      self.index = 0
     }
   }
 
@@ -78,10 +78,10 @@ lyric std {
     embed ArrayListBase<P, C>
 
     destructor P {
-      let kids = self.children()
+      let kids = self.children
       let mut i: i32 = len(kids) - 1
       while i >= 0 {
-        kids[i].set_parent(null)
+        kids[i].parent = null
         kids[i].destroy()
         i = i - 1
       }
@@ -98,21 +98,20 @@ lyric std {
     embed ArrayListBase<P, C>
 
     destructor P {
-      let kids = self.children()
+      let kids = self.children
       let mut i: i32 = len(kids) - 1
       while i >= 0 {
-        kids[i].set_parent(null)
-        kids[i].set_index(0)
+        kids[i].parent = null
+        kids[i].index = 0
         i = i - 1
       }
-      self.set_children([])
+      self.children = []
     }
 
     destructor C {
       array_remove<P, C>(self)
     }
   }
-
   // --- Doubly-linked list family ---
 
   // DoublyLinked: base interface for intrusive doubly-linked list.

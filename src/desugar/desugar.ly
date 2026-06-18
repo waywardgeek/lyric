@@ -636,11 +636,184 @@ lyric desugar {
     }
   }
 
+  // ---- 2.5. DesugarFieldAccess ----
+  // Rewrites field access on interface type params to getter/setter calls.
+  // Inside interface method bodies, `self.children` becomes `self.children()`
+  // and `self.children = x` becomes `self.set_children(x)`.
+
+  func desugar_field_access(file: File) {
+    for block in file.fb_children() {
+      for iface in block.id_children() {
+        // Collect field names per type param
+        let field_names = Dict<Sym, bool>()
+        for fd in iface.ifd_children() {
+          if !isnull(fd.name) {
+            field_names.set(sym(fd.name!.name), true)
+          }
+        }
+        let has_fields = len(iface.ifd_children()) > 0
+        if !has_fields { continue }
+
+        // Rewrite field accesses in method bodies
+        for m in iface.im_children() {
+          if !isnull(m.body) {
+            rewrite_field_access_block(m.body!, field_names)
+          }
+        }
+
+        // Also rewrite in destructor bodies
+        for db in iface.idb_children() {
+          if !isnull(db.body) {
+            rewrite_field_access_block(db.body!, field_names)
+          }
+        }
+      }
+    }
+  }
+
+  func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>) {
+    for s in block.bs_children() {
+      rewrite_field_access_stmt(s, field_names)
+    }
+  }
+
+  func rewrite_field_access_stmt(s: Stmt, field_names: Dict<Sym, bool>) {
+    match s.kind {
+      Assign(target, value) => {
+        // Check for `self.field = value` -> `self.set_field(value)`
+        match target.kind {
+          FieldAccess(recv, fname) => {
+            if field_names.get(sym(fname.name)) != null {
+              let setter_name = sym("set_" + fname.name)
+              let empty_ta: [TypeExpr] = []
+              let empty_ma: [bool] = [false]
+              s.kind = ExprStmt(Expr {
+                kind: MethodCall(recv, setter_name, empty_ta, [value], empty_ma),
+                span: s.span,
+              })
+              rewrite_field_access_expr(value, field_names)
+              return
+            }
+          }
+          _ => {}
+        }
+        rewrite_field_access_expr(target, field_names)
+        rewrite_field_access_expr(value, field_names)
+      }
+      VarDecl(_, _, _, _, value) => {
+        if !isnull(value) {
+          rewrite_field_access_expr(value!, field_names)
+        }
+      }
+      Return(value) => {
+        if !isnull(value) {
+          rewrite_field_access_expr(value!, field_names)
+        }
+      }
+      ExprStmt(expr) => {
+        rewrite_field_access_expr(expr, field_names)
+      }
+      If(cond, then_block, else_ifs, else_block) => {
+        rewrite_field_access_expr(cond, field_names)
+        rewrite_field_access_block(then_block, field_names)
+        for ei in else_ifs {
+          if !isnull(ei.condition) {
+            rewrite_field_access_expr(ei.condition!, field_names)
+          }
+          if !isnull(ei.body) {
+            rewrite_field_access_block(ei.body!, field_names)
+          }
+        }
+        if !isnull(else_block) {
+          rewrite_field_access_block(else_block!, field_names)
+        }
+      }
+      While(cond, body) => {
+        rewrite_field_access_expr(cond, field_names)
+        rewrite_field_access_block(body, field_names)
+      }
+      For(_, _, iter, body) => {
+        rewrite_field_access_expr(iter, field_names)
+        rewrite_field_access_block(body, field_names)
+      }
+      BlockStmt(block) => {
+        rewrite_field_access_block(block, field_names)
+      }
+      Match(expr, arms) => {
+        rewrite_field_access_expr(expr, field_names)
+        for arm in arms {
+          if !isnull(arm.body) {
+            rewrite_field_access_block(arm.body!, field_names)
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+
+  func rewrite_field_access_expr(e: Expr, field_names: Dict<Sym, bool>) {
+    match e.kind {
+      FieldAccess(recv, fname) => {
+        if field_names.get(sym(fname.name)) != null {
+          // Rewrite `self.field` -> `self.field()` (getter call)
+          let empty_ta: [TypeExpr] = []
+          let empty_args: [Expr] = []
+          let empty_ma: [bool] = []
+          e.kind = MethodCall(recv, fname, empty_ta, empty_args, empty_ma)
+        }
+        rewrite_field_access_expr(recv, field_names)
+      }
+      MethodCall(recv, _, _, args, _) => {
+        rewrite_field_access_expr(recv, field_names)
+        for arg in args {
+          rewrite_field_access_expr(arg, field_names)
+        }
+      }
+      Call(func_expr, _, args, _) => {
+        rewrite_field_access_expr(func_expr, field_names)
+        for arg in args {
+          rewrite_field_access_expr(arg, field_names)
+        }
+      }
+      Binary(left, _, right) => {
+        rewrite_field_access_expr(left, field_names)
+        rewrite_field_access_expr(right, field_names)
+      }
+      Unary(_, operand) => {
+        rewrite_field_access_expr(operand, field_names)
+      }
+      Index(recv, idx) => {
+        rewrite_field_access_expr(recv, field_names)
+        rewrite_field_access_expr(idx, field_names)
+      }
+      IfElse(cond, then_block, else_ifs, else_block) => {
+        rewrite_field_access_expr(cond, field_names)
+        rewrite_field_access_block(then_block, field_names)
+        for ei in else_ifs {
+          if !isnull(ei.condition) {
+            rewrite_field_access_expr(ei.condition!, field_names)
+          }
+          if !isnull(ei.body) {
+            rewrite_field_access_block(ei.body!, field_names)
+          }
+        }
+        rewrite_field_access_block(else_block, field_names)
+      }
+      StringInterp(parts) => {
+        for part in parts {
+          rewrite_field_access_expr(part, field_names)
+        }
+      }
+      _ => {}
+    }
+  }
+
   // ---- Main entry point ----
 
   func desugar_all(file: File) {
     desugar_interface_embeds(file)
     desugar_interface_fields(file)
+    desugar_field_access(file)
     desugar_relations(file)
     desugar_destructors(file)
     desugar_default_impls(file)
