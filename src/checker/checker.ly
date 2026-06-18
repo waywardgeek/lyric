@@ -1578,6 +1578,7 @@ lyric checker {
     // For each interface with body methods that have a receiver_type matching a type param,
     // find all impl blocks for that interface and register the method on the concrete type.
     let iface_keys = self.iface_decls.keys()
+
     for ik in iface_keys {
       let iface_entry = self.iface_decls.get(ik)
       if iface_entry == null { continue }

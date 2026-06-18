@@ -592,6 +592,10 @@ lyric std {
     return !isnull(self.get(key))
   }
 
+  pub func Dict.length<K, V>(self) -> i32 where K: Hashable {
+    return self.d_hash_count
+  }
+
   pub trusted func Dict.remove<K, V>(self, key: K) -> bool where K: Hashable {
     let existing = self.get(key)
     if !isnull(existing) {
