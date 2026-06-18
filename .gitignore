@@ -31,3 +31,5 @@ Thumbs.db
 # Generated Go output (legacy)
 *.go
 !legacy/**/*.go
+lyric_asan*
+*.dSYM
