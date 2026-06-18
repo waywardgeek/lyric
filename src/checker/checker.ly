@@ -2413,6 +2413,17 @@ lyric checker {
     match stmt.kind {
       VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
         self.check_var_decl(name, names, type_expr, is_mut, value)
+        if is_mut && is_ref && !isnull(name) {
+          let var_type = self.scope.lookup(sym_to_string(name!))
+          if !isnull(var_type) {
+            match var_type!.kind {
+              Sequence(_) => {
+                self.error_at(stmt.span, "let mut ref on a slice is not supported — slices are value types, mutations like append will not write back to the original")
+              }
+              _ => {}
+            }
+          }
+        }
       }
       Assign(target, value) => {
         self.check_assign(target, value)

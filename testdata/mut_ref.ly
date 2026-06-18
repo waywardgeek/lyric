@@ -12,7 +12,7 @@ func test_ref_binding() {
 
 func test_mut_ref_binding() {
   let mut data: [i32] = [10, 20, 30]
-  let mut ref view = data
+  let ref view = data
   // view shares backing data — no scope-exit free on view
   assert_eq(len(view), 3)
   assert_eq(view[0], 10)
