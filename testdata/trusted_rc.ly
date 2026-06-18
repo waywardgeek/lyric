@@ -2,7 +2,7 @@ lyric trusted_rc {
 
   class Parent { name: string }
   class Child { name: string }
-  relation ArrayList Parent refs [Child]
+  relation RefArrayList Parent refs [Child]
 
   final func Parent.on_destroy(self) {
     println(f"destroying parent: {self.name}")

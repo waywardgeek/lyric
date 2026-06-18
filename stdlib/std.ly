@@ -3,9 +3,10 @@
 
 lyric std {
 
-  // ArrayList: a parent P owns a dynamic array of children C.
-  // Children know their parent and index for O(1) swap-remove.
-  pub interface ArrayList<P, C> {
+  // ArrayListBase: base interface for array-backed parent-child relations.
+  // Provides fields and methods. No destruction semantics —
+  // use ArrayList or RefArrayList which embed this and add appropriate destructors.
+  pub interface ArrayListBase<P, C> {
     // The parent's array of children
     field P.children: [C]
 
@@ -70,8 +71,12 @@ lyric std {
       self.set_parent(null)
       self.set_index(0)
     }
+  }
 
-    // Destructor for parent: cascade destroy all owned children
+  // ArrayList: parent owns children, cascade-destroys on parent death.
+  pub interface ArrayList<P, C> {
+    embed ArrayListBase<P, C>
+
     destructor P {
       let kids = self.children()
       let mut i: i32 = len(kids) - 1
@@ -82,7 +87,27 @@ lyric std {
       }
     }
 
-    // Destructor for child: remove self from parent's array
+    destructor C {
+      array_remove<P, C>(self)
+    }
+  }
+
+  // RefArrayList: parent references children but does not own their lifetime.
+  // On parent death, children are unlinked but NOT destroyed.
+  pub interface RefArrayList<P, C> {
+    embed ArrayListBase<P, C>
+
+    destructor P {
+      let kids = self.children()
+      let mut i: i32 = len(kids) - 1
+      while i >= 0 {
+        kids[i].set_parent(null)
+        kids[i].set_index(0)
+        i = i - 1
+      }
+      self.set_children([])
+    }
+
     destructor C {
       array_remove<P, C>(self)
     }
