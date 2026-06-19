@@ -1,467 +1,533 @@
-//ldd:source checker.ly
-//ldd:why "Three-phase type checker with expression annotation. Phase 0 pre-registers all type names across all blocks. Phase 1 registers all type/function declarations. Phase 2 checks function bodies and annotates every Expr.resolved_type with a TypeExpr for the lowerer."
+module checker
+  source: ["checker.ly"]
+  why: "Three-phase type checker with expression annotation. Phase 0 pre-registers all type names across all blocks. Phase 1 registers all type/function declarations. Phase 2 checks function bodies and annotates every Expr.resolved_type with a TypeExpr for the lowerer."
 
-// ## Architecture
-//
-// The checker performs a three-phase pass over the AST:
-//
-// Phase 0 (preregister_type_names): Walks all blocks, registering stub
-// TypeInfo entries for every struct/class/enum/interface by name. This
-// ensures cross-block type references resolve (e.g. Lexer in lexer.ly
-// referencing Comment from ast.ly). Also registers imports as module types.
-//
-// Phase 1 (register_lyric_block): Walks all interfaces, structs, classes, enums,
-// and top-level functions, registering them into Dict registries with full
-// field/method detail. Interfaces registered first (classes may implement them).
-// Enum variants registered both as qualified (EnumName.Variant) in
-// enum_variant_types and as bare names in enum_variants_by_name (last enum
-// wins on collision). Class names registered as constructor functions in scope.
-// Constants registered in scope.
-//
-// Phase 2 (check_lyric_block_bodies): Walks function bodies performing type
-// inference and validation. Each expression returns its inferred Type AND
-// gets annotated via annotate(expr, type) which converts the internal Type
-// to a TypeExpr and sets expr.resolved_type. This is the checker→lowerer contract.
-//
-// CRITICAL: check_file runs Phase 0 across ALL blocks, then Phase 1 across
-// ALL blocks, then Phase 2 across ALL blocks. This ensures cross-file type
-// references and cross-file method calls all resolve correctly.
+  doc "Architecture":
+    """
+    The checker performs a three-phase pass over the AST:
 
-// ## Invariants — Three-Phase Checking
-//
-// The checker MUST run in three phases:
-// 0. preregister_type_names: register stub TypeInfo for all type names
-// across ALL blocks (no field/method detail)
-// 1. register_lyric_block: register full type/function detail across ALL blocks
-// 2. check_lyric_block_bodies: walk function bodies, resolve types, check
-// expressions, ANNOTATE resolved_type on every Expr
-//
-// Phase 0 MUST complete on ALL blocks before ANY Phase 1 begins.
-// Phase 1 MUST complete on ALL blocks before ANY Phase 2 begins.
-// This ensures forward references AND cross-file references resolve correctly.
+    Phase 0 (preregister_type_names): Walks all blocks, registering stub
+    TypeInfo entries for every struct/class/enum/interface by name. This
+    ensures cross-block type references resolve (e.g. Lexer in lexer.ly
+    referencing Comment from ast.ly). Also registers imports as module types.
 
-// ## Invariants — Expression Annotation
-//
-// Every Expr node MUST have its resolved_type set after check_expr.
-// The check_expr method calls check_expr_inner for type inference, then
-// annotate(expr, result) which converts the internal Type to a TypeExpr
-// via type_to_type_expr() and sets expr.resolved_type.
-//
-// The lowerer's resolve_expr_type() reads expr.resolved_type and calls
-// lower_type() to convert to LType. If resolved_type is nil, the lowerer
-// falls back to null/LTyAny, producing void* in C output.
-//
-// type_to_type_expr handles all TypeKind variants, producing Named/Optional/
-// Sequence/Map/Tuple/Func/Channel/Generator/Lock/Unit TypeExprKinds.
-// Int/Uint/Float map to named types (i8/i16/i32/i64/int, u8-u64/uint, f32/f64).
-// ErrorResult maps to a 2-element Tuple.
+    Phase 1 (register_lyric_block): Walks all interfaces, structs, classes, enums,
+    and top-level functions, registering them into Dict registries with full
+    field/method detail. Interfaces registered first (classes may implement them).
+    Enum variants registered both as qualified (EnumName.Variant) in
+    enum_variant_types and as bare names in enum_variants_by_name (last enum
+    wins on collision). Class names registered as constructor functions in scope.
+    Constants registered in scope.
 
-// ## Invariants — Dict and Sym Usage
-//
-// All registries use Dict<V> (string-keyed hash table) with Sym keys:
-// types, funcs, methods, impl_renames, enum_variant_types, enum_variants_by_name.
-// API: dict_get(d, sym_to_string(name)) -> DictEntry<V>?
-//
-// Scope is a linked list of Dict<Type> levels. new_scope(parent) creates a
-// new Dict with parent pointer; lookup walks the parent chain.
+    Phase 2 (check_lyric_block_bodies): Walks function bodies performing type
+    inference and validation. Each expression returns its inferred Type AND
+    gets annotated via annotate(expr, type) which converts the internal Type
+    to a TypeExpr and sets expr.resolved_type. This is the checker→lowerer contract.
 
-// ## Invariants — Type Representation
-//
-// Internal Type class with TypeKind enum and bits field (for Int/Uint/Float width).
-//
-// Primitive kinds: Int, Uint, Float (with bits for width), Bool, String.
-// Special: Void (unit type), Nil (nil literal — assignable to ALL types),
-// Any (accepts/produces anything), Error (error interface),
-// ErrorResult(ok, err) for (T, error) tuples.
-// Composite: Optional(inner), Sequence(elem), Map(key, value),
-// Tuple([TupleFieldType]), Func(params, ret, type_param_names),
-// Channel(elem), Generator(elem), Lock.
-// Named: Struct, Class, Enum, Interface (with name, fields/variants/methods, type_params).
-// Generic: TypeVar(name) — type variable, compatible with anything in assignability.
-//
-// TyNil is distinct from TyVoid: Nil = nil literal (assignable to optional,
-// class, interface, error, and currently all types); Void = unit/no-value.
+    CRITICAL: check_file runs Phase 0 across ALL blocks, then Phase 1 across
+    ALL blocks, then Phase 2 across ALL blocks. This ensures cross-file type
+    references and cross-file method calls all resolve correctly.
+    """
 
-// ## Invariants — Enum Variant Registration
-//
-// registerEnum stores variant info and defines variant names in scope:
-// - Unit variants: defined as enum-typed values
-// - Field variants: defined as TyFunc constructors (fields → enum type)
-//
-// Two lookup paths for variants:
-// 1. Qualified: enum_variant_types["EnumName.VariantName"] → enum Type
-// 2. Bare: enum_variants_by_name["VariantName"] → enum Type (last registered wins)
-// 3. Scope: variant names defined directly in scope for direct reference
-//
-// When multiple enums share variant names, the LAST registered wins
-// in both enum_variants_by_name and scope — disambiguation must happen
-// via checker type annotations or qualified access.
+  invariant "Three-Phase Checking":
+    procedural
+    """
+    The checker MUST run in three phases:
+    0. preregister_type_names: register stub TypeInfo for all type names
+       across ALL blocks (no field/method detail).
+    1. register_lyric_block: register full type/function detail across ALL blocks.
+    2. check_lyric_block_bodies: walk function bodies, resolve types, check
+       expressions, ANNOTATE resolved_type on every Expr.
 
-// ## Invariants — Generic Functions
-//
-// Generic functions declare type parameters <T: Constraint>. During
-// Phase 2, TypeParams are registered as TyVar in the function's scope.
-// Func type carries type_param_names: [Sym] alongside params and ret.
-//
-// TypeVar is compatible with anything in assignability checks —
-// constraints not yet validated in bootstrap checker.
+    Phase 0 MUST complete on ALL blocks before ANY Phase 1 begins.
+    Phase 1 MUST complete on ALL blocks before ANY Phase 2 begins.
+    This ensures forward references AND cross-file references resolve correctly.
+    """
 
-// ## Invariants — Numeric Widening
-//
-// Same-sign integers widen to larger bit widths (i8 → i16 → i32 → i64).
-// Floats widen (f32 → f64). Platform-width (bits=-1) types don't widen.
-// No cross-kind coercion (int→float requires explicit cast).
-// coerce_numeric returns the wider type for binary operations.
+  invariant "Expression Annotation":
+    procedural
+    """
+    Every Expr node MUST have its resolved_type set after check_expr.
+    The check_expr method calls check_expr_inner for type inference, then
+    annotate(expr, result) which converts the internal Type to a TypeExpr
+    via type_to_type_expr() and sets expr.resolved_type.
 
-// ## Invariants — Assignability Rules (is_assignable)
-//
-// - Nil → Optional, Class, Interface, Error (null assignable to nullable types)
-// - Any → anything and anything → Any (top type, bidirectional)
-// - TypeVar → anything (unresolved generics are compatible during inference)
-// - Interface ← Class/Struct: structural subtyping — all required methods must exist
-// - Union: a type is assignable to a union if assignable to ANY variant
-// - ErrorResult: (T, error) tuples checked component-wise
-// - Numeric widening: smaller to larger same-sign (see above)
+    The lowerer's resolve_expr_type() reads expr.resolved_type and calls
+    lower_type() to convert to LType. If resolved_type is nil, the lowerer
+    falls back to null/LTyAny, producing void* in C output.
 
-// ## Invariants — Phase 1.5 (Interface Methods)
-//
-// register_interface_methods runs between Phase 1 and Phase 2. It
-// links impl blocks to concrete types across block boundaries —
-// essential when methods defined in one module implement interfaces
-// from another (e.g. impl Hashable for concrete types in stdlib).
+    type_to_type_expr handles all TypeKind variants, producing Named/Optional/
+    Sequence/Map/Tuple/Func/Channel/Generator/Lock/Unit TypeExprKinds.
+    Int/Uint/Float map to named types (i8/i16/i32/i64/int, u8-u64/uint, f32/f64).
+    ErrorResult maps to a 2-element Tuple.
+    """
 
-// TypeKind = enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
+  invariant "Dict and Sym Usage":
+    procedural
+    """
+    All registries use Dict<V> (string-keyed hash table) with Sym keys:
+    types, funcs, methods, impl_renames, enum_variant_types, enum_variants_by_name.
+    API: dict_get(d, sym_to_string(name)) -> DictEntry<V>?
 
+    Scope is a linked list of Dict<Type> levels. new_scope(parent) creates a
+    new Dict with parent pointer; lookup walks the parent chain.
+    """
 
-// checker.ly:19
-// TypeKind = enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
+  invariant "Type Representation":
+    procedural
+    """
+    Internal Type class with TypeKind enum and bits field (for Int/Uint/Float width).
 
-// checker.ly:147
-class Checker {
-  current_func_name: string
-  current_func_return: Type?
-  errors: [string]
-  iface_decls: Dict<Sym, InterfaceDecl>
-  method_type_args: Dict<Sym, [TypeExpr]>
-  registry: Registry
-  scope: Scope
-  type_var_methods: Dict<Sym, Dict<Sym, Type>>?
-}
-// checker.ly:2649
-func Checker.bind_pattern(self, pat: Pattern, val_type: Type)
-// checker.ly:3473
-func Checker.build_type_arg_subst(self, recv_type: Type) -> Dict<Sym, Type>?
-// checker.ly:2502
-func Checker.check_assign(self, target: Expr, value: Expr)
-// checker.ly:2814
-func Checker.check_binary(self, left: Expr, op: BinaryOp, right: Expr) -> Type
-// checker.ly:2313
-func Checker.check_block(self, block: Block)
-// checker.ly:2937
-func Checker.check_block_expr_type(self, block: Block) -> Type
-// checker.ly:3355
-func Checker.check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type?
-// checker.ly:3689
-func Checker.check_builtin_method(self, recv_type: Type, method: string, arg_types: [Type]) -> Type?
-// checker.ly:3198
-func Checker.check_call(self, call_expr: Expr, func_expr: Expr, type_args: [TypeExpr], args: [Expr]) -> Type
-// checker.ly:2874
-func Checker.check_cast(self, target_type: TypeExpr, operand: Expr) -> Type
-// checker.ly:3736
-func Checker.check_channel_method(self, elem: Type, method: string) -> Type?
-// checker.ly:2709
-func Checker.check_expr(self, expr: Expr) -> Type
-// checker.ly:2714
-func Checker.check_expr_inner(self, expr: Expr) -> Type
-// checker.ly:3760
-func Checker.check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type
-// checker.ly:2572
-func Checker.check_for(self, var_name: Sym, index_var: Sym?, collection: Expr, body: Block)
-// checker.ly:2196
-func Checker.check_func_body(self, f: FuncDecl)
-// checker.ly:2550
-func Checker.check_if(self, condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?)
-// checker.ly:2912
-func Checker.check_if_else_expr(self, cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) -> Type
-// checker.ly:1856
-func Checker.check_implements(self, cls: ClassDecl)
-// checker.ly:2853
-func Checker.check_index(self, receiver: Expr, index: Expr) -> Type
-// checker.ly:2907
-func Checker.check_is(self, operand: Expr, variant: Sym) -> Type
-// checker.ly:3119
-func Checker.check_lambda(self, params: [Param], return_type: TypeExpr?, body: Block) -> Type
-// checker.ly:2963
-func Checker.check_list_lit(self, elems: [Expr]) -> Type
-// checker.ly:3708
-func Checker.check_list_method(self, elem: Type, method: string) -> Type?
-// checker.ly:2088
-func Checker.check_lyric_block_bodies(self, block: LyricBlock)
-// checker.ly:2974
-func Checker.check_map_lit(self, keys: [Expr], values: [Expr]) -> Type
-// checker.ly:3743
-func Checker.check_map_method(self, key: Type, value: Type, method: string) -> Type?
-// checker.ly:2625
-func Checker.check_match(self, value: Expr, arms: [MatchArm])
-// checker.ly:3141
-func Checker.check_match_expr(self, value: Expr, arms: [MatchArm]) -> Type
-// checker.ly:3492
-func Checker.check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type
-// checker.ly:2530
-func Checker.check_return(self, value: Expr?)
-// checker.ly:2867
-func Checker.check_slice(self, receiver: Expr, low: Expr?, high: Expr?) -> Type
-// checker.ly:2320
-func Checker.check_stmt(self, stmt: Stmt)
-// checker.ly:3723
-func Checker.check_string_method(self, method: string) -> Type?
-// checker.ly:2996
-func Checker.check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type
-// checker.ly:2887
-func Checker.check_try(self, operand: Expr) -> Type
-// checker.ly:2954
-func Checker.check_tuple_lit(self, elems: [Expr]) -> Type
-// checker.ly:2805
-func Checker.check_unary(self, op: UnaryOp, operand: Expr) -> Type
-// checker.ly:2879
-func Checker.check_unwrap(self, operand: Expr) -> Type
-// checker.ly:2433
-func Checker.check_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
-// checker.ly:2618
-func Checker.check_while(self, condition: Expr, body: Block)
-// checker.ly:915
-func Checker.error(self, msg: string)
-// checker.ly:919
-func Checker.error_at(self, span: Span, msg: string)
-// checker.ly:4141
-func Checker.find_typevar_name(self, te: TypeExpr) -> string
-// checker.ly:1205
-func Checker.func_decl_to_type(self, f: FuncDecl) -> Type
-// checker.ly:2045
-func Checker.func_decl_to_type_with_subst(self, f: FuncDecl, subst: Dict<Sym, string>) -> Type
-// checker.ly:1992
-func Checker.grant_relational_methods(self, iface_name: string, type_args: [TypeExpr])
-// checker.ly:883
-func Checker.infer_type_args(self, func_type: Type, arg_types: [Type]) -> Dict<Sym, Type>
-// checker.ly:548
-func Checker.is_assignable(self, src: Type, to: Type) -> bool
-// checker.ly:176
-func Checker.pop_scope(self)
-// checker.ly:1251
-func Checker.preregister_type_names(self, block: LyricBlock)
-// checker.ly:172
-func Checker.push_scope(self)
-// checker.ly:292
-func Checker.register_builtins(self)
-// checker.ly:1670
-func Checker.register_class(self, cls: ClassDecl)
-// checker.ly:1787
-func Checker.register_enum(self, e: EnumDecl)
-// checker.ly:1961
-func Checker.register_func(self, f: FuncDecl)
-// checker.ly:330
-func Checker.register_go_stdlib_modules(self)
-// checker.ly:1869
-func Checker.register_impl_methods(self, ib: ImplBlock)
-// checker.ly:1535
-func Checker.register_interface(self, iface: InterfaceDecl)
-// checker.ly:1423
-func Checker.register_interface_methods(self, file: File)
-// checker.ly:1335
-func Checker.register_lyric_block(self, block: LyricBlock)
-// checker.ly:315
-func Checker.register_primitive_type(self, name: string, t: Type)
-// checker.ly:1604
-func Checker.register_struct(self, s: StructDecl)
-// checker.ly:3800
-func Checker.resolve_field_type(self, recv_type: Type, field_str: string) -> Type
-// checker.ly:3313
-func Checker.resolve_module_func(self, mod_name: string, func_name: string) -> Type
-// checker.ly:1155
-func Checker.resolve_named_type(self, name: string, args: [TypeExpr], span: Span) -> Type
-// checker.ly:1091
-func Checker.resolve_type_expr(self, te: TypeExpr) -> Type
-// checker.ly:4086
-func Checker.type_expr_has_typevar(self, te: TypeExpr) -> bool
-// checker.ly:4456
-func Checker.validate_access_block(self, block: Block)
-// checker.ly:4531
-func Checker.validate_access_expr(self, expr: Expr)
-// checker.ly:4463
-func Checker.validate_access_stmt(self, stmt: Stmt)
-// checker.ly:4187
-func Checker.validate_all_exprs_resolved(self, file: File)
-// checker.ly:4678
-func Checker.validate_all_types_resolved(self, file: File)
-// checker.ly:4606
-func Checker.validate_field_access(self, receiver: Expr, field_name: Sym)
-// checker.ly:4428
-func Checker.validate_field_and_method_access(self, file: File)
-// checker.ly:4638
-func Checker.validate_method_access(self, receiver: Expr, method: Sym)
-// checker.ly:4222
-func Checker.vwalk_block(self, block: Block, ctx: string)
-// checker.ly:4322
-func Checker.vwalk_expr(self, expr: Expr, ctx: string)
-// checker.ly:4307
-func Checker.vwalk_pattern(self, pat: Pattern, ctx: string)
-// checker.ly:4229
-func Checker.vwalk_stmt(self, stmt: Stmt, ctx: string)
-// checker.ly:4041
-func Checker.walk_block(self, block: Block, callback: (Expr) -> ())
-// checker.ly:3884
-func Checker.walk_expr(self, expr: Expr, callback: (Expr) -> ())
-// checker.ly:4046
-func Checker.walk_pattern(self, pat: Pattern, callback: (Expr) -> ())
-// checker.ly:3969
-func Checker.walk_stmt(self, stmt: Stmt, callback: (Expr) -> ())
+    Primitive kinds: Int, Uint, Float (with bits for width), Bool, String.
+    Special: Void (unit type), Nil (nil literal — assignable to ALL types),
+    Any (accepts/produces anything), Error (error interface),
+    ErrorResult(ok, err) for (T, error) tuples.
+    Composite: Optional(inner), Sequence(elem), Map(key, value),
+    Tuple([TupleFieldType]), Func(params, ret, type_param_names),
+    Channel(elem), Generator(elem), Lock.
+    Named: Struct, Class, Enum, Interface (with name, fields/variants/methods, type_params).
+    Generic: TypeVar(name) — type variable, compatible with anything in assignability.
 
-// checker.ly:112
-class Registry {
-  types: Dict<Sym, TypeInfo>
-}
-// checker.ly:135
-func Registry.lookup(self, name: string) -> TypeInfo?
-// checker.ly:120
-func Registry.register(self, name: string, info: TypeInfo)
+    TyNil is distinct from TyVoid: Nil = nil literal (assignable to optional,
+    class, interface, error, and currently all types); Void = unit/no-value.
+    """
 
-// checker.ly:84
-class Scope {
-  parent: Scope?
-  vars: Dict<Sym, Type>
-}
-// checker.ly:104
-func Scope.define(self, name: string, t: Type)
-// checker.ly:93
-func Scope.lookup(self, name: string) -> Type?
+  invariant "Enum Variant Registration":
+    procedural
+    """
+    registerEnum stores variant info and defines variant names in scope:
+    - Unit variants: defined as enum-typed values.
+    - Field variants: defined as TyFunc constructors (fields → enum type).
 
-// checker.ly:47
-struct TupleFieldType {
-  name: string
-  type_val: Type?
-}
+    Two lookup paths for variants:
+    1. Qualified: enum_variant_types["EnumName.VariantName"] → enum Type.
+    2. Bare: enum_variants_by_name["VariantName"] → enum Type (last registered wins).
+    3. Scope: variant names defined directly in scope for direct reference.
 
-// checker.ly:52
-class Type {
-  bits: i32
-  kind: TypeKind
-  type_args: [Type]
-}
+    When multiple enums share variant names, the LAST registered wins
+    in both enum_variants_by_name and scope — disambiguation must happen
+    via checker type annotations or qualified access.
+    """
 
-// checker.ly:59
-class TypeInfo {
-  field_order: [string]
-  fields: Dict<Sym, Type>
-  implements_list: [string]
-  methods: Dict<Sym, Type>
-  type_param_constraints: [string]
-  type_param_names: [string]
-  type_val: Type
-  variants: Dict<Sym, VariantInfo>
-}
+  invariant "Generic Functions":
+    procedural
+    """
+    Generic functions declare type parameters <T: Constraint>. During
+    Phase 2, TypeParams are registered as TyVar in the function's scope.
+    Func type carries type_param_names: [Sym] alongside params and ret.
 
-// checker.ly:75
-struct VariantField {
-  name: string
-  type_val: Type
-}
+    TypeVar is compatible with anything in assignability checks —
+    constraints not yet validated in bootstrap checker.
+    """
 
-// checker.ly:70
-class VariantInfo {
-  enum_name: string
-  fields: [VariantField]
-}
+  invariant "Numeric Widening":
+    procedural
+    """
+    Same-sign integers widen to larger bit widths (i8 → i16 → i32 → i64).
+    Floats widen (f32 → f64). Platform-width (bits=-1) types don't widen.
+    No cross-kind coercion (int→float requires explicit cast).
+    coerce_numeric returns the wider type for binary operations.
+    """
 
-// checker.ly:1054
-func annotate(expr: Expr, t: Type) -> Type
-// checker.ly:4695
-func check_file(file: File) -> Checker
-// checker.ly:3865
-func coerce_numeric(a: Type, b: Type) -> Type
-// checker.ly:696
-func is_error_type(t: Type) -> bool
-// checker.ly:689
-func is_integer(t: Type) -> bool
-// checker.ly:682
-func is_numeric(t: Type) -> bool
-// checker.ly:4063
-func is_primitive_name(n: string) -> bool
-// checker.ly:214
-func make_any_type() -> Type
-// checker.ly:198
-func make_bool_type() -> Type
-// checker.ly:250
-func make_channel_type(elem: Type) -> Type
-// checker.ly:272
-func make_class_type(name: string) -> Type
-// checker.ly:276
-func make_enum_type(name: string) -> Type
-// checker.ly:260
-func make_error_result_type(ok: Type, err: Type) -> Type
-// checker.ly:218
-func make_error_type() -> Type
-// checker.ly:194
-func make_float_type(bits: i32) -> Type
-// checker.ly:246
-func make_func_type(params: [Type], ret: Type, tpnames: [string]) -> Type
-// checker.ly:254
-func make_generator_type(elem: Type) -> Type
-// checker.ly:186
-func make_int_type(bits: i32) -> Type
-// checker.ly:280
-func make_interface_type(name: string) -> Type
-// checker.ly:222
-func make_lock_type() -> Type
-// checker.ly:238
-func make_map_type(key: Type, value: Type) -> Type
-// checker.ly:284
-func make_module_type(name: string) -> Type
-// checker.ly:210
-func make_nil_type() -> Type
-// checker.ly:230
-func make_optional_type(inner: Type) -> Type
-// checker.ly:234
-func make_sequence_type(elem: Type) -> Type
-// checker.ly:202
-func make_string_type() -> Type
-// checker.ly:268
-func make_struct_type(name: string) -> Type
-// checker.ly:242
-func make_tuple_type(fields: [TupleFieldType]) -> Type
-// checker.ly:264
-func make_typevar_type(name: string) -> Type
-// checker.ly:190
-func make_uint_type(bits: i32) -> Type
-// checker.ly:226
-func make_union_type(variants: [Type]) -> Type
-// checker.ly:206
-func make_void_type() -> Type
-// checker.ly:710
-func match_type_vars(pattern: Type, concrete: Type, bindings: Dict<Sym, Type>) -> bool
-// checker.ly:158
-func new_checker() -> Checker
-// checker.ly:116
-func new_registry() -> Registry
-// checker.ly:89
-func new_scope(parent: Scope?) -> Scope
-// checker.ly:510
-func numeric_widens(src: Type, to: Type) -> bool
-// checker.ly:3175
-func propagate_arg_types(args: [Expr], param_types: [Type])
-// checker.ly:899
-func satisfies_constraint(t: Type, constraint: string) -> bool
-// checker.ly:2064
-func subst_type_var_names(t: Type, subst: Dict<Sym, string>) -> Type
-// checker.ly:813
-func substitute_type(t: Type, bindings: Dict<Sym, Type>) -> Type
-// checker.ly:4687
-func sym_to_string(s: Sym) -> string
-// checker.ly:1060
-func type_contains_var(t: Type) -> bool
-// checker.ly:342
-func type_name(t: Type) -> string
-// checker.ly:928
-func type_to_type_expr(t: Type) -> TypeExpr
-// checker.ly:375
-func types_equal(a: Type, b: Type) -> bool
+  invariant "Assignability Rules":
+    procedural
+    """
+    - Nil → Optional, Class, Interface, Error (null assignable to nullable types).
+    - Any → anything and anything → Any (top type, bidirectional).
+    - TypeVar → anything (unresolved generics are compatible during inference).
+    - Interface ← Class/Struct: structural subtyping — all required methods must exist.
+    - Union: a type is assignable to a union if assignable to ANY variant.
+    - ErrorResult: (T, error) tuples checked component-wise.
+    - Numeric widening: smaller to larger same-sign (see above).
 
+    is_assignable implements these rules.
+    """
+
+  invariant "Phase 1.5 — Interface Methods":
+    procedural
+    """
+    register_interface_methods runs between Phase 1 and Phase 2. It
+    links impl blocks to concrete types across block boundaries —
+    essential when methods defined in one module implement interfaces
+    from another (e.g. impl Hashable for concrete types in stdlib).
+    """
+
+  typedef TypeKind: enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
+    source: checker.ly:19
+
+  struct TupleFieldType
+    source: checker.ly:47
+    field name: string
+    field type_val: Type?
+
+  class Type
+    source: checker.ly:52
+    field bits: i32
+      doc: "for Int/Uint/Float — width in bits; -1 means platform width"
+    field kind: TypeKind
+      doc: "discriminator selecting which variant of the Type is represented"
+    field type_args: [Type]
+      doc: "for generic class/struct instances (e.g. Dict<V>)"
+
+  class TypeInfo
+    source: checker.ly:59
+    field field_order: [string]
+    field fields: Dict<Sym, Type>
+    field implements_list: [string]
+    field methods: Dict<Sym, Type>
+    field type_param_constraints: [string]
+    field type_param_names: [string]
+    field type_val: Type
+    field variants: Dict<Sym, VariantInfo>
+
+  class VariantInfo
+    source: checker.ly:70
+    field enum_name: string
+    field fields: [VariantField]
+
+  struct VariantField
+    source: checker.ly:75
+    field name: string
+    field type_val: Type
+
+  class Scope
+    source: checker.ly:84
+    field parent: Scope?
+    field vars: Dict<Sym, Type>
+    method lookup(self, name: string) -> Type?
+      source: checker.ly:93
+    method define(self, name: string, t: Type)
+      source: checker.ly:104
+
+  func new_scope(parent: Scope?) -> Scope
+    source: checker.ly:89
+
+  class Registry
+    source: checker.ly:112
+    field types: Dict<Sym, TypeInfo>
+    method register(self, name: string, info: TypeInfo)
+      source: checker.ly:120
+    method lookup(self, name: string) -> TypeInfo?
+      source: checker.ly:135
+
+  func new_registry() -> Registry
+    source: checker.ly:116
+
+  func get_method_aliases() -> Dict<Sym, string>
+    source: checker.ly:152
+
+  func get_method_labels() -> Dict<Sym, string>
+    source: checker.ly:159
+
+  class Checker
+    source: checker.ly:166
+    field current_func_name: string
+    field current_func_return: Type?
+    field errors: [string]
+    field iface_decls: Dict<Sym, InterfaceDecl>
+    field in_trusted: bool
+    field method_type_args: Dict<Sym, [TypeExpr]>
+    field registry: Registry
+    field scope: Scope
+    field type_var_methods: Dict<Sym, Dict<Sym, Type>>?
+    method push_scope(self)
+      source: checker.ly:192
+    method pop_scope(self)
+      source: checker.ly:196
+    method register_builtins(self)
+      source: checker.ly:312
+    method register_primitive_type(self, name: string, t: Type)
+      source: checker.ly:335
+    method register_go_stdlib_modules(self)
+      source: checker.ly:350
+    method is_assignable(self, src: Type, to: Type) -> bool
+      source: checker.ly:568
+    method infer_type_args(self, func_type: Type, arg_types: [Type]) -> Dict<Sym, Type>
+      source: checker.ly:903
+    method error(self, msg: string)
+      source: checker.ly:935
+    method error_at(self, span: Span, msg: string)
+      source: checker.ly:939
+    method resolve_type_expr(self, te: TypeExpr) -> Type
+      source: checker.ly:1111
+    method resolve_named_type(self, name: string, args: [TypeExpr], span: Span) -> Type
+      source: checker.ly:1175
+    method func_decl_to_type(self, f: FuncDecl) -> Type
+      source: checker.ly:1225
+    method preregister_type_names(self, block: LyricBlock)
+      source: checker.ly:1271
+    method register_lyric_block(self, block: LyricBlock)
+      source: checker.ly:1355
+    method register_interface_methods(self, file: File)
+      source: checker.ly:1443
+    method register_interface(self, iface: InterfaceDecl)
+      source: checker.ly:1687
+    method register_struct(self, s: StructDecl)
+      source: checker.ly:1756
+    method register_class(self, cls: ClassDecl)
+      source: checker.ly:1822
+    method register_enum(self, e: EnumDecl)
+      source: checker.ly:1939
+    method check_implements(self, cls: ClassDecl)
+      source: checker.ly:2008
+    method register_impl_methods(self, ib: ImplBlock)
+      source: checker.ly:2021
+    method register_func(self, f: FuncDecl)
+      source: checker.ly:2113
+    method grant_relational_methods(self, iface_name: string, type_args: [TypeExpr])
+      source: checker.ly:2144
+    method func_decl_to_type_with_subst(self, f: FuncDecl, subst: Dict<Sym, string>) -> Type
+      source: checker.ly:2197
+    method check_lyric_block_bodies(self, block: LyricBlock)
+      source: checker.ly:2240
+    method check_func_body(self, f: FuncDecl)
+      source: checker.ly:2348
+    method check_block(self, block: Block)
+      source: checker.ly:2468
+    method check_stmt(self, stmt: Stmt)
+      source: checker.ly:2475
+    method check_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
+      source: checker.ly:2609
+    method check_assign(self, target: Expr, value: Expr)
+      source: checker.ly:2678
+    method check_return(self, value: Expr?)
+      source: checker.ly:2706
+    method check_if(self, condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?)
+      source: checker.ly:2726
+    method check_for(self, var_name: Sym, index_var: Sym?, collection: Expr, body: Block)
+      source: checker.ly:2748
+    method check_while(self, condition: Expr, body: Block)
+      source: checker.ly:2794
+    method check_match(self, value: Expr, arms: [MatchArm])
+      source: checker.ly:2801
+    method bind_pattern(self, pat: Pattern, val_type: Type)
+      source: checker.ly:2825
+    method check_expr(self, expr: Expr) -> Type
+      source: checker.ly:2885
+      why: "Primary expression-checking entry point. Calls check_expr_inner for type inference, then annotate(expr, type) which sets expr.resolved_type — the checker→lowerer contract."
+    method check_expr_inner(self, expr: Expr) -> Type
+      source: checker.ly:2890
+    method check_unary(self, op: UnaryOp, operand: Expr) -> Type
+      source: checker.ly:2981
+    method check_binary(self, left: Expr, op: BinaryOp, right: Expr) -> Type
+      source: checker.ly:2990
+    method check_index(self, receiver: Expr, index: Expr) -> Type
+      source: checker.ly:3029
+    method check_slice(self, receiver: Expr, low: Expr?, high: Expr?) -> Type
+      source: checker.ly:3043
+    method check_cast(self, target_type: TypeExpr, operand: Expr) -> Type
+      source: checker.ly:3050
+    method check_unwrap(self, operand: Expr) -> Type
+      source: checker.ly:3055
+    method check_try(self, operand: Expr) -> Type
+      source: checker.ly:3063
+    method check_is(self, operand: Expr, variant: Sym) -> Type
+      source: checker.ly:3083
+    method check_if_else_expr(self, cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) -> Type
+      source: checker.ly:3088
+    method check_block_expr_type(self, block: Block) -> Type
+      source: checker.ly:3113
+    method check_tuple_lit(self, elems: [Expr]) -> Type
+      source: checker.ly:3130
+    method check_list_lit(self, elems: [Expr]) -> Type
+      source: checker.ly:3139
+    method check_map_lit(self, keys: [Expr], values: [Expr]) -> Type
+      source: checker.ly:3150
+    method check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type
+      source: checker.ly:3172
+    method check_lambda(self, params: [Param], return_type: TypeExpr?, body: Block) -> Type
+      source: checker.ly:3295
+    method check_match_expr(self, value: Expr, arms: [MatchArm]) -> Type
+      source: checker.ly:3317
+    method check_call(self, call_expr: Expr, func_expr: Expr, type_args: [TypeExpr], args: [Expr]) -> Type
+      source: checker.ly:3374
+    method resolve_module_func(self, mod_name: string, func_name: string) -> Type
+      source: checker.ly:3489
+    method check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type?
+      source: checker.ly:3531
+    method build_type_arg_subst(self, recv_type: Type) -> Dict<Sym, Type>?
+      source: checker.ly:3649
+    method check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type
+      source: checker.ly:3668
+    method check_builtin_method(self, recv_type: Type, method: string, arg_types: [Type]) -> Type?
+      source: checker.ly:3865
+    method check_list_method(self, elem: Type, method: string) -> Type?
+      source: checker.ly:3884
+    method check_string_method(self, method: string) -> Type?
+      source: checker.ly:3899
+    method check_channel_method(self, elem: Type, method: string) -> Type?
+      source: checker.ly:3912
+    method check_map_method(self, key: Type, value: Type, method: string) -> Type?
+      source: checker.ly:3919
+    method check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type
+      source: checker.ly:3936
+    method resolve_field_type(self, recv_type: Type, field_str: string) -> Type
+      source: checker.ly:3976
+    method walk_expr(self, expr: Expr, callback: (Expr) -> ())
+      source: checker.ly:4060
+    method walk_stmt(self, stmt: Stmt, callback: (Expr) -> ())
+      source: checker.ly:4145
+    method walk_block(self, block: Block, callback: (Expr) -> ())
+      source: checker.ly:4218
+    method walk_pattern(self, pat: Pattern, callback: (Expr) -> ())
+      source: checker.ly:4223
+    method type_expr_has_typevar(self, te: TypeExpr) -> bool
+      source: checker.ly:4263
+    method find_typevar_name(self, te: TypeExpr) -> string
+      source: checker.ly:4318
+    method validate_all_exprs_resolved(self, file: File)
+      source: checker.ly:4364
+    method vwalk_block(self, block: Block, ctx: string)
+      source: checker.ly:4399
+    method vwalk_stmt(self, stmt: Stmt, ctx: string)
+      source: checker.ly:4406
+    method vwalk_pattern(self, pat: Pattern, ctx: string)
+      source: checker.ly:4485
+    method vwalk_expr(self, expr: Expr, ctx: string)
+      source: checker.ly:4500
+    method validate_field_and_method_access(self, file: File)
+      source: checker.ly:4606
+    method validate_access_block(self, block: Block)
+      source: checker.ly:4634
+    method validate_access_stmt(self, stmt: Stmt)
+      source: checker.ly:4641
+    method validate_access_expr(self, expr: Expr)
+      source: checker.ly:4709
+    method validate_field_access(self, receiver: Expr, field_name: Sym)
+      source: checker.ly:4784
+    method validate_method_access(self, receiver: Expr, method: Sym)
+      source: checker.ly:4816
+    method validate_all_types_resolved(self, file: File)
+      source: checker.ly:4856
+
+  func new_checker() -> Checker
+    source: checker.ly:178
+
+  func make_int_type(bits: i32) -> Type
+    source: checker.ly:206
+
+  func make_uint_type(bits: i32) -> Type
+    source: checker.ly:210
+
+  func make_float_type(bits: i32) -> Type
+    source: checker.ly:214
+
+  func make_bool_type() -> Type
+    source: checker.ly:218
+
+  func make_string_type() -> Type
+    source: checker.ly:222
+
+  func make_void_type() -> Type
+    source: checker.ly:226
+
+  func make_nil_type() -> Type
+    source: checker.ly:230
+
+  func make_any_type() -> Type
+    source: checker.ly:234
+
+  func make_error_type() -> Type
+    source: checker.ly:238
+
+  func make_lock_type() -> Type
+    source: checker.ly:242
+
+  func make_union_type(variants: [Type]) -> Type
+    source: checker.ly:246
+
+  func make_optional_type(inner: Type) -> Type
+    source: checker.ly:250
+
+  func make_sequence_type(elem: Type) -> Type
+    source: checker.ly:254
+
+  func make_map_type(key: Type, value: Type) -> Type
+    source: checker.ly:258
+
+  func make_tuple_type(fields: [TupleFieldType]) -> Type
+    source: checker.ly:262
+
+  func make_func_type(params: [Type], ret: Type, tpnames: [string]) -> Type
+    source: checker.ly:266
+
+  func make_channel_type(elem: Type) -> Type
+    source: checker.ly:270
+
+  func make_generator_type(elem: Type) -> Type
+    source: checker.ly:274
+
+  func make_error_result_type(ok: Type, err: Type) -> Type
+    source: checker.ly:280
+
+  func make_typevar_type(name: string) -> Type
+    source: checker.ly:284
+
+  func make_struct_type(name: string) -> Type
+    source: checker.ly:288
+
+  func make_class_type(name: string) -> Type
+    source: checker.ly:292
+
+  func make_enum_type(name: string) -> Type
+    source: checker.ly:296
+
+  func make_interface_type(name: string) -> Type
+    source: checker.ly:300
+
+  func make_module_type(name: string) -> Type
+    source: checker.ly:304
+
+  func type_name(t: Type) -> string
+    source: checker.ly:362
+
+  func types_equal(a: Type, b: Type) -> bool
+    source: checker.ly:395
+
+  func numeric_widens(src: Type, to: Type) -> bool
+    source: checker.ly:530
+
+  func is_numeric(t: Type) -> bool
+    source: checker.ly:702
+
+  func is_integer(t: Type) -> bool
+    source: checker.ly:709
+
+  func is_error_type(t: Type) -> bool
+    source: checker.ly:716
+
+  func match_type_vars(pattern: Type, concrete: Type, bindings: Dict<Sym, Type>) -> bool
+    source: checker.ly:730
+
+  func substitute_type(t: Type, bindings: Dict<Sym, Type>) -> Type
+    source: checker.ly:833
+
+  func satisfies_constraint(t: Type, constraint: string) -> bool
+    source: checker.ly:919
+
+  func type_to_type_expr(t: Type) -> TypeExpr
+    source: checker.ly:948
+
+  func annotate(expr: Expr, t: Type) -> Type
+    source: checker.ly:1074
+
+  func type_contains_var(t: Type) -> bool
+    source: checker.ly:1080
+
+  func subst_type_var_names(t: Type, subst: Dict<Sym, string>) -> Type
+    source: checker.ly:2216
+
+  func propagate_arg_types(args: [Expr], param_types: [Type])
+    source: checker.ly:3351
+
+  func coerce_numeric(a: Type, b: Type) -> Type
+    source: checker.ly:4041
+
+  func is_primitive_name(n: string) -> bool
+    source: checker.ly:4240
+
+  func sym_to_string(s: Sym) -> string
+    source: checker.ly:4865
+
+  func check_file(file: File) -> Checker
+    source: checker.ly:4873
