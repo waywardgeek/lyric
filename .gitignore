@@ -33,3 +33,14 @@ Thumbs.db
 !legacy/**/*.go
 lyric_asan*
 *.dSYM
+
+# Built tools (Mac-arch-specific, build via `make tools`)
+/tools/extract_api
+/lyric.stable
+
+# More built/debug binaries (arch-specific, never commit)
+/a.out
+/lyric_dbg
+/lyric_debug
+*.dSYM/
+/testdata/hello_world
