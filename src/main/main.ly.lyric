@@ -1,103 +1,155 @@
-//ldd:source main.ly
-//ldd:why "CLI entry point: compile, test, fmt commands. Orchestrates the full pipeline from parsing to C output."
+module main
+  source: ["main.ly"]
+  why: "CLI entry point for the lyric compiler. Dispatches the compile, test, and fmt subcommands and orchestrates the full compilation pipeline from source files to emitted C output."
 
-// ## Architecture — Compilation Pipeline
-//
-// compile_pipeline executes passes in strict order:
-// 1. Parse all input files → merge into single AST
-// 2. Resolve module imports (if lyric.mod found)
-// 3. Merge stdlib (selective, transitive)
-// 4. Desugar (5 passes: embeds → fields → relations → destructors → defaults)
-// 5. Check (3 phases: preregister → register → check bodies)
-// 6. Lower (AST → LIR)
-// 7. Optimize (structural transforms + DCE)
-// 8. Monomorphize (specialize generics)
-// 9. Resolve class types (post-mono metadata)
-// 10. Memory pass: slab rewrite + RC injection (gated by flags)
-// 11. C backend emission
-//
-// CLI flags: -o (output), --lir-dump (diagnostic), --soa (SoA slabs),
-// --detect-uaf (poison checks), --rc-free (enable frees on rc=0),
-// --mono (monomorphize without emitting C)
+  doc "Architecture":
+    """
+    main.ly is a thin CLI driver — it contains no top-level classes, only
+    free functions and one small struct (DeclItem) used during fmt sorting.
+    All heavy lifting lives in the per-phase modules (parser, checker,
+    desugar, lowerer, optimizer, monomorphizer, memory, cbackend).
 
-// ## Architecture — Command Resolution
-//
-// resolve_command implements unique-prefix matching:
-// `lyric c` → compile, `lyric t` → test, `lyric f` → fmt.
-// Ambiguous prefixes are rejected with an error listing matches.
+    Command dispatch (resolve_command + main):
+      `lyric <prefix> [args]` — `resolve_command` performs unique-prefix
+      matching over {compile, test, fmt}. Ambiguous prefixes are rejected
+      with an error listing matches. `main` parses argv, resolves the
+      command, and calls cmd_compile / cmd_test / cmd_fmt.
 
-// ## Architecture — Test Discovery
-//
-// cmd_test compiles normally, then scans LIR functions for test_* names.
-// Generates a C test runner using emit_test_runner (setjmp/longjmp isolation).
-// Compiles + runs in a temp directory; cleans up after.
+    Compilation pipeline (compile_pipeline):
+      Executes passes in strict order — each consumes the previous pass's
+      output and the order is load-bearing for correctness:
+        1.  Parse all input files → merge into a single AST.
+        2.  Resolve module imports (if lyric.mod is found).
+        3.  Merge stdlib (selective, transitive on use).
+        4.  Desugar: 5 passes — embeds → fields → relations →
+            destructors → defaults.
+        5.  Check: 3 phases — preregister type names → register
+            decls → check function bodies (annotates resolved_type).
+        6.  Lower AST → LIR.
+        7.  Optimize: structural transforms + dead-code elimination.
+        8.  Monomorphize: specialize generics.
+        9.  Resolve class types (post-mono metadata fix-ups).
+        10. Memory pass: slab rewrite + reference-count injection
+            (gated by --soa / --detect-uaf / --rc-free flags).
+        11. C backend emission.
 
+      CLI flags consumed here: -o (output path), --lir-dump (diagnostic
+      LIR text), --soa (struct-of-arrays slabs), --detect-uaf (poison
+      checks on freed memory), --rc-free (actually free on rc=0),
+      --mono (run through monomorphization but skip C emission).
 
-// main.ly:1174
-struct DeclItem {
-  idx: i32
-  line: i32
-  tag: i32
-}
+    Test discovery (cmd_test):
+      Runs the normal compile pipeline, then scans the resulting LIR
+      functions for `test_*` names. Generates a C test runner via
+      emit_test_runner (setjmp/longjmp isolates each test's failures),
+      compiles + runs it in a temp directory, and cleans up afterward.
 
-// main.ly:696
-func cmd_compile(args: [string]) -> bool
-// main.ly:985
-func cmd_fmt(args: [string]) -> bool
-// main.ly:786
-func cmd_test(args: [string]) -> bool
-// main.ly:584
-func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool
-// main.ly:129
-func dump_expr_to_sb(sb: StringBuilder, e: LExpr?)
-// main.ly:489
-func dump_lir_func(sb: StringBuilder, f: LFuncDecl)
-// main.ly:508
-func dump_lir_to_file(prog: LProgram, path: string)
-// main.ly:325
-func dump_stmts(sb: StringBuilder, stmts: [LStmt?], indent: string)
-// main.ly:66
-func dump_type_str(t: LType?) -> string
-// main.ly:110
-func dump_value_str(v: LValue?) -> string
-// main.ly:1067
-func emit_comments_before(sb: StringBuilder, comments: [Comment], idx: i32, before_line: i32, indent: string) -> i32
-// main.ly:969
-func find_runtime_dir() -> string
-// main.ly:1089
-func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], comment_idx: i32)
-// main.ly:1348
-func fmt_class(sb: StringBuilder, c: ClassDecl)
-// main.ly:1223
-func fmt_enum(sb: StringBuilder, e: EnumDecl)
-// main.ly:1455
-func fmt_field(sb: StringBuilder, f: Field)
-// main.ly:1001
-func fmt_file(path: string) -> bool
-// main.ly:1379
-func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string)
-// main.ly:1199
-func fmt_import(sb: StringBuilder, imp: ImportDecl)
-// main.ly:1280
-func fmt_interface(sb: StringBuilder, iface: InterfaceDecl)
-// main.ly:1420
-func fmt_relation(sb: StringBuilder, r: RelationDecl)
-// main.ly:1207
-func fmt_struct(sb: StringBuilder, s: StructDecl)
-// main.ly:1444
-func fmt_type_alias(sb: StringBuilder, t: TypeAliasDecl)
-// main.ly:1481
-func fmt_type_expr(sb: StringBuilder, te: TypeExpr?)
-// main.ly:1465
-func fmt_type_params(sb: StringBuilder, tps: [TypeParam])
-// main.ly:1566
-func main()
-// main.ly:11
-func resolve_command(prefix: string) -> (string, bool)
-// main.ly:1181
-func sort_decl_items(items: [DeclItem])
-// main.ly:1059
-func split_at_marker(text: string, marker: string) -> (string, string)
-// main.ly:46
-func str_join(parts: [string], sep: string) -> string
+    Formatter (cmd_fmt / fmt_file and the fmt_* helpers):
+      Round-trips a .ly source file through parse → pretty-print.
+      DeclItem + sort_decl_items group/order top-level decls; the
+      emit_comments_before helper preserves source comments by line
+      number; the fmt_* family handles each AST node kind (block,
+      class, struct, enum, interface, func, field, relation, import,
+      type alias, type expr, type params).
 
+    LIR dump helpers (dump_lir_to_file and friends):
+      dump_lir_func / dump_stmts / dump_expr_to_sb / dump_type_str /
+      dump_value_str produce the human-readable LIR text used by
+      --lir-dump. These are diagnostic-only and never affect codegen.
+    """
+
+  func resolve_command(prefix: string) -> (string, bool)
+    source: main.ly:11
+
+  func str_join(parts: [string], sep: string) -> string
+    source: main.ly:46
+
+  func dump_type_str(t: LType?) -> string
+    source: main.ly:66
+
+  func dump_value_str(v: LValue?) -> string
+    source: main.ly:110
+
+  func dump_expr_to_sb(sb: StringBuilder, e: LExpr?)
+    source: main.ly:129
+
+  func dump_stmts(sb: StringBuilder, stmts: [LStmt?], indent: string)
+    source: main.ly:325
+
+  func dump_lir_func(sb: StringBuilder, f: LFuncDecl)
+    source: main.ly:489
+
+  func dump_lir_to_file(prog: LProgram, path: string)
+    source: main.ly:508
+
+  func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool
+    source: main.ly:584
+
+  func cmd_compile(args: [string]) -> bool
+    source: main.ly:696
+
+  func cmd_test(args: [string]) -> bool
+    source: main.ly:788
+
+  func find_runtime_dir() -> string
+    source: main.ly:973
+
+  func cmd_fmt(args: [string]) -> bool
+    source: main.ly:989
+
+  func fmt_file(path: string) -> bool
+    source: main.ly:1005
+
+  func split_at_marker(text: string, marker: string) -> (string, string)
+    source: main.ly:1063
+
+  func emit_comments_before(sb: StringBuilder, comments: [Comment], idx: i32, before_line: i32, indent: string) -> i32
+    source: main.ly:1071
+
+  func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], comment_idx: i32)
+    source: main.ly:1093
+
+  struct DeclItem
+    source: main.ly:1178
+    field idx: i32
+    field line: i32
+    field tag: i32
+
+  func sort_decl_items(items: [DeclItem])
+    source: main.ly:1185
+
+  func fmt_import(sb: StringBuilder, imp: ImportDecl)
+    source: main.ly:1203
+
+  func fmt_struct(sb: StringBuilder, s: StructDecl)
+    source: main.ly:1211
+
+  func fmt_enum(sb: StringBuilder, e: EnumDecl)
+    source: main.ly:1227
+
+  func fmt_interface(sb: StringBuilder, iface: InterfaceDecl)
+    source: main.ly:1284
+
+  func fmt_class(sb: StringBuilder, c: ClassDecl)
+    source: main.ly:1352
+
+  func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string)
+    source: main.ly:1383
+
+  func fmt_relation(sb: StringBuilder, r: RelationDecl)
+    source: main.ly:1424
+
+  func fmt_type_alias(sb: StringBuilder, t: TypeAliasDecl)
+    source: main.ly:1448
+
+  func fmt_field(sb: StringBuilder, f: Field)
+    source: main.ly:1459
+
+  func fmt_type_params(sb: StringBuilder, tps: [TypeParam])
+    source: main.ly:1469
+
+  func fmt_type_expr(sb: StringBuilder, te: TypeExpr?)
+    source: main.ly:1485
+
+  func main()
+    source: main.ly:1570

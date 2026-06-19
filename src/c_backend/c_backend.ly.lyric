@@ -1,363 +1,428 @@
-//ldd:source c_backend.ly
-//ldd:why "LIR to C code generation. Emits GNU C11 with slab allocator, tagged unions, reference counting."
+module c_backend
+  source: ["c_backend.ly"]
+  why: "LIR to C code generation. Emits GNU C11 with slab allocator, tagged unions, reference counting."
 
-// ## Invariants
-//
-// "CGen state is per-compilation — temp_types/var_types reset per function"
-// "Class handle optionals are pointers (NULL = none), not LyricOpt wrapped"
-// "LYRIC_OPT_DEF must come AFTER struct defs but BEFORE class defs"
-// "LYRIC_SLICE_DEF uses pointers so can come before struct defs"
-// "Forward decls → slice defs → structs (topo sorted) → opt/result defs → classes"
-// "Lambdas are hoisted to top-level static functions"
-// "Generators use Duff's device state machine pattern"
-// "Simple enums (all unit variants) emit typedef enum, not tagged union"
-// "Function bodies collected to separate buffer for lambda hoisting"
-// "spawn_captures redirect variable references to (*_ctx->name)"
-// "in_generator redirects variable references to _gen->name"
-// "mut params: emit_value returns (*name) for all types, StAssign targets (*name)"
-// "escape_printf doubles % in f-string literal text for C printf format strings"
-// "field_to_string_expr must NOT use f-strings with format specs — use string concat to avoid escape_printf double-escaping"
+  doc "Architecture":
+    """
+    Entry point: emit_c(prog: LProgram?) -> string. CGen class holds all
+    generator state. Expression emission returns string; statement emission
+    writes directly to the buffer. Type mapping is centralized in c_type(),
+    which handles all LType→C type conversions. Composite types (slice/opt/
+    result/chan) are registered on first use. Interface dispatch uses vtables
+    indexed by named LTyAny names.
 
-// ## Architecture
-//
-// "Entry point: emit_c(prog: LProgram?) -> string"
-// "CGen class holds all generator state"
-// "Expression emission returns string, statement emission writes directly"
-// "Type mapping: c_type() handles all LType→C type conversions"
-// "Composite types (slice/opt/result/chan) registered on first use"
-// "Interface vtable dispatch for named LTyAny names"
-//
-// Emission order (dependency-safe):
-// 1. Forward declarations (all structs, classes, enums)
-// 2. Slice/channel type defs (use pointers, can precede struct defs)
-// 3. Struct definitions (topologically sorted via Kahn's algorithm)
-// 4. Optional/result type defs (AFTER structs, BEFORE classes)
-// 5. Class definitions + slab allocator infrastructure
-// 6. Interface vtable structs + static vtable instances per impl
-// 7. Function forward declarations
-// 8. Function bodies (with hoisted lambdas/spawn blocks)
-//
-// Interface dispatch: each interface → C struct of function pointers.
-// Each implementing class → static const vtable instance. Interface
-// values boxed as { void* _data, const Iface_vtable* _vtable }.
+    Emission order (dependency-safe):
+      1. Forward declarations (all structs, classes, enums)
+      2. Slice/channel type defs (pointer-based, can precede struct defs)
+      3. Struct definitions (topologically sorted via Kahn's algorithm)
+      4. Optional/result type defs (AFTER structs, BEFORE classes)
+      5. Class definitions + slab allocator infrastructure
+      6. Interface vtable structs + static vtable instances per impl
+      7. Function forward declarations
+      8. Function bodies (with hoisted lambdas/spawn blocks)
 
-// ## Slab Allocator Emission
-//
-// "AoS mode: struct ClassName with lyric_next free-list pointer, block-based malloc"
-// "SoA mode: parallel arrays per field, uint32_t handles, slot 0 wasted (used starts at 1)"
-// "Per-class: _lyric_slab_ClassName struct + alloc/free functions emitted"
-// "Block size: LYRIC_SLAB_BLOCK (256)"
+    Slab allocator: AoS mode emits a struct ClassName with a lyric_next
+    free-list pointer, block-based malloc with LYRIC_SLAB_BLOCK=256. SoA
+    mode emits parallel arrays per field with uint32_t handles, slot 0
+    wasted (handles start at 1). Per-class alloc/free functions are emitted.
 
-// ## Reference Counting Emission
-//
-// "RC classes get _rc field in AoS struct / _rc parallel array in SoA"
-// "Alloc functions set _rc = 1 for RC classes"
-// "StRefIncr: emits p->_rc++ (AoS) or _lyric_slab_Name._rc[h]++ (SoA)"
-// "StRefDecr: emits conditional decrement + slab_free when rc hits 0 (gated by --rc-free flag)"
-// "is_rc_class(name): checks class is not permanent and not owned — name-based lookup"
-// "has_destroy_func(name): checks if class has a destroy_ClassName function"
-// "--detect-uaf: sets _rc = UINT32_MAX on free; ExClassGet/ValClassFieldRef emit poison checks"
-// "--rc-free: enables actual slab_free on rc=0; without it, StRefDecr is a no-op (retains only)"
+    Reference counting: RC classes get an _rc field (AoS) or _rc parallel
+    array (SoA). Alloc sets _rc = 1. StRefIncr emits p->_rc++ or
+    _lyric_slab_Name._rc[h]++. StRefDecr emits a conditional decrement and
+    slab_free when rc hits 0, gated by --rc-free. is_rc_class(name) is a
+    name-based lookup (not permanent, not owned). has_destroy_func(name)
+    checks for a destroy_ClassName function. --detect-uaf sets _rc =
+    UINT32_MAX on free and emits poison checks on ExClassGet and
+    ValClassFieldRef.
+    """
+
+  invariant "CGen State Lifecycle":
+    procedural
+    """
+    CGen state is per-compilation. temp_types and var_types are reset
+    per function. Composite type registries (slice_types, opt_types,
+    result_types, chan_types, tuple_types) accumulate across the whole
+    program. simple_enums is computed once during decl emission.
+
+    Function bodies are collected into a separate buffer so lambdas
+    (hoisted to top-level static functions) and spawn functions can be
+    emitted before the buffered bodies are flushed.
+    """
+
+  invariant "Emission Ordering":
+    procedural
+    """
+    LYRIC_OPT_DEF must come AFTER struct defs but BEFORE class defs —
+    optionals may wrap structs but classes may be optional handles.
+    LYRIC_SLICE_DEF uses pointers so can come before struct defs.
+    Order: forward decls → slice defs → structs (topo sorted) → opt/result
+    defs → classes. Violating this order produces incomplete-type C errors.
+    """
+
+  invariant "Optional and Handle Representation":
+    procedural
+    """
+    Class handle optionals are raw pointers (NULL = none), NOT wrapped in
+    LyricOpt. Non-class optionals use LyricOpt<T> tagged structs. This
+    distinction lets class handle code use ordinary pointer arithmetic and
+    NULL checks while still giving value types proper optional discipline.
+    """
+
+  invariant "Generator and Lambda Lowering":
+    procedural
+    """
+    Lambdas are hoisted to top-level static functions named by lambda_id.
+    Generators emit a Duff's device state machine; gen_yield_count tracks
+    the case labels needed. While inside a generator, in_generator is true
+    and variable references are redirected to _gen->name so the state
+    machine's saved frame is visible across resumption.
+
+    Simple enums (all unit variants) emit a plain typedef enum rather than
+    a tagged union — detected by is_simple_enum on each LEnumDecl.
+    """
+
+  invariant "Capture and Mut-Param Redirection":
+    procedural
+    """
+    spawn_captures redirects variable references to (*_ctx->name) so the
+    spawned goroutine can read captured locals from its heap-allocated
+    context. mut_params marks parameters passed by pointer: emit_value
+    returns (*name) for all types, and StAssign targets (*name).
+    These two redirections compose with in_generator; the order of checks
+    in emit_value matters for correctness.
+    """
+
+  invariant "Printf Format String Escaping":
+    procedural
+    """
+    escape_printf doubles % in f-string literal text to produce correct C
+    printf format strings. field_to_string_expr must NOT use f-strings
+    with format specs — it must use string concatenation to avoid double
+    escaping by escape_printf (which would corrupt the resulting format).
+    """
 
 
-// c_backend.ly:82
-struct CCapture {
-  name: string
-  typ: string
-}
 
-// c_backend.ly:7
-class CGen {
-  buf: StringBuilder?
-  chan_types: Dict<Sym, string>?
-  class_by_name: Dict<Sym, LClassDecl>?
-  current_func: LFuncDecl?
-  func_by_name: Dict<Sym, LFuncDecl>?
-  gen_funcs: Dict<Sym, bool>?
-  gen_struct_name: string
-  gen_yield_count: i32
-  iface_by_name: Dict<Sym, LInterfaceDecl>?
-  impl_map: Dict<Sym, [string]>?
-  in_generator: bool
-  indent: i32
-  lambda_id: i32
-  lambdas: [CLambda]
-  method_to_receiver: Dict<Sym, string>?
-  mut_params: Dict<Sym, bool>?
-  needs_exec_cmd: bool
-  needs_os_args: bool
-  needs_path_join: bool
-  opt_count: i32
-  opt_types: Dict<Sym, string>?
-  prog: LProgram?
-  result_count: i32
-  result_types: Dict<Sym, string>?
-  select_id: i32
-  simple_enums: Dict<Sym, bool>?
-  slice_count: i32
-  slice_types: Dict<Sym, string>?
-  spawn_captures: Dict<Sym, bool>?
-  spawn_funcs: [CSpawnFunc]
-  spawn_id: i32
-  struct_by_name: Dict<Sym, LStructDecl>?
-  temp_types: Dict<Sym, LType?>?
-  temp_used: Dict<Sym, bool>?
-  tuple_count: i32
-  tuple_types: Dict<Sym, string>?
-  var_types: Dict<Sym, LType?>?
-}
-// c_backend.ly:469
-func CGen.c_field_decl(self, t: LType?, name: string) -> string
-// c_backend.ly:737
-func CGen.c_param_list(self, f: LFuncDecl) -> string
-// c_backend.ly:490
-func CGen.c_return_type(self, t: LType?) -> string
-// c_backend.ly:497
-func CGen.c_tuple_type(self, t: LType?) -> string
-// c_backend.ly:367
-func CGen.c_type(self, t: LType?) -> string
-// c_backend.ly:1129
-func CGen.c_wrap_union(self, expr: string, src_type: LType?) -> string
-// c_backend.ly:575
-func CGen.chan_suffix(self, elem: LType?) -> string
-// c_backend.ly:3921
-func CGen.collect_composite_types(self)
-// c_backend.ly:3353
-func CGen.collect_gen_vars(self, stmts: [LStmt?]) -> [LVarDeclData]
-// c_backend.ly:704
-func CGen.contains_type_var(self, t: LType?) -> bool
-// c_backend.ly:3413
-func CGen.count_yields(self, stmts: [LStmt?]) -> i32
-// c_backend.ly:924
-func CGen.emit_args(self, args: [LValue?]) -> string
-// c_backend.ly:2421
-func CGen.emit_args_boxed(self, func_name: string, args: [LValue?]) -> string
-// c_backend.ly:2457
-func CGen.emit_args_boxed_mut(self, func_name: string, args: [LValue?], mut_args: [bool]) -> string
-// c_backend.ly:937
-func CGen.emit_args_with_mut(self, args: [LValue?], mut_args: [bool]) -> string
-// c_backend.ly:2277
-func CGen.emit_bin_op_expr(self, e: LExpr?) -> string
-// c_backend.ly:1346
-func CGen.emit_builtin(self, d: LBuiltinData?) -> string
-// c_backend.ly:2058
-func CGen.emit_call_expr(self, e: LExpr?) -> string
-// c_backend.ly:2182
-func CGen.emit_class_alloc_expr(self, e: LExpr?) -> string
-// c_backend.ly:4176
-func CGen.emit_class_decl(self, c: LClassDecl)
-// c_backend.ly:869
-func CGen.emit_class_msg_data(self, v: LValue?, class_name: string) -> string
-// c_backend.ly:4420
-func CGen.emit_enum_decl(self, e: LEnumDecl)
-// c_backend.ly:1803
-func CGen.emit_expr_str(self, e: LExpr?) -> string
-// c_backend.ly:4652
-func CGen.emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string, suffix: string)
-// c_backend.ly:3161
-func CGen.emit_for_stmt(self, s: LStmt?)
-// c_backend.ly:1310
-func CGen.emit_format(self, d: LFormatData?) -> string
-// c_backend.ly:1192
-func CGen.emit_fprint(self, stream: string, args: [LValue?], newline: bool) -> string
-// c_backend.ly:4489
-func CGen.emit_func_decl(self, f: LFuncDecl)
-// c_backend.ly:4477
-func CGen.emit_func_forward_decl(self, f: LFuncDecl)
-// c_backend.ly:2377
-func CGen.emit_func_lit_expr(self, e: LExpr?) -> string
-// c_backend.ly:3472
-func CGen.emit_generator_forward_decls(self, f: LFuncDecl)
-// c_backend.ly:3480
-func CGen.emit_generator_func_decl(self, f: LFuncDecl)
-// c_backend.ly:3442
-func CGen.emit_generator_struct_decl(self, f: LFuncDecl)
-// c_backend.ly:2128
-func CGen.emit_method_call_expr(self, e: LExpr?) -> string
-// c_backend.ly:2547
-func CGen.emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?)
-// c_backend.ly:4677
-func CGen.emit_os_helpers(self)
-// c_backend.ly:1270
-func CGen.emit_printf(self, args: [LValue?]) -> string
-// c_backend.ly:1266
-func CGen.emit_println(self, args: [LValue?]) -> string
-// c_backend.ly:3069
-func CGen.emit_return_stmt(self, s: LStmt?)
-// c_backend.ly:2513
-func CGen.emit_side_effect(self, e: LExpr?) -> string
-// c_backend.ly:4405
-func CGen.emit_simple_enum_decl(self, e: LEnumDecl)
-// c_backend.ly:4212
-func CGen.emit_slab_infrastructure(self, classes: [LClassDecl])
-// c_backend.ly:4297
-func CGen.emit_slab_infrastructure_soa(self, classes: [LClassDecl])
-// c_backend.ly:1290
-func CGen.emit_sprintf(self, args: [LValue?]) -> string
-// c_backend.ly:2636
-func CGen.emit_stmt(self, s: LStmt?)
-// c_backend.ly:2628
-func CGen.emit_stmts(self, stmts: [LStmt?])
-// c_backend.ly:4160
-func CGen.emit_struct_decl(self, s: LStructDecl)
-// c_backend.ly:2320
-func CGen.emit_struct_field_expr(self, e: LExpr?) -> string
-// c_backend.ly:2222
-func CGen.emit_struct_lit_expr(self, e: LExpr?) -> string
-// c_backend.ly:3196
-func CGen.emit_switch_stmt(self, s: LStmt?)
-// c_backend.ly:4528
-func CGen.emit_to_string_functions(self)
-// c_backend.ly:3226
-func CGen.emit_type_switch_stmt(self, s: LStmt?)
-// c_backend.ly:777
-func CGen.emit_value(self, v: LValue?) -> string
-// c_backend.ly:878
-func CGen.emit_value_as_cstr(self, v: LValue?) -> string
-// c_backend.ly:2348
-func CGen.emit_variant_construct_expr(self, e: LExpr?) -> string
-// c_backend.ly:3675
-func CGen.eq_expr(self, a: LValue?, b: LValue?) -> string
-// c_backend.ly:3341
-func CGen.extract_func_name_from_expr(self, e: LExpr?) -> string
-// c_backend.ly:3703
-func CGen.field_to_string_expr(self, t: LType?, val: string) -> string
-// c_backend.ly:1061
-func CGen.find_class_field(self, fields: [LField], name: string) -> LType?
-// c_backend.ly:3293
-func CGen.find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> string
-// c_backend.ly:727
-func CGen.func_name(self, f: LFuncDecl) -> string
-// c_backend.ly:681
-func CGen.has_destroy_func(self, class_name: string) -> bool
-// c_backend.ly:3545
-func CGen.infer_expr_type(self, e: LExpr?) -> LType?
-// c_backend.ly:980
-func CGen.infer_lval_type(self, v: LValue?) -> LType?
-// c_backend.ly:640
-func CGen.is_class_optional(self, t: LType?) -> bool
-// c_backend.ly:2416
-func CGen.is_gen_func_by_name(self, name: string) -> bool
-// c_backend.ly:769
-func CGen.is_generator_func(self, f: LFuncDecl) -> bool
-// c_backend.ly:667
-func CGen.is_rc_class(self, class_name: string) -> bool
-// c_backend.ly:173
-func CGen.line(self, s: string)
-// c_backend.ly:717
-func CGen.next_temp(self) -> i32
-// c_backend.ly:547
-func CGen.opt_type_name(self, elem: LType?) -> string
-// c_backend.ly:1038
-func CGen.opt_type_name_from_expr(self, e: LExpr?) -> string
-// c_backend.ly:1152
-func CGen.printf_spec_and_arg(self, v: LValue?) -> (string, string)
-// c_backend.ly:650
-func CGen.resolve_class_name(self, name: string, caller: string) -> string
-// c_backend.ly:655
-func CGen.resolve_class_name_from_type(self, t: LType?, caller: string) -> string
-// c_backend.ly:2495
-func CGen.resolve_concrete_class(self, v: LValue?) -> string
-// c_backend.ly:1074
-func CGen.resolve_field_type(self, owner_type: LType?, field: string) -> LType?
-// c_backend.ly:3286
-func CGen.resolve_gen_base_name(self, v: LValue?) -> string
-// c_backend.ly:3259
-func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> string
-// c_backend.ly:3693
-func CGen.resolve_type_name(self, name: string) -> string
-// c_backend.ly:958
-func CGen.resolve_value_type(self, v: LValue?) -> LType?
-// c_backend.ly:561
-func CGen.result_type_name(self, elem: LType?) -> string
-// c_backend.ly:1050
-func CGen.result_type_name_from_expr(self, e: LExpr?) -> string
-// c_backend.ly:536
-func CGen.slice_type_name(self, elem: LType?) -> string
-// c_backend.ly:1031
-func CGen.slice_type_name_from_type(self, t: LType?) -> string
-// c_backend.ly:1024
-func CGen.slice_type_name_from_value(self, v: LValue?) -> string
-// c_backend.ly:3650
-func CGen.to_string_expr(self, v: LValue?) -> string
-// c_backend.ly:1114
-func CGen.union_tag_for_type(self, t: LType?) -> string
-// c_backend.ly:4017
-func CGen.walk_expr_for_composite(self, e: LExpr?)
-// c_backend.ly:4059
-func CGen.walk_stmts_for_composite(self, stmts: [LStmt?])
-// c_backend.ly:3972
-func CGen.walk_type_for_composite(self, t: LType?)
-// c_backend.ly:4011
-func CGen.walk_val_for_composite(self, v: LValue?)
-// c_backend.ly:183
-func CGen.write_raw(self, s: string)
-// c_backend.ly:590
-func CGen.zero_value(self, t: LType?) -> string
+  class CGen
+    source: c_backend.ly:7
+    field buf: StringBuilder?
+    field chan_types: Dict<Sym, string>?
+    field class_by_name: Dict<Sym, LClassDecl>?
+    field current_func: LFuncDecl?
+    field func_by_name: Dict<Sym, LFuncDecl>?
+    field gen_funcs: Dict<Sym, bool>?
+    field gen_struct_name: string
+    field gen_yield_count: i32
+    field iface_by_name: Dict<Sym, LInterfaceDecl>?
+    field impl_map: Dict<Sym, [string]>?
+    field in_generator: bool
+    field indent: i32
+    field lambda_id: i32
+    field lambdas: [CLambda]
+    field method_to_receiver: Dict<Sym, string>?
+    field mut_params: Dict<Sym, bool>?
+    field needs_exec_cmd: bool
+    field needs_os_args: bool
+    field needs_path_join: bool
+    field opt_count: i32
+    field opt_types: Dict<Sym, string>?
+    field prog: LProgram?
+    field result_count: i32
+    field result_types: Dict<Sym, string>?
+    field select_id: i32
+    field simple_enums: Dict<Sym, bool>?
+    field slice_count: i32
+    field slice_types: Dict<Sym, string>?
+    field spawn_captures: Dict<Sym, bool>?
+    field spawn_funcs: [CSpawnFunc]
+    field spawn_id: i32
+    field struct_by_name: Dict<Sym, LStructDecl>?
+    field temp_types: Dict<Sym, LType?>?
+    field temp_used: Dict<Sym, bool>?
+    field tuple_count: i32
+    field tuple_types: Dict<Sym, string>?
+    field var_types: Dict<Sym, LType?>?
+    method line(self, s: string)
+      source: c_backend.ly:176
+    method write_raw(self, s: string)
+      source: c_backend.ly:186
+    method c_type(self, t: LType?) -> string
+      source: c_backend.ly:370
+    method c_field_decl(self, t: LType?, name: string) -> string
+      source: c_backend.ly:472
+    method c_return_type(self, t: LType?) -> string
+      source: c_backend.ly:493
+    method c_tuple_type(self, t: LType?) -> string
+      source: c_backend.ly:500
+    method slice_type_name(self, elem: LType?) -> string
+      source: c_backend.ly:539
+    method opt_type_name(self, elem: LType?) -> string
+      source: c_backend.ly:550
+    method result_type_name(self, elem: LType?) -> string
+      source: c_backend.ly:564
+    method chan_suffix(self, elem: LType?) -> string
+      source: c_backend.ly:578
+    method zero_value(self, t: LType?) -> string
+      source: c_backend.ly:593
+    method is_class_optional(self, t: LType?) -> bool
+      source: c_backend.ly:643
+    method resolve_class_name(self, name: string, caller: string) -> string
+      source: c_backend.ly:653
+    method resolve_class_name_from_type(self, t: LType?, caller: string) -> string
+      source: c_backend.ly:658
+    method is_rc_class(self, class_name: string) -> bool
+      source: c_backend.ly:670
+    method has_destroy_func(self, class_name: string) -> bool
+      source: c_backend.ly:684
+    method contains_type_var(self, t: LType?) -> bool
+      source: c_backend.ly:707
+    method next_temp(self) -> i32
+      source: c_backend.ly:720
+    method func_name(self, f: LFuncDecl) -> string
+      source: c_backend.ly:730
+    method c_param_list(self, f: LFuncDecl) -> string
+      source: c_backend.ly:740
+    method is_generator_func(self, f: LFuncDecl) -> bool
+      source: c_backend.ly:772
+    method emit_value(self, v: LValue?) -> string
+      source: c_backend.ly:780
+    method emit_class_msg_data(self, v: LValue?, class_name: string) -> string
+      source: c_backend.ly:872
+    method emit_value_as_cstr(self, v: LValue?) -> string
+      source: c_backend.ly:881
+    method emit_args(self, args: [LValue?]) -> string
+      source: c_backend.ly:927
+    method emit_args_with_mut(self, args: [LValue?], mut_args: [bool]) -> string
+      source: c_backend.ly:940
+    method resolve_value_type(self, v: LValue?) -> LType?
+      source: c_backend.ly:961
+    method infer_lval_type(self, v: LValue?) -> LType?
+      source: c_backend.ly:983
+    method slice_type_name_from_value(self, v: LValue?) -> string
+      source: c_backend.ly:1027
+    method slice_type_name_from_type(self, t: LType?) -> string
+      source: c_backend.ly:1034
+    method opt_type_name_from_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:1041
+    method result_type_name_from_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:1053
+    method find_class_field(self, fields: [LField], name: string) -> LType?
+      source: c_backend.ly:1064
+    method resolve_field_type(self, owner_type: LType?, field: string) -> LType?
+      source: c_backend.ly:1077
+    method union_tag_for_type(self, t: LType?) -> string
+      source: c_backend.ly:1117
+    method c_wrap_union(self, expr: string, src_type: LType?) -> string
+      source: c_backend.ly:1132
+    method printf_spec_and_arg(self, v: LValue?) -> (string, string)
+      source: c_backend.ly:1155
+    method emit_fprint(self, stream: string, args: [LValue?], newline: bool) -> string
+      source: c_backend.ly:1195
+    method emit_println(self, args: [LValue?]) -> string
+      source: c_backend.ly:1269
+    method emit_printf(self, args: [LValue?]) -> string
+      source: c_backend.ly:1273
+    method emit_sprintf(self, args: [LValue?]) -> string
+      source: c_backend.ly:1293
+    method emit_format(self, d: LFormatData?) -> string
+      source: c_backend.ly:1313
+    method emit_builtin(self, d: LBuiltinData?) -> string
+      source: c_backend.ly:1349
+    method emit_expr_str(self, e: LExpr?) -> string
+      source: c_backend.ly:1806
+    method emit_call_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2059
+    method emit_method_call_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2129
+    method emit_class_alloc_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2183
+    method emit_struct_lit_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2221
+    method emit_bin_op_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2276
+    method emit_struct_field_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2319
+    method emit_variant_construct_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2347
+    method emit_func_lit_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:2376
+    method is_gen_func_by_name(self, name: string) -> bool
+      source: c_backend.ly:2415
+    method emit_args_boxed(self, func_name: string, args: [LValue?]) -> string
+      source: c_backend.ly:2420
+    method emit_args_boxed_mut(self, func_name: string, args: [LValue?], mut_args: [bool]) -> string
+      source: c_backend.ly:2456
+    method resolve_concrete_class(self, v: LValue?) -> string
+      source: c_backend.ly:2494
+    method emit_side_effect(self, e: LExpr?) -> string
+      source: c_backend.ly:2512
+    method emit_multi_assign(self, names: [string], types: [LType?], expr: LExpr?)
+      source: c_backend.ly:2546
+    method emit_element_rc_release(self, elem_expr: string, typ: LType?)
+      source: c_backend.ly:2630
+    method emit_stmts(self, stmts: [LStmt?])
+      source: c_backend.ly:2672
+    method emit_stmt(self, s: LStmt?)
+      source: c_backend.ly:2680
+      why: "Central LIR statement dispatcher — every emitted line of C ultimately flows through here. Composes with in_generator, mut_params, and spawn_captures to redirect variable references; ordering of those checks in emit_value (called from here) is load-bearing for correctness."
+    method emit_return_stmt(self, s: LStmt?)
+      source: c_backend.ly:3131
+    method emit_for_stmt(self, s: LStmt?)
+      source: c_backend.ly:3223
+    method emit_switch_stmt(self, s: LStmt?)
+      source: c_backend.ly:3258
+    method emit_type_switch_stmt(self, s: LStmt?)
+      source: c_backend.ly:3288
+    method resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> string
+      source: c_backend.ly:3321
+    method resolve_gen_base_name(self, v: LValue?) -> string
+      source: c_backend.ly:3348
+    method find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> string
+      source: c_backend.ly:3355
+    method extract_func_name_from_expr(self, e: LExpr?) -> string
+      source: c_backend.ly:3403
+    method collect_gen_vars(self, stmts: [LStmt?]) -> [LVarDeclData]
+      source: c_backend.ly:3415
+    method count_yields(self, stmts: [LStmt?]) -> i32
+      source: c_backend.ly:3475
+    method emit_generator_struct_decl(self, f: LFuncDecl)
+      source: c_backend.ly:3504
+    method emit_generator_forward_decls(self, f: LFuncDecl)
+      source: c_backend.ly:3534
+    method emit_generator_func_decl(self, f: LFuncDecl)
+      source: c_backend.ly:3542
+    method infer_expr_type(self, e: LExpr?) -> LType?
+      source: c_backend.ly:3607
+    method to_string_expr(self, v: LValue?) -> string
+      source: c_backend.ly:3712
+    method eq_expr(self, a: LValue?, b: LValue?) -> string
+      source: c_backend.ly:3737
+    method resolve_type_name(self, name: string) -> string
+      source: c_backend.ly:3755
+    method field_to_string_expr(self, t: LType?, val: string) -> string
+      source: c_backend.ly:3765
+    method collect_composite_types(self)
+      source: c_backend.ly:3983
+    method walk_type_for_composite(self, t: LType?)
+      source: c_backend.ly:4034
+    method walk_val_for_composite(self, v: LValue?)
+      source: c_backend.ly:4073
+    method walk_expr_for_composite(self, e: LExpr?)
+      source: c_backend.ly:4079
+    method walk_stmts_for_composite(self, stmts: [LStmt?])
+      source: c_backend.ly:4121
+    method emit_struct_decl(self, s: LStructDecl)
+      source: c_backend.ly:4222
+    method emit_class_decl(self, c: LClassDecl)
+      source: c_backend.ly:4238
+    method emit_slab_infrastructure(self, classes: [LClassDecl])
+      source: c_backend.ly:4274
+    method emit_slab_infrastructure_soa(self, classes: [LClassDecl])
+      source: c_backend.ly:4359
+    method emit_simple_enum_decl(self, e: LEnumDecl)
+      source: c_backend.ly:4467
+    method emit_enum_decl(self, e: LEnumDecl)
+      source: c_backend.ly:4482
+    method emit_func_forward_decl(self, f: LFuncDecl)
+      source: c_backend.ly:4539
+    method emit_func_decl(self, f: LFuncDecl)
+      source: c_backend.ly:4551
+    method emit_to_string_functions(self)
+      source: c_backend.ly:4590
+    method emit_field_dump_to_string(self, type_name: string, fields: [LField], prefix: string, suffix: string)
+      source: c_backend.ly:4714
+    method emit_os_helpers(self)
+      source: c_backend.ly:4739
 
-// c_backend.ly:69
-struct CLambda {
-  body_str: string
-  name: string
-  params: string
-  ret_type: string
-}
+  struct CLambda
+    source: c_backend.ly:69
+    field body_str: string
+    field name: string
+    field params: string
+    field ret_type: string
 
-// c_backend.ly:76
-struct CSpawnFunc {
-  body_str: string
-  captures: [CCapture]
-  name: string
-}
+  struct CSpawnFunc
+    source: c_backend.ly:76
+    field body_str: string
+    field captures: [CCapture]
+    field name: string
 
-// c_backend.ly:332
-func c_bin_op(op: LBinOpKind) -> string
-// c_backend.ly:229
-func c_safe_name(name: string) -> string
-// c_backend.ly:355
-func c_un_op(op: LUnOpKind) -> string
-// c_backend.ly:4983
-func collect_declared_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
-// c_backend.ly:4942
-func collect_declared_vars_stmts(stmts: [LStmt?], decl: Dict<Sym, bool>?)
-// c_backend.ly:4756
-func collect_expr_vars(e: LExpr?, used: Dict<Sym, bool>?)
-// c_backend.ly:4936
-func collect_used_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
-// c_backend.ly:4837
-func collect_used_vars_stmts(stmts: [LStmt?], used: Dict<Sym, bool>?)
-// c_backend.ly:4749
-func collect_val_vars(v: LValue?, used: Dict<Sym, bool>?)
-// c_backend.ly:3752
-func dedup_classes(items: [LClassDecl]) -> [LClassDecl]
-// c_backend.ly:3767
-func dedup_enums(items: [LEnumDecl]) -> [LEnumDecl]
-// c_backend.ly:3782
-func dedup_funcs(items: [LFuncDecl]) -> [LFuncDecl]
-// c_backend.ly:3737
-func dedup_structs(items: [LStructDecl]) -> [LStructDecl]
-// c_backend.ly:4993
-func emit_c(prog: LProgram?) -> string
-// c_backend.ly:5449
-func emit_test_runner(test_funcs: [string]) -> string
-// c_backend.ly:274
-func escape_c(s: string) -> string
-// c_backend.ly:312
-func escape_printf(s: string) -> string
-// c_backend.ly:191
-func is_c_reserved(name: string) -> bool
-// c_backend.ly:625
-func is_simple_enum(e: LEnumDecl) -> bool
-// c_backend.ly:259
-func lc_first(s: string) -> string
-// c_backend.ly:87
-func new_cgen(prog: LProgram?) -> CGen?
-// c_backend.ly:236
-func sanitize_c_type_name(s: string) -> string
-// c_backend.ly:3902
-func str_to_lower(s: string) -> string
-// c_backend.ly:3805
-func struct_type_name(t: LType?) -> string
-// c_backend.ly:3811
-func topo_sort_structs(structs: [LStructDecl]) -> [LStructDecl]
+  struct CCapture
+    source: c_backend.ly:82
+    field name: string
+    field typ: string
 
+  func new_cgen(prog: LProgram?) -> CGen?
+    source: c_backend.ly:87
+
+  func is_c_reserved(name: string) -> bool
+    source: c_backend.ly:194
+
+  func c_safe_name(name: string) -> string
+    source: c_backend.ly:232
+
+  func sanitize_c_type_name(s: string) -> string
+    source: c_backend.ly:239
+
+  func lc_first(s: string) -> string
+    source: c_backend.ly:262
+
+  func escape_c(s: string) -> string
+    source: c_backend.ly:277
+
+  func escape_printf(s: string) -> string
+    source: c_backend.ly:315
+
+  func c_bin_op(op: LBinOpKind) -> string
+    source: c_backend.ly:335
+
+  func c_un_op(op: LUnOpKind) -> string
+    source: c_backend.ly:358
+
+  func is_simple_enum(e: LEnumDecl) -> bool
+    source: c_backend.ly:628
+
+  func dedup_structs(items: [LStructDecl]) -> [LStructDecl]
+    source: c_backend.ly:3799
+
+  func dedup_classes(items: [LClassDecl]) -> [LClassDecl]
+    source: c_backend.ly:3814
+
+  func dedup_enums(items: [LEnumDecl]) -> [LEnumDecl]
+    source: c_backend.ly:3829
+
+  func dedup_funcs(items: [LFuncDecl]) -> [LFuncDecl]
+    source: c_backend.ly:3844
+
+  func struct_type_name(t: LType?) -> string
+    source: c_backend.ly:3867
+
+  func topo_sort_structs(structs: [LStructDecl]) -> [LStructDecl]
+    source: c_backend.ly:3873
+
+  func str_to_lower(s: string) -> string
+    source: c_backend.ly:3964
+
+  func collect_val_vars(v: LValue?, used: Dict<Sym, bool>?)
+    source: c_backend.ly:4811
+
+  func collect_expr_vars(e: LExpr?, used: Dict<Sym, bool>?)
+    source: c_backend.ly:4818
+
+  func collect_used_vars_stmts(stmts: [LStmt?], used: Dict<Sym, bool>?)
+    source: c_backend.ly:4899
+
+  func collect_used_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
+    source: c_backend.ly:4998
+
+  func collect_declared_vars_stmts(stmts: [LStmt?], decl: Dict<Sym, bool>?)
+    source: c_backend.ly:5004
+
+  func collect_declared_vars(stmts: [LStmt?]) -> Dict<Sym, bool>?
+    source: c_backend.ly:5045
+
+  func emit_c(prog: LProgram?) -> string
+    source: c_backend.ly:5055
+
+  func emit_test_runner(test_funcs: [string]) -> string
+    source: c_backend.ly:5511

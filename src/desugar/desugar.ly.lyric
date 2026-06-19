@@ -1,139 +1,248 @@
-//ldd:source desugar.ly
-//ldd:why "Five-pass AST desugaring: embeds → interface fields → relations → destructors → default impls. Each pass creates AST consumed by the next. Runs BEFORE the checker."
+module desugar
+  source: ["desugar.ly"]
+  why: "Six-pass AST desugaring layer that runs BEFORE the checker. Lowers high-level Lyric constructs — interface embeds, interface fields, relations, destructors, default impls, and field-access shorthand — into the simpler core forms (plain fields, methods, impl blocks, and getter/setter calls) that the checker and lowerer expect."
 
-// ## Invariants — Pass Order
-//
-// The desugar passes MUST run in this order:
-// 1. DesugarInterfaceEmbeds — copies fields/destructors from embedded interfaces,
-// substituting type parameters. Enables OwningList/RefList to share
-// DoublyLinked mechanics.
-// 2. DesugarInterfaceFields — generates getter/setter method signatures
-// from `field T.name: Type` declarations
-// 3. DesugarRelations — relation decls → label-prefixed fields + impl blocks.
-// Uses globalIfaceMap across all blocks for cross-block interface lookup.
-// rewriteFieldType maps interface type params to concrete types.
-// 4. DesugarDestructors — for each owns relation, copies interface destructor
-// blocks to concrete class destroy methods. Multiple relations append.
-// Wraps each body in StmtBlock for variable name isolation.
-// 5. DesugarDefaultImpls — extracts interface methods with bodies into
-// top-level generic functions with relational where clauses
-//
-// Each pass generates AST consumed by later passes. Running out of order
-// produces silent failures. All desugar runs BEFORE the checker.
+  doc "Architecture":
+    """
+    desugar rewrites the parsed AST in place through six ordered passes.
+    Each pass produces AST that later passes consume; running out of order
+    causes silent failures, so the fixed sequence in desugar_all is the
+    single source of truth:
 
-// ## Invariants — Cross-Block Class Lookup (DesugarRelations)
-//
-// DesugarRelations must use a GLOBAL class lookup (across all blocks) when
-// injecting fields and generating impl method renames. Per-block classIdx
-// fails when a relation references a class from another block (e.g.,
-// Lexer:lc owns [Comment:lc] where Comment is in ast.ly but the relation
-// is in lexer.ly).
-//
-// The Go implementation uses `classLoc` map (blockIdx + classIdx) to find
-// classes globally. The same pattern applies to the bootstrap: relation
-// processing must scan ALL blocks to find target classes.
-//
-// Bug symptom: missing label-prefixed methods (e.g., `lc_children` not
-// generated for Comment), causing monomorphizer to emit wrong types.
+    1. desugar_interface_embeds — copies fields/destructors from embedded
+       interfaces into their embedders, substituting type parameters. This
+       is what lets OwningList<T>/RefList<T> share the DoublyLinked<T>
+       mechanics.
+    2. desugar_interface_fields — turns `field T.name: Type` declarations
+       on interfaces into matching getter/setter method signatures.
+    3. desugar_relations — expands relation decls into label-prefixed
+       fields on the parent class plus impl blocks on the child. Uses a
+       GLOBAL class lookup across all blocks (relations frequently target
+       a class declared in a different block, e.g. lexer.ly referencing
+       ast.ly's Comment). rewrite_field_type remaps interface type
+       parameters to the concrete types from the relation decl.
+    4. desugar_destructors — for each owns relation, deep-copies the
+       interface's destructor body onto the concrete class's destroy
+       method. Multiple relations append. Each body is wrapped in a
+       StmtBlock for variable-name isolation. Method calls inside the
+       copy are renamed to their label-prefixed forms.
+    5. desugar_default_impls — extracts interface methods that carry a
+       body into top-level generic functions guarded by relational
+       `where` clauses, so any conforming class picks them up.
+    6. desugar_field_access — rewrites `obj.field` shorthand into
+       getter/setter method calls for fields that were lifted onto
+       interfaces by pass 2.
 
-// ## Invariants — Deep Copy in Destructors
-//
-// DesugarDestructors copies interface destructor bodies to each concrete
-// class. The copy MUST be deep — sharing Stmt/Expr Data pointers causes
-// cross-relation contamination when destructor method calls are renamed
-// to label-prefixed versions (e.g., `children` → `fb_children`).
-//
-// The deepCopy functions must also copy TypeArgs slices on CallExpr and
-// MethodCallExpr, because type parameter substitution mutates TypeArgs
-// in-place. Without this, the last relation processed wins for ALL
-// destructors.
+    All six passes complete before the checker runs; the checker therefore
+    only ever sees plain classes, fields, methods, and impl blocks.
 
-// ## Invariants — Type Parameter Substitution
-//
-// When copying interface fields/methods/destructors to concrete classes,
-// type parameters must be substituted with concrete types from the
-// relation declaration. Two substitution strategies:
-// - Simple (Dict<Sym, string>): replaces type names as strings. Used for
-//   field injection and basic rewrites.
-// - Rich (Dict<Sym, TypeExpr>): preserves full type arguments through
-//   substitution. Required for destructors where generic types like
-//   Dict<K,V> must keep their type args intact.
-//
-// The rich variant (substitute_type_params_rich_*) is used in
-// DesugarDestructors; the simple variant elsewhere.
+    Two substitution strategies coexist. The simple variant
+    (Dict<Sym, string>, substitute_type_params_in_*) replaces type names
+    as strings and is used for field injection and the lighter rewrites.
+    The rich variant (Dict<Sym, TypeExpr>, substitute_type_params_rich_in_*)
+    preserves full type arguments through substitution and is required in
+    desugar_destructors, where generic types like Dict<K, V> must keep
+    their type args intact across the copy.
 
-// ## Invariants — Lock Statement Limitation
-//
-// deep_copy_stmt cannot reconstruct Lock statements due to a name
-// collision in the checker between Lock() and TypeKind.Lock. This is
-// a known limitation but doesn't affect destructors (they don't
-// typically contain lock statements).
+    Deep copy underpins passes 4 and 5. deep_copy_block / _stmt / _expr /
+    _type_expr / _type_args reconstruct the AST without sharing any Data
+    pointers. Sharing pointers causes cross-relation contamination once
+    method renames mutate the copied body. deep_copy_type_args in
+    particular must clone the TypeArgs slice on CallExpr / MethodCallExpr,
+    because rich type-parameter substitution rewrites TypeArgs in place;
+    without the clone, the last relation processed wins for all
+    destructors. Lock statements are a known gap in deep_copy_stmt
+    (checker name collision between Lock() and TypeKind.Lock), but they
+    do not appear in destructor bodies in practice.
+    """
 
-// ## Invariants — Impl Block Merging
-//
-// When a relation generates an impl block and a matching user-written
-// impl block already exists (same interface name and type args),
-// the generated mappings are merged into the existing impl block
-// rather than creating a duplicate. This allows user code to provide
-// explicit mappings while relation-generated mappings fill in the rest.
+  invariant "Pass Order":
+    procedural
+    """
+    desugar_all MUST invoke the passes in this exact order:
+      1. desugar_interface_embeds
+      2. desugar_interface_fields
+      3. desugar_relations
+      4. desugar_destructors
+      5. desugar_default_impls
+      6. desugar_field_access
 
+    Each pass generates AST consumed by later passes. Running out of
+    order produces silent failures (missing fields, unrenamed method
+    calls, destructors copied before embeds are resolved). All six
+    passes MUST complete before the checker runs.
+    """
 
-// desugar.ly:706
-func deep_copy_block(b: Block?) -> Block?
-// desugar.ly:824
-func deep_copy_block_val(b: Block) -> Block
-// desugar.ly:833
-func deep_copy_expr(e: Expr) -> Expr
-// desugar.ly:946
-func deep_copy_expr_list(exprs: [Expr]) -> [Expr]
-// desugar.ly:716
-func deep_copy_stmt(s: Stmt) -> Stmt
-// desugar.ly:936
-func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
-// desugar.ly:929
-func deep_copy_type_expr(te: TypeExpr) -> TypeExpr
-// desugar.ly:584
-func desugar_all(file: File)
-// desugar.ly:511
-func desugar_default_impls(file: File)
-// desugar.ly:356
-func desugar_destructors(file: File)
-// desugar.ly:17
-func desugar_interface_embeds(file: File)
-// desugar.ly:88
-func desugar_interface_fields(file: File)
-// desugar.ly:150
-func desugar_relations(file: File)
-// desugar.ly:1196
-func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>)
-// desugar.ly:1251
-func rename_method_calls_in_expr(expr: Expr, renames: Dict<Sym, string>)
-// desugar.ly:1202
-func rename_method_calls_in_stmt(stmt: Stmt, renames: Dict<Sym, string>)
-// desugar.ly:654
-func rewrite_field_type(te: TypeExpr?, iface_tps: [TypeParam], rel: RelationDecl) -> TypeExpr?
-// desugar.ly:610
-func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
-// desugar.ly:618
-func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr?
-// desugar.ly:958
-func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>)
-// desugar.ly:1012
-func substitute_type_params_in_expr(expr: Expr, type_map: Dict<Sym, string>)
-// desugar.ly:964
-func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<Sym, string>)
-// desugar.ly:629
-func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<Sym, string>)
-// desugar.ly:1064
-func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>)
-// desugar.ly:1119
-func substitute_type_params_rich_in_expr(expr: Expr, type_map: Dict<Sym, TypeExpr>)
-// desugar.ly:1070
-func substitute_type_params_rich_in_stmt(stmt: Stmt, type_map: Dict<Sym, TypeExpr>)
-// desugar.ly:1165
-func substitute_type_params_rich_in_type_expr(te: TypeExpr, type_map: Dict<Sym, TypeExpr>)
-// desugar.ly:603
-func sym_eq(a: Sym?, b: Sym?) -> bool
-// desugar.ly:595
-func type_expr_name(te: TypeExpr) -> Sym?
+  invariant "Cross-Block Class Lookup":
+    procedural
+    """
+    desugar_relations MUST resolve target classes using a GLOBAL lookup
+    across ALL blocks, not a per-block classIdx. Relations routinely
+    reference a class declared in a different block (e.g.
+    `Lexer:lc owns [Comment:lc]` where Comment lives in ast.ly but the
+    relation lives in lexer.ly).
 
+    The Go implementation uses a `classLoc` map keyed by
+    (blockIdx, classIdx); the bootstrap must mirror that pattern by
+    scanning every block when injecting fields and generating
+    label-prefixed impl method renames.
+
+    Bug symptom of a per-block lookup: missing label-prefixed methods
+    (e.g. `lc_children` never generated for Comment), which then causes
+    the monomorphizer downstream to emit wrong types.
+    """
+
+  invariant "Deep Copy in Destructors":
+    procedural
+    """
+    desugar_destructors MUST deep-copy interface destructor bodies onto
+    each concrete class. Sharing Stmt/Expr Data pointers across copies
+    causes cross-relation contamination once destructor method calls are
+    renamed to their label-prefixed forms (e.g. `children` →
+    `fb_children`).
+
+    deep_copy_expr and deep_copy_stmt MUST also clone the TypeArgs slice
+    on CallExpr and MethodCallExpr, because rich type-parameter
+    substitution mutates TypeArgs in place. Without the clone, the LAST
+    relation processed wins for ALL destructors.
+    """
+
+  invariant "Type Parameter Substitution Strategy":
+    procedural
+    """
+    Two substitution strategies coexist and MUST be used as follows:
+      - Simple — substitute_type_params_in_* / substitute_type_expr_copy
+        with Dict<Sym, string>. Replaces type names as strings. Used for
+        field injection and basic rewrites where only the top-level name
+        matters.
+      - Rich — substitute_type_params_rich_in_* with Dict<Sym, TypeExpr>.
+        Preserves full type arguments through substitution. REQUIRED in
+        desugar_destructors so that generic types like Dict<K, V> keep
+        their type args intact across the copy.
+
+    Mixing them — using the simple variant in destructor copy — drops
+    type args and produces ill-typed AST that the checker rejects with
+    confusing 'expected Dict<K, V>, got Dict' errors.
+    """
+
+  invariant "Lock Statement Limitation":
+    procedural
+    """
+    deep_copy_stmt cannot reconstruct Lock statements due to a name
+    collision in the checker between Lock() and TypeKind.Lock. This is
+    a known limitation. It does not affect destructors in practice —
+    they do not contain lock statements — but any future pass that
+    deep-copies arbitrary bodies must either avoid Lock or extend
+    deep_copy_stmt first.
+    """
+
+  invariant "Impl Block Merging":
+    procedural
+    """
+    When desugar_relations generates an impl block whose interface name
+    and type args match a user-written impl block already on the class,
+    the generated method-name mappings MUST be merged into the existing
+    impl block rather than emitted as a duplicate. This lets user code
+    provide explicit mappings while relation-generated mappings fill in
+    the rest. Two impl blocks for the same (interface, type args) pair
+    on one class is a bug, not a feature.
+    """
+
+  func desugar_interface_embeds(file: File)
+    source: desugar.ly:17
+
+  func desugar_interface_fields(file: File)
+    source: desugar.ly:145
+
+  func desugar_relations(file: File)
+    source: desugar.ly:207
+
+  func desugar_destructors(file: File)
+    source: desugar.ly:422
+
+  func desugar_default_impls(file: File)
+    source: desugar.ly:577
+
+  func desugar_field_access(file: File)
+    source: desugar.ly:653
+
+  func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>)
+    source: desugar.ly:683
+
+  func rewrite_field_access_stmt(s: Stmt, field_names: Dict<Sym, bool>)
+    source: desugar.ly:689
+
+  func rewrite_field_access_expr(e: Expr, field_names: Dict<Sym, bool>)
+    source: desugar.ly:763
+
+  func desugar_all(file: File)
+    source: desugar.ly:822
+
+  func type_expr_name(te: TypeExpr) -> Sym?
+    source: desugar.ly:834
+
+  func sym_eq(a: Sym?, b: Sym?) -> bool
+    source: desugar.ly:842
+
+  func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
+    source: desugar.ly:849
+
+  func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr?
+    source: desugar.ly:857
+
+  func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<Sym, string>)
+    source: desugar.ly:868
+
+  func rewrite_field_type(te: TypeExpr?, iface_tps: [TypeParam], rel: RelationDecl) -> TypeExpr?
+    source: desugar.ly:893
+
+  func deep_copy_block(b: Block?) -> Block?
+    source: desugar.ly:945
+
+  func deep_copy_stmt(s: Stmt) -> Stmt
+    source: desugar.ly:955
+
+  func deep_copy_block_val(b: Block) -> Block
+    source: desugar.ly:1063
+
+  func deep_copy_expr(e: Expr) -> Expr
+    source: desugar.ly:1072
+
+  func deep_copy_type_expr(te: TypeExpr) -> TypeExpr
+    source: desugar.ly:1168
+
+  func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
+    source: desugar.ly:1175
+
+  func deep_copy_expr_list(exprs: [Expr]) -> [Expr]
+    source: desugar.ly:1185
+
+  func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>)
+    source: desugar.ly:1197
+
+  func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<Sym, string>)
+    source: desugar.ly:1203
+
+  func substitute_type_params_in_expr(expr: Expr, type_map: Dict<Sym, string>)
+    source: desugar.ly:1251
+
+  func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>)
+    source: desugar.ly:1303
+
+  func substitute_type_params_rich_in_stmt(stmt: Stmt, type_map: Dict<Sym, TypeExpr>)
+    source: desugar.ly:1309
+
+  func substitute_type_params_rich_in_expr(expr: Expr, type_map: Dict<Sym, TypeExpr>)
+    source: desugar.ly:1358
+
+  func substitute_type_params_rich_in_type_expr(te: TypeExpr, type_map: Dict<Sym, TypeExpr>)
+    source: desugar.ly:1404
+
+  func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>)
+    source: desugar.ly:1435
+
+  func rename_method_calls_in_stmt(stmt: Stmt, renames: Dict<Sym, string>)
+    source: desugar.ly:1441
+
+  func rename_method_calls_in_expr(expr: Expr, renames: Dict<Sym, string>)
+    source: desugar.ly:1490

@@ -1,177 +1,289 @@
-//ldd:source monomorphizer.ly
-//ldd:why "LIR→LIR pass that replaces all generic declarations with specialized copies for each unique set of concrete type arguments. After this pass, no LTyTypeVar remains."
+module monomorphizer
+  source: ["monomorphizer.ly"]
+  why: "LIR→LIR pass that replaces all generic declarations with specialized copies for each unique set of concrete type arguments. After this pass, no LTyTypeVar remains anywhere in the program — the downstream lowerer and C emitter can assume fully concrete types."
 
-// ## Architecture
-//
-// 6 phases:
-// Phase 1a: Collect instantiations from class/struct field types
-// Phase 1b: Collect instantiations from function bodies (calls, allocs)
-// Phase 2: Generate specialized copies (iterate until fixpoint)
-// Phase 3: Remove generic declarations, add specialized ones
-// Phase 4: Rewrite call sites (mangle names, clear TypeArgs)
-// Phase 5: Rewrite signatures and field types (substTypeRemoveVars)
-// Phase 6: ResolveClassNames (per-function ClassRenameMap)
+  doc "Architecture":
+    """
+    The monomorphizer runs as a single top-level entry point (monomorphize)
+    organized into six phases over the LIR program:
 
-// ## Invariants
-//
-// - After monomorphization, NO LTyTypeVar should remain
-// - Phase 2 iterates until fixpoint — specializing may discover new instantiations
-// - classRenames is global last-writer-wins; per-function ClassRenameMap is correct
-// - substType preserves generic name with substituted TypeArgs
-// - substTypeRemoveVars mangles names (Dict with TypeArgs → Dict_CType)
-// - Generic classes that were never instantiated are also filtered out
-// - Methods of generic classes are filtered alongside the class
+    Phase 1a — collect_from_type on class/struct field types: walk every
+    field of every generic class/struct, recording each concrete instantiation
+    (e.g. Dict<string>) into class_inst_types / struct_inst_types keyed by
+    a comma-separated type_key.
 
-// ## Invariants — Name Mangling
-//
-// type_to_mangle converts types to C-compatible name fragments:
-// primitives → name (i32, string), classes → C+name, structs → S+name,
-// slices → slice_+elem, maps → map_+key_+val, optionals → opt_+inner.
-// A type_key is comma-separated mangled fragments identifying a unique
-// instantiation. mangle_name joins base + mangled args with underscores.
+    Phase 1b — collect_from_stmts/collect_from_expr on function bodies:
+    walk every statement and expression, recording instantiations discovered
+    in calls, allocations, casts, and value/type positions. Generic call sites
+    and class allocations are the dominant source of instantiations.
 
-// ## Invariants — Impl Method Renames
-//
-// impl_method_renames uses @-delimited keys: "IfaceName@TypeArgs@Method".
-// rewrite_impl_renames expands these to cover all monomorphized variants
-// before walking the program. rewrite_impl_method_calls uses relational
-// constraints on functions to find and apply the correct renames.
+    Phase 2 — specialization to fixpoint: iterate over the accumulated
+    instantiation maps, generating specialized copies of generic funcs,
+    classes, and structs via specialize_func / specialize_class /
+    specialize_struct. Each specialization is itself walked for new
+    instantiations; we loop until no new ones appear (fixpoint).
 
+    Phase 3 — declaration replacement: drop the original generic decls from
+    the program and append the specialized copies (filter_funcs,
+    filter_classes, filter_structs).
 
-// monomorphizer.ly:591
-struct ImplRenameEntry {
-  class_name: string
-  new_method: string
-  old_method: string
-}
+    Phase 4 — call-site rewriting: rewrite_value / rewrite_stmts /
+    rewrite_expr walk the program and rewrite generic call sites — mangling
+    the called name to the specialized form and clearing the now-redundant
+    TypeArgs.
 
-// monomorphizer.ly:11
-class MonoPass {
-  class_by_name: Dict<Sym, LClassDecl>?
-  class_inst_count: Dict<Sym, i32>?
-  class_inst_names: [string]
-  class_inst_types: Dict<Sym, LType?>?
-  class_instances: Dict<Sym, string>?
-  class_renames: Dict<Sym, string>?
-  current_class_rename_map: Dict<Sym, string>?
-  func_by_name: Dict<Sym, LFuncDecl>?
-  func_inst_count: Dict<Sym, i32>?
-  func_inst_names: [string]
-  func_inst_types: Dict<Sym, LType?>?
-  func_instances: Dict<Sym, string>?
-  methods_by_class: Dict<Sym, [LFuncDecl]>?
-  prog: LProgram?
-  struct_by_name: Dict<Sym, LStructDecl>?
-  struct_inst_count: Dict<Sym, i32>?
-  struct_inst_names: [string]
-  struct_inst_types: Dict<Sym, LType?>?
-  struct_instances: Dict<Sym, string>?
-}
-// monomorphizer.ly:788
-func MonoPass.build_class_rename_map(self, subst: Dict<Sym, LType?>?) -> Dict<Sym, string>?
-// monomorphizer.ly:469
-func MonoPass.collect_from_expr(self, e: LExpr)
-// monomorphizer.ly:378
-func MonoPass.collect_from_stmt(self, s: LStmt)
-// monomorphizer.ly:368
-func MonoPass.collect_from_stmts(self, stmts: [LStmt?])
-// monomorphizer.ly:314
-func MonoPass.collect_from_type(self, t: LType?)
-// monomorphizer.ly:199
-func MonoPass.func_key(self, f: LFuncDecl) -> string
-// monomorphizer.ly:236
-func MonoPass.record_class_instance(self, name: string, types: [LType?])
-// monomorphizer.ly:212
-func MonoPass.record_func_instance(self, name: string, types: [LType?])
-// monomorphizer.ly:258
-func MonoPass.record_struct_instance(self, name: string, types: [LType?])
-// monomorphizer.ly:1098
-func MonoPass.rewrite_expr(self, e: LExpr)
-// monomorphizer.ly:597
-func MonoPass.rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?)
-// monomorphizer.ly:881
-func MonoPass.rewrite_stmt(self, s: LStmt)
-// monomorphizer.ly:871
-func MonoPass.rewrite_stmts(self, stmts: [LStmt?])
-// monomorphizer.ly:860
-func MonoPass.rewrite_value(self, v: LValue?)
-// monomorphizer.ly:755
-func MonoPass.specialize_class(self, orig: LClassDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LClassDecl
-// monomorphizer.ly:543
-func MonoPass.specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string) -> LFuncDecl
-// monomorphizer.ly:773
-func MonoPass.specialize_struct(self, orig: LStructDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LStructDecl
-// monomorphizer.ly:1475
-func MonoPass.subst_type_remove_vars(self, t: LType?) -> LType?
+    Phase 5 — signature and field-type rewriting: subst_type_remove_vars
+    walks remaining func signatures and field types, replacing any
+    surviving TyTypeVar with the substituted concrete type and mangling
+    generic class names (e.g. Dict<string> → Dict_string).
 
-// monomorphizer.ly:117
-func check_no_typevar(func_name: string, context: string, t: LType)
-// monomorphizer.ly:148
-func check_stmts_no_typevar(func_name: string, stmts: [LStmt?])
-// monomorphizer.ly:2041
-func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr?
-// monomorphizer.ly:1554
-func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt?
-// monomorphizer.ly:1540
-func clone_stmts(stmts: [LStmt?], subst: Dict<Sym, LType?>?) -> [LStmt?]
-// monomorphizer.ly:2027
-func clone_value(v: LValue, subst: Dict<Sym, LType?>?) -> LValue?
-// monomorphizer.ly:2863
-func filter_classes(classes: [LClassDecl], class_instances: Dict<Sym, string>?) -> [LClassDecl]
-// monomorphizer.ly:2837
-func filter_funcs(funcs: [LFuncDecl], class_instances: Dict<Sym, string>?, class_by_name: Dict<Sym, LClassDecl>?) -> [LFuncDecl]
-// monomorphizer.ly:2877
-func filter_structs(structs: [LStructDecl], struct_instances: Dict<Sym, string>?) -> [LStructDecl]
-// monomorphizer.ly:292
-func get_inst_types(types_dict: Dict<Sym, LType?>?, count_dict: Dict<Sym, i32>?, key: string) -> [LType?]
-// monomorphizer.ly:280
-func has_inst_name(names: [string], name: string) -> bool
-// monomorphizer.ly:2782
-func has_type_vars(types: [LType?]) -> bool
-// monomorphizer.ly:207
-func inst_key(name: string, type_key_str: string) -> string
-// monomorphizer.ly:2692
-func mangle_name(base: string, type_args: [LType?]) -> string
-// monomorphizer.ly:3696
-func mono_starts_with(s: string, prefix: string) -> bool
-// monomorphizer.ly:3360
-func monomorphize(prog: LProgram?)
-// monomorphizer.ly:49
-func new_mono_pass(prog: LProgram?) -> MonoPass?
-// monomorphizer.ly:3093
-func resolve_class_expr(e: LExpr, renames: Dict<Sym, string>)
-// monomorphizer.ly:2895
-func resolve_class_names(prog: LProgram?)
-// monomorphizer.ly:2931
-func resolve_class_stmt(s: LStmt, renames: Dict<Sym, string>)
-// monomorphizer.ly:2921
-func resolve_class_stmts(stmts: [LStmt?], renames: Dict<Sym, string>)
-// monomorphizer.ly:3326
-func resolve_class_type(t: LType?, renames: Dict<Sym, string>)
-// monomorphizer.ly:3322
-func resolve_class_value(v: LValue, renames: Dict<Sym, string>)
-// monomorphizer.ly:3862
-func rewrite_impl_expr(e: LExpr?, renames: Dict<Sym, string>?)
-// monomorphizer.ly:3701
-func rewrite_impl_renames(prog: LProgram?)
-// monomorphizer.ly:3824
-func rewrite_impl_stmt(s: LStmt, renames: Dict<Sym, string>?)
-// monomorphizer.ly:3814
-func rewrite_impl_stmts(stmts: [LStmt?], renames: Dict<Sym, string>?)
-// monomorphizer.ly:711
-func rewrite_method_calls_in_expr(e: LExpr?, renames: [ImplRenameEntry])
-// monomorphizer.ly:668
-func rewrite_method_calls_in_stmt(s: LStmt, renames: [ImplRenameEntry])
-// monomorphizer.ly:658
-func rewrite_method_calls_in_stmts(stmts: [LStmt?], renames: [ImplRenameEntry])
-// monomorphizer.ly:1408
-func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType?
-// monomorphizer.ly:2793
-func type_has_var(t: LType?) -> bool
-// monomorphizer.ly:2768
-func type_key(types: [LType?]) -> string
-// monomorphizer.ly:2706
-func type_to_mangle(t: LType?) -> string
-// monomorphizer.ly:80
-func validate_post_mono(prog: LProgram?)
+    Phase 6 — resolve_class_names: a final per-function pass that applies
+    each function's ClassRenameMap to LTyClass references so allocations,
+    casts, and field accesses point at the correct monomorphized class.
 
+    Two cross-cutting helpers: rewrite_impl_renames pre-expands @-delimited
+    impl-method-rename keys into entries covering every monomorphized variant
+    of the implementing type, and validate_post_mono asserts the invariant
+    that no LTyTypeVar survives anywhere.
+    """
+
+  invariant "No TyTypeVar After Mono":
+    procedural
+    """
+    After monomorphize() returns, the program MUST contain no LTyTypeVar
+    nodes anywhere — not in func params, returns, locals, field types,
+    cast targets, value annotations, or alloc type args. validate_post_mono
+    enforces this by walking every func body via check_no_typevar and
+    check_stmts_no_typevar; any survivor is a hard error that would break
+    the downstream lowerer (it has no way to emit code for an unbound
+    type variable). Generic classes/structs/funcs that were never
+    instantiated are filtered out by filter_classes/filter_structs/
+    filter_funcs rather than left behind with type vars.
+    """
+
+  invariant "Specialization Fixpoint":
+    procedural
+    """
+    Phase 2 MUST iterate until no new instantiations are discovered.
+    Specializing a generic func body can reveal calls to OTHER generics
+    at new concrete types (e.g. specializing List<T>.map<U> for T=int
+    may produce a Dict<int, U> instantiation never seen before). Each
+    pass uses the *_inst_count dictionaries to detect whether the
+    instantiation set grew; if it did, run again. Without fixpoint
+    iteration, late-discovered instantiations would survive into Phase 5
+    and trip validate_post_mono.
+    """
+
+  invariant "Name Mangling":
+    procedural
+    """
+    type_to_mangle converts an LType to a C-compatible name fragment:
+    primitives → their name (i32, string, bool), classes → "C"+name,
+    structs → "S"+name, slices → "slice_"+elem_mangle, maps →
+    "map_"+key_mangle+"_"+val_mangle, optionals → "opt_"+inner_mangle.
+    type_key joins per-arg mangles with commas to form a stable key for
+    the instantiation dictionaries. mangle_name joins base + mangled args
+    with underscores to form the final specialized symbol
+    (Dict<string,i32> → Dict_string_i32). This scheme MUST stay
+    deterministic and injective: two distinct type-arg tuples must produce
+    distinct names, otherwise filter_funcs/filter_classes will collapse
+    specializations and the program will miscompile.
+    """
+
+  invariant "Impl Method Renames":
+    procedural
+    """
+    impl_method_renames uses @-delimited keys of the form
+    "IfaceName@TypeArgs@Method" to map an interface-method call site to
+    the concrete implementing method. rewrite_impl_renames expands each
+    such entry to cover every monomorphized variant of the implementing
+    type BEFORE the program walk begins, so subsequent rewrites see a
+    flat dictionary keyed by concrete type. rewrite_impl_method_calls
+    then uses each function's relational constraints (the LIR's record
+    of "this TypeVar implements IfaceName") to pick the right entry and
+    apply it to interface-dispatched method calls inside the function.
+    """
+
+  invariant "Per-Function ClassRenameMap":
+    procedural
+    """
+    classRenames is a single global Dict that maps generic class names to
+    one specialized name — necessarily last-writer-wins when a generic
+    class is instantiated at multiple type-arg tuples. Per-function
+    correctness instead relies on current_class_rename_map, built by
+    build_class_rename_map from the function's specialization substitution.
+    resolve_class_names installs that map for each specialized function
+    before walking its body, so LTyClass / alloc / cast references inside
+    the function resolve to THIS specialization rather than whichever one
+    happened to be written into the global map last.
+    """
+
+  class MonoPass
+    source: monomorphizer.ly:11
+    field class_by_name: Dict<Sym, LClassDecl>?
+    field class_inst_count: Dict<Sym, i32>?
+    field class_inst_names: [string]
+    field class_inst_types: Dict<Sym, LType?>?
+    field class_instances: Dict<Sym, string>?
+    field class_renames: Dict<Sym, string>?
+    field current_class_rename_map: Dict<Sym, string>?
+    field func_by_name: Dict<Sym, LFuncDecl>?
+    field func_inst_count: Dict<Sym, i32>?
+    field func_inst_names: [string]
+    field func_inst_types: Dict<Sym, LType?>?
+    field func_instances: Dict<Sym, string>?
+    field methods_by_class: Dict<Sym, [LFuncDecl]>?
+    field prog: LProgram?
+    field struct_by_name: Dict<Sym, LStructDecl>?
+    field struct_inst_count: Dict<Sym, i32>?
+    field struct_inst_names: [string]
+    field struct_inst_types: Dict<Sym, LType?>?
+    field struct_instances: Dict<Sym, string>?
+    method func_key(self, f: LFuncDecl) -> string
+      source: monomorphizer.ly:199
+    method record_func_instance(self, name: string, types: [LType?])
+      source: monomorphizer.ly:212
+    method record_class_instance(self, name: string, types: [LType?])
+      source: monomorphizer.ly:236
+    method record_struct_instance(self, name: string, types: [LType?])
+      source: monomorphizer.ly:258
+    method collect_from_type(self, t: LType?)
+      source: monomorphizer.ly:314
+    method collect_from_stmts(self, stmts: [LStmt?])
+      source: monomorphizer.ly:368
+    method collect_from_stmt(self, s: LStmt)
+      source: monomorphizer.ly:378
+    method collect_from_expr(self, e: LExpr)
+      source: monomorphizer.ly:469
+    method specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string, label: string) -> LFuncDecl
+      source: monomorphizer.ly:575
+    method rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?, label: string)
+      source: monomorphizer.ly:630
+    method specialize_class(self, orig: LClassDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LClassDecl
+      source: monomorphizer.ly:791
+    method specialize_struct(self, orig: LStructDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LStructDecl
+      source: monomorphizer.ly:809
+    method build_class_rename_map(self, subst: Dict<Sym, LType?>?) -> Dict<Sym, string>?
+      source: monomorphizer.ly:824
+    method rewrite_value(self, v: LValue?)
+      source: monomorphizer.ly:896
+    method rewrite_stmts(self, stmts: [LStmt?])
+      source: monomorphizer.ly:907
+    method rewrite_stmt(self, s: LStmt)
+      source: monomorphizer.ly:917
+    method rewrite_expr(self, e: LExpr)
+      source: monomorphizer.ly:1134
+    method subst_type_remove_vars(self, t: LType?) -> LType?
+      source: monomorphizer.ly:1511
+      why: "Phase-5 workhorse: substitutes any remaining LTyTypeVar in a type with its concrete binding AND mangles generic class/struct names (Dict<string> → Dict_string). This is what makes validate_post_mono pass on rewritten signatures and field types — without it, monomorphized funcs would still expose unbound type vars in their public surface."
+
+  func new_mono_pass(prog: LProgram?) -> MonoPass?
+    source: monomorphizer.ly:49
+
+  func validate_post_mono(prog: LProgram?)
+    source: monomorphizer.ly:80
+
+  func check_no_typevar(func_name: string, context: string, t: LType)
+    source: monomorphizer.ly:117
+
+  func check_stmts_no_typevar(func_name: string, stmts: [LStmt?])
+    source: monomorphizer.ly:148
+
+  func inst_key(name: string, type_key_str: string) -> string
+    source: monomorphizer.ly:207
+
+  func has_inst_name(names: [string], name: string) -> bool
+    source: monomorphizer.ly:280
+
+  func get_inst_types(types_dict: Dict<Sym, LType?>?, count_dict: Dict<Sym, i32>?, key: string) -> [LType?]
+    source: monomorphizer.ly:292
+
+  struct ImplRenameEntry
+    source: monomorphizer.ly:624
+    field class_name: string
+    field new_method: string
+    field old_method: string
+
+  func rewrite_method_calls_in_stmts(stmts: [LStmt?], renames: [ImplRenameEntry])
+    source: monomorphizer.ly:694
+
+  func rewrite_method_calls_in_stmt(s: LStmt, renames: [ImplRenameEntry])
+    source: monomorphizer.ly:704
+
+  func rewrite_method_calls_in_expr(e: LExpr?, renames: [ImplRenameEntry])
+    source: monomorphizer.ly:747
+
+  func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType?
+    source: monomorphizer.ly:1444
+
+  func clone_stmts(stmts: [LStmt?], subst: Dict<Sym, LType?>?) -> [LStmt?]
+    source: monomorphizer.ly:1576
+
+  func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt?
+    source: monomorphizer.ly:1590
+
+  func clone_value(v: LValue, subst: Dict<Sym, LType?>?) -> LValue?
+    source: monomorphizer.ly:2064
+
+  func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr?
+    source: monomorphizer.ly:2078
+
+  func mangle_name(base: string, type_args: [LType?]) -> string
+    source: monomorphizer.ly:2729
+
+  func type_to_mangle(t: LType?) -> string
+    source: monomorphizer.ly:2743
+
+  func type_key(types: [LType?]) -> string
+    source: monomorphizer.ly:2805
+
+  func has_type_vars(types: [LType?]) -> bool
+    source: monomorphizer.ly:2819
+
+  func type_has_var(t: LType?) -> bool
+    source: monomorphizer.ly:2830
+
+  func filter_funcs(funcs: [LFuncDecl], class_instances: Dict<Sym, string>?, class_by_name: Dict<Sym, LClassDecl>?) -> [LFuncDecl]
+    source: monomorphizer.ly:2874
+
+  func filter_classes(classes: [LClassDecl], class_instances: Dict<Sym, string>?) -> [LClassDecl]
+    source: monomorphizer.ly:2900
+
+  func filter_structs(structs: [LStructDecl], struct_instances: Dict<Sym, string>?) -> [LStructDecl]
+    source: monomorphizer.ly:2914
+
+  func resolve_class_names(prog: LProgram?)
+    source: monomorphizer.ly:2932
+
+  func resolve_class_stmts(stmts: [LStmt?], renames: Dict<Sym, string>)
+    source: monomorphizer.ly:2958
+
+  func resolve_class_stmt(s: LStmt, renames: Dict<Sym, string>)
+    source: monomorphizer.ly:2968
+
+  func resolve_class_expr(e: LExpr, renames: Dict<Sym, string>)
+    source: monomorphizer.ly:3130
+
+  func resolve_class_value(v: LValue, renames: Dict<Sym, string>)
+    source: monomorphizer.ly:3359
+
+  func resolve_class_type(t: LType?, renames: Dict<Sym, string>)
+    source: monomorphizer.ly:3363
+
+  func monomorphize(prog: LProgram?)
+    source: monomorphizer.ly:3397
+
+  func mono_starts_with(s: string, prefix: string) -> bool
+    source: monomorphizer.ly:3744
+
+  func rewrite_impl_renames(prog: LProgram?)
+    source: monomorphizer.ly:3749
+
+  func rewrite_impl_stmts(stmts: [LStmt?], renames: Dict<Sym, string>?)
+    source: monomorphizer.ly:3862
+
+  func rewrite_impl_stmt(s: LStmt, renames: Dict<Sym, string>?)
+    source: monomorphizer.ly:3872
+
+  func rewrite_impl_expr(e: LExpr?, renames: Dict<Sym, string>?)
+    source: monomorphizer.ly:3910

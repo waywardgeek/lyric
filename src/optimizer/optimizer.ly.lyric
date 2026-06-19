@@ -1,87 +1,153 @@
-//ldd:source optimizer.ly
-//ldd:why "LIR-to-LIR optimization: structural transforms, dead code elimination, unused temp/var removal."
+module optimizer
+  source: ["optimizer.ly"]
+  why: "Post-lowering LIR→LIR optimization pass. Fixes semantic issues that are easier to handle as transforms on the flat LIR representation than during initial lowering: side-effect temp fusion, multi-return destructuring, extract-pair rewriting, nil zero-value fixing, and dead temp/var elimination."
 
-// ## Purpose
-//
-// Post-lowering LIR→LIR optimization pass. Fixes semantic issues that
-// are easier to handle as transforms on the flat LIR representation
-// than during initial lowering.
-//
-// Passes (in order):
-// 1. Side-effect temp elimination: fuse void-context builtins into bare statements
-// 2. Multi-return destructuring: split single-temp multi-return into tuple VarDecls
-// 3. Extract pair destructuring: rewrite extractValue/extractError patterns
-// 4. Nil zero value fixing: replace nil with proper zero values for value types
-// 5. For-range index coercion (stub)
-// 6. Optional return wrapping (stub)
-// 7. Append reassign rewriting (stub)
-// Then: recursive nested block optimization
-// Then: collect used temps/vars, eliminate unused, blank unused multi-assign names
+  doc "Architecture":
+    """
+    The optimizer runs as a sequence of LIR→LIR passes on each function body.
 
-// ## Invariants
-//
-// PROCEDURAL — structural transforms run BEFORE elimination.
-// Elimination runs on transformed stmts, then re-collects after
-// elimination to catch names freed by VarDecl removal.
-//
-// collectUsedTemps and collectUsedVarNames must walk ALL stmt/expr/value
-// variants exhaustively — missing a variant silently drops live references.
-//
-// parseTempID strips _val/_err suffixes to map multi-assign names
-// back to their source temp IDs.
-//
-// SAFETY: When eliminating unused temps, if the temp's expression is
-// side-effecting (is_side_effect_expr: calls, method calls, push, append,
-// sort, reverse, remove, extend), it's converted to StSideEffect rather
-// than deleted. This prevents accidentally optimizing away function calls.
+    Structural transforms (run in order, BEFORE elimination):
+      1. fuse_side_effect_temps: collapse void-context builtin calls bound
+         to throwaway temps into bare StSideEffect statements.
+      2. destructure_multi_return: split single-temp multi-return calls into
+         tuple VarDecls so downstream lowering sees explicit (ok, err) names.
+      3. destructure_extract_pairs: rewrite extractValue/extractError patterns
+         emitted by the lowerer into direct field reads on the tuple temp.
+      4. fix_nil_zero_values: replace `nil` initializers with the proper zero
+         value for value types (int 0, bool false, empty struct, etc.) so the
+         backend never sees a bogus nil for a non-nullable LType.
+      5. for-range index coercion (stub — reserved for future use).
+      6. optional return wrapping (stub).
+      7. append-reassign rewriting (stub).
 
+    Then optimize_nested_stmts_structural recurses into nested blocks
+    (if/else, for, while, match arms) applying the same pipeline.
 
-// optimizer.ly:703
-func blank_unused_multi_assign_names(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
-// optimizer.ly:824
-func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>)
-// optimizer.ly:988
-func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>)
-// optimizer.ly:832
-func collect_used_temps_in_stmt(s: LStmt, used: Dict<Sym, bool>)
-// optimizer.ly:1176
-func collect_used_temps_in_value(v: LValue, used: Dict<Sym, bool>)
-// optimizer.ly:1194
-func collect_used_var_names(stmts: [LStmt?], used: Dict<Sym, bool>)
-// optimizer.ly:1352
-func collect_used_var_names_in_expr(e: LExpr, used: Dict<Sym, bool>)
-// optimizer.ly:1202
-func collect_used_var_names_in_stmt(s: LStmt, used: Dict<Sym, bool>)
-// optimizer.ly:1540
-func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>)
-// optimizer.ly:228
-func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?]
-// optimizer.ly:166
-func destructure_multi_return(stmts: [LStmt?]) -> [LStmt?]
-// optimizer.ly:514
-func eliminate_unused_temps(stmts: [LStmt?], used_temps: Dict<Sym, bool>) -> [LStmt?]
-// optimizer.ly:598
-func eliminate_unused_temps_recursive(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>) -> [LStmt?]
-// optimizer.ly:376
-func fix_nil_zero_values(stmts: [LStmt?]) -> [LStmt?]
-// optimizer.ly:67
-func fuse_side_effect_temps(stmts: [LStmt?]) -> [LStmt?]
-// optimizer.ly:570
-func is_numeric_str(s: string) -> bool
-// optimizer.ly:128
-func is_side_effect_expr(e: LExpr) -> bool
-// optimizer.ly:8
-func optimize(prog: LProgram)
-// optimizer.ly:16
-func optimize_func(mut fn: LFuncDecl)
-// optimizer.ly:424
-func optimize_nested_stmts_structural(s: LStmt, return_type: LType?)
-// optimizer.ly:38
-func optimize_stmts_structural(stmts: [LStmt?], return_type: LType?) -> [LStmt?]
-// optimizer.ly:583
-func parse_temp_id(name: string) -> i32
-// optimizer.ly:736
-func recurse_blank_unused(stmt: LStmt, used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
-// optimizer.ly:397
-func zero_value_for_type(t: LType) -> LValue?
+    Elimination phase (runs AFTER all structural transforms):
+      - collect_used_temps and collect_used_var_names walk every stmt/expr/
+        value variant to build live-set Dicts.
+      - eliminate_unused_temps_recursive drops VarDecls whose temp/var is
+        never read, then re-collects live sets to catch names freed by the
+        first pass of deletions.
+      - blank_unused_multi_assign_names replaces unused names inside
+        multi-assignment LHSs with `_` so the backend can elide stores.
 
+    parseTempID strips _val/_err suffixes so multi-assign result names map
+    back to their source temp IDs during liveness analysis.
+    """
+
+  invariant "Transform Before Eliminate":
+    procedural
+    """
+    Structural transforms (fuse_side_effect_temps, destructure_multi_return,
+    destructure_extract_pairs, fix_nil_zero_values) MUST run to completion
+    before eliminate_unused_temps_recursive begins. Elimination operates on
+    the rewritten stmts and MUST re-collect used_temps / used_vars after
+    each round of deletion, because removing a VarDecl can free names that
+    were previously kept alive only by that decl's RHS.
+    """
+
+  invariant "Exhaustive Liveness Walks":
+    procedural
+    """
+    collect_used_temps_in_stmt / _in_expr / _in_value and the parallel
+    collect_used_var_names_in_* family MUST visit every variant of LStmt,
+    LExpr, and LValue. Any missed variant silently drops a live reference,
+    causing eliminate_unused_temps to delete a temp that is still read —
+    producing miscompiled output rather than a verifier error. Recursive
+    descent into nested blocks (if/else, for, while, match) is mandatory.
+    """
+
+  invariant "Side-Effect Safety on Elimination":
+    procedural
+    """
+    When eliminate_unused_temps drops a VarDecl whose RHS is_side_effect_expr
+    (Call, MethodCall, push, append, sort, reverse, remove, extend), it MUST
+    convert the decl to StSideEffect rather than deleting it. Otherwise an
+    unused-result call like `_ = list.push(x)` would be silently optimized
+    away, changing program semantics. Pure expressions (literals, var reads,
+    arithmetic, field reads) may be deleted outright.
+    """
+
+  invariant "Temp ID Normalization":
+    procedural
+    """
+    parse_temp_id strips the `_val` and `_err` suffixes that
+    destructure_multi_return appends to per-result names, mapping each back
+    to the source temp's numeric ID. Liveness analysis MUST normalize names
+    through parse_temp_id before consulting used_temps; otherwise the two
+    halves of a destructured multi-return appear as distinct unused names
+    and get incorrectly eliminated.
+    """
+
+  func optimize(prog: LProgram)
+    source: optimizer.ly:8
+
+  func optimize_func(mut fn: LFuncDecl)
+    source: optimizer.ly:16
+
+  func optimize_stmts_structural(stmts: [LStmt?], return_type: LType?) -> [LStmt?]
+    source: optimizer.ly:38
+
+  func fuse_side_effect_temps(stmts: [LStmt?]) -> [LStmt?]
+    source: optimizer.ly:67
+
+  func is_side_effect_expr(e: LExpr) -> bool
+    source: optimizer.ly:128
+
+  func destructure_multi_return(stmts: [LStmt?]) -> [LStmt?]
+    source: optimizer.ly:166
+
+  func destructure_extract_pairs(stmts: [LStmt?]) -> [LStmt?]
+    source: optimizer.ly:228
+
+  func fix_nil_zero_values(stmts: [LStmt?]) -> [LStmt?]
+    source: optimizer.ly:376
+
+  func zero_value_for_type(t: LType) -> LValue?
+    source: optimizer.ly:397
+
+  func optimize_nested_stmts_structural(s: LStmt, return_type: LType?)
+    source: optimizer.ly:424
+
+  func eliminate_unused_temps(stmts: [LStmt?], used_temps: Dict<Sym, bool>) -> [LStmt?]
+    source: optimizer.ly:514
+
+  func is_numeric_str(s: string) -> bool
+    source: optimizer.ly:570
+
+  func parse_temp_id(name: string) -> i32
+    source: optimizer.ly:583
+
+  func eliminate_unused_temps_recursive(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>) -> [LStmt?]
+    source: optimizer.ly:598
+
+  func blank_unused_multi_assign_names(stmts: [LStmt?], used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
+    source: optimizer.ly:703
+
+  func recurse_blank_unused(stmt: LStmt, used_temps: Dict<Sym, bool>, used_vars: Dict<Sym, bool>)
+    source: optimizer.ly:736
+
+  func collect_used_temps(stmts: [LStmt?], used: Dict<Sym, bool>)
+    source: optimizer.ly:824
+
+  func collect_used_temps_in_stmt(s: LStmt, used: Dict<Sym, bool>)
+    source: optimizer.ly:832
+
+  func collect_used_temps_in_expr(e: LExpr, used: Dict<Sym, bool>)
+    source: optimizer.ly:988
+
+  func collect_used_temps_in_value(v: LValue, used: Dict<Sym, bool>)
+    source: optimizer.ly:1176
+
+  func collect_used_var_names(stmts: [LStmt?], used: Dict<Sym, bool>)
+    source: optimizer.ly:1194
+
+  func collect_used_var_names_in_stmt(s: LStmt, used: Dict<Sym, bool>)
+    source: optimizer.ly:1202
+
+  func collect_used_var_names_in_expr(e: LExpr, used: Dict<Sym, bool>)
+    source: optimizer.ly:1352
+
+  func collect_used_var_names_in_value(v: LValue, used: Dict<Sym, bool>)
+    source: optimizer.ly:1540

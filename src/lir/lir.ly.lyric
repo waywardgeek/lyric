@@ -1,747 +1,707 @@
-//ldd:source lir.ly
-//ldd:why "Low-level Intermediate Representation types. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST. Structured control flow (not basic blocks), flat expressions (SSA-like temps)."
-
-// ## Architecture
-//
-// LIR sits between AST and C backend:
-// AST + Checker annotations → Lowerer → LProgram → Optimizer → Monomorphizer → Memory Pass → C Backend
-//
-// Key properties:
-// - All expressions flattened to SSA-like temps (%0, %1, ...)
-// - Structured control flow preserved (StIf, StWhile, StFor, StSwitch)
-// - Enums → tagged unions with integer tags
-// - Classes → heap handles (LTyClassHandle)
-// - Try (?) → extract+check+early-return pattern
-// - Memory pass rewrites ExClassAlloc → ExSlabAlloc, inserts RC instrumentation
-
-// ## Invariants — Nullable Variant Fields
-//
-// Like AST Expr/Stmt, LIR uses nullable fields per variant:
-// LExpr has bin_op: LBinOpData?, call: LCallData?, etc.
-// LStmt has temp_def: LTempDef?, assign: LAssignData?, etc.
-// Same rationale: void* has no type recovery in C.
-
-// ## Invariants — Type System
-//
-// LTypeKind enum covers: LTyInt, LTyUint, LTyFloat, LTyBool, LTyString,
-// LTyUnit, LTySlice, LTyMap, LTyTuple, LTyOptional, LTyChannel,
-// LTyStruct, LTyClassHandle, LTyTaggedUnion, LTyFunc, LTyTypeVar,
-// LTyAny, LTyError, LTyErrorResult, LTyMutex, LTyUnion.
-//
-// LTyAny is the fallback for unresolved types — maps to void* in C.
-// LTyClassHandle means "pointer to heap-allocated class" — already a pointer.
-// LTyErrorResult wraps (T, error) tuples with value/error fields.
-// LTyTaggedUnion represents enum types with integer tag + variant data.
-//
-// LType has class metadata fields populated by resolve_class_types():
-// - class_decl: LClassDecl? — link to the class declaration
-// - is_permanent: bool — class uses permanent keyword, skips RC
-// - is_owned: bool — class is child in an owns relation, RC managed by parent
-
-// ## Invariants — Expression Flattening
-//
-// Every sub-expression is assigned to a unique temp: %0 = b * c; %1 = a + %0.
-// Backends NEVER see nested expressions — all operands are LValue
-// (LValTemp, LValVar, or a literal). The temp counter is per-function.
-
-// ## Invariants — While Loop Conditions
-//
-// While-loop conditions use CondBlock + CondVar: statements in CondBlock
-// compute the condition value into CondVar. The CondBlock is re-evaluated
-// each iteration without code duplication.
-
-// ## Memory Management
-//
-// permanent keyword: contextual modifier on class declarations. Permanent classes
-// skip all RC instrumentation — no _rc field, no alloc init, no inc/dec. Used for
-// compiler-internal classes (AST nodes, LIR nodes, CGen, etc.) that live for the
-// entire compilation and are freed by slab destruction, not individual RC.
-// 34 compiler classes are permanent; stdlib types (Dict, StringBuilder) are NOT.
-//
-// Owned classes: child classes in owns relations. Their lifetime is managed by the
-// parent's destructor, not by RC. is_owned set on LClassDecl during resolve_class_types().
-//
-// RC-eligible classes: non-permanent AND non-owned. Currently StringBuilder and Dict
-// variants. Get _rc field in AoS struct / _rc parallel array in SoA.
-//
-// LStmtKind RC variants:
-// - StRefIncr: increment _rc on a class handle (LRefIncrData: handle + class_name)
-// - StRefDecr: decrement _rc, free if 0 (LRefDecrData: handle + class_name)
-// - StSliceRetain: increment _rc on all class handles in a slice
-//
-// LStmtKind scope-exit free variants:
-// - StSlabFree: free a class handle via slab
-// - StSliceFree: free a slice's backing memory
-//
-// LProgram flags:
-// - slab_mode / slab_mode_soa: AoS vs SoA slab allocation
-// - detect_uaf: sets _rc = UINT32_MAX on free, checks on every field access
-// - rc_free: enables actual slab_free calls when rc drops to 0 (opt-in)
-// - owned_classes: Dict<Sym, bool> tracking which classes are relation children
-
-// ## resolve_class_types()
-//
-// Called post-lowering AND post-monomorphization. Walks all LType nodes in the
-// program (struct fields, class fields, function params, return types, all
-// expressions) and populates class_decl, is_permanent, is_owned metadata.
-// Essential for the memory pass to determine which types need RC.
-
-// LBinOpKind = enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
-
-// LExprKind = enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
-
-// LSelectKind = enum { SelRecv, SelSend, SelDefault }
-
-// LStmtKind = enum { StTempDef, StVarDecl, StAssign, StStructSet, StClassSet, StIndexSet, StIf, StWhile, StFor, StSwitch, StBlock, StReturn, StBreak, StContinue, StExpr, StDefer, StSpawn, StLock, StSend, StSelect, StYield, StSideEffect, StMultiAssign, StTypeSwitch, StSlabSet, StSlabFree, StSliceFree, StSliceRetain, StRefIncr, StRefDecr }
-
-// LTypeKind = enum { TyI8, TyI16, TyI32, TyI64, TyU8, TyU16, TyU32, TyU64, TyF32, TyF64, TyBool, TyString, TyUnit, TyError, TyPlatformInt, TyPlatformUint, TyStruct, TyClassHandle, TyTuple, TySlice, TyMap, TyChannel, TyGenerator, TyMutex, TyOptional, TyTaggedUnion, TyFuncPtr, TyErrorResult, TyAny, TyTypeVar, TyUnion }
-
-// LUnOpKind = enum { UnNeg, UnNot, UnBitNot }
-
-// LValueKind = enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
-
-
-// lir.ly:174
-// LBinOpKind = enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
-
-// lir.ly:105
-// LExprKind = enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
-
-// lir.ly:574
-// LSelectKind = enum { SelRecv, SelSend, SelDefault }
-
-// lir.ly:397
-// LStmtKind = enum { StTempDef, StVarDecl, StAssign, StStructSet, StClassSet, StIndexSet, StIf, StWhile, StFor, StSwitch, StBlock, StReturn, StBreak, StContinue, StExpr, StDefer, StSpawn, StLock, StSend, StSelect, StYield, StSideEffect, StMultiAssign, StTypeSwitch, StSlabSet, StSlabFree, StSliceFree, StSliceRetain, StRefIncr, StRefDecr }
-
-// lir.ly:7
-// LTypeKind = enum { TyI8, TyI16, TyI32, TyI64, TyU8, TyU16, TyU32, TyU64, TyF32, TyF64, TyBool, TyString, TyUnit, TyError, TyPlatformInt, TyPlatformUint, TyStruct, TyClassHandle, TyTuple, TySlice, TyMap, TyChannel, TyGenerator, TyMutex, TyOptional, TyTaggedUnion, TyFuncPtr, TyErrorResult, TyAny, TyTypeVar, TyUnion }
-
-// lir.ly:195
-// LUnOpKind = enum { UnNeg, UnNot, UnBitNot }
-
-// lir.ly:73
-// LValueKind = enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
-
-// lir.ly:475
-struct LAssignData {
-  target: string
-  value: LValue?
-}
-
-// lir.ly:201
-struct LBinOpData {
-  left: LValue?
-  op: LBinOpKind
-  right: LValue?
-}
-
-// lir.ly:547
-struct LBlockData {
-  stmts: [LStmt?]
-}
-
-// lir.ly:257
-struct LBuiltinData {
-  args: [LValue?]
-  file: string
-  line: i32
-  name: string
-}
-
-// lir.ly:239
-class LCallData {
-  args: [LValue?]
-  func_name: string
-  is_exported: bool
-  mut_args: [bool]
-  type_args: [LType?]
-}
-
-// lir.ly:212
-struct LCastData {
-  operand: LValue?
-  target: LType?
-}
-
-// lir.ly:273
-class LClassAllocData {
-  class_name: string
-  fields: [LFieldInit]
-  type_args: [LType?]
-}
-
-// lir.ly:633
-class LClassDecl {
-  fields: [LField]
-  implements: [string]
-  is_exported: bool
-  is_owned: bool
-  is_permanent: bool
-  name: string
-  type_params: [LTypeParam]
-}
-
-// lir.ly:222
-struct LClassGetData {
-  class_name: string
-  field: string
-  handle: LValue?
-}
-
-// lir.ly:486
-struct LClassSetData {
-  class_name: string
-  field: string
-  handle: LValue?
-  value: LValue?
-}
-
-// lir.ly:555
-struct LDeferData {
-  body: [LStmt?]
-}
-
-// lir.ly:643
-class LEnumDecl {
-  is_exported: bool
-  name: string
-  variants: [LVariant]
-}
-
-// lir.ly:327
-struct LEnvGetData {
-  env: LValue?
-  field: string
-}
-
-// lir.ly:138
-class LExpr {
-  bin_op: LBinOpData?
-  builtin: LBuiltinData?
-  call: LCallData?
-  cast: LCastData?
-  class_alloc: LClassAllocData?
-  class_get: LClassGetData?
-  env_get: LEnvGetData?
-  extract_error: LExtractErrorData?
-  extract_value: LExtractValueData?
-  format: LFormatData?
-  func_lit: LFuncLitData?
-  func_ref: LFuncRefData?
-  index_get: LIndexGetData?
-  is_null: LIsNullData?
-  kind: LExprKind
-  make_channel: LMakeChannelData?
-  make_result: LMakeResultData?
-  method_call: LMethodCallData?
-  slab_alloc: LSlabAllocData?
-  slab_get: LSlabGetData?
-  slice_data: LSliceData?
-  struct_field: LStructFieldData?
-  struct_lit: LStructLitData?
-  typ: LType?
-  un_op: LUnOpData?
-  unwrap_opt: LUnwrapOptionalData?
-  variant_construct: LVariantConstructData?
-  variant_data: LVariantDataData?
-  variant_tag: LVariantTagData?
-  wrap_opt: LWrapOptionalData?
-}
-
-// lir.ly:551
-struct LExprStmtData {
-  temp_id: i32
-}
-
-// lir.ly:318
-struct LExtractErrorData {
-  value: LValue?
-}
-
-// lir.ly:314
-struct LExtractValueData {
-  value: LValue?
-}
-
-// lir.ly:41
-struct LField {
-  name: string
-  typ: LType?
-}
-
-// lir.ly:264
-struct LFieldInit {
-  name: string
-  value: LValue?
-}
-
-// lir.ly:512
-struct LForData {
-  body: [LStmt?]
-  collection: LValue?
-  index_var: string
-  var_name: string
-  var_type: LType?
-}
-
-// lir.ly:344
-struct LFormatData {
-  parts: [LFormatPart]
-}
-
-// lir.ly:337
-struct LFormatPart {
-  format: string
-  is_literal: bool
-  text: string
-  value: LValue?
-}
-
-// lir.ly:669
-class LFuncDecl {
-  body: [LStmt?]
-  class_rename_map: Dict<Sym, string>?
-  is_exported: bool
-  name: string
-  params: [LParam]
-  receiver: string
-  receiver_type_params: [LTypeParam]
-  relational_constraints: [LRelationalConstraint]
-  return_type: LType?
-  type_params: [LTypeParam]
-}
-
-// lir.ly:348
-struct LFuncLitData {
-  body: [LStmt?]
-  params: [LParam]
-  return_type: LType?
-}
-
-// lir.ly:332
-struct LFuncRefData {
-  env: LValue?
-  name: string
-}
-
-// lir.ly:500
-struct LIfData {
-  cond: LValue?
-  else_body: [LStmt?]
-  then_body: [LStmt?]
-}
-
-// lir.ly:621
-struct LImport {
-  alias: string
-  path: string
-}
-
-// lir.ly:228
-struct LIndexGetData {
-  collection: LValue?
-  index: LValue?
-}
-
-// lir.ly:493
-struct LIndexSetData {
-  collection: LValue?
-  field: string
-  index: LValue?
-  value: LValue?
-}
-
-// lir.ly:656
-class LInterfaceDecl {
-  embeds: [string]
-  is_exported: bool
-  methods: [LInterfaceMethod]
-  name: string
-  type_params: [LTypeParam]
-}
-
-// lir.ly:649
-struct LInterfaceMethod {
-  name: string
-  params: [LParam]
-  receiver_type: string
-  return_type: LType?
-}
-
-// lir.ly:292
-struct LIsNullData {
-  value: LValue?
-}
-
-// lir.ly:564
-struct LLockData {
-  body: [LStmt?]
-  mutex: LValue?
-}
-
-// lir.ly:279
-struct LMakeChannelData {
-  buf_size: LValue?
-  elem_type: LType?
-}
-
-// lir.ly:322
-struct LMakeResultData {
-  err: LValue?
-  value: LValue?
-}
-
-// lir.ly:247
-class LMethodCallData {
-  args: [LValue?]
-  is_exported: bool
-  method: string
-  mut_args: [bool]
-  param_types: [LType?]
-  receiver: LValue?
-  type_args: [LType?]
-}
-
-// lir.ly:600
-struct LMultiAssignData {
-  expr: LExpr?
-  names: [string]
-  types: [LType?]
-}
-
-// lir.ly:610
-struct LParam {
-  mutable: bool
-  name: string
-  typ: LType?
-}
-
-// lir.ly:688
-class LProgram {
-  class_renames: Dict<Sym, string>?
-  classes: [LClassDecl]
-  detect_uaf: bool
-  enums: [LEnumDecl]
-  functions: [LFuncDecl]
-  globals: [LVarDeclData]
-  impl_method_renames: Dict<Sym, string>?
-  imports: [LImport]
-  interfaces: [LInterfaceDecl]
-  owned_classes: Dict<Sym, bool>?
-  package_name: string
-  rc_free: bool
-  slab_mode: bool
-  slab_mode_soa: bool
-  structs: [LStructDecl]
-  type_defs: [LTypeDef]
-}
-// lir.ly:710
-func LProgram.resolve_class_types(self)
-
-// lir.ly:388
-struct LRefDecrData {
-  class_name: string
-  handle: LValue?
-}
-
-// lir.ly:383
-struct LRefIncrData {
-  class_name: string
-  handle: LValue?
-}
-
-// lir.ly:664
-struct LRelationalConstraint {
-  interface_name: string
-  type_args: [string]
-}
-
-// lir.ly:543
-struct LReturnData {
-  values: [LValue?]
-}
-
-// lir.ly:580
-struct LSelectCase {
-  binding: string
-  body: [LStmt?]
-  channel: LValue?
-  kind: LSelectKind
-  value: LValue?
-}
-
-// lir.ly:588
-struct LSelectData {
-  cases: [LSelectCase]
-}
-
-// lir.ly:569
-struct LSendData {
-  channel: LValue?
-  value: LValue?
-}
-
-// lir.ly:596
-struct LSideEffectData {
-  expr: LExpr?
-}
-
-// lir.ly:361
-struct LSlabAllocData {
-  class_name: string
-  fields: [LFieldInit]
-}
-
-// lir.ly:373
-struct LSlabFreeData {
-  class_name: string
-  handle: LValue?
-}
-
-// lir.ly:355
-struct LSlabGetData {
-  class_name: string
-  field: string
-  handle: LValue?
-}
-
-// lir.ly:366
-struct LSlabSetData {
-  class_name: string
-  field: string
-  handle: LValue?
-  value: LValue?
-}
-
-// lir.ly:233
-struct LSliceData {
-  collection: LValue?
-  high: LValue?
-  low: LValue?
-}
-
-// lir.ly:378
-struct LSliceFreeData {
-  name: string
-  typ: LType?
-}
-
-// lir.ly:559
-struct LSpawnData {
-  body: [LStmt?]
-  captures: [string]
-}
-
-// lir.ly:430
-class LStmt {
-  assign: LAssignData?
-  block: LBlockData?
-  class_set: LClassSetData?
-  defer_data: LDeferData?
-  expr_stmt: LExprStmtData?
-  for_data: LForData?
-  if_data: LIfData?
-  index_set: LIndexSetData?
-  kind: LStmtKind
-  lock_data: LLockData?
-  multi_assign: LMultiAssignData?
-  ref_decr: LRefDecrData?
-  ref_incr: LRefIncrData?
-  ret: LReturnData?
-  select_data: LSelectData?
-  send_data: LSendData?
-  side_effect: LSideEffectData?
-  slab_free: LSlabFreeData?
-  slab_set: LSlabSetData?
-  slice_free: LSliceFreeData?
-  slice_retain: LSliceFreeData?
-  spawn_data: LSpawnData?
-  struct_set: LStructSetData?
-  switch_data: LSwitchData?
-  temp_def: LTempDef?
-  type_switch: LTypeSwitchData?
-  var_decl: LVarDeclData?
-  while_data: LWhileData?
-  yield_data: LYieldData?
-}
-
-// lir.ly:626
-class LStructDecl {
-  fields: [LField]
-  is_exported: bool
-  name: string
-  type_params: [LTypeParam]
-}
-
-// lir.ly:217
-struct LStructFieldData {
-  field: string
-  receiver: LValue?
-}
-
-// lir.ly:269
-struct LStructLitData {
-  fields: [LFieldInit]
-}
-
-// lir.ly:480
-struct LStructSetData {
-  field: string
-  receiver: LValue?
-  value: LValue?
-}
-
-// lir.ly:520
-struct LSwitchCase {
-  binding: string
-  body: [LStmt?]
-  tag: i32
-}
-
-// lir.ly:526
-struct LSwitchData {
-  cases: [LSwitchCase]
-  enum_name: string
-  tag: LValue?
-}
-
-// lir.ly:463
-struct LTempDef {
-  expr: LExpr?
-  id: i32
-}
-
-// lir.ly:52
-class LType {
-  bits: i32
-  class_decl: LClassDecl?
-  elem: LType?
-  fields: [LField]
-  is_exported: bool
-  is_owned: bool
-  is_permanent: bool
-  key: LType?
-  kind: LTypeKind
-  name: string
-  params: [LType?]
-  ret: LType?
-  type_args: [LType?]
-  variants: [LVariant]
-}
-
-// lir.ly:682
-class LTypeDef {
-  is_exported: bool
-  name: string
-  typ: LType?
-}
-
-// lir.ly:616
-struct LTypeParam {
-  constraint: string
-  name: string
-}
-
-// lir.ly:532
-struct LTypeSwitchCase {
-  binding: string
-  body: [LStmt?]
-  typ: LType?
-}
-
-// lir.ly:538
-struct LTypeSwitchData {
-  cases: [LTypeSwitchCase]
-  value: LValue?
-}
-
-// lir.ly:207
-struct LUnOpData {
-  op: LUnOpKind
-  operand: LValue?
-}
-
-// lir.ly:288
-struct LUnwrapOptionalData {
-  value: LValue?
-}
-
-// lir.ly:87
-class LValue {
-  bool_val: bool
-  collection: LValue?
-  float_val: f64
-  index: LValue?
-  int_val: i64
-  kind: LValueKind
-  name: string
-  str_val: string
-  temp_id: i32
-  typ: LType?
-  uint_val: u64
-}
-
-// lir.ly:468
-struct LVarDeclData {
-  init: LValue?
-  mutable: bool
-  name: string
-  typ: LType?
-}
-
-// lir.ly:46
-struct LVariant {
-  fields: [LField]
-  name: string
-  tag: i32
-}
-
-// lir.ly:296
-struct LVariantConstructData {
-  enum_name: string
-  fields: [LValue?]
-  tag: i32
-  variant: string
-}
-
-// lir.ly:307
-struct LVariantDataData {
-  enum_name: string
-  field: string
-  value: LValue?
-  variant: string
-}
-
-// lir.ly:303
-struct LVariantTagData {
-  value: LValue?
-}
-
-// lir.ly:506
-struct LWhileData {
-  body: [LStmt?]
-  cond_block: [LStmt?]
-  cond_var: LValue?
-}
-
-// lir.ly:284
-struct LWrapOptionalData {
-  value: LValue?
-}
-
-// lir.ly:592
-struct LYieldData {
-  value: LValue?
-}
-
-// lir.ly:878
-func resolve_expr(expr: LExpr?, index: Dict<Sym, LClassDecl>)
-// lir.ly:811
-func resolve_stmt(s: LStmt, index: Dict<Sym, LClassDecl>)
-// lir.ly:798
-func resolve_stmts(stmts: [LStmt?], index: Dict<Sym, LClassDecl>)
-// lir.ly:771
-func resolve_type(typ: LType?, index: Dict<Sym, LClassDecl>)
-// lir.ly:929
-func resolve_value(val: LValue?, index: Dict<Sym, LClassDecl>)
-
+module lir
+  source: ["lir.ly"]
+  why: "Low-level Intermediate Representation. Defines LType, LValue, LExpr, LStmt, LProgram — the target of lowering from AST and the input to the C backend. Structured control flow (not basic blocks); flat expressions with SSA-like temps."
+
+  doc "Architecture":
+    """
+    LIR sits between the AST and the C backend in the pipeline:
+
+      AST + Checker annotations → Lowerer → LProgram
+        → Optimizer → Monomorphizer → Memory Pass → C Backend
+
+    Key properties:
+    - All expressions are flattened to SSA-like temps (%0, %1, ...).
+      Sub-expressions never nest; every operand is an LValue.
+    - Structured control flow is preserved: StIf, StWhile, StFor,
+      StSwitch — no basic-block graph.
+    - Enums become tagged unions with integer tags and per-variant
+      field data (LTyTaggedUnion + LVariant).
+    - Classes become heap handles (LTyClassHandle), already a pointer.
+    - try (?) is expanded to extract+check+early-return.
+    - The memory pass rewrites ExClassAlloc → ExSlabAlloc and inserts
+      RC instrumentation (StRefIncr/StRefDecr, StSliceRetain, frees).
+
+    Memory model:
+    - `permanent` classes (AST/LIR/CGen, ~34 compiler-internal classes)
+      skip all RC: no _rc field, no inc/dec, freed by slab destruction.
+    - `owned` classes are children in `owns` relations; their lifetime
+      is managed by the parent's destructor, not by RC.
+    - RC-eligible classes are non-permanent AND non-owned (currently
+      StringBuilder, Dict and friends). They get an _rc field
+      (AoS struct) or _rc parallel array (SoA slab).
+
+    Post-lowering pass `resolve_class_types()` walks every LType in
+    the program (struct/class fields, function params, return types,
+    expression types) and populates class_decl / is_permanent /
+    is_owned on each LType. The memory pass depends on this metadata
+    to decide which types need RC instrumentation.
+
+    LProgram flags drive the backend:
+    - slab_mode / slab_mode_soa — AoS vs SoA slab allocation.
+    - detect_uaf — sets _rc = UINT32_MAX on free and checks on every
+      field access (use-after-free detection).
+    - rc_free — actually call slab_free when _rc drops to 0 (opt-in).
+    - owned_classes — Dict<Sym, bool> of classes that are relation
+      children.
+    """
+
+  invariant "Nullable Variant Fields":
+    procedural
+    """
+    LIR sum types (LExpr, LStmt, LValue, LType) use the same
+    nullable-per-variant encoding as the AST: a discriminator `kind`
+    plus one nullable field per variant carrying the variant's data.
+
+    - LExpr has bin_op: LBinOpData?, call: LCallData?, etc. Exactly
+      one of these is non-null per node, selected by `kind: LExprKind`.
+    - LStmt has temp_def: LTempDef?, assign: LAssignData?, etc.,
+      selected by `kind: LStmtKind`.
+    - LValue carries variant-specific scalar fields (int_val, str_val,
+      temp_id, name, ...) plus collection/index for ValIndexRef and
+      ValClassFieldRef, selected by `kind: LValueKind`.
+
+    Rationale: void* in C has no type recovery, so a single tagged
+    payload pointer would force unsafe casts in the backend. Nullable
+    per-variant fields preserve typing through codegen.
+    """
+
+  invariant "Expression Flattening":
+    procedural
+    """
+    Every sub-expression is assigned to a unique temp BEFORE being
+    used. Source `a + b * c` lowers to:
+        %0 = b * c        // LTempDef { id: 0, expr: ExBinOp(b, *, c) }
+        %1 = a + %0       // LTempDef { id: 1, expr: ExBinOp(a, +, %0) }
+
+    Backends NEVER see nested LExpr — every operand inside an
+    LExpr is an LValue (LValTemp, LValVar, ValGlobal, or a literal
+    ValLit*). The temp counter is per-function and resets on each
+    LFuncDecl.
+    """
+
+  invariant "While Loop Conditions":
+    procedural
+    """
+    While-loop conditions are represented as `cond_block: [LStmt?]`
+    plus `cond_var: LValue?`. Statements in cond_block compute the
+    boolean condition into cond_var. The backend re-evaluates
+    cond_block on every iteration without duplicating source — this
+    keeps complex conditions (containing calls, temps, short-circuit
+    chains) representable without violating expression flattening.
+    """
+
+  invariant "Type System":
+    procedural
+    """
+    LTypeKind covers all backend-visible types:
+      LTyInt-family (I8/I16/I32/I64, PlatformInt),
+      LTyUint-family (U8/U16/U32/U64, PlatformUint),
+      LTyFloat-family (F32/F64),
+      LTyBool, LTyString, LTyUnit, LTyError,
+      LTySlice, LTyMap, LTyTuple, LTyOptional, LTyChannel,
+      LTyGenerator, LTyMutex,
+      LTyStruct, LTyClassHandle, LTyTaggedUnion, LTyFuncPtr,
+      LTyTypeVar, LTyAny, LTyErrorResult, LTyUnion.
+
+    Semantics:
+    - LTyAny is the fallback for unresolved types — emitted as void*
+      in C. Its presence in the final program indicates the checker
+      failed to annotate an expression.
+    - LTyClassHandle means "pointer to a heap-allocated class" —
+      it is itself a pointer; no extra indirection in C.
+    - LTyErrorResult wraps (T, error) tuples with value/error fields,
+      mirroring the checker's ErrorResult.
+    - LTyTaggedUnion represents enum types as integer tag + per-variant
+      field block. `variants: [LVariant]` carries the layout.
+
+    LType also carries class metadata populated by
+    resolve_class_types(): class_decl, is_permanent, is_owned. These
+    are nil/false until that pass has run.
+    """
+
+  typedef LTypeKind: enum { TyI8, TyI16, TyI32, TyI64, TyU8, TyU16, TyU32, TyU64, TyF32, TyF64, TyBool, TyString, TyUnit, TyError, TyPlatformInt, TyPlatformUint, TyStruct, TyClassHandle, TyTuple, TySlice, TyMap, TyChannel, TyGenerator, TyMutex, TyOptional, TyTaggedUnion, TyFuncPtr, TyErrorResult, TyAny, TyTypeVar, TyUnion }
+    source: lir.ly:7
+
+  struct LField
+    source: lir.ly:41
+    field name: string
+    field typ: LType?
+
+  struct LVariant
+    source: lir.ly:46
+    field fields: [LField]
+    field name: string
+    field tag: i32
+
+  class LType
+    source: lir.ly:52
+    field bits: i32
+      doc: "Width in bits for Int/Uint/Float kinds; -1 means platform-width."
+    field class_decl: LClassDecl?
+      doc: "Populated by resolve_class_types() for LTyClassHandle; nil until that pass runs."
+    field elem: LType?
+    field fields: [LField]
+    field is_exported: bool
+    field is_owned: bool
+    field is_permanent: bool
+    field key: LType?
+    field kind: LTypeKind
+      doc: "Discriminator selecting which LTypeKind variant this LType represents. Other fields are interpreted per kind (elem for slice/optional, key+elem for map, fields for struct/tuple, variants for tagged union, params+ret for func, etc.)."
+    field name: string
+    field params: [LType?]
+    field ret: LType?
+    field type_args: [LType?]
+    field variants: [LVariant]
+
+  typedef LValueKind: enum { ValVar, ValTemp, ValGlobal, ValLitInt, ValLitUint, ValLitFloat, ValLitString, ValLitBool, ValLitNull, ValIndexRef, ValClassFieldRef }
+    source: lir.ly:73
+
+  class LValue
+    source: lir.ly:87
+    field bool_val: bool
+    field collection: LValue?
+    field float_val: f64
+    field index: LValue?
+    field int_val: i64
+    field kind: LValueKind
+      doc: "Discriminator selecting which LValueKind variant this LValue represents. For ValVar/ValGlobal use `name`; for ValTemp use `temp_id`; for ValLit* use the matching scalar (int_val/uint_val/float_val/str_val/bool_val); for ValIndexRef/ValClassFieldRef use collection+index/name."
+    field name: string
+    field str_val: string
+    field temp_id: i32
+    field typ: LType?
+    field uint_val: u64
+
+  typedef LExprKind: enum { ExBinOp, ExUnOp, ExCast, ExStructField, ExClassGet, ExIndexGet, ExSlice, ExCall, ExMethodCall, ExBuiltin, ExStructLit, ExClassAlloc, ExMakeSlice, ExMakeMap, ExMakeChannel, ExWrapOptional, ExUnwrapOptional, ExIsNull, ExVariantConstruct, ExVariantTag, ExVariantData, ExExtractValue, ExExtractError, ExMakeResult, ExEnvGet, ExFuncRef, ExFuncLit, ExFormat, ExSlabGet, ExSlabAlloc }
+    source: lir.ly:105
+
+  class LExpr
+    source: lir.ly:138
+    field bin_op: LBinOpData?
+    field builtin: LBuiltinData?
+    field call: LCallData?
+    field cast: LCastData?
+    field class_alloc: LClassAllocData?
+    field class_get: LClassGetData?
+    field env_get: LEnvGetData?
+    field extract_error: LExtractErrorData?
+    field extract_value: LExtractValueData?
+    field format: LFormatData?
+    field func_lit: LFuncLitData?
+    field func_ref: LFuncRefData?
+    field index_get: LIndexGetData?
+    field is_null: LIsNullData?
+    field kind: LExprKind
+      doc: "Discriminator selecting which LExprKind variant this LExpr represents. Exactly one of the variant-specific *_data / *_op / call / cast / ... fields is non-null per node, chosen by this kind."
+    field make_channel: LMakeChannelData?
+    field make_result: LMakeResultData?
+    field method_call: LMethodCallData?
+    field slab_alloc: LSlabAllocData?
+    field slab_get: LSlabGetData?
+    field slice_data: LSliceData?
+    field struct_field: LStructFieldData?
+    field struct_lit: LStructLitData?
+    field typ: LType?
+    field un_op: LUnOpData?
+    field unwrap_opt: LUnwrapOptionalData?
+    field variant_construct: LVariantConstructData?
+    field variant_data: LVariantDataData?
+    field variant_tag: LVariantTagData?
+    field wrap_opt: LWrapOptionalData?
+
+  typedef LBinOpKind: enum { BinAdd, BinSub, BinMul, BinDiv, BinMod, BinEq, BinNe, BinLt, BinLe, BinGt, BinGe, BinAnd, BinOr, BinBitAnd, BinBitOr, BinBitXor, BinShl, BinShr }
+    source: lir.ly:174
+
+  typedef LUnOpKind: enum { UnNeg, UnNot, UnBitNot }
+    source: lir.ly:195
+
+  struct LBinOpData
+    source: lir.ly:201
+    field left: LValue?
+    field op: LBinOpKind
+      doc: "Which binary operation to apply: arithmetic (BinAdd..BinMod), comparison (BinEq..BinGe), logical (BinAnd/BinOr) or bitwise (BinBitAnd..BinShr)."
+    field right: LValue?
+
+  struct LUnOpData
+    source: lir.ly:207
+    field op: LUnOpKind
+    field operand: LValue?
+
+  struct LCastData
+    source: lir.ly:212
+    field operand: LValue?
+    field target: LType?
+
+  struct LStructFieldData
+    source: lir.ly:217
+    field field: string
+    field receiver: LValue?
+
+  struct LClassGetData
+    source: lir.ly:222
+    field class_name: string
+    field field: string
+    field handle: LValue?
+
+  struct LIndexGetData
+    source: lir.ly:228
+    field collection: LValue?
+    field index: LValue?
+
+  struct LSliceData
+    source: lir.ly:233
+    field collection: LValue?
+    field high: LValue?
+    field low: LValue?
+
+  class LCallData
+    source: lir.ly:239
+    field args: [LValue?]
+    field func_name: string
+    field is_exported: bool
+    field mut_args: [bool]
+    field type_args: [LType?]
+
+  class LMethodCallData
+    source: lir.ly:247
+    field args: [LValue?]
+    field is_exported: bool
+    field method: string
+    field mut_args: [bool]
+    field param_types: [LType?]
+    field receiver: LValue?
+    field type_args: [LType?]
+
+  struct LBuiltinData
+    source: lir.ly:257
+    field args: [LValue?]
+    field file: string
+    field line: i32
+    field name: string
+
+  struct LFieldInit
+    source: lir.ly:264
+    field name: string
+    field value: LValue?
+
+  struct LStructLitData
+    source: lir.ly:269
+    field fields: [LFieldInit]
+
+  class LClassAllocData
+    source: lir.ly:273
+    field class_name: string
+    field fields: [LFieldInit]
+    field type_args: [LType?]
+
+  struct LMakeChannelData
+    source: lir.ly:279
+    field buf_size: LValue?
+    field elem_type: LType?
+
+  struct LWrapOptionalData
+    source: lir.ly:284
+    field value: LValue?
+
+  struct LUnwrapOptionalData
+    source: lir.ly:288
+    field value: LValue?
+
+  struct LIsNullData
+    source: lir.ly:292
+    field value: LValue?
+
+  struct LVariantConstructData
+    source: lir.ly:296
+    field enum_name: string
+    field fields: [LValue?]
+    field tag: i32
+    field variant: string
+
+  struct LVariantTagData
+    source: lir.ly:303
+    field value: LValue?
+
+  struct LVariantDataData
+    source: lir.ly:307
+    field enum_name: string
+    field field: string
+    field value: LValue?
+    field variant: string
+
+  struct LExtractValueData
+    source: lir.ly:314
+    field value: LValue?
+
+  struct LExtractErrorData
+    source: lir.ly:318
+    field value: LValue?
+
+  struct LMakeResultData
+    source: lir.ly:322
+    field err: LValue?
+    field value: LValue?
+
+  struct LEnvGetData
+    source: lir.ly:327
+    field env: LValue?
+    field field: string
+
+  struct LFuncRefData
+    source: lir.ly:332
+    field env: LValue?
+    field name: string
+
+  struct LFormatPart
+    source: lir.ly:337
+    field format: string
+    field is_literal: bool
+    field text: string
+    field value: LValue?
+
+  struct LFormatData
+    source: lir.ly:344
+    field parts: [LFormatPart]
+
+  struct LFuncLitData
+    source: lir.ly:348
+    field body: [LStmt?]
+    field params: [LParam]
+    field return_type: LType?
+
+  struct LSlabGetData
+    source: lir.ly:355
+    field class_name: string
+    field field: string
+    field handle: LValue?
+
+  struct LSlabAllocData
+    source: lir.ly:361
+    field class_name: string
+    field fields: [LFieldInit]
+
+  struct LSlabSetData
+    source: lir.ly:366
+    field class_name: string
+    field field: string
+    field handle: LValue?
+    field value: LValue?
+
+  struct LSlabFreeData
+    source: lir.ly:373
+    field class_name: string
+    field handle: LValue?
+
+  struct LSliceFreeData
+    source: lir.ly:378
+    field name: string
+    field typ: LType?
+
+  struct LSliceRcReleaseData
+    source: lir.ly:384
+    field elem_type: LType?
+    field slice_name: string
+
+  struct LRefIncrData
+    source: lir.ly:389
+    field class_name: string
+    field handle: LValue?
+
+  struct LRefDecrData
+    source: lir.ly:394
+    field class_name: string
+    field handle: LValue?
+
+  typedef LStmtKind: enum { StTempDef, StVarDecl, StAssign, StStructSet, StClassSet, StIndexSet, StIf, StWhile, StFor, StSwitch, StBlock, StReturn, StBreak, StContinue, StExpr, StDefer, StSpawn, StLock, StSend, StSelect, StYield, StSideEffect, StMultiAssign, StTypeSwitch, StSlabSet, StSlabFree, StSliceFree, StSliceRetain, StRefIncr, StRefDecr, StSliceRcRelease }
+    source: lir.ly:403
+
+  class LStmt
+    source: lir.ly:437
+    field assign: LAssignData?
+    field block: LBlockData?
+    field class_set: LClassSetData?
+    field defer_data: LDeferData?
+    field expr_stmt: LExprStmtData?
+    field for_data: LForData?
+    field if_data: LIfData?
+    field index_set: LIndexSetData?
+    field kind: LStmtKind
+      doc: "Discriminator selecting which LStmtKind variant this LStmt represents. Exactly one of the variant-specific *_data / temp_def / assign / ret / ... fields is non-null per node, chosen by this kind."
+    field lock_data: LLockData?
+    field multi_assign: LMultiAssignData?
+    field ref_decr: LRefDecrData?
+    field ref_incr: LRefIncrData?
+    field ret: LReturnData?
+    field select_data: LSelectData?
+    field send_data: LSendData?
+    field side_effect: LSideEffectData?
+    field slab_free: LSlabFreeData?
+    field slab_set: LSlabSetData?
+    field slice_free: LSliceFreeData?
+    field slice_rc_release: LSliceRcReleaseData?
+    field slice_retain: LSliceFreeData?
+    field spawn_data: LSpawnData?
+    field struct_set: LStructSetData?
+    field switch_data: LSwitchData?
+    field temp_def: LTempDef?
+    field type_switch: LTypeSwitchData?
+    field var_decl: LVarDeclData?
+    field while_data: LWhileData?
+    field yield_data: LYieldData?
+
+  struct LTempDef
+    source: lir.ly:471
+    field expr: LExpr?
+    field id: i32
+
+  struct LVarDeclData
+    source: lir.ly:476
+    field init: LValue?
+    field is_ref: bool
+    field mutable: bool
+    field name: string
+    field typ: LType?
+
+  struct LAssignData
+    source: lir.ly:484
+    field target: string
+    field value: LValue?
+
+  struct LStructSetData
+    source: lir.ly:489
+    field field: string
+    field receiver: LValue?
+    field value: LValue?
+
+  struct LClassSetData
+    source: lir.ly:495
+    field class_name: string
+    field field: string
+    field handle: LValue?
+    field value: LValue?
+
+  struct LIndexSetData
+    source: lir.ly:502
+    field collection: LValue?
+    field field: string
+    field index: LValue?
+    field value: LValue?
+
+  struct LIfData
+    source: lir.ly:509
+    field cond: LValue?
+    field else_body: [LStmt?]
+    field then_body: [LStmt?]
+
+  struct LWhileData
+    source: lir.ly:515
+    field body: [LStmt?]
+    field cond_block: [LStmt?]
+    field cond_var: LValue?
+
+  struct LForData
+    source: lir.ly:521
+    field body: [LStmt?]
+    field collection: LValue?
+    field index_var: string
+    field var_name: string
+    field var_type: LType?
+
+  struct LSwitchCase
+    source: lir.ly:529
+    field binding: string
+    field body: [LStmt?]
+    field tag: i32
+
+  struct LSwitchData
+    source: lir.ly:535
+    field cases: [LSwitchCase]
+    field enum_name: string
+    field tag: LValue?
+
+  struct LTypeSwitchCase
+    source: lir.ly:541
+    field binding: string
+    field body: [LStmt?]
+    field typ: LType?
+
+  struct LTypeSwitchData
+    source: lir.ly:547
+    field cases: [LTypeSwitchCase]
+    field value: LValue?
+
+  struct LReturnData
+    source: lir.ly:552
+    field values: [LValue?]
+
+  struct LBlockData
+    source: lir.ly:556
+    field stmts: [LStmt?]
+
+  struct LExprStmtData
+    source: lir.ly:560
+    field temp_id: i32
+
+  struct LDeferData
+    source: lir.ly:564
+    field body: [LStmt?]
+
+  struct LSpawnData
+    source: lir.ly:568
+    field body: [LStmt?]
+    field captures: [string]
+
+  struct LLockData
+    source: lir.ly:573
+    field body: [LStmt?]
+    field mutex: LValue?
+
+  struct LSendData
+    source: lir.ly:578
+    field channel: LValue?
+    field value: LValue?
+
+  typedef LSelectKind: enum { SelRecv, SelSend, SelDefault }
+    source: lir.ly:583
+
+  struct LSelectCase
+    source: lir.ly:589
+    field binding: string
+    field body: [LStmt?]
+    field channel: LValue?
+    field kind: LSelectKind
+      doc: "Discriminator selecting which select-case variant this is: SelRecv (read from channel into binding), SelSend (send value into channel), or SelDefault (fallback when no other case is ready)."
+    field value: LValue?
+
+  struct LSelectData
+    source: lir.ly:597
+    field cases: [LSelectCase]
+
+  struct LYieldData
+    source: lir.ly:601
+    field value: LValue?
+
+  struct LSideEffectData
+    source: lir.ly:605
+    field expr: LExpr?
+
+  struct LMultiAssignData
+    source: lir.ly:609
+    field expr: LExpr?
+    field names: [string]
+    field types: [LType?]
+
+  struct LParam
+    source: lir.ly:619
+    field mutable: bool
+    field name: string
+    field typ: LType?
+
+  struct LTypeParam
+    source: lir.ly:625
+    field constraint: string
+    field name: string
+
+  struct LImport
+    source: lir.ly:630
+    field alias: string
+    field path: string
+
+  class LStructDecl
+    source: lir.ly:635
+    field fields: [LField]
+    field is_exported: bool
+    field name: string
+    field type_params: [LTypeParam]
+
+  class LClassDecl
+    source: lir.ly:642
+    field fields: [LField]
+    field implements: [string]
+    field is_exported: bool
+    field is_owned: bool
+    field is_permanent: bool
+    field name: string
+    field type_params: [LTypeParam]
+
+  class LEnumDecl
+    source: lir.ly:652
+    field is_exported: bool
+    field name: string
+    field variants: [LVariant]
+
+  struct LInterfaceMethod
+    source: lir.ly:658
+    field name: string
+    field params: [LParam]
+    field receiver_type: string
+    field return_type: LType?
+
+  class LInterfaceDecl
+    source: lir.ly:665
+    field embeds: [string]
+    field is_exported: bool
+    field methods: [LInterfaceMethod]
+    field name: string
+    field type_params: [LTypeParam]
+
+  struct LRelationalConstraint
+    source: lir.ly:673
+    field interface_name: string
+    field type_args: [string]
+
+  class LFuncDecl
+    source: lir.ly:678
+    field body: [LStmt?]
+    field class_rename_map: Dict<Sym, string>?
+    field is_exported: bool
+    field is_final: bool
+    field is_trusted: bool
+    field name: string
+    field params: [LParam]
+    field receiver: string
+    field receiver_type_params: [LTypeParam]
+    field relational_constraints: [LRelationalConstraint]
+    field return_type: LType?
+    field type_params: [LTypeParam]
+
+  class LTypeDef
+    source: lir.ly:693
+    field is_exported: bool
+    field name: string
+    field typ: LType?
+
+  class LProgram
+    source: lir.ly:699
+    field class_renames: Dict<Sym, string>?
+    field classes: [LClassDecl]
+    field detect_uaf: bool
+    field enums: [LEnumDecl]
+    field functions: [LFuncDecl]
+    field globals: [LVarDeclData]
+    field impl_method_renames: Dict<Sym, string>?
+    field imports: [LImport]
+    field interfaces: [LInterfaceDecl]
+    field owned_classes: Dict<Sym, bool>?
+    field package_name: string
+    field rc_free: bool
+    field slab_mode: bool
+    field slab_mode_soa: bool
+    field structs: [LStructDecl]
+    field type_defs: [LTypeDef]
+    method resolve_class_types(self)
+      source: lir.ly:721
+
+  func resolve_type(typ: LType?, index: Dict<Sym, LClassDecl>)
+    source: lir.ly:782
+
+  func resolve_stmts(stmts: [LStmt?], index: Dict<Sym, LClassDecl>)
+    source: lir.ly:809
+
+  func resolve_stmt(s: LStmt, index: Dict<Sym, LClassDecl>)
+    source: lir.ly:822
+
+  func resolve_expr(expr: LExpr?, index: Dict<Sym, LClassDecl>)
+    source: lir.ly:889
+
+  func resolve_value(val: LValue?, index: Dict<Sym, LClassDecl>)
+    source: lir.ly:940

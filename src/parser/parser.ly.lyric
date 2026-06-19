@@ -1,266 +1,275 @@
-//ldd:source expr_parser.ly, parser.ly
-//ldd:why "Statement and expression parsing. Two files: parser.ly (statements, declarations) and expr_parser.ly (Pratt precedence climbing for expressions)."
+module parser
+  source: ["expr_parser.ly","parser.ly"]
+  why: "Statement and expression parsing. Two files share one Parser class: parser.ly handles top-level declarations and statements; expr_parser.ly implements Pratt precedence climbing for expressions. Token stream in, AST out."
 
-// ## Architecture
-//
-// Linear pipeline: Token stream → AST.
-//
-// 1. Declaration Parsing (parser.ly): Recursive descent for top-level
-// constructs (struct, class, enum, func, interface, relation, impl).
-// Each has a parse_* method. LL(1) with state save/restore for
-// ambiguous cases.
-//
-// 2. Expression Parsing (expr_parser.ly): Pratt/precedence-climbing with
-// 10 binary precedence levels. Unary prefix handled before the
-// precedence loop. Postfix ops (field access, method call, index,
-// function call) in a tight loop.
-//
-// 3. Statement Parsing (expr_parser.ly): Dispatches on current token
-// kind to parse_var_decl, parse_if, parse_for, parse_while,
-// parse_match_stmt, etc.
+  doc "Architecture":
+    """
+    Linear pipeline: Token stream → AST.
 
-// ## Invariants — For Loops
-//
-// Idiomatic Lyric uses `for item in collection` and `for item, idx in collection`.
-// The stdlib provides `range(start, end)` as a generator for index iteration.
-// Do NOT use C-style while loops for iteration.
+    1. Declaration parsing (parser.ly): recursive descent for top-level
+       constructs (struct, class, enum, func, interface, relation, impl).
+       Each has a parse_* method. LL(1) with state save/restore for
+       ambiguous cases.
 
-// ## Invariants — Parser/ExprParser Split
-//
-// parser.ly and expr_parser.ly share the Parser class (same lyric block name).
-// parser.ly handles top-level declarations and statements.
-// expr_parser.ly handles expression parsing via Pratt precedence climbing.
-// Both files are in the same package and compiled together.
+    2. Expression parsing (expr_parser.ly): Pratt/precedence climbing with
+       10 binary precedence levels. Unary prefix handled before the
+       precedence loop. Postfix ops (field access, method call, index,
+       function call) in a tight loop.
 
-// ## Invariants — Struct Literal Ambiguity
-//
-// `Ident {` is ambiguous: struct literal vs variable + block. Resolution
-// via noStructLit flag (Rust approach):
-// - for/while/if/match condition expressions set noStructLit=true
-// - When noStructLit is true, is_struct_lit_ahead() always returns false
-// - This means struct literals in these positions require parens:
-// `for x in (Point {}) { }` not `for x in Point {} { }`
-// - Everywhere else (let, return, args, etc.) struct literals work normally
-//
-// The exprDepth counter (incremented in arg lists and brackets) is a
-// separate mechanism for positional struct literals inside expressions.
+    3. Statement parsing (expr_parser.ly): dispatches on current token kind
+       to parse_var_decl, parse_if, parse_for, parse_while, parse_match_stmt,
+       etc.
 
-// ## Invariants — Lookahead and State Restoration
-//
-// For constructs that aren't LL(1), the parser saves the entire Lexer state
-// (via lex.save_state()), performs a trial parse, and restores on failure.
-// Used for:
-// - Generic call-site disambiguation: try_parse_type_args() attempts to
-// parse <TypeExpr, ...> followed by `(`. If `>` isn't followed by `(`,
-// backtracks and treats `<` as comparison.
-// - Struct literal detection
-// - Annotation vs field detection (is_why_annotation)
+    Both files share the Parser class (same lyric block name), live in the
+    same package, and are compiled together.
+    """
 
-// ## Invariants — Pratt Precedence Levels
-//
-// Level  1: || (logical or)
-// Level  2: && (logical and)
-// Level  3: == != (equality)
-// Level  4: < <= > >= (comparison)
-// Level  5: | (bitwise or)
-// Level  6: ^ (bitwise xor)
-// Level  7: & (bitwise and)
-// Level  8: << >> (shifts)
-// Level  9: + - (additive)
-// Level 10: * / % (multiplicative)
+  invariant "For Loops":
+    procedural
+    """
+    Idiomatic Lyric uses `for item in collection` and `for item, idx in collection`.
+    The stdlib provides `range(start, end)` as a generator for index iteration.
+    Do NOT emit or accept C-style while loops for iteration.
+    """
 
-// ## Invariants — Compound Assignment Desugaring
-//
-// Compound assignment (+=, -=, *=, /=) is desugared in the parser:
-// `x += y` becomes `x = x + y` at the AST level.
+  invariant "Struct Literal Ambiguity":
+    procedural
+    """
+    `Ident {` is ambiguous: struct literal vs variable followed by block.
+    Resolution via the no_struct_lit flag (Rust approach):
+      - for/while/if/match condition expressions set no_struct_lit=true.
+      - When no_struct_lit is true, is_struct_lit_ahead() always returns false.
+      - This means struct literals in these positions require parens:
+        `for x in (Point {}) { }` not `for x in Point {} { }`.
+      - Everywhere else (let, return, args, etc.) struct literals work normally.
 
-// ## Invariants — F-String Sub-Parsing
-//
-// F-strings are parsed by splitting the raw lexer token into literal
-// segments and expressions. For each {expr} segment, a NEW sub-parser
-// is instantiated to parse the Lyric expression within the braces.
-// This allows nested expressions and even nested f-strings.
+    The expr_depth counter (incremented in arg lists and brackets) is a
+    separate mechanism for positional struct literals inside expressions.
+    """
 
-// ## Invariants — Implicit Module Naming
-//
-// Files without an explicit `lyric block_name { }` wrapper get an
-// implicit block name derived from the filename (e.g. math.ly → math).
-// The parser handles this in do_parse_file.
+  invariant "Lookahead and State Restoration":
+    procedural
+    """
+    For constructs that aren't LL(1), the parser saves the entire Lexer state
+    (via lex.save_state()), performs a trial parse, and restores on failure.
+    Used for:
+      - Generic call-site disambiguation: try_parse_type_args() attempts to
+        parse <TypeExpr, ...> followed by `(`. If `>` isn't followed by `(`,
+        backtracks and treats `<` as comparison.
+      - Struct literal detection (is_struct_lit_ahead).
+      - Annotation vs field detection (peek_annotation / is_why_annotation).
+    """
 
+  invariant "Pratt Precedence Levels":
+    procedural
+    """
+    Level  1: || (logical or)
+    Level  2: && (logical and)
+    Level  3: == != (equality)
+    Level  4: < <= > >= (comparison)
+    Level  5: | (bitwise or)
+    Level  6: ^ (bitwise xor)
+    Level  7: & (bitwise and)
+    Level  8: << >> (shifts)
+    Level  9: + - (additive)
+    Level 10: * / % (multiplicative)
 
-// expr_parser.ly:305
-struct ArgListResult {
-  elems: [Expr]
-  end_pos: Pos
-  mut_args: [bool]
-}
+    Compound assignment (+=, -=, *=, /=) is desugared in the parser:
+    `x += y` becomes `x = x + y` at the AST level.
+    """
 
-// parser.ly:13
-class Parser {
-  expr_depth: i32
-  lex: Lexer?
-  no_struct_lit: bool
-  pushed: Token?
-}
-// parser.ly:110
-func Parser.consume_annotation(self, kind: TokenKind) -> bool
-// parser.ly:122
-func Parser.do_parse_file(self) -> (File?, error)
-// parser.ly:62
-func Parser.expect(self, kind: TokenKind) -> (Token?, error)
-// parser.ly:70
-func Parser.expect_ident(self) -> (Token?, error)
-// expr_parser.ly:668
-func Parser.is_paren_lambda_ahead(self) -> bool
-// expr_parser.ly:848
-func Parser.is_pattern_let_ahead(self) -> bool
-// expr_parser.ly:1320
-func Parser.is_struct_lit_ahead(self) -> bool
-// parser.ly:58
-func Parser.make_error(self, span: Span, msg: string) -> Error
-// parser.ly:90
-func Parser.make_span(self, start: Pos) -> Span
-// parser.ly:39
-func Parser.next(self) -> Token
-// expr_parser.ly:311
-func Parser.parse_arg_list(self) -> (ArgListResult?, error)
-// parser.ly:1181
-func Parser.parse_base_type(self) -> (TypeExpr?, error)
-// expr_parser.ly:732
-func Parser.parse_block(self) -> (Block?, error)
-// expr_parser.ly:1159
-func Parser.parse_cascade(self) -> (Stmt?, error)
-// parser.ly:832
-func Parser.parse_class(self) -> (ClassDecl?, error)
-// parser.ly:982
-func Parser.parse_const_decl(self) -> (ConstDecl?, error)
-// parser.ly:631
-func Parser.parse_destructor_block(self) -> (DestructorBlock?, error)
-// expr_parser.ly:508
-func Parser.parse_dict_lit(self, lbrace: Token) -> (Expr?, error)
-// parser.ly:470
-func Parser.parse_enum(self) -> (EnumDecl?, error)
-// parser.ly:497
-func Parser.parse_enum_variant(self) -> (EnumVariant?, error)
-// expr_parser.ly:79
-func Parser.parse_expr(self) -> (Expr?, error)
-// expr_parser.ly:86
-func Parser.parse_expr_no_struct_lit(self) -> (Expr?, error)
-// expr_parser.ly:1252
-func Parser.parse_expr_or_assign(self) -> (Stmt?, error)
-// parser.ly:331
-func Parser.parse_field(self) -> (Field?, error)
-// expr_parser.ly:966
-func Parser.parse_for(self) -> (Stmt?, error)
-// expr_parser.ly:1390
-func Parser.parse_fstring(self, tok: Token) -> (Expr?, error)
-// parser.ly:914
-func Parser.parse_func(self) -> (FuncDecl?, error)
-// expr_parser.ly:905
-func Parser.parse_if(self) -> (Stmt?, error)
-// expr_parser.ly:590
-func Parser.parse_if_expr(self) -> (Expr?, error)
-// expr_parser.ly:945
-func Parser.parse_if_let(self, start: Pos) -> (Stmt?, error)
-// parser.ly:645
-func Parser.parse_impl(self) -> (ImplBlock?, error)
-// parser.ly:759
-func Parser.parse_impl_mapping(self) -> (ImplMapping?, error)
-// parser.ly:697
-func Parser.parse_impl_mapping_short(self, for_type: Sym) -> (ImplMapping?, error)
-// parser.ly:280
-func Parser.parse_import(self) -> (ImportDecl?, error)
-// parser.ly:522
-func Parser.parse_interface(self) -> (InterfaceDecl?, error)
-// parser.ly:609
-func Parser.parse_interface_embed(self) -> (InterfaceEmbed?, error)
-// parser.ly:593
-func Parser.parse_interface_field(self) -> (InterfaceFieldDecl?, error)
-// expr_parser.ly:624
-func Parser.parse_lambda_expr(self) -> (Expr?, error)
-// expr_parser.ly:864
-func Parser.parse_let_else(self, start: Pos, is_mut: bool) -> (Stmt?, error)
-// expr_parser.ly:1237
-func Parser.parse_lock(self) -> (Stmt?, error)
-// parser.ly:141
-func Parser.parse_lyric_block(self) -> (LyricBlock?, error)
-// parser.ly:188
-func Parser.parse_lyric_item(self, block: LyricBlock) -> (bool, error)
-// expr_parser.ly:532
-func Parser.parse_map_lit(self, lbrace: Token) -> (Expr?, error)
-// expr_parser.ly:1024
-func Parser.parse_match_arms(self) -> ([MatchArm], error)
-// expr_parser.ly:573
-func Parser.parse_match_expr(self) -> (Expr?, error)
-// expr_parser.ly:1010
-func Parser.parse_match_stmt(self) -> (Stmt?, error)
-// parser.ly:359
-func Parser.parse_param(self) -> (Param?, error)
-// expr_parser.ly:703
-func Parser.parse_paren_lambda(self, start: Pos) -> (Expr?, error)
-// expr_parser.ly:1051
-func Parser.parse_pattern(self) -> (Pattern?, error)
-// expr_parser.ly:139
-func Parser.parse_postfix_expr(self) -> (Expr?, error)
-// expr_parser.ly:94
-func Parser.parse_prec_expr(self, min_prec: i32) -> (Expr?, error)
-// expr_parser.ly:343
-func Parser.parse_primary_expr(self) -> (Expr?, error)
-// parser.ly:1047
-func Parser.parse_relation(self) -> (RelationDecl?, error)
-// parser.ly:1097
-func Parser.parse_relation_side(self, first: Token) -> RelationSide
-// expr_parser.ly:878
-func Parser.parse_return(self) -> (Stmt?, error)
-// expr_parser.ly:1183
-func Parser.parse_select(self) -> (Stmt?, error)
-// expr_parser.ly:1201
-func Parser.parse_select_case(self) -> (SelectCase?, error)
-// expr_parser.ly:1171
-func Parser.parse_spawn(self) -> (Stmt?, error)
-// expr_parser.ly:749
-func Parser.parse_stmt(self) -> (Stmt?, error)
-// parser.ly:438
-func Parser.parse_struct(self) -> (StructDecl?, error)
-// expr_parser.ly:1349
-func Parser.parse_struct_lit(self, name: Sym, type_args: [TypeExpr], start: Pos) -> (Expr?, error)
-// parser.ly:396
-func Parser.parse_tuple_field(self) -> (TupleField?, error)
-// parser.ly:315
-func Parser.parse_type_alias(self) -> (TypeAliasDecl?, error)
-// parser.ly:1129
-func Parser.parse_type_expr(self) -> (TypeExpr?, error)
-// parser.ly:415
-func Parser.parse_type_params(self) -> ([TypeParam], error)
-// expr_parser.ly:112
-func Parser.parse_unary_expr(self) -> (Expr?, error)
-// expr_parser.ly:787
-func Parser.parse_var_decl(self) -> (Stmt?, error)
-// parser.ly:1012
-func Parser.parse_where_clause(self) -> (WhereClause?, error)
-// expr_parser.ly:997
-func Parser.parse_while(self) -> (Stmt?, error)
-// expr_parser.ly:893
-func Parser.parse_yield(self) -> (Stmt?, error)
-// parser.ly:32
-func Parser.peek(self) -> Token
-// parser.ly:97
-func Parser.peek_annotation(self) -> TokenKind?
-// parser.ly:48
-func Parser.push_back(self, t: Token)
-// parser.ly:52
-func Parser.skip_newlines(self)
-// expr_parser.ly:1446
-func Parser.try_parse_type_args(self) -> [TypeExpr]?
+  invariant "F-String Sub-Parsing":
+    procedural
+    """
+    F-strings are parsed by splitting the raw lexer token into literal
+    segments and expressions. For each {expr} segment, a NEW sub-parser is
+    instantiated to parse the Lyric expression within the braces. This
+    allows nested expressions and even nested f-strings.
+    """
 
-// expr_parser.ly:22
-func binary_prec(kind: TokenKind) -> i32
-// expr_parser.ly:70
-func is_ident_kind(kind: ExprKind) -> bool
-// parser.ly:20
-func new_parser(src_text: string, filename: string) -> Parser
-// parser.ly:25
-func parse_file(src_text: string, filename: string) -> (File?, error)
-// expr_parser.ly:46
-func token_to_binary_op(kind: TokenKind) -> BinaryOp
+  invariant "Implicit Module Naming":
+    procedural
+    """
+    Files without an explicit `lyric block_name { }` wrapper get an implicit
+    block name derived from the filename (e.g. math.ly → math). The parser
+    handles this in do_parse_file.
+    """
 
+  func binary_prec(kind: TokenKind) -> i32
+    source: expr_parser.ly:22
+
+  func token_to_binary_op(kind: TokenKind) -> BinaryOp
+    source: expr_parser.ly:46
+
+  func is_ident_kind(kind: ExprKind) -> bool
+    source: expr_parser.ly:70
+
+  struct ArgListResult
+    source: expr_parser.ly:305
+    field elems: [Expr]
+    field end_pos: Pos
+    field mut_args: [bool]
+
+  class Parser
+    source: parser.ly:13
+    field expr_depth: i32
+    field lex: Lexer?
+    field no_struct_lit: bool
+    field pushed: Token?
+    method parse_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:79
+    method parse_expr_no_struct_lit(self) -> (Expr?, error)
+      source: expr_parser.ly:86
+    method parse_prec_expr(self, min_prec: i32) -> (Expr?, error)
+      source: expr_parser.ly:94
+    method parse_unary_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:112
+    method parse_postfix_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:139
+    method parse_arg_list(self) -> (ArgListResult?, error)
+      source: expr_parser.ly:311
+    method parse_primary_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:343
+    method parse_dict_lit(self, lbrace: Token) -> (Expr?, error)
+      source: expr_parser.ly:508
+    method parse_map_lit(self, lbrace: Token) -> (Expr?, error)
+      source: expr_parser.ly:532
+    method parse_match_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:573
+    method parse_if_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:590
+    method parse_lambda_expr(self) -> (Expr?, error)
+      source: expr_parser.ly:624
+    method is_paren_lambda_ahead(self) -> bool
+      source: expr_parser.ly:668
+    method parse_paren_lambda(self, start: Pos) -> (Expr?, error)
+      source: expr_parser.ly:703
+    method parse_block(self) -> (Block?, error)
+      source: expr_parser.ly:732
+    method parse_stmt(self) -> (Stmt?, error)
+      source: expr_parser.ly:749
+    method parse_var_decl(self) -> (Stmt?, error)
+      source: expr_parser.ly:798
+    method is_pattern_let_ahead(self) -> bool
+      source: expr_parser.ly:865
+    method parse_let_else(self, start: Pos, is_mut: bool) -> (Stmt?, error)
+      source: expr_parser.ly:881
+    method parse_return(self) -> (Stmt?, error)
+      source: expr_parser.ly:895
+    method parse_yield(self) -> (Stmt?, error)
+      source: expr_parser.ly:910
+    method parse_if(self) -> (Stmt?, error)
+      source: expr_parser.ly:922
+    method parse_if_let(self, start: Pos) -> (Stmt?, error)
+      source: expr_parser.ly:962
+    method parse_for(self) -> (Stmt?, error)
+      source: expr_parser.ly:983
+    method parse_while(self) -> (Stmt?, error)
+      source: expr_parser.ly:1014
+    method parse_match_stmt(self) -> (Stmt?, error)
+      source: expr_parser.ly:1027
+    method parse_match_arms(self) -> ([MatchArm], error)
+      source: expr_parser.ly:1041
+    method parse_pattern(self) -> (Pattern?, error)
+      source: expr_parser.ly:1068
+    method parse_cascade(self) -> (Stmt?, error)
+      source: expr_parser.ly:1176
+    method parse_spawn(self) -> (Stmt?, error)
+      source: expr_parser.ly:1188
+    method parse_select(self) -> (Stmt?, error)
+      source: expr_parser.ly:1200
+    method parse_select_case(self) -> (SelectCase?, error)
+      source: expr_parser.ly:1218
+    method parse_lock(self) -> (Stmt?, error)
+      source: expr_parser.ly:1254
+    method parse_expr_or_assign(self) -> (Stmt?, error)
+      source: expr_parser.ly:1269
+    method is_struct_lit_ahead(self) -> bool
+      source: expr_parser.ly:1337
+      why: "Resolves the `Ident {` ambiguity (struct literal vs variable + block) by lookahead. Returns false unconditionally when no_struct_lit is set, which is how for/while/if/match conditions exclude struct literals without parens."
+    method parse_struct_lit(self, name: Sym, type_args: [TypeExpr], start: Pos) -> (Expr?, error)
+      source: expr_parser.ly:1366
+    method parse_fstring(self, tok: Token) -> (Expr?, error)
+      source: expr_parser.ly:1407
+    method try_parse_type_args(self) -> [TypeExpr]?
+      source: expr_parser.ly:1463
+    method peek(self) -> Token
+      source: parser.ly:32
+    method next(self) -> Token
+      source: parser.ly:39
+    method push_back(self, t: Token)
+      source: parser.ly:48
+    method skip_newlines(self)
+      source: parser.ly:52
+    method make_error(self, span: Span, msg: string) -> Error
+      source: parser.ly:58
+    method expect(self, kind: TokenKind) -> (Token?, error)
+      source: parser.ly:62
+    method expect_ident(self) -> (Token?, error)
+      source: parser.ly:70
+    method make_span(self, start: Pos) -> Span
+      source: parser.ly:90
+    method peek_annotation(self) -> TokenKind?
+      source: parser.ly:97
+    method consume_annotation(self, kind: TokenKind) -> bool
+      source: parser.ly:110
+    method do_parse_file(self) -> (File?, error)
+      source: parser.ly:122
+    method parse_lyric_block(self) -> (LyricBlock?, error)
+      source: parser.ly:141
+    method parse_lyric_item(self, block: LyricBlock) -> (bool, error)
+      source: parser.ly:188
+    method parse_import(self) -> (ImportDecl?, error)
+      source: parser.ly:302
+    method parse_type_alias(self) -> (TypeAliasDecl?, error)
+      source: parser.ly:337
+    method parse_field(self) -> (Field?, error)
+      source: parser.ly:353
+    method parse_param(self) -> (Param?, error)
+      source: parser.ly:381
+    method parse_tuple_field(self) -> (TupleField?, error)
+      source: parser.ly:418
+    method parse_type_params(self) -> ([TypeParam], error)
+      source: parser.ly:437
+    method parse_struct(self) -> (StructDecl?, error)
+      source: parser.ly:460
+    method parse_enum(self) -> (EnumDecl?, error)
+      source: parser.ly:492
+    method parse_enum_variant(self) -> (EnumVariant?, error)
+      source: parser.ly:519
+    method parse_interface(self) -> (InterfaceDecl?, error)
+      source: parser.ly:544
+    method parse_interface_field(self) -> (InterfaceFieldDecl?, error)
+      source: parser.ly:621
+    method parse_interface_embed(self) -> (InterfaceEmbed?, error)
+      source: parser.ly:637
+    method parse_destructor_block(self) -> (DestructorBlock?, error)
+      source: parser.ly:659
+    method parse_impl(self) -> (ImplBlock?, error)
+      source: parser.ly:673
+    method parse_impl_mapping_short(self, for_type: Sym) -> (ImplMapping?, error)
+      source: parser.ly:725
+    method parse_impl_mapping(self) -> (ImplMapping?, error)
+      source: parser.ly:787
+    method parse_class(self) -> (ClassDecl?, error)
+      source: parser.ly:860
+    method parse_func(self) -> (FuncDecl?, error)
+      source: parser.ly:961
+    method parse_const_decl(self) -> (ConstDecl?, error)
+      source: parser.ly:1029
+    method parse_where_clause(self) -> (WhereClause?, error)
+      source: parser.ly:1059
+    method parse_relation(self) -> (RelationDecl?, error)
+      source: parser.ly:1094
+    method parse_relation_side(self, first: Token) -> RelationSide
+      source: parser.ly:1144
+    method parse_type_expr(self) -> (TypeExpr?, error)
+      source: parser.ly:1176
+    method parse_base_type(self) -> (TypeExpr?, error)
+      source: parser.ly:1228
+
+  func new_parser(src_text: string, filename: string) -> Parser
+    source: parser.ly:20
+
+  func parse_file(src_text: string, filename: string) -> (File?, error)
+    source: parser.ly:25

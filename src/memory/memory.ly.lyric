@@ -1,123 +1,301 @@
-//ldd:source memory.ly
-//ldd:why "LIR memory pass: slab rewrite, scope-exit frees, escape analysis, reference counting instrumentation."
+module memory
+  source: ["memory.ly"]
+  why: "LIR→LIR memory pass: rewrites class allocation to slab (AoS, pointer-stable) allocation, inserts reference-counting instrumentation, performs escape analysis (fixed-point), and emits scope-exit frees for slices and class handles."
 
-// ## Invariants
-//
-// "Lyric structs are VALUE TYPES — s.optional_struct_field!.subfield = x modifies a COPY"
-// "Must read→modify→write-back: let mut d = s.field!; d.sub = x; s.field = d"
-// "This affects ALL block-containing stmts: if_data, while_data, for_data, switch_data, block_data"
-// "slab_rewrite_one_stmt must write back after rewriting nested statement bodies"
-// "AoS slab: class refs are ClassName* pointers, NULL = none, lyric_next free-list field"
-// "Block-based allocation (LYRIC_SLAB_BLOCK 256), pointer-stable (no realloc)"
-// "ExClassAlloc → ExSlabAlloc is the ONLY rewrite; ExClassGet/StClassSet unchanged (AoS uses pointers)"
-// "slab_rewrite_stmt_into returns [LStmt?] — do NOT use mut on class/slice params"
+  doc "Architecture":
+    """
+    LIR→LIR transformation pass. Entry point: slab_rewrite(prog: LProgram).
+    Runs after monomorphization, before C backend emission.
 
-// ## Architecture
-//
-// "LIR→LIR transformation pass: rewrites class allocation to slab allocation + RC instrumentation"
-// "Entry point: slab_rewrite(prog: LProgram)"
-// "Runs after monomorphization, before C backend emission"
-// "C backend emits slab infrastructure: block structs, alloc/free functions per class"
-// "Pipeline: escape analysis (fixed-point) → slab rewrite + scope-exit frees + RC insertion"
+    Pipeline:
+      1. Escape analysis (fixed-point iteration over all functions) — produces
+         a Dict<Sym,bool> marking which (function, param-index) positions
+         escape (stored into a field, returned, captured, etc.).
+      2. Slab rewrite — replaces ExClassAlloc with ExSlabAlloc; ExClassGet
+         and StClassSet are unchanged because AoS slabs use real pointers.
+      3. Scope-exit frees — for slices and class locals that do NOT escape,
+         emit StSliceFree / StSlabFree / StRefDecr at scope exit.
+      4. RC instrumentation — inserts StRefIncr/StRefDecr for RC classes
+         (currently StringBuilder and Dict variants).
 
-// ## Reference Counting
-//
-// "Only non-permanent, non-owned classes get RC (currently StringBuilder + Dict variants)"
-// "RC design: every reference is OWNED except function params (which are BORROWED)"
-// "Owned refs (must decrement when done): return from any call, field/global read, copy from local"
-// "Borrowed refs (no decrement): function parameters — caller holds ref for call duration"
-// "Alloc (via call return): rc = 1, caller owns the reference"
-// "Field store (obj.field = x): always emit retain — reference escapes into another lifetime"
-// "Return owned ref: transfer ownership, skip scope-exit decrement (net zero)"
-// "Return borrowed ref (param): must increment before return (creates new owned ref for caller)"
-// "Move optimization: if source is dead after assign, transfer ownership without inc/dec"
-// "StRefIncr/StRefDecr emitted by memory pass; C backend emits p->_rc++ / conditional decrement+free"
+    The C backend consumes the rewritten LIR and emits the slab
+    infrastructure: per-class block structs, alloc/free functions,
+    and (under --detect-uaf) poison-on-free checks at every ExClassGet
+    / ValClassFieldRef of an RC class.
+    """
 
-// ## Escape Analysis
-//
-// "Fixed-point iteration: marks which function params escape (stored in fields, returned, etc.)"
-// "escape_key_idx(func_name, param_index) → Dict key for tracking"
-// "mark_value_escape propagates escape from callee params to caller params"
-// "var_escapes_via_call checks if a local is passed to an escaping param position"
-// "Used by scope-exit free for slices and class locals — escaped refs skip scope-exit free"
-// "KNOWN WORKAROUND: class locals that escape via function calls skip RC tracking entirely"
-// "This prevents UAF but leaks — needs proper fix via field-store retains inside callee bodies"
+  invariant "Value-type stmt rewrites must write back":
+    procedural
+    """
+    Lyric structs are VALUE TYPES — `s.optional_struct_field!.subfield = x`
+    modifies a COPY, not the original. Any rewrite that touches a nested
+    statement body MUST follow read → modify → write-back:
 
-// ## Scope-Exit Frees
-//
-// "Three kinds: StSliceFree (slice backing), StSlabFree (class handle), StRefDecr (RC classes)"
-// "Escape analysis gates eligibility — escaped locals are not freed at scope exit"
-// "Only tracks locals allocated in the current scope (ExClassAlloc / fresh alloc)"
-// "Owned classes (relation children) skip scope-exit free — parent destructor handles them"
+        let mut d = s.field!
+        d.sub = x
+        s.field = d
 
-// ## UAF Detection (--detect-uaf)
-//
-// "On free: sets _rc = UINT32_MAX (poison value)"
-// "On every ExClassGet/ValClassFieldRef of RC classes: checks for poison, aborts with message"
-// "Uses is_rc_class() name-based lookup (not class_decl which may be null)"
-// "Caught Dict_CSym_CType UAF — checker's type Dict freed while still referenced"
+    This applies to ALL block-containing statements: if_data, while_data,
+    for_data, switch_data, block_data. In particular,
+    slab_rewrite_one_stmt MUST write back after rewriting nested
+    statement bodies, or rewrites will silently no-op.
+
+    slab_rewrite_stmt_into returns [LStmt?] — do NOT use `mut` on
+    class/slice parameters; mutate via return value instead.
+    """
+
+  invariant "Slab layout: AoS, pointer-stable, single rewrite point":
+    procedural
+    """
+    AoS slab: class refs are real `ClassName*` pointers; NULL means none;
+    each class carries a `lyric_next` free-list field. Allocation is
+    block-based (LYRIC_SLAB_BLOCK = 256 objects per block) and
+    pointer-stable — blocks are never realloc'd, so pointers handed out
+    by ExSlabAlloc remain valid for the object's lifetime.
+
+    ExClassAlloc → ExSlabAlloc is the ONLY allocation rewrite. ExClassGet
+    and StClassSet are deliberately unchanged because AoS uses pointers
+    natively, so field access compiles to ordinary pointer dereferences.
+    """
+
+  invariant "Reference counting: ownership discipline":
+    procedural
+    """
+    Only non-permanent, non-owned classes get RC (currently StringBuilder
+    and Dict variants). Every reference is OWNED except function
+    parameters, which are BORROWED for the duration of the call.
+
+    Owned refs (must decrement when done):
+      - return value from any call
+      - field read or global read
+      - copy from a local
+
+    Borrowed refs (no decrement):
+      - function parameters — the caller holds the ref for the call.
+
+    Rules:
+      - Alloc (via call return): rc = 1, caller owns the new reference.
+      - Field store (obj.field = x): ALWAYS emit retain — reference escapes
+        into another lifetime.
+      - Return owned ref: transfer ownership; SKIP the scope-exit decrement
+        (net zero: -1 scope exit + +1 return == 0, so just skip both).
+      - Return borrowed ref (a parameter): MUST increment before return,
+        creating a new owned ref for the caller.
+      - Move optimization: if the source local is dead after an assign,
+        transfer ownership without inc/dec.
+
+    StRefIncr / StRefDecr are emitted by this pass; the C backend lowers
+    them to `p->_rc++` and a conditional decrement-and-free.
+    """
+
+  invariant "Escape analysis: fixed-point over (func, param) positions":
+    procedural
+    """
+    Fixed-point iteration marks which function parameters escape (stored
+    in fields, returned, captured, passed to escaping positions, etc.).
+
+    Key encoding: escape_key_idx(func_name, param_index) → Sym used as the
+    Dict key for the global escape_map.
+
+    Propagation: mark_value_escape walks LValues; when a caller's local
+    flows to a callee parameter position that is marked escaping,
+    var_escapes_via_call / var_at_escaping_position propagate the mark
+    back to the caller.
+
+    Consumers: scope-exit free for slices and class locals — escaped refs
+    SKIP scope-exit free (the receiving lifetime owns them now).
+
+    KNOWN WORKAROUND: class locals that escape via function calls
+    currently skip RC tracking entirely. This prevents use-after-free
+    but leaks. Proper fix requires field-store retains emitted inside
+    callee bodies; tracked separately.
+    """
+
+  invariant "Scope-exit frees: three statement kinds, gated by escape":
+    procedural
+    """
+    Three scope-exit free statement kinds, emitted by this pass:
+      - StSliceFree  — frees a slice's backing storage.
+      - StSlabFree   — returns a class handle to its slab free-list.
+      - StRefDecr    — decrements an RC class's reference count
+                       (and frees if rc reaches 0).
+
+    Eligibility gates:
+      - Escape analysis: escaped locals are NOT freed at scope exit.
+      - Locality: only locals allocated in the CURRENT scope
+        (ExClassAlloc / fresh alloc) are tracked.
+      - Ownership: owned classes (relation children) skip scope-exit free
+        — the parent class's destructor handles them.
+    """
+
+  invariant "UAF detection (--detect-uaf)":
+    procedural
+    """
+    Under the --detect-uaf build flag:
+      - On free: the slab sets `_rc = UINT32_MAX` as a poison value.
+      - On every ExClassGet / ValClassFieldRef of an RC class: emit a
+        check that aborts with a diagnostic message if the poison value
+        is observed.
+
+    Classification uses is_rc_class() — a NAME-based lookup, NOT
+    class_decl, because class_decl may be null at this stage in the
+    pipeline. This name-based lookup is what caught the Dict_CSym_CType
+    UAF where the checker's type Dict was freed while still referenced.
+    """
 
 
-// memory.ly:346
-func check_call_escapes(callee_name: string, args: [LValue?], param_offset: i32, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:27
-func compute_escape_map(prog: LProgram) -> Dict<Sym, bool>
-// memory.ly:1515
-func emit_class_releases(names: [string], types: [LType?], skip_names: [string], mut out: [LStmt?])
-// memory.ly:1504
-func emit_ref_decr(handle: LValue?, class_name: string, mut out: [LStmt?])
-// memory.ly:1493
-func emit_ref_incr(handle: LValue?, class_name: string, mut out: [LStmt?])
-// memory.ly:1427
-func emit_slice_frees(names: [string], types: [LType?], skip_names: [string], mut out: [LStmt?])
-// memory.ly:63
-func escape_key(func_name: string, param_name: string) -> Sym
-// memory.ly:68
-func escape_key_idx(func_name: string, idx: i32) -> Sym
-// memory.ly:1409
-func get_return_var_names(s: LStmt) -> [string]
-// memory.ly:1386
-func is_fresh_class_init(init: LValue?, fresh_class_temps: [i32]) -> bool
-// memory.ly:1368
-func is_fresh_slice_init(init: LValue?, fresh_temps: [i32]) -> bool
-// memory.ly:1353
-func is_fresh_string_expr(e: LExpr) -> bool
-// memory.ly:1456
-func is_owned_class(prog: LProgram, class_name: string) -> bool
-// memory.ly:1463
-func is_permanent_class(prog: LProgram, class_name: string) -> bool
-// memory.ly:1475
-func is_rc_class_type(prog: LProgram, typ: LType?) -> bool
-// memory.ly:585
-func is_var_value(var_name: string, v: LValue) -> bool
-// memory.ly:320
-func mark_value_escape(v: LValue, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:306
-func resolve_method_callee_name(d: LMethodCallData) -> string
-// memory.ly:224
-func scan_escapes_in_expr(e: LExpr, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:88
-func scan_escapes_in_stmt(s: LStmt, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:73
-func scan_escapes_in_stmts(stmts: [LStmt?], func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:1444
-func should_skip(name: string, skip_names: [string]) -> bool
-// memory.ly:598
-func slab_rewrite(prog: LProgram)
-// memory.ly:1078
-func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram)
-// memory.ly:833
-func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?]
-// memory.ly:645
-func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram) -> [LStmt?]
-// memory.ly:1336
-func slab_rewrite_value(v: LValue)
-// memory.ly:567
-func var_at_escaping_position(var_name: string, callee_name: string, args: [LValue?], param_offset: i32, escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:494
-func var_escapes_in_expr(var_name: string, e: LExpr, escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:381
-func var_escapes_in_stmt(var_name: string, s: LStmt, escape_map: Dict<Sym, bool>) -> bool
-// memory.ly:368
-func var_escapes_via_call(var_name: string, stmts: [LStmt?], escape_map: Dict<Sym, bool>) -> bool
+  func compute_escape_map(prog: LProgram) -> Dict<Sym, bool>
+    source: memory.ly:27
 
+  func escape_key(func_name: string, param_name: string) -> Sym
+    source: memory.ly:63
+
+  func escape_key_idx(func_name: string, idx: i32) -> Sym
+    source: memory.ly:68
+
+  func scan_escapes_in_stmts(stmts: [LStmt?], func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:73
+
+  func scan_escapes_in_stmt(s: LStmt, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:88
+
+  func scan_escapes_in_expr(e: LExpr, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:224
+
+  func resolve_method_callee_name(d: LMethodCallData) -> string
+    source: memory.ly:319
+
+  func mark_value_escape(v: LValue, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:333
+
+  func check_call_escapes(callee_name: string, args: [LValue?], param_offset: i32, func_name: string, params: [LParam], param_names: Dict<Sym, bool>, mut escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:359
+
+  func var_escapes_via_call(var_name: string, stmts: [LStmt?], escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:381
+
+  func var_escapes_in_stmt(var_name: string, s: LStmt, escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:394
+
+  func var_escapes_in_expr(var_name: string, e: LExpr, escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:507
+
+  func var_at_escaping_position(var_name: string, callee_name: string, args: [LValue?], param_offset: i32, escape_map: Dict<Sym, bool>) -> bool
+    source: memory.ly:580
+
+  func is_var_value(var_name: string, v: LValue) -> bool
+    source: memory.ly:598
+
+  func find_finalizer(prog: LProgram, class_name: string) -> string
+    source: memory.ly:612
+
+  func slab_rewrite(prog: LProgram)
+    source: memory.ly:633
+
+  func slab_rewrite_stmts(stmts: [LStmt?], all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam]) -> [LStmt?]
+    source: memory.ly:742
+
+  func slab_rewrite_one_stmt(s: LStmt, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam]) -> [LStmt?]
+    source: memory.ly:1069
+
+  func slab_rewrite_expr(e: LExpr, all_stmts: [LStmt?], escape_map: Dict<Sym, bool>, prog: LProgram, params: [LParam])
+    source: memory.ly:1314
+
+  func slab_rewrite_value(v: LValue)
+    source: memory.ly:1572
+
+  func is_fresh_string_expr(e: LExpr) -> bool
+    source: memory.ly:1589
+
+  func is_fresh_slice_init(init: LValue?, fresh_temps: [i32]) -> bool
+    source: memory.ly:1604
+
+  func is_fresh_class_init(init: LValue?, fresh_class_temps: [i32]) -> bool
+    source: memory.ly:1622
+
+  func get_return_var_names(s: LStmt) -> [string]
+    source: memory.ly:1645
+
+  func emit_slice_frees(names: [string], types: [LType?], skip_names: [string], prog: LProgram, mut out: [LStmt?])
+    source: memory.ly:1665
+
+  func should_skip(name: string, skip_names: [string]) -> bool
+    source: memory.ly:1697
+
+  func is_owned_class(prog: LProgram, class_name: string) -> bool
+    source: memory.ly:1709
+
+  func is_permanent_class(prog: LProgram, class_name: string) -> bool
+    source: memory.ly:1716
+
+  func is_rc_class_type(prog: LProgram, typ: LType?) -> bool
+    source: memory.ly:1728
+
+  func find_struct_decl(prog: LProgram, name: string) -> LStructDecl?
+    source: memory.ly:1755
+
+  func type_has_rc_fields(prog: LProgram, typ: LType?) -> bool
+    source: memory.ly:1772
+
+  func emit_struct_field_rc(var_name: string, typ: LType?, prog: LProgram, is_retain: bool, mut out: [LStmt?])
+    source: memory.ly:1813
+
+  func emit_struct_releases(names: [string], types: [LType?], skip_names: [string], prog: LProgram, mut out: [LStmt?])
+    source: memory.ly:1898
+
+  func emit_ref_incr(handle: LValue?, class_name: string, mut out: [LStmt?])
+    source: memory.ly:1909
+
+  func emit_ref_decr(handle: LValue?, class_name: string, mut out: [LStmt?])
+    source: memory.ly:1920
+
+  func emit_class_releases(names: [string], types: [LType?], skip_names: [string], mut out: [LStmt?])
+    source: memory.ly:1931
+
+  func insert_temp_releases(stmts: [LStmt?], prog: LProgram) -> [LStmt?]
+    source: memory.ly:1955
+
+  func i32_in_list(val: i32, list: [i32]) -> bool
+    source: memory.ly:2102
+
+  func stmt_uses_temp_flat(s: LStmt, temp_id: i32) -> bool
+    source: memory.ly:2112
+
+  func expr_uses_temp(e: LExpr, temp_id: i32) -> bool
+    source: memory.ly:2202
+
+  func value_is_temp(v: LValue, temp_id: i32) -> bool
+    source: memory.ly:2307
+
+  func var_is_live_after(var_name: string, stmts: [LStmt?], start_idx: i32) -> bool
+    source: memory.ly:2319
+
+  func var_used_in_stmt(var_name: string, s: LStmt) -> bool
+    source: memory.ly:2331
+
+  func var_used_in_stmts(var_name: string, stmts: [LStmt?]) -> bool
+    source: memory.ly:2448
+
+  func var_used_in_expr(var_name: string, e: LExpr) -> bool
+    source: memory.ly:2458
+
+  func var_used_in_value(var_name: string, v: LValue) -> bool
+    source: memory.ly:2568
+
+  func count_var_uses(var_name: string, stmts: [LStmt?]) -> i32
+    source: memory.ly:2577
+
+  func count_var_uses_in_stmt(var_name: string, s: LStmt) -> i32
+    source: memory.ly:2589
+
+  func count_var_uses_in_expr(var_name: string, e: LExpr) -> i32
+    source: memory.ly:2699
+
+  func count_var_uses_in_value(var_name: string, v: LValue) -> i32
+    source: memory.ly:2798
+
+  func delta_fold(stmts: [LStmt?]) -> [LStmt?]
+    source: memory.ly:2808
+
+  func rc_handles_match(incr: LRefIncrData?, decr: LRefDecrData?) -> bool
+    source: memory.ly:2843

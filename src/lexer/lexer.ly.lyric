@@ -1,144 +1,203 @@
-//ldd:source lexer.ly
-//ldd:why "Tokenizer for Lyric source. Produces Token stream with TokenKind enum. Stateful scanner tracking line/column for source mapping."
+module lexer
+  source: ["lexer.ly"]
+  why: "Tokenizer for Lyric source. Produces a Token stream classified by the TokenKind enum. The Lexer is a stateful scanner tracking line/column/position so every Token carries an accurate Span for downstream error reporting and source mapping."
 
-// ## Architecture
-//
-// Linear scan: raw text → Token stream. The Lexer scans char-by-char
-// producing Token objects with Kind, Text, and Span.
-//
-// Key features:
-// - Triple-quoted strings (
+  doc "Architecture":
+    """
+    Linear scan: raw text → Token stream. The Lexer walks the source
+    byte-by-byte producing Token values with kind, text, and span.
 
-// ## Invariants — Keyword Lookup
-//
-// The lexer uses Dict<TokenKind> (HashedList) for keyword lookup — O(1)
-// via Sym hashing. Two dictionaries: keywords (hard keywords) and
-// annot_keywords (contextual annotation keywords like why, doc, source).
-//
-// LexerState (save_state/restore_state) enables parser backtracking for
-// ambiguous constructs like struct literals vs blocks. LexerState is a
-// simple struct copy — cheap to save/restore.
+    Keyword recognition uses a Dict<Sym, TokenKind> built once at
+    construction and consulted by scan_ident. Hard keywords (class, func,
+    struct, …) lex to their specific TokenKind. Contextual keywords (doc,
+    why, source, field, lock, implements, embed) are emitted as LIdent and
+    resolved by the parser based on position.
 
-// ## Invariants — No Line Continuation
-//
-// Lyric's lexer does not support line continuation for binary operators.
-// Multi-condition expressions must be on ONE line or extracted into helpers.
-//
-// bracketDepth tracks () and [] nesting — newlines suppressed when > 0.
-// {} braces do NOT increment bracketDepth (they delimit blocks with statements).
-// bracketDepth is included in LexerState save/restore.
+    LexerState (save_state / restore_state) snapshots pos/line/column,
+    bracket_depth, and any peeked token, enabling parser backtracking for
+    ambiguous constructs such as struct literals vs blocks. The snapshot
+    is a simple value copy — cheap and side-effect free.
 
-// ## Invariants — F-String Sentinels
-//
-// In f-strings, escaped braces {{ and }} are stored as sentinel bytes
-// \x01 and \x02 respectively, to distinguish them from interpolation
-// boundaries { and }. The parser must decode these back to { and }.
+    Bracket tracking: bracket_depth counts open () and [] only. Newlines
+    inside brackets are suppressed (no SNewline emitted) so that
+    multi-line argument lists / list literals don't terminate statements.
+    Braces {} delimit blocks and do NOT participate in bracket_depth.
 
-// ## Invariants — Comment Collection
-//
-// Comments are NOT emitted as tokens. They are collected into an
-// ArrayList relation owned by the Lexer instance. Each Comment has
-// text and Pos. This keeps the token stream clean for parsing while
-// preserving comments for tooling.
+    String forms: scan_string, scan_triple_string, scan_fstring, and
+    scan_char_lit handle the four literal shapes. F-strings encode escaped
+    braces {{ and }} as sentinel bytes \\x01 and \\x02 in the token text
+    so the parser can later distinguish them from interpolation
+    boundaries; the parser is responsible for decoding the sentinels.
 
-// ## Invariants — Contextual Keywords
-//
-// doc, why, source, fake, field, lock, implements, embed are contextual
-// keywords. The lexer emits them as TIdent; the parser resolves them
-// contextually based on position. This allows these words to be used as
-// identifiers in field/param/variable positions.
-//
-// Exception: lyric-block keywords (struct, class, enum, func, etc.) are
-// always lexed as their specific TokenKind.
+    Comments are NOT emitted as tokens. The scan loop consumes // and
+    /* */ comments and discards them, keeping the token stream clean
+    for parsing.
 
-// ## Invariants — Token Splitting for Nested Generics
-//
-// Nested generics like Dict<Dict<V>> produce >> which lexes as TShr.
-// The parser splits TShr into two TGt tokens using a pushBack mechanism.
-// The lexer itself does NOT handle this — it's a parser responsibility.
+    Token splitting (e.g. >> → > >) for nested generics like Dict<Dict<V>>
+    is explicitly NOT a lexer responsibility — the lexer emits OShr and
+    the parser uses pushBack to split it when a closing > is expected.
+    """
 
-// TokenKind = enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KEmbed, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KCascade, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
+  invariant "Keyword Lookup":
+    procedural
+    """
+    Keyword resolution MUST go through lookup_keyword, which consults
+    the Lexer's keywords Dict<Sym, TokenKind> built once by
+    init_keywords. Lookup is O(1) via Sym hashing.
+
+    Hard keywords (KLyric, KFunc, KClass, KStruct, KEnum, KInterface,
+    KImpl, KLet, KIf, KElse, KFor, KWhile, KMatch, KReturn, KBreak,
+    KContinue, KTrue, KFalse, KNil, KSelf, KMut, …) always lex to
+    their specific TokenKind.
+
+    Contextual keywords — doc, why, source, fake, field, lock,
+    implements, embed — are emitted as LIdent. The parser resolves
+    them positionally so they remain usable as ordinary identifiers
+    in field/param/variable names.
+    """
+
+  invariant "No Line Continuation":
+    procedural
+    """
+    The lexer does NOT support line continuation across binary
+    operators. A multi-condition expression MUST live on a single
+    logical line or be extracted into a helper.
+
+    bracket_depth tracks () and [] nesting only. While bracket_depth
+    > 0, newline bytes are consumed without emitting SNewline so that
+    multi-line argument lists and list literals stay one statement.
+    {} braces delimit blocks and MUST NOT increment bracket_depth.
+
+    bracket_depth is part of LexerState and MUST be saved/restored
+    by save_state and restore_state so backtracking does not corrupt
+    newline suppression.
+    """
+
+  invariant "F-String Sentinels":
+    procedural
+    """
+    Inside an f-string, escaped braces {{ and }} MUST be stored in
+    the token text as sentinel bytes \\x01 and \\x02 respectively.
+    Real { and } in the token text continue to mark interpolation
+    boundaries.
+
+    The parser is responsible for decoding \\x01 → { and \\x02 → }
+    when materializing the literal string segments of the f-string.
+    The lexer MUST NOT emit { or } for escaped braces — that would
+    be indistinguishable from interpolation.
+    """
+
+  invariant "Comment Handling":
+    procedural
+    """
+    Comments are NOT emitted as tokens. The scan loop consumes //
+    line comments and /* */ block comments and discards them.
+    Downstream consumers (parser, formatter) MUST NOT expect comment
+    tokens in the stream.
+
+    Tooling that needs comments preserved must extend the lexer to
+    collect them into a side channel; the bootstrap pipeline does
+    not require this.
+    """
+
+  invariant "Token Splitting Boundary":
+    procedural
+    """
+    Nested generics like Dict<Dict<V>> produce the source text >>,
+    which the lexer MUST emit as a single OShr token. The lexer does
+    NOT attempt to split OShr into two PGt tokens based on context.
+
+    Splitting OShr → PGt PGt for closing nested generic argument
+    lists is a parser-side responsibility, handled via a pushBack
+    mechanism in the parser's expectation logic.
+    """
 
 
-// lexer.ly:15
-// TokenKind = enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KEmbed, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KCascade, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
+  typedef TokenKind: enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KEmbed, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KCascade, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
+    source: lexer.ly:15
 
-// lexer.ly:115
-class Lexer {
-  bracket_depth: i32
-  column: i32
-  filename: Sym?
-  keywords: Dict<Sym, TokenKind>?
-  line: i32
-  peeked_token: Token?
-  pos: i32
-  src: string
-}
-// lexer.ly:193
-func Lexer.advance(self) -> u8
-// lexer.ly:189
-func Lexer.current_pos(self) -> Pos
-// lexer.ly:234
-func Lexer.next(self) -> Token
-// lexer.ly:224
-func Lexer.peek(self) -> Token
-// lexer.ly:215
-func Lexer.peek_at(self, offset: i32) -> u8
-// lexer.ly:208
-func Lexer.peek_char(self) -> u8
-// lexer.ly:137
-func Lexer.restore_state(self, state: LexerState)
-// lexer.ly:127
-func Lexer.save_state(self) -> LexerState
-// lexer.ly:458
-func Lexer.scan(self) -> Token
-// lexer.ly:293
-func Lexer.scan_backtick_sym(self, start: Pos) -> Token
-// lexer.ly:277
-func Lexer.scan_char_lit(self, start: Pos) -> Token
-// lexer.ly:246
-func Lexer.scan_escape(self, buf: StringBuilder) -> bool
-// lexer.ly:353
-func Lexer.scan_fstring(self, start: Pos) -> Token
-// lexer.ly:427
-func Lexer.scan_ident(self, start: Pos) -> Token
-// lexer.ly:397
-func Lexer.scan_number(self, start: Pos) -> Token
-// lexer.ly:310
-func Lexer.scan_string(self, start: Pos) -> Token
-// lexer.ly:336
-func Lexer.scan_triple_string(self, start: Pos) -> Token
+  class Token
+    source: lexer.ly:39
+    field kind: TokenKind
+      doc: "Discriminator selecting which lexical category this token belongs to (keyword, literal, punctuation, operator, separator). Drives all parser dispatch."
+    field span: Span
+    field text: string
 
-// lexer.ly:107
-struct LexerState {
-  bracket_depth: i32
-  column: i32
-  line: i32
-  peeked_token: Token?
-  pos: i32
-}
+  func init_keywords() -> Dict<Sym, TokenKind>
+    source: lexer.ly:47
 
-// lexer.ly:39
-class Token {
-  kind: TokenKind
-  span: Span
-  text: string
-}
+  func lookup_keyword(lex: Lexer, text: string) -> TokenKind?
+    source: lexer.ly:94
 
-// lexer.ly:168
-func hex_val(ch: u8) -> u8
-// lexer.ly:47
-func init_keywords() -> Dict<Sym, TokenKind>
-// lexer.ly:160
-func is_digit(ch: u8) -> bool
-// lexer.ly:164
-func is_ident_char(ch: u8) -> bool
-// lexer.ly:156
-func is_letter(ch: u8) -> bool
-// lexer.ly:94
-func lookup_keyword(lex: Lexer, text: string) -> TokenKind?
-// lexer.ly:183
-func make_token(kind: TokenKind, text: string, start: Pos, end: Pos) -> Token
-// lexer.ly:145
-func new_lexer(src_text: string, filename: Sym) -> Lexer
+  struct LexerState
+    source: lexer.ly:107
+    field bracket_depth: i32
+    field column: i32
+    field line: i32
+    field peeked_token: Token?
+    field pos: i32
 
+  class Lexer
+    source: lexer.ly:115
+    field bracket_depth: i32
+    field column: i32
+    field filename: Sym?
+    field keywords: Dict<Sym, TokenKind>?
+      doc: "Keyword table mapping Sym(identifier) → TokenKind for hard keywords. Built once by init_keywords and consulted by scan_ident. Optional because the field is wired up after construction; lookup_keyword must tolerate a missing table."
+    field line: i32
+    field peeked_token: Token?
+    field pos: i32
+    field src: string
+    method save_state(self) -> LexerState
+      source: lexer.ly:127
+    method restore_state(self, state: LexerState)
+      source: lexer.ly:137
+    method current_pos(self) -> Pos
+      source: lexer.ly:189
+    method advance(self) -> u8
+      source: lexer.ly:193
+    method peek_char(self) -> u8
+      source: lexer.ly:208
+    method peek_at(self, offset: i32) -> u8
+      source: lexer.ly:215
+    method peek(self) -> Token
+      source: lexer.ly:224
+    method next(self) -> Token
+      source: lexer.ly:234
+    method scan_escape(self, buf: StringBuilder) -> bool
+      source: lexer.ly:246
+    method scan_char_lit(self, start: Pos) -> Token
+      source: lexer.ly:277
+    method scan_backtick_sym(self, start: Pos) -> Token
+      source: lexer.ly:293
+    method scan_string(self, start: Pos) -> Token
+      source: lexer.ly:310
+    method scan_triple_string(self, start: Pos) -> Token
+      source: lexer.ly:336
+    method scan_fstring(self, start: Pos) -> Token
+      source: lexer.ly:353
+    method scan_number(self, start: Pos) -> Token
+      source: lexer.ly:397
+    method scan_ident(self, start: Pos) -> Token
+      source: lexer.ly:427
+    method scan(self) -> Token
+      source: lexer.ly:458
+      why: "The main lexing loop: skips whitespace and comments, then dispatches on the next byte to the appropriate scan_* helper, producing exactly one Token per call. Honors bracket_depth to suppress newlines inside () and []. This is the single entry point feeding peek and next."
+
+  func new_lexer(src_text: string, filename: Sym) -> Lexer
+    source: lexer.ly:145
+
+  func is_letter(ch: u8) -> bool
+    source: lexer.ly:156
+
+  func is_digit(ch: u8) -> bool
+    source: lexer.ly:160
+
+  func is_ident_char(ch: u8) -> bool
+    source: lexer.ly:164
+
+  func hex_val(ch: u8) -> u8
+    source: lexer.ly:168
+
+  func make_token(kind: TokenKind, text: string, start: Pos, end: Pos) -> Token
+    source: lexer.ly:183

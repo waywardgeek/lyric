@@ -1,463 +1,460 @@
-//ldd:source ast.ly, modules.ly
-//ldd:why "Defines all AST node types for the Lyric language. Leaf package — no dependencies on other bootstrap packages. Shared by parser, checker, desugar, and lowerer."
+module ast
+  source: ["ast.ly","modules.ly"]
+  why: "Defines all AST node types for the Lyric language. Leaf package — no dependencies on other bootstrap packages. Shared by parser, checker, desugar, and lowerer."
 
-// ## Architecture
-//
-// The AST is a strict hierarchy rooted in File. A File contains one or more
-// LyricBlock nodes. Data flows in from the parser; once constructed, the AST
-// is the source of truth for the entire toolchain.
-//
-// Two file formats share the same AST:
-// - .lyric: declaration-only (FuncDecl.body is null)
-// - .ly: full implementation (FuncDecl.body is Block)
+  doc "Architecture":
+    """
+    The AST is a strict hierarchy rooted in File. A File contains one or more
+    LyricBlock nodes. Data flows in from the parser; once constructed, the AST
+    is the source of truth for the entire toolchain.
 
-// ## Invariants — Nullable Variant Fields
-//
-// Lyric uses nullable fields per variant on class types instead of Go's
-// any-typed Data fields + Kind enum. Expr has one nullable field per
-// ExprKind (call: CallData?, bin_op: BinOpData?, etc.). Only the field
-// matching `kind` is non-null.
-//
-// This is required because Lyric `any` maps to `void*` in C — no type
-// recovery without casts. The nullable field pattern is verbose but
-// fully type-safe in C.
-//
-// Applies to: Expr, Stmt, TypeExpr, Pattern.
-//
-// Exception: Expr.resolved_type is typed as TypeExpr? (not any). TypeExpr
-// is defined earlier in the same file, so proper typing is possible.
-//
-// CRITICAL: When accessing variant data, always check null first. The
-// pattern is: `if expr.call != null { let c = expr.call! ... }`.
-// Do NOT assume a field is non-null based on kind without checking.
+    Two file formats share the same AST:
+    - .lyric: declaration-only (FuncDecl.body is null)
+    - .ly: full implementation (FuncDecl.body is Block)
 
-// ## Invariants — No If-Expressions
-//
-// Lyric does not support if-as-expression. All conditional assignment
-// must use: let mut x = default; if cond { x = value }
-// This affects match-as-expression too — use mutable variable + match statement.
+    Transitive Stdlib Merge: merge_stdlib uses a transitive closure algorithm:
+    1. Collect all type names and function calls used in user code
+    2. Find matching declarations in stdlib
+    3. Transitively follow references (if merged func returns a stdlib class, merge that class too)
+    4. Handle primitive extension methods (e.g. i32.get_hash) for generic code (Dict)
+    5. Repeat until no new dependencies discovered
+    This avoids bloating the binary with unused stdlib code.
 
-// ## Invariants — Positions and Spans
-//
-// Every major AST node carries a Span (start Pos, end Pos). Pos has file,
-// line, column. Required for error messages with precise source locations.
+    Module Resolution (Namespace Flattening): resolve_module_imports flattens
+    packages into a single global namespace in 3 phases:
+    1. Prefixing: all declarations in imported package get prefix (e.g. math.sin → math_sin)
+    2. Internal rewriting: references within imported package updated to prefixed names
+    3. Qualified access rewriting: caller's math.sin(x) → math_sin(x)
+    This is because the bootstrap compiler targets a flat compilation model.
+    """
 
-// ## Invariants — Expression and Statement Kinds
-//
-// ExprKind enum: Ident, IntLit, FloatLit, StringLit, StringInterp, BoolLit,
-// Nil, Unary, Binary, Call, MethodCall, FieldAccess, Index, ListLit,
-// TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice, Is.
-//
-// StmtKind enum: VarDecl, Assign, Return, Expr, If, For, While, Match,
-// Block, Cascade, Break, Continue, Spawn, Select, Lock, IfLet, LetElse.
-//
-// PatternKind enum: Ident, Literal, Variant, Wildcard, Tuple.
-//
-// TypeExprKind enum: Named, Optional, Union, Sequence, Map, Tuple, Func,
-// Channel, Lock, Unit.
+  invariant "Nullable Variant Fields":
+    procedural
+    """
+    Lyric uses nullable fields per variant on class types instead of Go's
+    any-typed Data fields + Kind enum. Expr has one nullable field per
+    ExprKind (call: CallData?, bin_op: BinOpData?, etc.). Only the field
+    matching `kind` is non-null.
 
-// ## Invariants — Relations
-//
-// RelationDecl models ownership (Owns) and reference (Refs) relationships.
-// Supports cardinality (IsMany), labeled sides, and implementation hints.
-// Relations generate fields and impl blocks during desugaring.
+    This is required because Lyric `any` maps to `void*` in C — no type
+    recovery without casts. The nullable field pattern is verbose but
+    fully type-safe in C.
 
-// ## Architecture — Transitive Stdlib Merge
-//
-// merge_stdlib uses a transitive closure algorithm:
-// 1. Collect all type names and function calls used in user code
-// 2. Find matching declarations in stdlib
-// 3. Transitively follow references (if merged func returns a stdlib class, merge that class too)
-// 4. Handle primitive extension methods (e.g. i32.get_hash) for generic code (Dict)
-// 5. Repeat until no new dependencies discovered
-// This avoids bloating the binary with unused stdlib code.
+    Applies to: Expr, Stmt, TypeExpr, Pattern.
 
-// ## Architecture — Module Resolution (Namespace Flattening)
-//
-// resolve_module_imports flattens packages into a single global namespace in 3 phases:
-// 1. Prefixing: all declarations in imported package get prefix (e.g. math.sin → math_sin)
-// 2. Internal rewriting: references within imported package updated to prefixed names
-// 3. Qualified access rewriting: caller's math.sin(x) → math_sin(x)
-// This is because the bootstrap compiler targets a flat compilation model.
+    Exception: Expr.resolved_type is typed as TypeExpr? (not any). TypeExpr
+    is defined earlier in the same file, so proper typing is possible.
 
-// ## Invariants — Desugaring
-//
-// Five desugar passes run BEFORE the checker, in strict order:
-// 1. InterfaceEmbeds — flatten embedded interfaces
-// 2. InterfaceFields — field decls → getter/setter methods
-// 3. Relations — inject ownership/reference fields + impl blocks
-// 4. Destructors — copy interface destructor bodies to classes
-// 5. DefaultImpls — extract interface methods to top-level functions
-//
-// Each pass creates AST consumed by later passes. Order is critical.
+    CRITICAL: When accessing variant data, always check null first. The
+    pattern is: `if expr.call != null { let c = expr.call! ... }`.
+    Do NOT assume a field is non-null based on kind without checking.
+    """
 
-// BinaryOp = enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
+  invariant "No If-Expressions":
+    procedural
+    """
+    Lyric does not support if-as-expression. All conditional assignment
+    must use: let mut x = default; if cond { x = value }
+    This affects match-as-expression too — use mutable variable + match statement.
+    """
 
-// ExprKind = enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }
+  invariant "Positions and Spans":
+    procedural
+    """
+    Every major AST node carries a Span (start Pos, end Pos). Pos has file,
+    line, column. Required for error messages with precise source locations.
+    """
 
-// ImplMappingKind = enum { Alias, FieldBind, Inline }
+  invariant "Expression and Statement Kinds":
+    procedural
+    """
+    ExprKind enum: Ident, IntLit, FloatLit, StringLit, StringInterp, BoolLit,
+    Nil, Unary, Binary, Call, MethodCall, FieldAccess, Index, ListLit,
+    TupleLit, MapLit, StructLit, Lambda, Match, Cast, Unwrap, Try, Slice, Is.
 
-// PatternKind = enum { Ident(name: Sym), Literal(expr: Expr), Variant(name: Sym, bindings: [Pattern]), Wildcard, Tuple(elems: [Pattern]) }
+    StmtKind enum: VarDecl, Assign, Return, Expr, If, For, While, Match,
+    Block, Cascade, Break, Continue, Spawn, Select, Lock, IfLet, LetElse.
 
-// RelationKind = enum { Owns, Refs }
+    PatternKind enum: Ident, Literal, Variant, Wildcard, Tuple.
 
-// StmtKind = enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block) }
+    TypeExprKind enum: Named, Optional, Union, Sequence, Map, Tuple, Func,
+    Channel, Lock, Unit.
+    """
 
-// TypeExprKind = enum { Named(name: Sym, args: [TypeExpr]), Optional(inner: TypeExpr), Union(variants: [TypeExpr]), Sequence(elem: TypeExpr), Map(key: TypeExpr, value: TypeExpr), Tuple(fields: [TupleField]), Func(params: [TypeExpr], ret: TypeExpr), Channel(elem: TypeExpr), Generator(elem: TypeExpr), Lock, Unit }
+  invariant "Relations":
+    procedural
+    """
+    RelationDecl models ownership (Owns) and reference (Refs) relationships.
+    Supports cardinality (IsMany), labeled sides, and implementation hints.
+    Relations generate fields and impl blocks during desugaring.
+    """
 
-// UnaryOp = enum { Neg, Not }
+  invariant "Desugaring":
+    procedural
+    """
+    Five desugar passes run BEFORE the checker, in strict order:
+    1. InterfaceEmbeds — flatten embedded interfaces
+    2. InterfaceFields — field decls → getter/setter methods
+    3. Relations — inject ownership/reference fields + impl blocks
+    4. Destructors — copy interface destructor bodies to classes
+    5. DefaultImpls — extract interface methods to top-level functions
+
+    Each pass creates AST consumed by later passes. Order is critical.
+    """
 
 
-// ast.ly:243
-// BinaryOp = enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
+  struct Pos
+    source: ast.ly:15
+    field column: i32
+    field file: Sym?
+    field line: i32
 
-// ast.ly:255
-// ExprKind = enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }
+  struct Span
+    source: ast.ly:21
+    field end: Pos
+    field start: Pos
 
-// ast.ly:171
-// ImplMappingKind = enum { Alias, FieldBind, Inline }
+  typedef TypeExprKind: enum { Named(name: Sym, args: [TypeExpr]), Optional(inner: TypeExpr), Union(variants: [TypeExpr]), Sequence(elem: TypeExpr), Map(key: TypeExpr, value: TypeExpr), Tuple(fields: [TupleField]), Func(params: [TypeExpr], ret: TypeExpr), Channel(elem: TypeExpr), Generator(elem: TypeExpr), Lock, Unit }
+    source: ast.ly:28
 
-// ast.ly:292
-// PatternKind = enum { Ident(name: Sym), Literal(expr: Expr), Variant(name: Sym, bindings: [Pattern]), Wildcard, Tuple(elems: [Pattern]) }
+  class TypeExpr
+    source: ast.ly:42
+    field kind: TypeExprKind
+    field span: Span
 
-// ast.ly:194
-// RelationKind = enum { Owns, Refs }
+  class TupleField
+    source: ast.ly:47
+    field name: Sym?
+    field type_expr: TypeExpr?
 
-// ast.ly:315
-// StmtKind = enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block) }
+  class TypeParam
+    source: ast.ly:54
+    field constraint: Sym?
+    field name: Sym?
+    field span: Span
 
-// ast.ly:28
-// TypeExprKind = enum { Named(name: Sym, args: [TypeExpr]), Optional(inner: TypeExpr), Union(variants: [TypeExpr]), Sequence(elem: TypeExpr), Map(key: TypeExpr, value: TypeExpr), Tuple(fields: [TupleField]), Func(params: [TypeExpr], ret: TypeExpr), Channel(elem: TypeExpr), Generator(elem: TypeExpr), Lock, Unit }
+  class WhereClause
+    source: ast.ly:60
+    field constraint: Sym?
+    field span: Span
+    field variable: Sym?
 
-// ast.ly:241
-// UnaryOp = enum { Neg, Not }
+  class Param
+    source: ast.ly:69
+    field is_mut: bool
+    field is_self: bool
+    field name: Sym?
+    field span: Span
+    field type_expr: TypeExpr?
 
-// ast.ly:355
-class Block {
-  span: Span
-}
+  class FuncDecl
+    source: ast.ly:77
+    field body: Block?
+    field is_final: bool
+    field is_public: bool
+    field is_trusted: bool
+    field name: Sym?
+    field receiver_type: Sym?
+    field return_type: TypeExpr?
+    field span: Span
 
-// ast.ly:102
-class ClassDecl {
-  implements: [Sym]
-  is_permanent: bool
-  is_public: bool
-  name: Sym?
-  span: Span
-}
+  class Field
+    source: ast.ly:93
+    field default_value: Expr?
+    field guarded_by: Sym?
+    field is_public: bool
+    field name: Sym?
+    field span: Span
+    field type_expr: TypeExpr?
 
-// ast.ly:234
-class Comment {
-  pos: Pos
-  text: string
-}
+  class ClassDecl
+    source: ast.ly:104
+    field implements: [Sym]
+    field is_permanent: bool
+    field is_public: bool
+    field name: Sym?
+    field span: Span
 
-// ast.ly:226
-class ConstDecl {
-  is_public: bool
-  name: Sym?
-  span: Span
-  type_expr: TypeExpr?
-  value: Expr?
-}
+  class StructDecl
+    source: ast.ly:116
+    field is_public: bool
+    field name: Sym?
+    field span: Span
 
-// ast.ly:151
-class DestructorBlock {
-  body: Block?
-  span: Span
-  type_param: Sym?
-}
+  class EnumVariant
+    source: ast.ly:124
+    field name: Sym?
+    field span: Span
 
-// ast.ly:341
-class ElseIf {
-  body: Block?
-  condition: Expr?
-  span: Span
-}
+  class EnumDecl
+    source: ast.ly:130
+    field is_public: bool
+    field name: Sym?
+    field span: Span
 
-// ast.ly:128
-class EnumDecl {
-  is_public: bool
-  name: Sym?
-  span: Span
-}
+  class InterfaceFieldDecl
+    source: ast.ly:140
+    field name: Sym?
+    field span: Span
+    field type_expr: TypeExpr?
+    field type_param: Sym?
 
-// ast.ly:122
-class EnumVariant {
-  name: Sym?
-  span: Span
-}
+  class InterfaceEmbed
+    source: ast.ly:147
+    field name: Sym?
+    field span: Span
 
-// ast.ly:283
-class Expr {
-  inferred_type_args: [TypeExpr]
-  kind: ExprKind
-  resolved_type: TypeExpr?
-  span: Span
-}
+  class DestructorBlock
+    source: ast.ly:153
+    field body: Block?
+    field span: Span
+    field type_param: Sym?
 
-// ast.ly:91
-class Field {
-  default_value: Expr?
-  guarded_by: Sym?
-  is_public: bool
-  name: Sym?
-  span: Span
-  type_expr: TypeExpr?
-}
+  class InterfaceDecl
+    source: ast.ly:159
+    field implements: [Sym]
+    field is_public: bool
+    field name: Sym?
+    field span: Span
 
-// ast.ly:377
-class File {
-  filename: string
-  span: Span
-}
+  typedef ImplMappingKind: enum { Alias, FieldBind, Inline }
+    source: ast.ly:173
 
-// ast.ly:77
-class FuncDecl {
-  body: Block?
-  is_public: bool
-  name: Sym?
-  receiver_type: Sym?
-  return_type: TypeExpr?
-  span: Span
-}
+  class ImplMapping
+    source: ast.ly:175
+    field inline_func: FuncDecl?
+    field kind: ImplMappingKind
+      doc: "discriminator selecting Alias (rename), FieldBind (delegate to embedded field), or Inline (provide a fresh method body)"
+    field method_name: Sym?
+    field span: Span
+    field target_class: Sym?
+    field target_member: Sym?
+    field type_param: Sym?
 
-// ast.ly:183
-class ImplBlock {
-  for_type: Sym?
-  interface_name: Sym?
-  label: Sym?
-  span: Span
-}
+  class ImplBlock
+    source: ast.ly:185
+    field for_type: Sym?
+    field interface_name: Sym?
+    field label: Sym?
+    field span: Span
 
-// ast.ly:173
-class ImplMapping {
-  inline_func: FuncDecl?
-  kind: ImplMappingKind
-  method_name: Sym?
-  span: Span
-  target_class: Sym?
-  target_member: Sym?
-  type_param: Sym?
-}
+  typedef RelationKind: enum { Owns, Refs }
+    source: ast.ly:196
 
-// ast.ly:213
-class ImportDecl {
-  alias: Sym?
-  path: string
-  span: Span
-}
+  struct RelationSide
+    source: ast.ly:198
+    field label: Sym?
+    field type_args: [Sym]
+    field type_name: Sym?
 
-// ast.ly:157
-class InterfaceDecl {
-  implements: [Sym]
-  is_public: bool
-  name: Sym?
-  span: Span
-}
+  class RelationDecl
+    source: ast.ly:204
+    field child: RelationSide
+    field hint: Sym?
+    field is_many: bool
+    field kind: RelationKind
+      doc: "discriminator selecting Owns (parent owns child lifetime) or Refs (parent merely references child)"
+    field parent: RelationSide
+    field span: Span
 
-// ast.ly:145
-class InterfaceEmbed {
-  name: Sym?
-  span: Span
-}
+  class ImportDecl
+    source: ast.ly:215
+    field alias: Sym?
+    field path: string
+    field span: Span
 
-// ast.ly:138
-class InterfaceFieldDecl {
-  name: Sym?
-  span: Span
-  type_expr: TypeExpr?
-  type_param: Sym?
-}
+  class TypeAliasDecl
+    source: ast.ly:221
+    field is_public: bool
+    field name: Sym?
+    field span: Span
+    field type_expr: TypeExpr?
 
-// ast.ly:362
-class LyricBlock {
-  name: Sym?
-  span: Span
-}
+  class ConstDecl
+    source: ast.ly:228
+    field is_public: bool
+    field name: Sym?
+    field span: Span
+    field type_expr: TypeExpr?
+    field value: Expr?
 
-// ast.ly:305
-class MatchArm {
-  body: Block?
-  guard: Expr?
-  pattern: Pattern?
-  patterns: [Pattern]
-  span: Span
-}
+  class Comment
+    source: ast.ly:236
+    field pos: Pos
+    field text: string
 
-// ast.ly:69
-class Param {
-  is_mut: bool
-  is_self: bool
-  name: Sym?
-  span: Span
-  type_expr: TypeExpr?
-}
+  typedef UnaryOp: enum { Neg, Not }
+    source: ast.ly:243
 
-// ast.ly:300
-class Pattern {
-  kind: PatternKind
-  span: Span
-}
+  typedef BinaryOp: enum { Add, Sub, Mul, Div, Mod, Eq, Neq, Lt, Le, Gt, Ge, And, Or, BitAnd, BitOr, BitXor, Shl, Shr }
+    source: ast.ly:245
 
-// ast.ly:15
-struct Pos {
-  column: i32
-  file: Sym?
-  line: i32
-}
+  struct StructLitField
+    source: ast.ly:252
+    field name: Sym?
+    field value: Expr?
 
-// ast.ly:202
-class RelationDecl {
-  child: RelationSide
-  hint: Sym?
-  is_many: bool
-  kind: RelationKind
-  parent: RelationSide
-  span: Span
-}
+  typedef ExprKind: enum { Ident(name: Sym), IntLit(value: string, type_hint: Sym?), FloatLit(value: string), StringLit(value: string), StringInterp(parts: [Expr]), BoolLit(value: bool), Nil, Call(func_expr: Expr, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), MethodCall(receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], mut_args: [bool]), FieldAccess(receiver: Expr, field_name: Sym), Index(receiver: Expr, index: Expr), Slice(receiver: Expr, low: Expr?, high: Expr?), Unary(op: UnaryOp, operand: Expr), Binary(left: Expr, op: BinaryOp, right: Expr), TupleLit(elems: [Expr]), ListLit(elems: [Expr]), MapLit(keys: [Expr], values: [Expr]), StructLit(type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]), Lambda(params: [Param], return_type: TypeExpr?, body: Block), Match(value: Expr, arms: [MatchArm]), Cast(target_type: TypeExpr, operand: Expr), Unwrap(operand: Expr), Try(operand: Expr), Is(operand: Expr, variant: Sym), IfElse(cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) }
+    source: ast.ly:257
 
-// ast.ly:196
-struct RelationSide {
-  label: Sym?
-  type_args: [Sym]
-  type_name: Sym?
-}
+  class Expr
+    source: ast.ly:285
+    field inferred_type_args: [TypeExpr]
+    field kind: ExprKind
+      doc: "discriminator selecting which ExprKind variant (Ident, Call, Binary, …) carries this expression's data"
+    field resolved_type: TypeExpr?
+    field span: Span
 
-// ast.ly:347
-class SelectCase {
-  bind_var: Sym?
-  body: Block?
-  expr: Expr?
-  is_default: bool
-  span: Span
-}
+  typedef PatternKind: enum { Ident(name: Sym), Literal(expr: Expr), Variant(name: Sym, bindings: [Pattern]), Wildcard, Tuple(elems: [Pattern]) }
+    source: ast.ly:294
 
-// ast.ly:21
-struct Span {
-  end: Pos
-  start: Pos
-}
+  class Pattern
+    source: ast.ly:302
+    field kind: PatternKind
+    field span: Span
 
-// ast.ly:336
-class Stmt {
-  kind: StmtKind
-  span: Span
-}
+  class MatchArm
+    source: ast.ly:307
+    field body: Block?
+    field guard: Expr?
+    field pattern: Pattern?
+    field patterns: [Pattern]
+    field span: Span
 
-// ast.ly:114
-class StructDecl {
-  is_public: bool
-  name: Sym?
-  span: Span
-}
+  typedef StmtKind: enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block), Ref(expr: Expr), Unref(expr: Expr) }
+    source: ast.ly:317
 
-// ast.ly:250
-struct StructLitField {
-  name: Sym?
-  value: Expr?
-}
+  class Stmt
+    source: ast.ly:340
+    field kind: StmtKind
+    field span: Span
 
-// ast.ly:47
-class TupleField {
-  name: Sym?
-  type_expr: TypeExpr?
-}
+  class ElseIf
+    source: ast.ly:345
+    field body: Block?
+    field condition: Expr?
+    field span: Span
 
-// ast.ly:219
-class TypeAliasDecl {
-  is_public: bool
-  name: Sym?
-  span: Span
-  type_expr: TypeExpr?
-}
+  class SelectCase
+    source: ast.ly:351
+    field bind_var: Sym?
+    field body: Block?
+    field expr: Expr?
+    field is_default: bool
+    field span: Span
 
-// ast.ly:42
-class TypeExpr {
-  kind: TypeExprKind
-  span: Span
-}
+  class Block
+    source: ast.ly:359
+    field span: Span
 
-// ast.ly:54
-class TypeParam {
-  constraint: Sym?
-  name: Sym?
-  span: Span
-}
+  class LyricBlock
+    source: ast.ly:366
+    field name: Sym?
+    field span: Span
 
-// ast.ly:60
-class WhereClause {
-  constraint: Sym?
-  span: Span
-  variable: Sym?
-}
+  class File
+    source: ast.ly:381
+    field filename: string
+    field span: Span
 
-// ast.ly:780
-func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>)
-// ast.ly:586
-func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>)
-// ast.ly:696
-func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>)
-// ast.ly:495
-func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>)
-// ast.ly:990
-func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool>
-// ast.ly:535
-func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool>
-// ast.ly:981
-func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>)
-// ast.ly:789
-func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>)
-// ast.ly:893
-func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>)
-// ast.ly:1019
-func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bool
-// modules.ly:744
-func find_alias_index(name: string, alias_names: [string]) -> i32
-// ast.ly:425
-func find_stdlib_dir() -> string
-// ast.ly:467
-func is_primitive_type(name: string) -> bool
-// ast.ly:436
-func load_stdlib(dir: string) -> File?
-// modules.ly:126
-func lookup_name(name: string, orig: [string], prefixed: [string]) -> string
-// ast.ly:389
-func merge_files(files: [File?]) -> File?
-// ast.ly:1036
-func merge_stdlib(file: File?, std_file: File?)
-// modules.ly:145
-func prefix_block_declarations(block: LyricBlock, prefix: string, mut orig: [string], mut prefixed: [string])
-// modules.ly:136
-func prefix_sym(s: Sym?, prefix: string) -> Sym?
-// modules.ly:10
-func resolve_module_imports(module_root: string, root_file: File?) -> (File?, string)
-// modules.ly:216
-func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string])
-// modules.ly:330
-func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string])
-// modules.ly:414
-func rewrite_expr(expr: Expr?, orig: [string], prefixed: [string])
-// modules.ly:271
-func rewrite_func_references(f: FuncDecl, orig: [string], prefixed: [string])
-// modules.ly:542
-func rewrite_pattern(pat: Pattern?, orig: [string], prefixed: [string])
-// modules.ly:567
-func rewrite_qualified_access(block: LyricBlock, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:655
-func rewrite_qualified_block(block: Block, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:754
-func rewrite_qualified_expr(expr: Expr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:593
-func rewrite_qualified_in_func(f: FuncDecl, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:663
-func rewrite_qualified_stmt(stmt: Stmt, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:605
-func rewrite_qualified_type_expr(te: TypeExpr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
-// modules.ly:337
-func rewrite_stmt(stmt: Stmt, orig: [string], prefixed: [string])
-// modules.ly:290
-func rewrite_type_expr(te: TypeExpr?, orig: [string], prefixed: [string])
-// modules.ly:115
-func strip_imports(block: LyricBlock)
+  func merge_files(files: [File?]) -> File?
+    source: ast.ly:393
 
+  func find_stdlib_dir() -> string
+    source: ast.ly:429
+
+  func load_stdlib(dir: string) -> File?
+    source: ast.ly:440
+
+  func is_primitive_type(name: string) -> bool
+    source: ast.ly:471
+
+  func ast_collect_type_names(te: TypeExpr?, names: Dict<Sym, bool>)
+    source: ast.ly:499
+
+  func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool>
+    source: ast.ly:539
+
+  func ast_collect_call_names_expr(expr: Expr?, names: Dict<Sym, bool>)
+    source: ast.ly:590
+
+  func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+    source: ast.ly:700
+
+  func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>)
+    source: ast.ly:784
+
+  func ast_collect_var_refs_in_expr(expr: Expr?, names: Dict<Sym, bool>)
+    source: ast.ly:793
+
+  func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>)
+    source: ast.ly:897
+
+  func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>)
+    source: ast.ly:985
+
+  func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool>
+    source: ast.ly:994
+
+  func ast_func_references_types(fn_: FuncDecl, used_types: Dict<Sym, bool>) -> bool
+    source: ast.ly:1023
+
+  func merge_stdlib(file: File?, std_file: File?)
+    source: ast.ly:1040
+
+  func resolve_module_imports(module_root: string, root_file: File?) -> (File?, string)
+    source: modules.ly:10
+
+  func strip_imports(block: LyricBlock)
+    source: modules.ly:115
+
+  func lookup_name(name: string, orig: [string], prefixed: [string]) -> string
+    source: modules.ly:126
+
+  func prefix_sym(s: Sym?, prefix: string) -> Sym?
+    source: modules.ly:136
+
+  func prefix_block_declarations(block: LyricBlock, prefix: string, mut orig: [string], mut prefixed: [string])
+    source: modules.ly:145
+
+  func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string])
+    source: modules.ly:216
+
+  func rewrite_func_references(f: FuncDecl, orig: [string], prefixed: [string])
+    source: modules.ly:271
+
+  func rewrite_type_expr(te: TypeExpr?, orig: [string], prefixed: [string])
+    source: modules.ly:290
+
+  func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string])
+    source: modules.ly:330
+
+  func rewrite_stmt(stmt: Stmt, orig: [string], prefixed: [string])
+    source: modules.ly:337
+
+  func rewrite_expr(expr: Expr?, orig: [string], prefixed: [string])
+    source: modules.ly:414
+
+  func rewrite_pattern(pat: Pattern?, orig: [string], prefixed: [string])
+    source: modules.ly:542
+
+  func rewrite_qualified_access(block: LyricBlock, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:567
+
+  func rewrite_qualified_in_func(f: FuncDecl, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:593
+
+  func rewrite_qualified_type_expr(te: TypeExpr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:605
+
+  func rewrite_qualified_block(block: Block, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:655
+
+  func rewrite_qualified_stmt(stmt: Stmt, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:663
+
+  func find_alias_index(name: string, alias_names: [string]) -> i32
+    source: modules.ly:744
+
+  func rewrite_qualified_expr(expr: Expr?, alias_names: [string], orig_names: [[string]], prefixed_names: [[string]])
+    source: modules.ly:754

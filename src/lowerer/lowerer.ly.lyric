@@ -1,289 +1,341 @@
-//ldd:source lowerer.ly
-//ldd:why "AST → LIR translation. Flattens expressions into SSA-like temp definitions, resolves type sugar, handles error results. Two-phase architecture matching Go implementation."
+module lowerer
+  source: ["lowerer.ly"]
+  why: "Translates the type-checked AST into LIR (LProgram). Flattens nested expressions into SSA-like temp-def chains, resolves type sugar to LType, lowers enums to tagged unions, classes to heap handles, try (?) to error-extract-and-early-return, and short-circuit logical ops to if-statements — so backends never see nested expressions."
 
-// ## Architecture
-//
-// The lowerer converts a type-checked AST into an LProgram:
-//
-// 1. register_block: Collect all struct/class/enum/interface/function
-// declarations into Dict registries. Populates variant tags, class
-// fields, enum variants.
-// 2. lower_file: Walk all blocks, lower each declaration to LIR.
-// Functions lowered by walking body statements, flattening expressions
-// into temp chains.
-//
-// Key transforms:
-// - Enums → LTyTaggedUnion, match → switch on variant tag
-// - Classes → LTyClassHandle (heap pointer), field access via class_get/set
-// - Try (?) → extract error → null check → early return → extract value
-// - Generators → goroutine + channel pattern
-// - Lambdas → LExprFuncLit with params and body
-// - String interpolation → LExprFormat with parts list
-// - Impl blocks → forwarding wrapper methods
+  doc "Architecture":
+    """
+    The lowerer converts a type-checked AST into an LProgram via two phases:
 
-// ## Invariants — Two-Phase Architecture
-//
-// The lowerer uses two phases, matching the Go implementation:
-// 1. register_block: collect all struct/class/enum/interface/function
-// declarations into Dict registries (no code generation)
-// 2. lower_file: walk all blocks, lower declarations to LIR
-//
-// This ensures forward references resolve correctly. Phase 1 must run
-// across ALL blocks before Phase 2 begins (same pattern as checker).
+    1. register_block: collect all struct/class/enum/interface/function
+       declarations into Dict registries (no code generation). Populates
+       variant tags, class fields, class field defaults, enum variants,
+       impl-method renames, type aliases, and import aliases.
 
-// ## Invariants — Type Lowering Fallback
-//
-// lower_type() resolves AST TypeExpr to LType. For identifier types, it
-// checks: primitives → structs → classes → enums → type aliases.
-// If nothing matches, it assumes LTyTypeVar (generic type parameter).
-//
-// Typos in type names silently become type variables — the checker should
-// catch these but has gaps during bootstrap.
+    2. lower_file: walk all blocks, lower each declaration to LIR. Functions
+       are lowered by walking body statements, flattening expressions into
+       temp chains via lower_expr → emit_temp.
 
-// ## Invariants — Enum Variant Disambiguation
-//
-// Multiple enums may share variant names (e.g., Ident exists in ExprKind,
-// PatternKind, TypeExprKind). The lowerer must consult the checker's type
-// annotation on each expression to determine which enum a variant belongs
-// to. Without this, last-writer-wins in the variant lookup map causes
-// wrong enum variant construction.
-//
-// Three levels of disambiguation:
-// 1. lower_call/lower_ident: check resolved_type to pick correct enum
-// 2. Match lowering: use enum-specific variant maps (keyed by enum name)
-// 3. Variant constructor: inherit field types from enum declaration
+    Key transforms:
+    - Enums → LTyTaggedUnion; match → switch on variant tag.
+    - Classes → LTyClassHandle (heap pointer); field access via class_get/set.
+    - Try (?) → extract error → null check → early return → extract value.
+    - Generators → goroutine + channel pattern.
+    - Lambdas → LExprFuncLit with params and body.
+    - String interpolation → LExprFormat with parts list.
+    - Impl blocks → forwarding wrapper methods.
+    - The Lyric `error` interface → LTyErrorResult (T, error) tuples;
+      ErrorResult fields `._0`/`._1` map to `.value`/`.error` in C.
 
-// ## Invariants — Error Type Resolution
-//
-// The Lyric `error` interface maps to LTyErrorResult for (T, error) tuples.
-// In the Go compiler, the checker types `error` as TyInterface; the lowerer
-// must detect TyInterface with name "error" and map to LTyErrorResult.
-//
-// ErrorResult fields: ._0 → .value (the T), ._1 → .error (const char*).
-// Return of (T, error) tuples wraps with lyric_ok/lyric_err in C.
+    Phase 1 MUST complete across ALL blocks before Phase 2 begins, so
+    forward references and cross-file references resolve correctly
+    (same pattern as the checker).
+    """
 
-// ## Invariants — Expression Flattening
-//
-// Every lowerExpr call emits LStmtTempDef statements and returns an LValue.
-// The temp counter (next_temp) is per-function, reset at lower_func start.
-// Backends never see nested expressions.
+  invariant "Two-Phase Architecture":
+    procedural
+    """
+    The lowerer uses two phases, matching the Go implementation:
+    1. register_block: collect all struct/class/enum/interface/function
+       declarations into Dict registries (no code generation).
+    2. lower_file: walk all blocks, lower declarations to LIR.
 
-// ## Invariants — Class Field Defaults
-//
-// Class fields can have default values. The lowerer stores these during
-// registration. During struct literal lowering for class allocations,
-// any field not explicitly provided is filled with its default value.
+    Phase 1 MUST run across ALL blocks before Phase 2 begins. This
+    ensures forward references and cross-file references resolve
+    correctly (same invariant as the checker's phase ordering).
+    """
 
-// ## Invariants — Short-Circuit Lowering
-//
-// Logical && and || are NOT lowered as binary ops (would cause eager
-// evaluation). Instead they're lowered to if-statements:
-// - `a && b` → `let mut t = a; if t { t = b }`
-// - `a || b` → `let mut t = a; if !t { t = b }`
-// This prevents segfaults from null access on short-circuit paths.
+  invariant "Type Lowering Fallback":
+    procedural
+    """
+    lower_type() resolves AST TypeExpr to LType. For identifier types it
+    checks, in order: primitives → structs → classes → enums → type aliases.
+    If nothing matches, it assumes LTyTypeVar (generic type parameter).
 
-// ## Invariants — Statement Buffer Management
-//
-// The lowerer uses save_stmts()/restore_stmts() to temporarily redirect
-// emitted statements to a sub-buffer (e.g. for if-else bodies, while
-// conditions, match arms). The previous buffer is restored after the
-// nested processing completes. This is analogous to the checker's
-// push_scope()/pop_scope() pattern.
+    Consequence: typos in type names silently become type variables. The
+    checker is responsible for catching these, but has gaps during bootstrap
+    — when generated C produces void* for a "generic" parameter, suspect a
+    typo upstream.
+    """
+
+  invariant "Enum Variant Disambiguation":
+    procedural
+    """
+    Multiple enums may share variant names (e.g. Ident exists in ExprKind,
+    PatternKind, and TypeExprKind). The lowerer MUST consult the checker's
+    type annotation on each expression to determine which enum a variant
+    belongs to. Without this, last-writer-wins in the variant lookup map
+    causes wrong enum variant construction.
+
+    Three levels of disambiguation:
+    1. lower_call/lower_ident: check resolved_type to pick the correct enum.
+    2. Match lowering: use enum-specific variant maps keyed by enum name.
+    3. Variant constructor: inherit field types from enum declaration.
+    """
+
+  invariant "Error Type Resolution":
+    procedural
+    """
+    The Lyric `error` interface maps to LTyErrorResult for (T, error)
+    tuples. In the Go compiler the checker types `error` as TyInterface;
+    the lowerer MUST detect TyInterface with name "error" and remap it to
+    LTyErrorResult.
+
+    ErrorResult field layout: `._0` → `.value` (the T), `._1` → `.error`
+    (const char*). Return of `(T, error)` tuples is wrapped with
+    `lyric_ok` / `lyric_err` in the emitted C.
+    """
+
+  invariant "Expression Flattening":
+    procedural
+    """
+    Every lower_expr call emits LStmtTempDef statements and returns an
+    LValue. Backends never see nested expressions — they see a sequence
+    of temp definitions plus a final LValue reference.
+
+    The temp counter (temp_id / next_temp) is per-function and MUST be
+    reset at the start of lower_func; otherwise temp names collide
+    across functions in the same program.
+    """
+
+  invariant "Class Field Defaults":
+    procedural
+    """
+    Class fields can declare default values. The lowerer stores these in
+    class_defaults during register_block. During struct-literal lowering
+    for class allocations, any field not explicitly provided in the
+    literal MUST be filled in from class_defaults — otherwise the
+    constructed object has uninitialized fields.
+    """
+
+  invariant "Short-Circuit Lowering":
+    procedural
+    """
+    Logical `&&` and `||` MUST NOT be lowered as plain binary ops — that
+    would force eager evaluation of the right operand and segfault on
+    null-guarded code like `p != null && p.field == 0`.
+
+    They are lowered to if-statements instead:
+      `a && b` → `let mut t = a; if t { t = b }`
+      `a || b` → `let mut t = a; if !t { t = b }`
+    """
+
+  invariant "Statement Buffer Management":
+    procedural
+    """
+    The lowerer uses save_stmts() / restore_stmts() to temporarily
+    redirect emitted statements into a sub-buffer (e.g. for if/else
+    bodies, while conditions, match arms). The previous buffer MUST be
+    restored after the nested processing completes.
+
+    This is analogous to the checker's push_scope() / pop_scope()
+    pattern: every save_stmts() MUST be paired with a restore_stmts()
+    on every control-flow path.
+    """
 
 
-// lowerer.ly:13
-class Lowerer {
-  class_defaults: Dict<Sym, Expr>?
-  class_fields: Dict<Sym, Dict<Sym, LType>>?
-  classes: Dict<Sym, ClassDecl>?
-  current_func_return: LType?
-  enum_variant_fields: Dict<Sym, [TupleField]>?
-  enum_variant_tags: Dict<Sym, i32>?
-  enums: Dict<Sym, EnumDecl>?
-  func_sigs: Dict<Sym, FuncDecl>?
-  impl_method_renames: Dict<Sym, string>?
-  import_aliases: Dict<Sym, string>?
-  interfaces: Dict<Sym, InterfaceDecl>?
-  lowered_ifaces: Dict<Sym, LInterfaceDecl>?
-  scope: Dict<Sym, LType>?
-  stmts: [LStmt?]
-  structs: Dict<Sym, StructDecl>?
-  temp_id: i32
-  type_aliases: Dict<Sym, TypeExpr>?
-  unit_variants: Dict<Sym, bool>?
-  variant_to_enum: Dict<Sym, string>?
-}
-// lowerer.ly:1939
-func Lowerer.arm_has_nested_variant(self, arm: MatchArm) -> bool
-// lowerer.ly:91
-func Lowerer.define_var(self, name: string, typ: LType?)
-// lowerer.ly:67
-func Lowerer.emit(self, stmt: LStmt?)
-// lowerer.ly:1952
-func Lowerer.emit_nested_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm], result_name: string, result_type: LType?)
-// lowerer.ly:71
-func Lowerer.emit_temp(self, expr: LExpr?) -> LValue?
-// lowerer.ly:1762
-func Lowerer.emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
-// lowerer.ly:1705
-func Lowerer.emit_variant_bindings(self, val: LValue?, enum_name: string, variant: string, bindings: [Pattern])
-// lowerer.ly:323
-func Lowerer.expr_type(self, e: Expr?) -> LType?
-// lowerer.ly:3629
-func Lowerer.find_variant_enum(self, variant_name: string) -> string
-// lowerer.ly:3600
-func Lowerer.find_variant_field_name(self, enum_name: string, variant_name: string, field_idx: i32) -> string
-// lowerer.ly:3591
-func Lowerer.find_variant_tag(self, enum_name: string, variant_name: string) -> i32
-// lowerer.ly:3616
-func Lowerer.get_variant_field_type(self, enum_name: string, variant_name: string, field_idx: i32) -> LType?
-// lowerer.ly:1924
-func Lowerer.has_nested_variant_patterns(self, arms: [MatchArm]) -> bool
-// lowerer.ly:1746
-func Lowerer.is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool
-// lowerer.ly:95
-func Lowerer.lookup_var(self, name: string) -> LType?
-// lowerer.ly:3313
-func Lowerer.lower_arm_body(self, body: Block?, result_name: string, rt: LType?)
-// lowerer.ly:1257
-func Lowerer.lower_assign(self, target: Expr?, value: Expr?)
-// lowerer.ly:2894
-func Lowerer.lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue?
-// lowerer.ly:1093
-func Lowerer.lower_block(self, block: Block?)
-// lowerer.ly:1100
-func Lowerer.lower_block_as_stmts(self, block: Block?) -> [LStmt?]
-// lowerer.ly:2407
-func Lowerer.lower_call(self, orig: Expr?, func_expr: Expr?, type_args: [TypeExpr], args: [Expr], call_mut_args: [bool]) -> LValue?
-// lowerer.ly:3427
-func Lowerer.lower_cast(self, orig: Expr?, target_type: TypeExpr?, operand: Expr?) -> LValue?
-// lowerer.ly:620
-func Lowerer.lower_class_decl(self, cd: ClassDecl?) -> LClassDecl
-// lowerer.ly:1357
-func Lowerer.lower_else_ifs(self, else_ifs: [ElseIf], final_else: Block?) -> [LStmt?]
-// lowerer.ly:1393
-func Lowerer.lower_else_ifs_with_result(self, else_ifs: [ElseIf], final_else: Block?, result_name: string, result_type: LType?)
-// lowerer.ly:646
-func Lowerer.lower_enum_decl(self, ed: EnumDecl?) -> LEnumDecl
-// lowerer.ly:1815
-func Lowerer.lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm])
-// lowerer.ly:2265
-func Lowerer.lower_expr(self, e: Expr?) -> LValue?
-// lowerer.ly:2800
-func Lowerer.lower_field_access(self, orig: Expr?, receiver: Expr?, field_name: Sym) -> LValue?
-// lowerer.ly:448
-func Lowerer.lower_file(self, file: File?) -> LProgram?
-// lowerer.ly:2375
-func Lowerer.lower_float_lit(self, value: string) -> LValue?
-// lowerer.ly:1451
-func Lowerer.lower_for(self, var_name: Sym, index_var: Sym?, collection: Expr?, body: Block?)
-// lowerer.ly:973
-func Lowerer.lower_func(self, fd: FuncDecl?) -> LFuncDecl?
-// lowerer.ly:978
-func Lowerer.lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl?
-// lowerer.ly:2299
-func Lowerer.lower_ident(self, orig: Expr?, name: Sym) -> LValue?
-// lowerer.ly:1347
-func Lowerer.lower_if(self, condition: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?)
-// lowerer.ly:3554
-func Lowerer.lower_if_else_expr(self, orig: Expr?, cond: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?) -> LValue?
-// lowerer.ly:1544
-func Lowerer.lower_if_let(self, pattern: Pattern?, value: Expr?, then_block: Block?, else_block: Block?)
-// lowerer.ly:707
-func Lowerer.lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl]
-// lowerer.ly:2848
-func Lowerer.lower_index(self, orig: Expr?, receiver: Expr?, index: Expr?) -> LValue?
-// lowerer.ly:2349
-func Lowerer.lower_int_lit(self, value: string, type_hint: Sym?) -> LValue?
-// lowerer.ly:670
-func Lowerer.lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl
-// lowerer.ly:3508
-func Lowerer.lower_is(self, orig: Expr?, operand: Expr?, variant: Sym) -> LValue?
-// lowerer.ly:3245
-func Lowerer.lower_lambda(self, orig: Expr?, params: [Param], return_type: TypeExpr?, body: Block?) -> LValue?
-// lowerer.ly:1640
-func Lowerer.lower_let_else(self, pattern: Pattern?, value: Expr?, else_block: Block?)
-// lowerer.ly:3095
-func Lowerer.lower_list_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
-// lowerer.ly:3111
-func Lowerer.lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue?
-// lowerer.ly:1730
-func Lowerer.lower_match(self, value: Expr?, arms: [MatchArm])
-// lowerer.ly:2128
-func Lowerer.lower_match_as_if_else(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
-// lowerer.ly:3342
-func Lowerer.lower_match_expr(self, orig: Expr?, value: Expr?, arms: [MatchArm]) -> LValue?
-// lowerer.ly:2616
-func Lowerer.lower_method_call(self, orig: Expr?, receiver: Expr?, method: Sym, type_args: [TypeExpr], args: [Expr], mc_mut_args: [bool]) -> LValue?
-// lowerer.ly:2828
-func Lowerer.lower_mut_arg(self, e: Expr?) -> LValue?
-// lowerer.ly:270
-func Lowerer.lower_named_type(self, name: Sym, args: [TypeExpr]) -> LType?
-// lowerer.ly:1319
-func Lowerer.lower_return(self, value: Expr?)
-// lowerer.ly:1490
-func Lowerer.lower_select(self, cases: [SelectCase])
-// lowerer.ly:2862
-func Lowerer.lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue?
-// lowerer.ly:1108
-func Lowerer.lower_stmt(self, s: Stmt?)
-// lowerer.ly:2384
-func Lowerer.lower_string_interp(self, orig: Expr?, parts: [Expr]) -> LValue?
-// lowerer.ly:599
-func Lowerer.lower_struct_decl(self, sd: StructDecl?) -> LStructDecl
-// lowerer.ly:3161
-func Lowerer.lower_struct_lit(self, orig: Expr?, type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> LValue?
-// lowerer.ly:3457
-func Lowerer.lower_try(self, orig: Expr?, operand: Expr?) -> LValue?
-// lowerer.ly:3072
-func Lowerer.lower_tuple_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
-// lowerer.ly:187
-func Lowerer.lower_type(self, te: TypeExpr?) -> LType?
-// lowerer.ly:2877
-func Lowerer.lower_unary(self, orig: Expr?, op: UnaryOp, operand: Expr?) -> LValue?
-// lowerer.ly:3440
-func Lowerer.lower_unwrap(self, orig: Expr?, operand: Expr?) -> LValue?
-// lowerer.ly:1179
-func Lowerer.lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
-// lowerer.ly:1434
-func Lowerer.lower_while(self, condition: Expr?, body: Block?)
-// lowerer.ly:1801
-func Lowerer.lyric_name_to_ltype(self, name: string) -> LType?
-// lowerer.ly:61
-func Lowerer.next_temp(self) -> i32
-// lowerer.ly:169
-func Lowerer.primitive_type_for_name(self, name: string) -> LType?
-// lowerer.ly:345
-func Lowerer.register_block(self, block: LyricBlock)
-// lowerer.ly:107
-func Lowerer.restore_stmts(self, old: [LStmt?])
-// lowerer.ly:101
-func Lowerer.save_stmts(self) -> [LStmt?]
-// lowerer.ly:937
-func Lowerer.subst_impl_type(self, t: LType?, argmap: Dict<Sym, LType>) -> LType?
+  class Lowerer
+    source: lowerer.ly:13
+    field class_defaults: Dict<Sym, Expr>?
+    field class_fields: Dict<Sym, Dict<Sym, LType>>?
+    field classes: Dict<Sym, ClassDecl>?
+    field current_func_return: LType?
+    field enum_variant_fields: Dict<Sym, [TupleField]>?
+    field enum_variant_tags: Dict<Sym, i32>?
+    field enums: Dict<Sym, EnumDecl>?
+    field func_sigs: Dict<Sym, FuncDecl>?
+    field impl_method_renames: Dict<Sym, string>?
+    field import_aliases: Dict<Sym, string>?
+    field interfaces: Dict<Sym, InterfaceDecl>?
+    field lowered_ifaces: Dict<Sym, LInterfaceDecl>?
+    field scope: Dict<Sym, LType>?
+    field stmts: [LStmt?]
+    field structs: Dict<Sym, StructDecl>?
+    field temp_id: i32
+    field type_aliases: Dict<Sym, TypeExpr>?
+    field unit_variants: Dict<Sym, bool>?
+    field variant_to_enum: Dict<Sym, string>?
+    method next_temp(self) -> i32
+      source: lowerer.ly:61
+    method emit(self, stmt: LStmt?)
+      source: lowerer.ly:67
+    method emit_temp(self, expr: LExpr?) -> LValue?
+      source: lowerer.ly:71
+    method define_var(self, name: string, typ: LType?)
+      source: lowerer.ly:91
+    method lookup_var(self, name: string) -> LType?
+      source: lowerer.ly:95
+    method save_stmts(self) -> [LStmt?]
+      source: lowerer.ly:101
+    method restore_stmts(self, old: [LStmt?])
+      source: lowerer.ly:107
+    method primitive_type_for_name(self, name: string) -> LType?
+      source: lowerer.ly:169
+    method lower_type(self, te: TypeExpr?) -> LType?
+      source: lowerer.ly:187
+    method lower_named_type(self, name: Sym, args: [TypeExpr]) -> LType?
+      source: lowerer.ly:270
+    method expr_type(self, e: Expr?) -> LType?
+      source: lowerer.ly:323
+    method register_block(self, block: LyricBlock)
+      source: lowerer.ly:345
+    method lower_file(self, file: File?) -> LProgram?
+      source: lowerer.ly:448
+      why: "Phase 2 entry point. Walks every block in the file and lowers each declaration to LIR, producing the LProgram consumed by the backend. Must be called only after register_block has run across ALL blocks (see Two-Phase Architecture invariant)."
+    method lower_struct_decl(self, sd: StructDecl?) -> LStructDecl
+      source: lowerer.ly:599
+    method lower_class_decl(self, cd: ClassDecl?) -> LClassDecl
+      source: lowerer.ly:620
+    method lower_enum_decl(self, ed: EnumDecl?) -> LEnumDecl
+      source: lowerer.ly:646
+    method lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl
+      source: lowerer.ly:670
+    method lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl]
+      source: lowerer.ly:707
+    method subst_impl_type(self, t: LType?, argmap: Dict<Sym, LType>) -> LType?
+      source: lowerer.ly:953
+    method lower_func(self, fd: FuncDecl?) -> LFuncDecl?
+      source: lowerer.ly:989
+    method lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl?
+      source: lowerer.ly:994
+    method lower_block(self, block: Block?)
+      source: lowerer.ly:1111
+    method lower_block_as_stmts(self, block: Block?) -> [LStmt?]
+      source: lowerer.ly:1118
+    method lower_stmt(self, s: Stmt?)
+      source: lowerer.ly:1126
+    method lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?)
+      source: lowerer.ly:1213
+    method lower_assign(self, target: Expr?, value: Expr?)
+      source: lowerer.ly:1291
+    method lower_return(self, value: Expr?)
+      source: lowerer.ly:1353
+    method lower_if(self, condition: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?)
+      source: lowerer.ly:1381
+    method lower_else_ifs(self, else_ifs: [ElseIf], final_else: Block?) -> [LStmt?]
+      source: lowerer.ly:1391
+    method lower_else_ifs_with_result(self, else_ifs: [ElseIf], final_else: Block?, result_name: string, result_type: LType?)
+      source: lowerer.ly:1427
+    method lower_while(self, condition: Expr?, body: Block?)
+      source: lowerer.ly:1468
+    method lower_for(self, var_name: Sym, index_var: Sym?, collection: Expr?, body: Block?)
+      source: lowerer.ly:1485
+    method lower_select(self, cases: [SelectCase])
+      source: lowerer.ly:1524
+    method lower_if_let(self, pattern: Pattern?, value: Expr?, then_block: Block?, else_block: Block?)
+      source: lowerer.ly:1578
+    method lower_let_else(self, pattern: Pattern?, value: Expr?, else_block: Block?)
+      source: lowerer.ly:1674
+    method emit_variant_bindings(self, val: LValue?, enum_name: string, variant: string, bindings: [Pattern])
+      source: lowerer.ly:1739
+    method lower_match(self, value: Expr?, arms: [MatchArm])
+      source: lowerer.ly:1764
+    method is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool
+      source: lowerer.ly:1780
+    method emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
+      source: lowerer.ly:1796
+    method lyric_name_to_ltype(self, name: string) -> LType?
+      source: lowerer.ly:1835
+    method lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm])
+      source: lowerer.ly:1849
+    method has_nested_variant_patterns(self, arms: [MatchArm]) -> bool
+      source: lowerer.ly:1958
+    method arm_has_nested_variant(self, arm: MatchArm) -> bool
+      source: lowerer.ly:1973
+    method emit_nested_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm], result_name: string, result_type: LType?)
+      source: lowerer.ly:1986
+    method lower_match_as_if_else(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
+      source: lowerer.ly:2162
+    method lower_expr(self, e: Expr?) -> LValue?
+      source: lowerer.ly:2299
+    method lower_ident(self, orig: Expr?, name: Sym) -> LValue?
+      source: lowerer.ly:2333
+    method lower_int_lit(self, value: string, type_hint: Sym?) -> LValue?
+      source: lowerer.ly:2383
+    method lower_float_lit(self, value: string) -> LValue?
+      source: lowerer.ly:2409
+    method lower_string_interp(self, orig: Expr?, parts: [Expr]) -> LValue?
+      source: lowerer.ly:2418
+    method lower_call(self, orig: Expr?, func_expr: Expr?, type_args: [TypeExpr], args: [Expr], call_mut_args: [bool]) -> LValue?
+      source: lowerer.ly:2441
+    method lower_method_call(self, orig: Expr?, receiver: Expr?, method: Sym, type_args: [TypeExpr], args: [Expr], mc_mut_args: [bool]) -> LValue?
+      source: lowerer.ly:2650
+    method lower_field_access(self, orig: Expr?, receiver: Expr?, field_name: Sym) -> LValue?
+      source: lowerer.ly:2834
+    method lower_mut_arg(self, e: Expr?) -> LValue?
+      source: lowerer.ly:2862
+    method lower_index(self, orig: Expr?, receiver: Expr?, index: Expr?) -> LValue?
+      source: lowerer.ly:2882
+    method lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue?
+      source: lowerer.ly:2896
+    method lower_unary(self, orig: Expr?, op: UnaryOp, operand: Expr?) -> LValue?
+      source: lowerer.ly:2911
+    method lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue?
+      source: lowerer.ly:2928
+    method lower_tuple_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
+      source: lowerer.ly:3106
+    method lower_list_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
+      source: lowerer.ly:3129
+    method lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue?
+      source: lowerer.ly:3145
+    method lower_struct_lit(self, orig: Expr?, type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> LValue?
+      source: lowerer.ly:3195
+    method lower_lambda(self, orig: Expr?, params: [Param], return_type: TypeExpr?, body: Block?) -> LValue?
+      source: lowerer.ly:3279
+    method lower_arm_body(self, body: Block?, result_name: string, rt: LType?)
+      source: lowerer.ly:3347
+    method lower_match_expr(self, orig: Expr?, value: Expr?, arms: [MatchArm]) -> LValue?
+      source: lowerer.ly:3376
+    method lower_cast(self, orig: Expr?, target_type: TypeExpr?, operand: Expr?) -> LValue?
+      source: lowerer.ly:3461
+    method lower_unwrap(self, orig: Expr?, operand: Expr?) -> LValue?
+      source: lowerer.ly:3474
+    method lower_try(self, orig: Expr?, operand: Expr?) -> LValue?
+      source: lowerer.ly:3491
+    method lower_is(self, orig: Expr?, operand: Expr?, variant: Sym) -> LValue?
+      source: lowerer.ly:3542
+    method lower_if_else_expr(self, orig: Expr?, cond: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?) -> LValue?
+      source: lowerer.ly:3588
+    method find_variant_tag(self, enum_name: string, variant_name: string) -> i32
+      source: lowerer.ly:3625
+    method find_variant_field_name(self, enum_name: string, variant_name: string, field_idx: i32) -> string
+      source: lowerer.ly:3634
+    method get_variant_field_type(self, enum_name: string, variant_name: string, field_idx: i32) -> LType?
+      source: lowerer.ly:3650
+    method find_variant_enum(self, variant_name: string) -> string
+      source: lowerer.ly:3663
 
-// lowerer.ly:2995
-func is_builtin_func(name: string) -> bool
-// lowerer.ly:2984
-func is_map_method(name: string) -> bool
-// lowerer.ly:3045
-func is_numeric_type(t: LType) -> bool
-// lowerer.ly:156
-func lir_int_type(bits: i32) -> LType?
-// lowerer.ly:162
-func lir_uint_type(bits: i32) -> LType?
-// lowerer.ly:122
-func make_bool_val(v: bool) -> LValue?
-// lowerer.ly:113
-func make_int_val(v: i64, bits: i32) -> LValue?
-// lowerer.ly:138
-func make_null_val(typ: LType?) -> LValue?
-// lowerer.ly:130
-func make_string_val(s: string) -> LValue?
-// lowerer.ly:146
-func make_var_val(name: string, typ: LType?) -> LValue?
-// lowerer.ly:35
-func new_lowerer() -> Lowerer
-// lowerer.ly:3061
-func wider_numeric_type(a: LType, b: LType) -> LType?
+  func new_lowerer() -> Lowerer
+    source: lowerer.ly:35
 
+  func make_int_val(v: i64, bits: i32) -> LValue?
+    source: lowerer.ly:113
+
+  func make_bool_val(v: bool) -> LValue?
+    source: lowerer.ly:122
+
+  func make_string_val(s: string) -> LValue?
+    source: lowerer.ly:130
+
+  func make_null_val(typ: LType?) -> LValue?
+    source: lowerer.ly:138
+
+  func make_var_val(name: string, typ: LType?) -> LValue?
+    source: lowerer.ly:146
+
+  func lir_int_type(bits: i32) -> LType?
+    source: lowerer.ly:156
+
+  func lir_uint_type(bits: i32) -> LType?
+    source: lowerer.ly:162
+
+  func is_map_method(name: string) -> bool
+    source: lowerer.ly:3018
+
+  func is_builtin_func(name: string) -> bool
+    source: lowerer.ly:3029
+
+  func is_numeric_type(t: LType) -> bool
+    source: lowerer.ly:3079
+
+  func wider_numeric_type(a: LType, b: LType) -> LType?
+    source: lowerer.ly:3095
