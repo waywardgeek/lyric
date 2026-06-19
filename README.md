@@ -27,7 +27,7 @@ code generation. A `.lyric` file contains only the decisions that matter - data
 structures, API boundaries, type relationships, concurrency contracts, ownership,
 and invariants - at much higher information density than implementation code.
 
-See [Understanding-Driven Development](https://coderhapsody.ai/docs/understanding-driven-development)
+See [Context-Driven Development](https://coderhapsody.ai/docs/context-driven-development)
 for the methodology.
 
 ---
@@ -196,7 +196,7 @@ runtime/                C runtime headers
 stdlib/                 Lyric standard library
 testdata/               Top-level Lyric regression programs
 testdata/golden/        Expected output files
-legacy/go-compiler/     Historical Go compiler and Go-source UDD tools
+legacy/go-compiler/     Historical Go compiler and Go-source CDD tools
 cr/docs/                Design and methodology documents
 ```
 
@@ -230,7 +230,7 @@ compiler output.
 - [The Lyric Book](https://coderhapsody.ai/docs/the-lyric-book) - a K&R-style guide to the language
 - [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language-spec) - full type system, syntax, and semantics
 - [Lyric Language Reference](https://coderhapsody.ai/docs/lyric-language-reference) - quick reference card
-- [Understanding-Driven Development](https://coderhapsody.ai/docs/understanding-driven-development) - the methodology behind `.lyric` files
+- [Context-Driven Development](https://coderhapsody.ai/docs/context-driven-development) - the methodology behind `.lyric` files
 - [Two Weeks](https://coderhapsody.ai/docs/two-weeks) - the story of how Lyric was built in 14 days
 
 ---

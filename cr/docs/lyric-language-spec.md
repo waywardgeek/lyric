@@ -12,11 +12,11 @@ Lyric is a typed language with two modes of use:
 
 **`.lyric` files — understandings.** Declaration-only Lyric: types, signatures,
 interfaces, annotations, doc blocks, invariants, ownership relations. No function
-bodies. The design artifact for Understanding-Driven Development (UDD). Verified
+bodies. The design artifact for Context-Driven Development (CDD). Verified
 against implementations written in any language. Every `.lyric` file is valid Lyric.
 
 **`.ly` files — code.** Full Lyric with function bodies, executable control flow,
-and real semantics. Compilable and runnable. An optional capability — UDD does not
+and real semantics. Compilable and runnable. An optional capability — CDD does not
 require production code to be written in Lyric. The compiler exists to prove the
 language design is sound: if the notation is precise enough to verify against real
 implementations, then function bodies are all that's missing to make it a real language.
@@ -1381,7 +1381,7 @@ doc "Invariants — Pointer Stability": """
 """
 ```
 
-`doc "Invariants"` blocks are especially important for UDD — they capture
+`doc "Invariants"` blocks are especially important for CDD — they capture
 operational contracts that prevent cross-session rediscovery of module behaviors.
 
 ### `invariant:` — System-Wide Claims

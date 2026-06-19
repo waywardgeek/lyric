@@ -147,8 +147,8 @@ lyric Lyric {
     generic funcs/classes survive monomorphization Phase 3.
   """
 
-  doc "UDD Methodology": """
-    Understanding-Driven Development (UDD) — formerly Grok-Driven Development.
+  doc "CDD Methodology": """
+    Context-Driven Development (CDD) — formerly Grok-Driven Development.
     .lyric files are the primary design artifact: compressed understanding that
     fits in AI context for any system size. Code is a projection of understanding.
 

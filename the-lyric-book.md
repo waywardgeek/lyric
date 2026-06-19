@@ -4995,7 +4995,7 @@ interface Graph<G, N, E> {
 
 
 
-## Appendix E: Understanding-Driven Development
+## Appendix E: Context-Driven Development
 
 The Lyric compiler is 30,796 lines across 12 packages. A new contributor looking at `checker.ly` sees 3,260 lines of type-checking logic. Where do you start? What are the invariants? Which phase runs first?
 
@@ -5060,4 +5060,4 @@ Comments rot. `.lyric` files rot slower because `lyric verify` catches structura
 
 Thread safety annotations (`guarded_by`, `requires_lock`, `excludes_lock`) document concurrency contracts. The compiler doesn't enforce them across function boundaries, but `verify` ensures the annotated functions still exist.
 
-This is Understanding-Driven Development: build understanding first, then build code.
+This is Context-Driven Development: build understanding first, then build code.

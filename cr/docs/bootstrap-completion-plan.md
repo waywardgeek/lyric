@@ -107,7 +107,7 @@ After Phase 5, the bootstrap compiler should be able to:
 
 ## Notes
 - The Go→Lyric ratio is roughly 0.8x (Lyric is more concise due to `?`, `match`, closures).
-- All modules should get `.lyric` UDD files documenting invariants.
+- All modules should get `.lyric` CDD files documenting invariants.
 - Non-exhaustive match warnings in checker.ly are benign (4 warnings currently).
 - `lyric fmt` and `lyric verify/update/gen` are deferred — they're tools for the Go↔Lyric
   bridge which becomes less relevant once we're self-hosting.

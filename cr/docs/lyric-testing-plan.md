@@ -78,11 +78,11 @@ Unit tests for the Lyric bootstrap compiler modules, written in Lyric itself usi
 - Representative programs exercising multiple features
 - Regression tests for known bugs
 
-## UDD Deliverables
+## CDD Deliverables
 
 Each sprint produces TWO deliverables:
 1. **Passing tests** (`testdata/test_<module>.ly`)
-2. **UDD .lyric file** (`bootstrap/<module>.lyric`)
+2. **CDD .lyric file** (`bootstrap/<module>.lyric`)
 
 The .lyric file captures module invariants discovered during testing. Before writing it, the instance MUST read the corresponding Go .lyric file (e.g., `pkg/checker/checker.lyric`) to understand the Go module's architecture, then write a bootstrap-specific .lyric that documents:
 - Module invariants (especially cross-module contracts)
