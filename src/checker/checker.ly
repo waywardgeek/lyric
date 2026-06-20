@@ -1891,6 +1891,22 @@ lyric checker {
       }
     }
 
+    // Phase 1 forward guard: user-declared field vs method name collision.
+    // Under the multi-class interface redesign §4.2, fields and methods share
+    // a namespace within a class.  Relation-injected names are out of scope
+    // here (Phase 3 will extend the check to them).
+    for f in cfields {
+      if f.name != null {
+        let fname = sym_to_string(f.name!)
+        for m in cmethods {
+          if m.name != null && sym_to_string(m.name!) == fname {
+            eprintln(f"checker: class {cname} declares both field '{fname}' and method '{fname}'; field and zero-arg method names share a namespace under UFCS — rename one")
+            os_exit(1)
+          }
+        }
+      }
+    }
+
     self.pop_scope()
     // self.registry.register(cname, info) // Already in registry
 
