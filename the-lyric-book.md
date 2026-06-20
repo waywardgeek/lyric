@@ -334,7 +334,7 @@ No more `"mod"` slipping through. If someone adds a `Pow` variant to `Op`, the c
 
 ## 2.3 Match
 
-`match` is exhaustive — the compiler requires you to handle every variant. It works as an expression (returns a value) or as a statement:
+`match` is exhaustive — the compiler requires you to handle every variant. It works as an expression (returns a value) or as a statement. 🚧 *Branch-type unification for `match`-as-expression is not enforced yet — the checker takes the type of the first arm and trusts the rest agree. Mixing types across arms compiles today and fails downstream. Treat the spec rule "all arms produce the same type" as load-bearing.*
 
 ```lyric
 // Expression — returns a value
@@ -394,6 +394,8 @@ let t1 = Number(3.14)
 let t2 = Operator(Add)
 let t3 = LeftParen
 ```
+
+Enum variant construction is **positional only** — `Number(3.14)`, never `Number(value: 3.14)`. Named-argument syntax is reserved for struct literals (`Token { kind: TokenKind.Number, text: "42" }`). The payload field names exist so that `match` patterns can bind them, but they don't appear at the construction site.
 
 Extract data with `match`:
 
@@ -546,6 +548,8 @@ let small: i32 = big as i32
 ```
 
 Narrowing casts truncate silently: `i64` to `i32` wraps. Float-to-integer casts truncate toward zero. These are the C rules — if you need range checking, write a function.
+
+🚧 *The checker is permissive about `as` today. Any type-to-type cast is accepted; the cast simply re-tags the value with the target type and the C backend deals with what comes out. The spec intent is to restrict it to numeric↔numeric (checked) and class↔class (checked), rejecting nonsense like `"hello" as Point`. Until that tightening lands, treat `as` as a discipline tool: use it only where the operation makes physical sense.*
 
 Casts compose in expressions:
 
@@ -776,6 +780,43 @@ The `!` operator is a deliberate trade-off. It's concise for cases where you've 
 
 Optional types compose: `string?` is an optional string, `[i32]?` is an optional slice. You can't accidentally use an optional where a concrete type is expected — the compiler forces you to unwrap first.
 
+### Auto-Deref for Optional Class Receivers
+
+There's one place where Lyric does NOT force you to write `!`: field access on an optional whose inner type is a **class**. The checker auto-unwraps:
+
+```lyric
+class Node {
+    name: string
+    next: Node?
+}
+
+func greet(n: Node?) {
+    println(n.name)            // n is Node?, .name accessed directly
+    if !isnull(n.next) {
+        println(n.next.name)   // chained auto-deref also works
+    }
+}
+```
+
+The convenience pays for itself in linked-list and AST traversal code, where every link is "guaranteed non-null in this branch" and `!` markers become noise. It applies only to class optionals — struct and primitive optionals (`Point?`, `i32?`) still require explicit `!` because they use a tagged representation under the hood.
+
+🚧 *Today, if the optional actually is null when accessed this way, the C backend segfaults — the lowerer emits a direct field load with no runtime null check. That's a bug, not a feature. The fix on the roadmap is to emit the same Lyric-level panic that `expr!` produces. Until then: if your control flow doesn't already prove the value is non-null, write `n!.name` for an honest panic, or guard with `if !isnull(n) { ... }`.*
+
+### Lvalue Unwrap — Writing Through `!`
+
+`expr!` isn't just an rvalue; it's also a valid lvalue. You can write through the unwrap to mutate a field on the inner value in place:
+
+```lyric
+class Outer { data: Inner? }
+struct Inner { value: i32 }
+
+let o = Outer { data: Inner { value: 0 } }
+o.data!.value = 42        // writes through the optional unwrap
+println(o.data!.value)    // 42
+```
+
+This is the right idiom whenever you have a "this is initialized once, mutated many times" field. The unwrap panics on null exactly as in the rvalue case.
+
 ## 3.5 Methods Inside and Outside
 
 So far we've defined methods inside the class body. Lyric also lets you define methods externally:
@@ -821,6 +862,24 @@ class Counter {
 
 Lyric's default is private because most fields are implementation details. You export the interface, not the internals.
 
+**A note on naming.** Lyric's compiler is case-agnostic — there is no Go-style "capital means exported" rule (that's what `pub` is for). The conventions below are convention only, but the ecosystem follows them and your code will read better if you do too:
+
+| Kind | Convention | Example |
+|---|---|---|
+| Classes, structs, enums, interfaces | PascalCase | `Counter`, `Point`, `Color`, `Graph` |
+| Enum variants | PascalCase | `Red`, `Circle`, `LParen` |
+| Type variables | Short PascalCase | `T`, `U`, `P`, `C` |
+| Functions and methods | snake_case | `array_append`, `get_hash` |
+| Fields | snake_case | `roster_children`, `is_empty` |
+| Locals and parameters | snake_case | `let total_count = 0` |
+| Module-level constants | UPPER_SNAKE | `let PREC_NONE: i32 = 0` |
+| Packages | snake_case | `ast`, `parser`, `expr_parser` |
+| Test functions | `test_` prefix | `test_lexer_basic` |
+
+The `test_` prefix is the one rule the compiler does enforce — the test runner discovers tests by it (Chapter 7). Everything else is style.
+
+One catch the compiler enforces ruthlessly: **field-literal construction must match the declared name exactly.** `Point { x: 1.0 }` works because the field is `x`. `Point { X: 1.0 }` is a checker error. No case-insensitive matching, no fuzzy resolution, no automatic PascalCase ↔ snake_case translation. If you mis-case a field name, you get a clear error at the construction site.
+
 ## 3.7 `mut` Parameters — When Structs Need to Change
 
 Classes are always passed by reference — mutations are visible to the caller. Structs are different. Since structs are values, passing one to a function copies it. If you want a function to modify a struct in place, you need `mut`:
@@ -852,6 +911,8 @@ Output:
 `mut` appears in three places: the parameter declaration (`mut p: Point`), the call site (`translate(mut p, ...)`), and the variable declaration (`let mut p`). All three are required. This is deliberate — when you read a call site and see `mut`, you know that argument might be modified. No surprises.
 
 Why not just use a class? Because Point is data — two integers, no identity, no heap allocation needed. `mut` gives you pass-by-reference for value types when you need it, without forcing everything onto the heap.
+
+One small point about class methods: you may see `mut self` written in older code or in code translated from Rust. The parser accepts it, but the `mut` is redundant — `self` on a class method is always mutable (classes are reference types, so the method already operates through a pointer). Prefer plain `self`.
 
 ## 3.8 Lambdas and Higher-Order Functions
 
@@ -1057,6 +1118,17 @@ func main() {
 ```
 
 `s[lo:hi]` returns elements from index `lo` up to but not including `hi`. This works on any slice, not just strings.
+
+Three shorthand forms drop one or both endpoints:
+
+```lyric
+let s = "hello, world"
+let head = s[:5]      // same as s[0:5]   → "hello"
+let tail = s[7:]      // same as s[7:s.len()]  → "world"
+let copy = s[:]       // full descriptor copy (shares backing array)
+```
+
+`xs[:n]` defaults the low end to 0, `xs[n:]` defaults the high end to the slice length, and `xs[:]` does both. The last form is the idiomatic way to take a fresh slice descriptor that shares the same backing array — useful when you want to hand a slice to a function without letting its `push` operations resize your local view.
 
 ## 4.4 Scanning Text
 
@@ -1417,7 +1489,7 @@ class Item {
 
 func make_item(s: string) -> (Item, error) {
     if s == "" {
-        return (Item { name: "" }, "empty name")
+        return (Item { name: "" }, new_error("empty name"))
     }
     return (Item { name: s }, null)
 }
@@ -1436,7 +1508,7 @@ func collect(names: [string]) -> ([Item], error) {
 
 When `?` fires inside the loop, it returns from `collect`, not just from the loop iteration.
 
-Notice that `make_item` returns a bare string `"empty name"` as the error. In Lyric, strings satisfy the `error` interface — a useful shortcut when you don't need a custom error class.
+`new_error("empty name")` is the stdlib shortcut for building an `Error { msg: "..." }` in one call — cleaner than spelling out the class literal every time you want a quick error.
 
 ## 5.5 Custom Errors
 
@@ -1466,7 +1538,14 @@ func parse_token(input: string, pos: i32) -> (Token, error) {
 }
 ```
 
-The caller doesn't need to know it's a `ParseError` — it just sees `error` and can print the message. This is the same pattern as Go's `error` interface: any class with a `pub func message(self) -> string` method satisfies it. Strings also satisfy `error` — calling `.message()` on a string returns itself.
+The caller doesn't need to know it's a `ParseError` — it just sees `error` and can print the message. This is the same pattern as Go's `error` interface: any class with a `pub func message(self) -> string` method satisfies it.
+
+For one-off errors where a dedicated class is overkill, use the stdlib `Error` class or its shortcut constructor `new_error(msg)`:
+
+```lyric
+return (0, Error { msg: "division by zero" })
+return (0, new_error("division by zero"))    // same thing, less typing
+```
 
 ## 5.6 A Parser for the Calculator
 
@@ -1708,6 +1787,16 @@ func max_val<T: Comparable>(a: T, b: T) -> T {
 ```
 
 If you try `max_val<string>("a", "b")` and `string` doesn't satisfy `Comparable`, the compiler rejects it. The error happens at compile time, not at link time like C++ templates, and not in a wall of angle brackets.
+
+Lyric ships three built-in constraints:
+
+| Constraint | Satisfied by | Provides |
+|---|---|---|
+| `Comparable` | numeric types, `string`, `bool` | `<` `>` `<=` `>=` |
+| `Equatable`  | numeric types, `string`, `bool` | `==` `!=` |
+| `Hashable`   | `Sym`, numeric types, `bool` (not `string` — see Ch 10) | `get_hash(self) -> u64` |
+
+🚧 *`Hashable` currently declares only `get_hash`. An `equals` method is on the roadmap and is required for hash tables to handle collisions correctly when keys aren't pointer-equal. Today, `Dict` is safest with `Sym` keys, where the intern table guarantees uniqueness — see Chapter 10.*
 
 ### 6.4 Where Clauses
 
@@ -2002,7 +2091,7 @@ func test_error_message() {
 
 Because errors are values, you test them like any other return — check the error, check the value. No exception catching, no panic recovery, no special test syntax.
 
-The `parse()` function used here is a convenience wrapper that tokenizes and parses in one call — it creates a `Tokenizer`, feeds the result to `Parser`, and returns `(f64, error)`. A note on `assert_eq(result, 42.0)`: float equality is exact comparison. This is safe for integer-valued floats, but `parse("1.0 / 3.0 * 3.0")` would fail. For real floating-point tests, compare against an epsilon.
+The `parse()` function used here is a convenience wrapper that tokenizes and parses in one call — it creates a `Tokenizer`, feeds the result to `Parser`, and returns `(f64, error)`. A note on `assert_eq(result, 42.0)`: float equality is exact comparison. This is safe for integer-valued floats, but `parse("1.0 / 3.0 * 3.0")` would fail. For real floating-point tests, compare against an epsilon — write a helper that asserts `|a - b| < tol`. 🚧 *A built-in `assert_eq_approx(actual, expected, tol)` is on the roadmap; until it lands, the helper is one line.*
 
 ### 7.3 How It Works Under the Hood
 
@@ -2430,6 +2519,8 @@ Lyric's standard library provides four relation types:
 
 All four are written in Lyric, defined in the standard library. None of them are compiler builtins. The `relation` keyword and the `field`/`destructor`/`embed` machinery are the builtins — the data structures are just interfaces that use them.
 
+And there's nothing magic about *these* four interfaces. The `relation` declaration accepts **any binary interface** (one with two type parameters in `(parent, child)` order) as its hint — including ones you write yourself. We'll see how to build one in Chapter 9.
+
 ### 8.5 Multiple Relations
 
 A class can participate in multiple relations. Here's a parent with two kinds of children:
@@ -2645,6 +2736,8 @@ class Task implements Displayable, Prioritizable {
 ```
 
 This is documentation and a compiler check. Lyric uses structural interface satisfaction by default — if the methods exist, the interface is satisfied. `implements` just makes it explicit.
+
+🚧 *Today, `implements` is declarative only — the checker records the claim but doesn't yet verify that the required methods are actually present. Missing methods surface as errors later in lowering or codegen instead of at the declaration site. The roadmap item is to do the structural check up front so you get a clean "Task: method `display` required by Displayable is missing" error.*
 
 ### 9.3 Method Syntax on Interfaces
 
@@ -3059,6 +3152,26 @@ if !isnull(entry) {
 
 This is because `Dict` is built on `HashedList`, which stores children — and a `DictEntry` is that child. There's no wrapper to extract just the value. It's one extra field access, and it gives you the key for free when you need it.
 
+### Dict Literals
+
+For dictionaries you know up front, there's a brace-literal shorthand. The keys can be string literals, backtick syms, or integer literals — the parser disambiguates a Dict literal from a struct literal by looking at the first key form:
+
+```lyric
+let names  = {`alice`: 1, `bob`: 2}                 // Dict<Sym, i32>
+let cities = {"NYC": 8_000_000, "SF": 875_000}       // Dict<string, i32>
+let nums   = {1: "one", 2: "two"}                    // Dict<i32, string>
+```
+
+An empty dictionary literal needs a type annotation so the compiler knows what `K` and `V` are:
+
+```lyric
+let empty: Dict<Sym, string> = {}
+```
+
+The auto-import pass adds the `Dict` class to the compilation unit whenever it sees a Dict literal — you don't write an `import` for it.
+
+🚧 *Heads-up on collisions: today `HashedList` matches entries by `hash_key()` value alone, with no separate equality check. For `Sym` keys, this is safe because the intern table guarantees one entry per unique string. For other key types, two values that happen to hash the same would collide silently. The roadmap fix is to add an `equals` method to `Hashable` so the table can disambiguate. Until then, prefer `Sym` keys (which is why the language pushes you that way with `sym()` and backticks).*
+
 ### 10.4 How Dict Works
 
 `Dict` is not a compiler builtin. It's two classes and a relation:
@@ -3291,9 +3404,11 @@ When `a.destroy()` fires, it cascade-destroys Alice (because `TeamA` *owns* her)
 
 **After `a.destroy()`, `p` is a dangling pointer.** Accessing `p.name` is undefined behavior, even though the zeroed memory makes it look safe. The slab allocator's `memset` is a debugging aid, not a safety guarantee. Don't rely on it.
 
+🚧 *This is the one place Lyric's safety story has a real gap today: a stale reference to a destroyed object is a use-after-free. The roadmap fix is **bidirectional pointers** — a back-pointer annotation that the compiler tracks across destroys, automatically nulling it when the owner dies. Combined with a planned `destroys` annotation (declares "this function may destroy `self`") and `mut resize` (declares "this function may reallocate the backing array"), the checker will be able to reject UAF at compile time. Until then: when you have references that outlive an `owns` relation, keep them inside `if !isnull(parent)` guards, or hold them through the parent (`team.roster_children[i]`) rather than as standalone pointers.*
+
 A class can participate in multiple `owns` relations simultaneously — Alice was owned by both TeamA and TeamB. Whichever owner's `destroy` fires first cascade-destroys the child. The child's destructor automatically unlinks it from all other relations before the slab slot is freed.
 
-This is deterministic. No GC pause, no finalization queue, no reference cycle detection. The ownership graph declared by relations is the destruction order. The compiler generates the cascade code — you never write a destructor.
+This is deterministic. No GC pause, no finalization queue, no reference cycle detection. The ownership graph declared by relations is the destruction order. The compiler generates the cascade code — you never write a destructor. Every non-`permanent` class gets a `destroy(self)` method synthesized for it automatically, with a body assembled from all the relation destructors and any `final func` cleanup you declared. The default body for a class with no relations and no `final` just frees the slab slot.
 
 ### 11.5 Scope-Exit Analysis
 
@@ -3360,6 +3475,8 @@ Without `mut`, the function receives a copy. The fix is always `mut` — pass by
 
 The same principle doesn't apply to classes. Classes are pointers. When you pass a class to a function, the function sees the same object. Mutations are visible to the caller. No `mut` needed — and in fact, using `mut` on a class parameter creates a double-pointer, which is almost never what you want.
 
+One more thing the compiler does behind your back: **move semantics are inferred, not declared.** If you assign a local class variable into a struct field or pass it to a function, and you never touch that local again afterward, the lowerer treats the assignment as a *move* — no retain/release pair is emitted around it. You don't write `move x` or anything like Rust's `T` vs `&T`; the dataflow analysis figures it out. The effect is invisible at the Lyric level, but it's why you'll see fewer reference-count operations in the generated C than you might expect.
+
 ### 11.7 What the Calculator Costs
 
 Let's count the allocations in our calculator from the previous chapters:
@@ -3423,7 +3540,7 @@ func main() {
 }
 ```
 
-Variables from the enclosing scope are captured automatically. The compiler analyzes which variables the block references, generates a context struct with those fields, and passes a pointer to it when launching the thread. **Captured variables are passed by pointer** — mutations in the spawned block are visible to the parent, and vice versa. This means two `spawn` blocks capturing the same variable can race. If you need isolation, copy the value into a local before spawning. For shared mutable state, use `lock` (§12.5). Each `spawn` creates an OS thread via `pthread_create` — there's no green thread runtime or thread pool. In the C output, this becomes a `pthread_create` call with an auto-generated wrapper function:
+Variables from the enclosing scope are captured automatically. The compiler analyzes which variables the block references, generates a context struct with those fields, and passes a pointer to it when launching the thread. 🚧 **Captured variables are passed by pointer** — mutations in the spawned block are visible to the parent, and vice versa. This means two `spawn` blocks capturing the same variable can race. The roadmap intent is copy-by-value capture with explicit shared mutation through channels or locks; until that lands, if you need isolation, copy the value into a local before spawning. For shared mutable state, use `lock` (§12.5). Each `spawn` creates an OS thread via `pthread_create` — there's no green thread runtime or thread pool. In the C output, this becomes a `pthread_create` call with an auto-generated wrapper function:
 
 ```c
 typedef struct {
@@ -3505,7 +3622,7 @@ func main() {
 
 The producer sends values and closes the channel when finished. The consumer receives until the channel signals completion.
 
-A note on `receive()` when the channel is closed: it returns the zero value for the type (0 for integers, empty string for strings). There's no `(value, ok)` tuple like Go — you need to use a sentinel value or a separate `done` channel to signal completion. In this example, the producer sends values 0–4, so we use `val >= 0` as our loop condition (the zero-value `0` on close terminates the loop only because the producer happens to send positive values first). For robustness, prefer a separate done channel or a known sentinel.
+A note on `receive()` when the channel is closed: it returns the zero value for the type (0 for integers, empty string for strings). 🚧 *There's no `(value, ok)` tuple like Go's `v, ok := <-ch` — you need to use a sentinel value or a separate `done` channel to signal completion. The roadmap target is a `(T, bool)` form: `let (v, ok) = ch.receive()`.* In this example, the producer sends values 0–4, so we use `val >= 0` as our loop condition (the zero-value `0` on close terminates the loop only because the producer happens to send positive values first). For robustness, prefer a separate done channel or a known sentinel.
 
 Channels are passed by reference — the spawned block and the main function share the same channel object.
 
@@ -3570,7 +3687,7 @@ func main() {
 
 The `default` branch runs immediately if no channel is ready — turning a blocking select into a non-blocking poll. Send cases (`case ch.send(val) =>`) succeed when the channel has buffer space or a receiver is waiting.
 
-The C backend compiles `select` into a polling loop: try each case, run `default` if present, otherwise `sched_yield()` and retry. Each case becomes a non-blocking `tryrecv` or `trysend` call on the underlying channel. This burns CPU on hot selects — in production, profile for tight select loops and consider alternative designs. A proper runtime would use epoll or kqueue, but the current implementation is correct and simple.
+The C backend compiles `select` into a polling loop: try each case, run `default` if present, otherwise `sched_yield()` and retry. Each case becomes a non-blocking `tryrecv` or `trysend` call on the underlying channel. 🚧 *This burns CPU on hot selects — the roadmap target is condvar / epoll-based wake. Until then, profile for tight select loops and consider alternative designs.*
 
 ### 12.5 Locks
 
@@ -3595,6 +3712,8 @@ func main() {
 Output: `final count: 11`.
 
 `lock` is a built-in type that zero-initializes — `let mut mu: lock` is valid without a constructor call. The C backend generates `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER`. `lock(mu) { ... }` acquires the mutex, runs the block, and releases it — even if the block returns early. In C, this compiles to `pthread_mutex_lock` and `pthread_mutex_unlock` bracketing the block body. The scoped syntax makes it impossible to forget the unlock.
+
+(Older code, or code translated from Rust, may use `Mutex` or `Lock` — both are lowerer-level synonyms that are slated for removal. Lowercase `lock` is canonical.)
 
 ### 12.6 Guarded Fields
 
@@ -3629,7 +3748,7 @@ func main() {
 }
 ```
 
-The `count` field is annotated `guarded_by(mu)`. Accessing `c.count` outside a `lock(c.mu)` block is a compile error. The `label` field has no annotation — it's accessible anywhere. `guarded_by` is checked statically by the compiler. No runtime overhead, no lock-order verification at this stage — just the basic discipline that a field should only be touched while its mutex is held.
+The `count` field is annotated `guarded_by(mu)`. 🚧 *Today the annotation parses and is stored on the field, but the checker does not enforce it — accessing `c.count` outside a `lock(c.mu)` block compiles cleanly. The design intent is what's described here: a compile-time error on un-guarded access. The roadmap item is to add the cross-function check.* The `label` field has no annotation — it'll always be accessible anywhere, even after the check is added. `guarded_by` is meant to be statically verifiable with no runtime overhead — just the basic discipline that a field should only be touched while its mutex is held.
 
 Note that `guarded_by` is a contextual keyword — the lexer emits it as an identifier, and the parser recognizes it by context. This keeps the keyword list small and avoids breaking code that uses `guarded_by` as a variable name (unlikely, but possible).
 
@@ -3906,7 +4025,13 @@ The first form is what you'll use most — it imports a sibling directory by nam
 
 A few things to know about the current module system:
 
-**No circular imports.** If `lexer` imports `ast`, then `ast` cannot import `lexer`. The compiler reports "circular import detected" and fails. In practice, this pushes you toward clean dependency graphs — types at the bottom, logic on top.
+**Imports are single-level today.** When you `import lexer`, the compiler resolves `lexer`'s declarations but does NOT recursively resolve `lexer`'s own `import` statements. 🚧 *Recursive import resolution is on the roadmap — until it lands, every package your program uses transitively must be listed explicitly in the root file, or the build will fail with unresolved names. The compiler's own build works around this by listing all twelve packages from `main.ly`.*
+
+**`pub` isn't filtered across imports yet.** 🚧 *Today, every declaration in an imported package is visible after prefixing — package-private declarations leak. The roadmap target is true `pub` filtering: non-`pub` declarations should be invisible to importers. Write `pub` on everything you intend to export now, so your code is correct once the filter lands.*
+
+**Cycle detection.** 🚧 *Today there's no cycle detector — circular imports either work by accident or blow up with a duplicate-declaration error from the merge pass. The single-level rule makes the question mostly moot in practice; cycle detection becomes load-bearing once recursive resolution lands. The roadmap fix is the standard topological-sort error: "cycle detected: a → b → c → a."*
+
+**`lyric.mod` content isn't parsed.** Today the compiler only checks for the file's *existence* as a module-root marker. 🚧 *The intent is for `lyric.mod` to declare the module's import-path prefix, its external dependencies, and the package containing `main()`. Until that parsing lands, drop a one-line `module name` and rely on the directory layout.*
 
 **No re-exports.** If `parser` imports `ast`, the types from `ast` don't become part of `parser`'s public API. Callers who need `ast.Token` must import `ast` themselves.
 
@@ -4030,11 +4155,13 @@ One design choice worth noting: the parser uses a `no_struct_lit` flag to resolv
 
 Between parsing and C emission, the source passes through three major transformations:
 
-**Desugar** (1,298 lines) runs five passes in fixed order: Embeds → InterfaceFields → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
+**Desugar** (1,298 lines) runs six passes in fixed order: InterfaceEmbeds → InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
 
-**Check** (4,689 lines) is three-phase: Phase 0 pre-registers all type names, Phase 1 registers full type/function details, Phase 2 checks function bodies and annotates every expression with its resolved type. The phases must complete across ALL blocks before the next phase begins — this is what makes forward references and cross-file references work.
+**Check** (4,689 lines) is four-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
 
 **Lower** (3,555 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
+
+**Optimize** (1,535 lines) runs six LIR→LIR passes: fuse side-effect temps, destructure multi-returns, destructure extract-pairs from the `?` operator, fix nil-zero values on non-class returns, eliminate unused temps recursively while preserving side effects, and blank out unused multi-assign names. Each pass is small and local; together they undo the lowerer's verbose-but-correct first cut.
 
 **Monomorphize** (3,857 lines) eliminates generics by creating specialized copies: `identity<i32>` becomes `identity_i32`. This is iterative — specializing a function may reveal new generic calls in its body. In practice, it converges in two or three iterations. The tradeoff vs. vtables is code size for speed; for a compiler where types are known at compile time, monomorphization wins.
 
@@ -4155,7 +4282,7 @@ The compiler is the language's most comprehensive test. If a feature works in th
 | `spawn` | Launch concurrent block |
 | `lock` | Scoped mutex acquisition |
 | `yield` | Produce value from generator |
-| `cascade` | Cascade through relation children |
+| `cascade` | 🚧 Reserved — currently a no-op statement, slated for removal (use `owns`/`refs` on relations) |
 
 **Modifier and operator keywords:**
 
@@ -4397,34 +4524,33 @@ func test_addition() {
 import ast                             // qualified: ast.Node
 ```
 
-### Annotation Keywords
+### Annotations
 
-Used in `.lyric` files for documentation and verification:
+The only annotation that the Lyric grammar parses today is `guarded_by(lock_name)` on fields:
 
-| Annotation | Purpose |
-|------------|---------|
-| `why:` | One-line purpose on any declaration |
-| `doc "Section":` | Named documentation block |
-| `invariant:` | System-wide claim |
-| `verified_at:` | Verification timestamp |
-| `guarded_by(mu)` | Field protected by mutex |
-| `requires_lock()` | Function requires lock held |
-| `excludes_lock()` | Function requires lock not held |
-| `concurrent: true` | Method is thread-safe |
-| `source:` | Link to implementation file |
-| `fake:` | Link to test fake |
+```lyric
+class Executor {
+    active: Dict<u32, Job>   guarded_by(mu)
+    mu: lock
+}
+```
+
+🚧 *A larger function-level annotation table — `requires:`, `ensures:`, `raises:`, `concurrent:`, `requires_lock`, `excludes_lock`, `spawns:`, `pure:` — is described in the language spec as a roadmap target but does not parse today.*
+
+The Context-Driven Development annotations (`why:`, `doc`, `invariant:`, `verified_at:`, `source:`, `fake:`) and the three-zone `.lyric` file layout have moved to the separate **`lyre`** tool — they are not part of the Lyric grammar. See Appendix E.
 
 ### Toolchain
 
 | Command | Purpose |
 |---------|---------|
 | `lyric compile file.ly` | Compile to C, then to binary |
-| `lyric compile -mod .` | Compile entire module |
+| `lyric compile <dir>` | Compile entire module rooted at a `lyric.mod` directory |
 | `lyric compile --soa file.ly` | Compile with SoA memory layout |
 | `lyric test file.ly` | Discover and run `test_*` functions |
-| `lyric verify` | Check `.lyric` files against source |
-| `lyric update` | Regenerate `.lyric` function index and deps |
-| `lyric fmt file.ly` | Format source file |
+| `lyric fmt file.lyric` | Format `.lyric` design files |
+| `lyric help` | Show usage |
+
+The CDD-layer commands `lyric verify`, `lyric update`, and `lyric gen` live in the separate `lyre` tool — see Appendix E.
 
 
 ## Appendix B: Standard Library Reference
@@ -4951,7 +5077,7 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 | Channel | `ch := make(chan T)` | `mpsc::channel()` | — | `let ch = make_channel<T>()` |
 | Send/receive | `ch <- v` / `v = <-ch` | `tx.send(v)` / `rx.recv()` | — | `ch.send(v)` / `ch.receive()` |
 | Select | `select { case ... }` | `tokio::select!` | — | `select { case v = ch.receive() => ... }` |
-| Mutex | `sync.Mutex` | `std::sync::Mutex<T>` | `std::mutex` | `Lock` type + `lock(mu) { ... }` |
+| Mutex | `sync.Mutex` | `std::sync::Mutex<T>` | `std::mutex` | `lock` type + `lock(mu) { ... }` |
 
 Lyric's concurrency is Go's model with method syntax for channels. `spawn` captures variables from the enclosing scope automatically — no explicit move or clone. (Chapter 12)
 
@@ -4995,69 +5121,22 @@ interface Graph<G, N, E> {
 
 
 
-## Appendix E: Context-Driven Development
+## Appendix E: The CDD Layer (`lyre`)
 
-The Lyric compiler is 30,796 lines across 12 packages. A new contributor looking at `checker.ly` sees 3,260 lines of type-checking logic. Where do you start? What are the invariants? Which phase runs first?
+Earlier drafts of this book described **Context-Driven Development** — the practice of keeping a `.lyric` design artifact alongside every `.ly` source file, annotated with `why:` purpose statements, `doc "..."` narrative blocks, `invariant:` claims, and `source:`/`fake:` links to implementation — as if it were part of the Lyric language. It isn't, and it never was: those annotations don't parse with the Lyric grammar. They are a layer on top, owned by a separate tool called **`lyre`**.
 
-The code tells you *what*. `.lyric` files tell you *why*.
+The split is clean:
 
-### E.1 A .lyric File
+- **Lyric** (this book) is the language and compiler. A `.lyric` file, from Lyric's perspective, is a valid Lyric source file with no function bodies — declarations only.
+- **`lyre`** is the design-artifact tool. It reads `.lyric` files, recognizes the CDD annotation layer, generates the function-index and dependency zones, and provides `lyre verify` / `lyre update` / `lyre gen` to keep the artifact in sync with the implementation.
 
-Every package has a `.lyric` file alongside its `.ly` source:
+If you want the full CDD methodology — the three-zone file layout, the `why:`/`doc`/`invariant:`/`verified_at:`/`source:`/`fake:` vocabulary, the verify/update/gen workflow — see the `lyre` repository at `~/projects/lyre/`. The methodology stands on its own and applies whether the implementation language is Lyric, Go, Python, or anything else `lyre` has an extractor for.
 
-```lyric
-// ast.lyric — understanding doc for the bootstrap AST package
-lyric ast {
-  why: "Defines all AST node types for the Lyric language. Leaf package —
-       no dependencies on other bootstrap packages."
+What stays in Lyric proper:
 
-  doc "Invariants — Nullable Variant Fields": """
-    Expr has one nullable field per ExprKind (call: CallData?,
-    bin_op: BinOpData?, etc.). Only the field matching `kind` is non-null.
-  """
+- The `.lyric` file *format* (declaration-only Lyric source) is a Lyric concept.
+- The one annotation Lyric's own grammar parses today is `guarded_by(lock_name)` on fields (Chapter 12).
+- A roadmap table of function-level annotations (`requires:`, `ensures:`, `concurrent:`, `requires_lock`, `excludes_lock`, etc.) is described in the language spec, but does not parse today.
 
-  source: ["ast.ly"]
-}
-```
+The Lyric toolchain ships four subcommands — `compile`, `test`, `fmt`, `help` — and nothing else. The verify/update/gen commands you may have seen in earlier drafts live in `lyre`.
 
-No executable code. Just declarations capturing purpose, architecture, and invariants.
-
-### E.2 Three Annotation Types
-
-**`why:`** — one-line purpose. Not what the code does, but *why* it exists.
-
-**`doc "Section": """..."""`** — named narrative blocks for invariants and design decisions. Example from `checker.lyric`:
-
-```lyric
-doc "Invariants — Three-Phase Checking": """
-  Phase 0 MUST complete on ALL blocks before ANY Phase 1 begins.
-  Phase 1 MUST complete on ALL blocks before ANY Phase 2 begins.
-"""
-```
-
-This invariant spans three functions. No function comment can capture it.
-
-**`invariant:`** — system-wide claims with `verified_at:` timestamps:
-
-```lyric
-invariant: "bootstrap2.c == bootstrap3.c"
-  verified_at: "2026-06-12"
-```
-
-### E.3 The Workflow
-
-1. **Read the `.lyric` file** before editing the `.ly` file
-2. Edit the code
-3. **`lyric update`** — regenerates the function index and dependency list
-4. **`lyric verify`** — checks that declarations match the source
-5. Update design docs if the design changed
-
-The payoff: the next session — human or AI — starts with design-level understanding instead of reading thousands of lines of implementation.
-
-### E.4 Why Not Comments?
-
-Comments rot. `.lyric` files rot slower because `lyric verify` catches structural drift. The real advantage is scope — "Phase 0 MUST complete on ALL blocks before ANY Phase 1 begins" spans three functions and can't live in any single function's comments.
-
-Thread safety annotations (`guarded_by`, `requires_lock`, `excludes_lock`) document concurrency contracts. The compiler doesn't enforce them across function boundaries, but `verify` ensures the annotated functions still exist.
-
-This is Context-Driven Development: build understanding first, then build code.
