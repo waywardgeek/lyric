@@ -1,9 +1,10 @@
-// graph.ly — capability-interface design for graph algorithms (v3)
+// graph.ly — capability-interface design for graph algorithms (v4)
 //
 // Companion to tree.ly.  Both files demonstrate the layered design
 // agreed in the multi-class-interface-redesign discussion:
 //
-//   Storage     = relations (labels-as-scopes; auto-injected accessors).
+//   Storage     = relations (labels-as-scopes, or flat injection
+//                 when unlabeled; auto-injected accessors).
 //   Capability  = small multi-class interfaces.
 //   Algorithm   = free functions with where-clauses (UFCS at call site).
 //   Composition = constraint aliases bundle related capabilities.
@@ -35,23 +36,33 @@
 //   5. Method-call type args banned.  `obj.method<T>(args)` is a parse
 //      error; receiver and where-clause pin all type params.  Free-
 //      function calls still accept type args for the rare case where T
-//      appears only in the return type.
+//      appears only in the return type.  Constructor calls
+//      (`Dict<Sym, i32>()`) are NOT method calls — type args on the
+//      class name are fine.
 //
 //   6. Relation-derived methods fully monomorphized at desugar.  By
 //      checker time, every `obj.method(args)` is a concrete call.
 //
-//   7. Labels in where-clauses (`ManyToOne<N:out, E:source>`) name
+//   7. Labels in where-clauses (`Collection<N:out, E:source>`) name
 //      *which* relation a constraint binds to when multiple match.
+//      Algorithm authors can also write unlabeled constraints
+//      (`Collection<N, N>`) to require flat-form relations from users
+//      — see tree.ly for that style.
+//
+//   8. Type parameters on function declarations are EXPLICIT.  Every
+//      generic function declares its type params inside `<>` between
+//      `func` and the function/receiver name (`func<G, N, E> G.bfs(...)`).
+//      Call-site inference is unchanged.
 
 // =========================================================================
 // PART 1.  Capability interfaces  (would live in `graph` package)
 // =========================================================================
 //
-// ManyToOne bundles what every relation hint provides: parent-side
+// Collection bundles what every relation hint provides: parent-side
 // iteration + count, child-side back-pointer.  The 3 stdlib hints
-// (ArrayList, DoublyLinked, HashedList) all auto-derive ManyToOne.
+// (ArrayList, DoublyLinked, HashedList) all auto-derive Collection.
 
-interface ManyToOne<P, C> {
+interface Collection<P, C> {
     pub func P.iter(self) -> gen C
     pub func P.count(self) -> i32
     pub func C.parent(self) -> P?
@@ -81,9 +92,9 @@ interface EdgeWeight<E, W: Numeric> {
 // clauses to avoid repetition.
 
 constraint DirectedGraph<G, N, E> =
-    ManyToOne<G:nodes, N:graph> +
-    ManyToOne<N:out,   E:source> +
-    ManyToOne<N:in,    E:target>
+    Collection<G:nodes, N:graph> +
+    Collection<N:out,   E:source> +
+    Collection<N:in,    E:target>
 
 constraint WeightedDirectedGraph<G, N, E, W> =
     DirectedGraph<G, N, E> + EdgeWeight<E, W>
@@ -94,10 +105,10 @@ constraint WeightedDirectedGraph<G, N, E, W> =
 //
 // Free functions with where-clauses.  UFCS makes them callable as
 // methods on the receiver: `net.bfs(alice)`, `net.total_weight()`.
-// Type parameters are inferred from the signature and where-clause
-// (no explicit `<G, N, E>` declaration needed).
+// Type parameters are declared explicitly in `<>` between `func` and
+// the receiver-class name, per the redesign's §6.1 rule.
 
-pub func G.count_edges(self) -> i32 where DirectedGraph<G, N, E> {
+pub func<G, N, E> G.count_edges(self) -> i32 where DirectedGraph<G, N, E> {
     let mut total: i32 = 0
     for n in self.nodes.iter() {
         total = total + n.out.count
@@ -105,7 +116,7 @@ pub func G.count_edges(self) -> i32 where DirectedGraph<G, N, E> {
     return total
 }
 
-pub func N.successors(self) -> [N] where DirectedGraph<G, N, E> {
+pub func<G, N, E> N.successors(self) -> [N] where DirectedGraph<G, N, E> {
     let mut result: [N] = []
     for e in self.out.iter() {
         result = append(result, e.target)
@@ -113,7 +124,7 @@ pub func N.successors(self) -> [N] where DirectedGraph<G, N, E> {
     return result
 }
 
-pub func N.predecessors(self) -> [N] where DirectedGraph<G, N, E> {
+pub func<G, N, E> N.predecessors(self) -> [N] where DirectedGraph<G, N, E> {
     let mut result: [N] = []
     for e in self.in.iter() {
         result = append(result, e.source)
@@ -121,14 +132,14 @@ pub func N.predecessors(self) -> [N] where DirectedGraph<G, N, E> {
     return result
 }
 
-pub func G.has_edge(self, src: N, dst: N) -> bool where DirectedGraph<G, N, E> {
+pub func<G, N, E> G.has_edge(self, src: N, dst: N) -> bool where DirectedGraph<G, N, E> {
     for e in src.out.iter() {
         if e.target == dst { return true }
     }
     return false
 }
 
-pub func G.bfs(self, start: N) -> [N] where DirectedGraph<G, N, E> {
+pub func<G, N, E> G.bfs(self, start: N) -> [N] where DirectedGraph<G, N, E> {
     // TODO(hashable): visited-tracking uses linear-search `[N]` slices
     // to stay free of stdlib hashing.  Switch to Dict<N, bool> for O(1)
     // membership once `Hashable.equals` is restored on the interface.
@@ -156,7 +167,7 @@ pub func G.bfs(self, start: N) -> [N] where DirectedGraph<G, N, E> {
     return order
 }
 
-pub func G.total_weight(self) -> W where WeightedDirectedGraph<G, N, E, W> {
+pub func<G, N, E, W> G.total_weight(self) -> W where WeightedDirectedGraph<G, N, E, W> {
     let mut sum: W = W.zero()
     for n in self.nodes.iter() {
         for e in n.out.iter() {
@@ -191,14 +202,14 @@ relation DoublyLinked Route:b     refs [Via:b]
 // the algorithm expects (out/in/source/target).  Bridge them in a
 // grouped impl block on the constraint alias.  Each entry is a label-
 // rename alias from algorithm-side label to user-side label.  The
-// `Net:nodes → Net:routes` binding for ManyToOne<G:nodes, N:graph>
+// `Net:nodes → Net:routes` binding for Collection<G:nodes, N:graph>
 // also needs bridging because the relation label is `:routes`, not
 // `:nodes`.
 
 impl DirectedGraph<Net, Route, Via> {
-    ManyToOne<Net:nodes, Route:graph> = ManyToOne<Net:routes, Route:net>
-    ManyToOne<Route:out, Via:source>  = ManyToOne<Route:a, Via:a>
-    ManyToOne<Route:in,  Via:target>  = ManyToOne<Route:b, Via:b>
+    Collection<Net:nodes, Route:graph> = Collection<Net:routes, Route:net>
+    Collection<Route:out, Via:source>  = Collection<Route:a, Via:a>
+    Collection<Route:in,  Via:target>  = Collection<Route:b, Via:b>
 }
 
 // EdgeWeight<Via, f32> auto-derives via the `weight: f32` field.
@@ -249,9 +260,9 @@ relation DoublyLinked Person:out    refs [Follow:source]
 relation DoublyLinked Person:in     refs [Follow:target]
 
 // All constraint members auto-derive:
-//   ManyToOne<Network:nodes, Person:graph>  — direct (labels match)
-//   ManyToOne<Person:out, Follow:source>    — direct
-//   ManyToOne<Person:in, Follow:target>     — direct
+//   Collection<Network:nodes, Person:graph>  — direct (labels match)
+//   Collection<Person:out, Follow:source>    — direct
+//   Collection<Person:in, Follow:target>     — direct
 //   EdgeWeight<Follow, f64>                 — direct (field auto-getter)
 //
 // No impl block needed for Network/Person/Follow to satisfy
@@ -291,14 +302,14 @@ pub func mutual_followers(a: Person, b: Person) -> [Person] {
 //
 // What this final design demonstrates:
 //
-//   - **ManyToOne is the single unified capability** for relation-shaped
+//   - **Collection is the single unified capability** for relation-shaped
 //     storage.  No fine-grained OutEdges/InEdges/EdgeEndpoints zoo.
 //   - **Constraint aliases** bundle the capabilities an algorithm
 //     category needs (DirectedGraph, WeightedDirectedGraph) without
 //     introducing interface-composing-interface.
 //   - **Algorithms are free functions** with where-clauses, callable
 //     as methods via UFCS.
-//   - **Labels in where-clauses** (`ManyToOne<N:out, E:source>`) name
+//   - **Labels in where-clauses** (`Collection<N:out, E:source>`) name
 //     which relation a constraint binds to.
 //   - **Grouped constraint-alias impl** (`impl DirectedGraph<...>`)
 //     organizes related bridging impls together; desugars to separate

@@ -1,18 +1,29 @@
-// tree.ly — capability-interface design for tree algorithms (v3)
+// tree.ly — capability-interface design for tree algorithms (v4)
 //
 // Companion to graph.ly.  See its preamble for the design rules.
 // This file exercises a SELF-RELATION (same class on both sides),
-// which is the second nontrivial case for labels-as-scopes after the
-// multi-relation-same-pair case in graph.ly.
+// using the UNLABELED-FLAT form of relation declaration: a single
+// self-relation with no labels injects all hint members directly
+// into the class namespace.
+//
+// graph.ly uses LABELED relations because the FPGA case has two
+// distinct relations on the same (Route, Via) pair.  tree.ly uses
+// UNLABELED because there's only one relation on (Folder, Folder),
+// and the flat form reads cleaner.
+//
+// Algorithm constraints follow suit: graph.ly's constraints carry
+// labels (`Collection<N:out, E:source>`); tree.ly's constraints do
+// not (`Collection<N, N>`).  The algorithm author chooses; users
+// either match or provide a bridging impl.
 
 // =========================================================================
 // PART 1.  Capability interfaces
 // =========================================================================
 //
-// ManyToOne is reused from graph.ly's design (would be in a shared
+// Collection is reused from graph.ly's design (would be in a shared
 // `relations` package).  Redeclared here for self-containment.
 
-interface ManyToOne<P, C> {
+interface Collection<P, C> {
     pub func P.iter(self) -> gen C
     pub func P.count(self) -> i32
     pub func C.parent(self) -> P?
@@ -30,12 +41,16 @@ interface HasRoot<T, N> {
 // PART 2.  Constraint aliases
 // =========================================================================
 //
-// TreeNode<N> captures the self-relation on N: children scope on the
-// parent side, parent scope on the child side.  Two labels because
-// self-relations live in one class's namespace and must distinguish
-// the two sides.
+// TreeNode<N> requires the unlabeled Collection self-relation on N —
+// `iter`, `count`, and `parent` injected flat into the class
+// namespace.  Algorithm authors who prefer label-distinguished
+// children/parent sides would write `Collection<N:children, N:parent>`
+// instead; users would then need a labeled relation
+// (`relation DoublyLinked Folder:children owns [Folder:parent]`) to
+// satisfy it.  Both styles are legal; tree.ly picks the flat style
+// because tree shapes have a natural single-relation reading.
 
-constraint TreeNode<N> = ManyToOne<N:children, N:parent>
+constraint TreeNode<N> = Collection<N, N>
 
 constraint Tree<T, N> = HasRoot<T, N> + TreeNode<N>
 
@@ -46,16 +61,20 @@ constraint Tree<T, N> = HasRoot<T, N> + TreeNode<N>
 // Node-only algorithms (subtree traversal) constrain on `TreeNode<N>`.
 // Tree-spanning algorithms (full traversals from root) constrain on
 // the full `Tree<T, N>`.  Tighter constraints = clearer requirements.
+//
+// All algorithm type parameters are declared explicitly inside `<>`
+// per the redesign's §6.1 rule (call-site inference still works for
+// callers; only the declaration sites need explicit `<T>`).
 
-pub func N.is_leaf(self) -> bool where TreeNode<N> {
-    return self.children.count == 0
+pub func<N> N.is_leaf(self) -> bool where TreeNode<N> {
+    return self.count == 0
 }
 
-pub func N.is_root(self) -> bool where TreeNode<N> {
-    return isnull(self.parent)              // auto-projection: child-side scope yields parent
+pub func<N> N.is_root(self) -> bool where TreeNode<N> {
+    return isnull(self.parent)
 }
 
-pub func N.depth(self) -> i32 where TreeNode<N> {
+pub func<N> N.depth(self) -> i32 where TreeNode<N> {
     let mut d: i32 = 0
     let mut cur: N? = self.parent
     while !isnull(cur) {
@@ -65,15 +84,15 @@ pub func N.depth(self) -> i32 where TreeNode<N> {
     return d
 }
 
-pub func N.subtree_size(self) -> i32 where TreeNode<N> {
+pub func<N> N.subtree_size(self) -> i32 where TreeNode<N> {
     let mut total: i32 = 1
-    for c in self.children.iter() {
+    for c in self.iter() {
         total = total + c.subtree_size()
     }
     return total
 }
 
-pub func N.path_to_root(self) -> [N] where TreeNode<N> {
+pub func<N> N.path_to_root(self) -> [N] where TreeNode<N> {
     let mut result: [N] = [self]
     let mut cur: N? = self.parent
     while !isnull(cur) {
@@ -83,7 +102,7 @@ pub func N.path_to_root(self) -> [N] where TreeNode<N> {
     return result
 }
 
-pub func N.common_ancestor(self, other: N) -> N? where TreeNode<N> {
+pub func<N> N.common_ancestor(self, other: N) -> N? where TreeNode<N> {
     // TODO(hashable): linear-search on the path slice.  Switch to
     // Dict<N, bool> for O(1) lookup once `Hashable.equals` is
     // restored.  Same caveat as graph.ly bfs.
@@ -98,28 +117,28 @@ pub func N.common_ancestor(self, other: N) -> N? where TreeNode<N> {
     return null
 }
 
-pub func T.count_nodes(self) -> i32 where Tree<T, N> {
+pub func<T, N> T.count_nodes(self) -> i32 where Tree<T, N> {
     let r = self.root
     if isnull(r) { return 0 }
     return r!.subtree_size()
 }
 
-pub func T.walk(self) -> [N] where Tree<T, N> {
+pub func<T, N> T.walk(self) -> [N] where Tree<T, N> {
     let r = self.root
     if isnull(r) { return [] }
     return collect_pre_order(r!, [])
 }
 
-pub func collect_pre_order<N>(n: N, acc: [N]) -> [N] where TreeNode<N> {
+pub func<N> collect_pre_order(n: N, acc: [N]) -> [N] where TreeNode<N> {
     let mut r = append(acc, n)
-    for c in n.children.iter() {
+    for c in n.iter() {
         r = collect_pre_order(c, r)
     }
     return r
 }
 
 // =========================================================================
-// PART 4.  Filesystem  (semantic labels match — zero impl blocks)
+// PART 4.  Filesystem  (unlabeled self-relation — flat injection)
 // =========================================================================
 
 class Filesystem {
@@ -132,14 +151,18 @@ class Folder {
     size_bytes: i64
 }
 
-// Self-relation with role-named labels.  Distinct labels mandatory
-// in self-relations (one namespace).  Labels match TreeNode's expected
-// names, so ManyToOne<Folder:children, Folder:parent> auto-derives.
-relation DoublyLinked Folder:children owns [Folder:parent]
+// Unlabeled self-relation: a single relation between (Folder, Folder)
+// needs no labels.  All hint members inject flat into Folder:
+//   Parent-side: first, last, iter(), count, append(Folder), remove(Folder)
+//   Child-side:  parent, next, prev
+// P-side and C-side names don't collide (children/iter/count/append
+// vs. parent/next/prev), so a single unlabeled self-relation is safe.
+relation DoublyLinked Folder owns [Folder]
 
 // Auto-derivation status — all green, no impl blocks:
-//   HasRoot<Filesystem, Folder>           — Filesystem.root field
-//   ManyToOne<Folder:children, Folder:parent> — Folder self-relation
+//   HasRoot<Filesystem, Folder>   — Filesystem.root field
+//   Collection<Folder, Folder>     — Folder's unlabeled self-relation
+//                                   gives iter/count/parent directly.
 // Together: Tree<Filesystem, Folder> is satisfied.
 
 pub func count_folders(fs: Filesystem) -> i32 {
@@ -168,22 +191,26 @@ pub func deepest_common(a: Folder, b: Folder) -> Folder? {
 // =========================================================================
 //
 // One Tree library, one implementation.  All algorithm satisfaction is
-// auto-derived because the user's relation labels happen to match the
-// constraint's expected names.  Zero impl blocks.
+// auto-derived because the user's unlabeled self-relation gives
+// exactly what `Collection<N, N>` requires.  Zero impl blocks.
 //
 // Three design points the self-relation case exercises that graph.ly
 // doesn't:
 //
-//   1. **Distinct labels mandatory** in self-relations.  `Folder:children
-//      owns [Folder:parent]` uses two labels because both sides live in
-//      Folder's namespace; same-letter (legal in cross-class relations)
-//      would collide here.
+//   1. **Unlabeled-flat injection for single self-relations.**
+//      `relation DoublyLinked Folder owns [Folder]` injects all hint
+//      members directly into Folder — no `.label.` prefix — because
+//      P-side and C-side member names don't collide and there's only
+//      one such relation.  Reads naturally: `folder.parent`,
+//      `folder.iter()`, `folder.append(child)`.
 //
-//   2. **Auto-projection of singleton scopes.**  `node.parent` is the
-//      parent Node (typed `N?`), not a scope handle.  Without it, the
-//      body would say `node.parent.parent` — once for the scope name,
-//      once for the back-pointer field inside.  Auto-projection lets
-//      `is_root(n) = isnull(n.parent)` read as intended.
+//   2. **Constraint signature follows the relation style.**
+//      `TreeNode<N> = Collection<N, N>` carries no labels because the
+//      user's relation carries no labels.  graph.ly's
+//      `DirectedGraph<G, N, E>` carries labels (`:out`, `:in`,
+//      `:source`, `:target`) because its users have multiple relations
+//      on the same `(P, C)` pair.  Algorithm authors choose; tree-
+//      shaped data picks flat.
 //
 //   3. **Constraint subset for node-only algorithms.**  `subtree_size`
 //      constrains on `TreeNode<N>` (just the self-relation), not the
@@ -196,9 +223,12 @@ pub func deepest_common(a: Folder, b: Folder) -> Folder? {
 //
 //   - Constraint composition: `Tree<T, N> = HasRoot<T, N> + TreeNode<N>`
 //     bundles a wrapper-side capability with a node-side capability.
-//   - Self-relation auto-derive: the same ManyToOne mechanism that
-//     works for cross-class relations works unchanged for self-
-//     relations, given distinct labels.
+//   - Self-relation flat-form auto-derive: the same Collection
+//     mechanism that works for cross-class relations works unchanged
+//     for self-relations, because flat injection means the required
+//     surface lives directly on N.
 //   - Algorithm constraint tightening: `T.count_nodes` requires the
 //     full Tree (needs root); `N.subtree_size` requires only TreeNode
 //     (works on any subtree, no enclosing root needed).
+//   - Explicit `<N>` and `<T, N>` on every algorithm declaration
+//     per the redesign's explicit-type-params-on-decl rule.

@@ -2,13 +2,18 @@
 
 *Status: design proposal. Not yet adopted into the spec.*
 
-*Last updated: 2026-06-21.*
+*Last updated: 2026-06-21 (revision 3 — incorporates DQ1–DQ4 decisions
+plus follow-up: explicit type params on decls, NO `hint interface`
+keyword (one unified interface mechanism; checker validates when an
+interface is used as a relation hint), no auto-projection, `embed`
+removed, unlabeled relations inject flat into the class, ManyToOne →
+Collection).*
 
 *Companion artifacts: `testdata/graph.ly`, `testdata/tree.ly` — worked-out
 examples in the proposed syntax.*
 
-*Required background: `cr/docs/lyric-language-spec.md` §1037 (Interfaces
-and Multi-Class Contracts) and §1166 (Relations).*
+*Required background: `cr/docs/lyric-language-spec.md` sections
+"Interfaces and Multi-Class Contracts" and "Relations".*
 
 ---
 
@@ -57,17 +62,19 @@ The spec describes a `relation` declaration with the syntax:
 relation [Hint] Parent[<Args>][:plabel] (owns|refs) (Child[<Args>][:clabel] | [Child[<Args>][:clabel]])
 ```
 
-(spec §1170). The hint is a multi-class interface with **two type
-parameters in (parent, child) order**. The relation's identity, however,
-is a **four-tuple `(P, C, plabel, clabel)`** — the labels are required
-to distinguish multiple relations between the same `(P, C)` pair.
+(spec "Relations" — relation grammar). The hint is a multi-class
+interface with **two type parameters in (parent, child) order**. The
+relation's identity, however, is a **four-tuple `(P, C, plabel,
+clabel)`** — the labels are required to distinguish multiple relations
+between the same `(P, C)` pair.
 
 This is the root contradiction: **the hint's vocabulary is binary;
 the relation's identity is quaternary; the labels live below the
 type system and cannot be named from inside the hint's method
 bodies.**
 
-The spec's example (§1037) makes the problem visible:
+The spec's example (in "Interfaces and Multi-Class Contracts") makes
+the problem visible:
 
 ```lyric
 interface ArrayList<P, C> {
@@ -105,23 +112,23 @@ gets freed and its memory reused by an unrelated structure.
 
 ### 1.2 Three cascading symptoms
 
-1. **`Field vs Method Access for Relation Accessors` (spec §1216)** is
-   a hand-waved special case. The spec promises `team.roster_children`
-   (field) and `team.roster_children()` (method) are equivalent — but
-   only for the auto-injected accessor form. Hint method bodies
-   referencing `self.children` neither work as field access nor as
-   method call without the textual-rewrite scheme.
+1. **"Field vs Method Access for Relation Accessors"** is a hand-waved
+   special case. The spec promises `team.roster_children` (field) and
+   `team.roster_children()` (method) are equivalent — but only for the
+   auto-injected accessor form. Hint method bodies referencing
+   `self.children` neither work as field access nor as method call
+   without the textual-rewrite scheme.
 
-2. **`Any binary interface can serve as a hint` (spec §1170)** is too
-   generous. The spec's own §1037 example declares `interface Graph<G,
-   N, E>` (three type parameters); the `relation` grammar permits
-   exactly one parent and one child. Three-class interfaces cannot be
-   relation hints, but the spec doesn't say so.
+2. **"Any binary interface can serve as a hint"** is too generous. The
+   spec's own "Interfaces and Multi-Class Contracts" example declares
+   `interface Graph<G, N, E>` (three type parameters); the `relation`
+   grammar permits exactly one parent and one child. Three-class
+   interfaces cannot be relation hints, but the spec doesn't say so.
 
-3. **Free-function form `array_append<P, C>(p, c)` (spec §1190)** is
-   keyed only on `(P, C)`. When a parent has two same-hint same-child
-   relations, the free-function form is one symbol with two valid
-   expansions — and nothing in the type system breaks the tie.
+3. **Free-function form `array_append<P, C>(p, c)`** is keyed only on
+   `(P, C)`. When a parent has two same-hint same-child relations, the
+   free-function form is one symbol with two valid expansions — and
+   nothing in the type system breaks the tie.
 
 The deeper diagnosis: Lyric is trying to express *trait-with-
 associated-state-and-labels*, parameterized by `(parent_type,
@@ -163,7 +170,7 @@ The redesign separates four concerns that today's spec conflates:
 ┌─────────────────────────────────────────────────────────────────┐
 │ CAPABILITY  — small multi-class interfaces describe what an     │
 │               algorithm needs from a data structure.            │
-│               `ManyToOne<P, C>` is the universal relation-      │
+│               `Collection<P, C>` is the universal relation-      │
 │               shape; specialized capabilities (EdgeWeight,      │
 │               Numeric, HasRoot) cover what's not relational.    │
 └─────────────────────────────────────────────────────────────────┘
@@ -203,15 +210,19 @@ substitution, just deferred to where the types are known.
 
 ## 3. Storage Layer Rules
 
-### 3.1 Labels are scopes
+### 3.1 Labels are scopes; the empty label is flat
 
 A relation declaration
 
 ```lyric
-relation Hint Parent:plabel (owns|refs) [Child:clabel]
+relation Hint Parent[:plabel] (owns|refs) [Child[:clabel]]
 ```
 
-creates two scopes:
+creates two namespaces of member injection on the participating classes,
+parameterized by whether labels are present.
+
+**Labeled form** (`Parent:plabel ... [Child:clabel]`) creates two
+scopes:
 
 - `parent.plabel` on Parent — the parent-side view of the relation.
   Contains the hint's parent-side fields and methods (typically
@@ -223,7 +234,7 @@ creates two scopes:
 Inside each scope, member names are **not prefixed** — the scope name
 is the prefix. So a relation `Team:roster owns [Player:team]` produces:
 
-| Access form (new)              | Access form (today's spec)        |
+| Access form (labeled)          | Access form (today's spec)        |
 |--------------------------------|-----------------------------------|
 | `team.roster.children`         | `team.roster_children`            |
 | `team.roster.count`            | `team.roster_count`               |
@@ -231,13 +242,42 @@ is the prefix. So a relation `Team:roster owns [Player:team]` produces:
 | `player.team.parent`           | `player.team_parent`              |
 | `player.team.index`            | `player.team_index`               |
 
-Scopes are first-class enough to be:
+**Unlabeled form** (`Parent ... [Child]`, no `:label` on either side)
+injects all hint members **flat into the class namespace** — no scope.
+This is the common case: most relations between a (P, C) pair are
+unique, and labels are pure ceremony.
+
+```lyric
+relation DoublyLinked Folder owns [Folder]
+```
+
+…injects (on Folder, which is both P and C for a self-relation):
+
+- Parent-side: `first: Folder?`, `last: Folder?`, `append(Folder)`,
+  `remove(Folder)`, `iter() -> gen Folder`, `count: i32`.
+- Child-side: `parent: Folder?`, `next: Folder?`, `prev: Folder?`.
+
+The user writes `node.parent`, `node.iter()`, `node.append(child)`,
+`node.first`, etc. — directly on the class, no `.label.` prefix.
+
+**Mixed forms** (`Parent:label ... [Child]` — labeled on one side,
+unlabeled on the other) are allowed. The labeled side gets a scope;
+the unlabeled side injects flat.
+
+Scopes are first-class enough at the syntactic level to be:
 
 - **Iterable**: `for x in team.roster` iterates the children. (Iteration
   sugar is on TODO; explicit form `for x in team.roster.iter()` works
   today after migration.)
 - **Subject of method calls**: `team.roster.append(player)`.
 - **Subject of `len`**: `len(team.roster)` returns count.
+
+**Scopes are syntactic, not values.** A scope is a path in the name-
+resolution algorithm; it cannot be bound to a variable, passed as an
+argument, or stored in a field. `let s = team.roster` is a hard error
+("scope is not a value"). To pass relation data around, pass the
+underlying field (`team.roster.children` is the `[Player]` slice) or
+the parent class itself.
 
 ### 3.2 Cross-class relations: same-letter labels are legal
 
@@ -253,41 +293,57 @@ Produces `route.a`, `route.b` scopes on Route and `via.a`, `via.b`
 scopes on Via. No collision: `route.a` lives in Route's namespace,
 `via.a` lives in Via's. They never share a symbol table entry.
 
-### 3.3 Self-relations: distinct labels mandatory
+### 3.3 Multi-relation rule: at most one unlabeled per (P, C) pair
 
-When parent and child are the same class (a self-relation), both
-scopes live in one namespace, and the two labels must be distinct:
+Multiple relations between the same `(Parent, Child)` type pair are
+allowed, but **only one of them may be unlabeled**. The second must
+introduce labels on at least one side to disambiguate.
+
+For **self-relations** (where the parent and child class are the same),
+the same rule applies, but the namespace collision boundary tightens
+because both sides inject into one class:
 
 ```lyric
-// LEGAL — distinct labels:
+// LEGAL — unlabeled, single self-relation, P-side and C-side names
+// don't collide (children/iter/count/append/remove vs. parent/next/prev):
+relation DoublyLinked Folder owns [Folder]
+
+// LEGAL — labeled, role names express the direction-of-view:
 relation DoublyLinked Folder:children owns [Folder:parent]
 
-// ILLEGAL — collision in Folder's namespace:
-relation DoublyLinked Folder:a owns [Folder:a]
+// LEGAL — multiple self-relations require distinct labels:
+relation DoublyLinked TreeNode:left owns [TreeNode:lparent]
+relation DoublyLinked TreeNode:right owns [TreeNode:rparent]
+
+// ILLEGAL — two unlabeled relations on same (P, C) pair:
+relation ArrayList Team owns [Player]
+relation ArrayList Team owns [Player]   // ERROR: ambiguous
+
+// ILLEGAL — labels on a self-relation collide in one namespace:
+relation DoublyLinked Folder:a owns [Folder:a]   // ERROR
 ```
 
-The natural pair for trees is `children` / `parent` — role names that
-read as the direction-of-view from each side.
+The compiler enforces "at most one unlabeled" and "labels don't
+collide in any class's namespace" at the checker (Phase 1).
 
-### 3.4 Auto-projection of singleton child-side scopes
+For the existing three hints, the P-side and C-side member names never
+overlap, so a single unlabeled self-relation always works. A future
+hint that injects same-named members on both sides would force labels
+in self-relations — captured as a design constraint on new hints, not
+a language rule.
 
-A child-side scope of a many-to-one relation contains a back-pointer
-field `parent: P?` plus link-pointers (for doubly-linked) or an index
-(for ArrayList). When the scope name itself is referenced in a context
-expecting the parent type, it **auto-projects** to the `parent` field:
+### 3.4 (No auto-projection)
 
-```lyric
-let p: Folder? = node.parent              // auto-projects to node.parent.parent
-let n: Route? = via.a                     // auto-projects to via.a.parent (FPGA case)
-```
-
-The full scope handle is still accessible — `node.parent.next`,
-`node.parent.prev` for explicit link-pointer access. Auto-projection
-only fires when the use context demands the parent type.
-
-Auto-projection is what makes `is_root(n) = isnull(n.parent)` read
-naturally. Without it, the body would have to say `isnull(n.parent.parent)`,
-which reads as a double indirection and obscures intent.
+A previous draft proposed *auto-projection*: a child-side scope name
+in a context expecting the parent type would silently resolve to the
+scope's `.parent` field, so `via.a` would mean `via.a.parent` when
+assigned to a `Route?`-typed variable. **This is rejected.** Implicit
+unwrap is the same class of magic as the current spec's segfaulting
+auto-deref on optional class receivers, and it costs more in surprise
+than it pays in keystrokes. Adopters write `.parent` explicitly:
+`via.a.parent`, not `via.a`. The unlabeled flat form (§3.1) already
+gives clean reading for the common single-relation case (`node.parent`
+is just the back-pointer field, no scope at all).
 
 ### 3.5 `DoublyLinked` with `owns`/`refs` modifier
 
@@ -311,7 +367,8 @@ Three hint names, two modifiers. `owns`/`refs` becomes orthogonal:
 every hint can be either, with the modifier choosing destruction
 behavior (cascade vs. unlink). The `_method_aliases` global Dict and
 the per-relation rename map become unnecessary, because methods are
-addressed by their scope path, not by a prefixed name.
+addressed by their scope path (when labeled) or their flat class name
+(when unlabeled), not by a prefixed name.
 
 Migration is a one-line sed:
 `s/\bOwningList\b/DoublyLinked/g; s/\bRefList\b/DoublyLinked/g`
@@ -319,10 +376,10 @@ applied to source code. The `owns`/`refs` keyword stays as-is.
 
 ### 3.6 Hint interfaces declare members in `P.method` / `C.method` form
 
-Today's hint interfaces declare members in a flat namespace, relying on
-the desugar pass to apply textual label prefixes. Under the new design,
-hint interface declarations explicitly assign each member to either the
-parent-side scope (`P.method`) or the child-side scope (`C.method`):
+Interfaces that are used as relation hints declare each member as
+belonging to either the parent-side (`P.method`) or child-side
+(`C.method`). The desugar pass uses this annotation to decide which
+class each member injects into:
 
 ```lyric
 interface ArrayList<P, C> {
@@ -341,48 +398,104 @@ interface ArrayList<P, C> {
 }
 ```
 
-When the desugar pass instantiates this for `relation ArrayList
-Foo:bar owns [Baz:qux]`, it substitutes P=Foo and C=Baz throughout,
-placing parent-side members into `Foo.bar` scope and child-side
-members into `Baz.qux` scope.
+When the desugar pass instantiates this for a labeled relation
+(`relation ArrayList Foo:bar owns [Baz:qux]`), it substitutes P=Foo
+and C=Baz throughout, placing parent-side members into `Foo.bar` scope
+and child-side members into `Baz.qux` scope. For an unlabeled relation
+(`relation ArrayList Foo owns [Baz]`), members inject flat into Foo
+and Baz directly.
 
 The body of `append` references `self.children` — under substitution,
 this refers to the **same scope's** `children` field, which becomes
-`foo.bar.children`. Within a single relation's instantiation, all
-abstract names resolve unambiguously to the same scope.
+`foo.bar.children` (labeled) or `foo.children` (unlabeled). Within a
+single relation's instantiation, all abstract names resolve
+unambiguously to the same namespace.
 
-### 3.7 Per-class field injection on type variables
+### 3.7 Any interface may be a relation hint; the checker enforces fit
 
-When an interface declares a field on a type variable that is *not*
-participating in a relation declaration in its own body, the field is
-injected on the bound concrete class **once**, regardless of how many
-relations involve that type variable.
+There is **no special "hint interface" keyword**. One mechanism: an
+interface declares methods and `field T.name: Type` requirements.
+Field declarations get *injected* into the participating class(es)
+when the interface is bound — whether the binding comes from a
+`relation` declaration or from a generic where-clause. The injection
+rule is the same in both cases (one field per concrete class per
+distinct binding); only the binding mechanism differs.
 
-```lyric
-interface EdgeWeight<E, W: Numeric> {
-    field E.weight: W = W.zero()        // per-class field injection
-    pub func E.weight(self) -> W { return self.weight }
-}
+An interface may be used as the hint in a `relation` declaration iff
+the checker validates that it fits the relation-hint shape:
+
+1. **Exactly two type parameters**, in `(parent, child)` order. Zero,
+   one, or three+ is an error.
+2. **Each member is annotated with its side** via the `P.member` /
+   `C.member` declaration form. Members on the parent's type variable
+   land on the parent side; members on the child's type variable land
+   on the child side. A member that names neither type variable
+   (e.g., `func default_name() -> string` with no `P.` / `C.` prefix)
+   is an error in hint position.
+3. **Member bodies reference only same-side state.** A parent-side
+   method body may reference parent-side fields and methods; same for
+   child-side. Cross-side references inside a body are an error
+   (they're ill-defined under per-relation injection because there's
+   no way to name "the other side's instance" from inside one side's
+   method).
+
+When these conditions hold, the desugar pass can mechanically
+instantiate the interface for any `relation Hint P:l owns [C:m]`
+declaration, substituting P and C and routing members to the right
+scope (or flat, for unlabeled relations).
+
+When they don't hold, the checker emits a diagnostic at the
+`relation` declaration site, citing the interface declaration site
+and the specific failure:
+
+```
+error: cannot use MyContract as a relation hint
+   at example.ly:42:  relation MyContract Foo:bar owns [Baz:qux]
+   note: MyContract is declared at contracts.ly:10
+   reason: an interface used as a relation hint must have exactly 2
+           type parameters (parent, child); MyContract has 3 type
+           parameters <A, B, C>.
+   suggestion: split MyContract into a 2-parameter interface (for use
+               as the relation hint) plus a 3-parameter capability
+               interface, or use a different hint.
 ```
 
-A concrete class `Via` that satisfies `EdgeWeight<Via, f64>` gains a
-single `weight: f64` field, not one field per relation Via participates
-in. This eliminates the "duplicated weight under different prefixes"
-bug shape that would arise from naively applying per-relation prefixing
-to interface fields.
+```
+error: cannot use Display as a relation hint
+   at example.ly:42:  relation Display Widget:w owns [Panel:p]
+   note: Display is declared at ui.ly:5
+   reason: Display has methods that name no relation side
+           (`func to_string(self) -> string` is unscoped).  An
+           interface used as a relation hint must annotate every
+           member with `P.` or `C.`.
+```
 
-The distinction from hint interfaces: hint interface fields are
-declared on type variables that the hint expects to be relation
-participants, and they land in the per-relation scope. Non-hint
-interface fields land directly on the concrete class. The compiler
-distinguishes the two cases by whether the interface is being used as
-a relation hint (auto-detected from any `relation X ...` declaration
-referencing the interface) or as a capability interface (no relation
-declarations reference it).
+```
+error: cannot use Pairing as a relation hint
+   at example.ly:42:  relation Pairing Foo owns [Baz]
+   note: Pairing is declared at pairing.ly:8
+   reason: Pairing.P.merge body references `self.other` where `other`
+           is a C-side field.  Methods of an interface used as a
+           relation hint may reference only same-side members.
+```
 
-If the spec wants to be explicit, the keyword `hint interface` could
-mark hint-interface declarations. The implicit detection works for the
-existing three hints and is simpler.
+Why this approach beats a special keyword:
+
+- **No action-at-a-distance** — a `relation` declaration cannot
+  silently change anything about the interface; the interface's own
+  declaration is unchanged.
+- **One interface mechanism** — `interface` is the only keyword;
+  every interface declares contract + optional field injection.
+- **Checker catches misuse at the use site**, with a clean message
+  pointing back at both the relation and the interface. The cost is
+  three diagnostic rules in the checker, not a new keyword in the
+  language.
+
+The companion non-hint case (interfaces used purely as capabilities,
+never as relation hints) just works — they declare methods and
+optional fields; consumers satisfy them by providing those members.
+The `Collection`, `EdgeWeight`, `HasRoot`, and `Numeric` interfaces
+in §5 and §6.2 are examples.
 
 ---
 
@@ -421,10 +534,10 @@ and a method `func Class.name(self) -> T`, it is a **compile error**
 (naming collision). The user must rename one — fields use one name,
 computed properties use another, never the same name for both.
 
-This eliminates today's spec §1216 special case ("field == zero-arg
-method, for relation accessors only") by generalizing it to the
-universal rule: fields and zero-arg methods are interchangeable at the
-call site for any class scope, not just for relation-injected accessors.
+This eliminates today's spec "field vs method access for relation
+accessors" special case by generalizing it to the universal rule:
+fields and zero-arg methods are interchangeable at the call site for
+any class scope, not just for relation-injected accessors.
 
 ### 4.3 UFCS at call sites
 
@@ -473,7 +586,7 @@ the reader which interface slot this method satisfies.
 Method calls do not take explicit type arguments:
 
 ```lyric
-net.bfs(alice)                // OK
+net.bfs(alice)                    // OK
 net.bfs<Net, Route, Via>(alice)   // PARSE ERROR
 ```
 
@@ -488,14 +601,30 @@ arguments:
 > receiver determines the binding. If you need to pin a non-receiver
 > type parameter, use the free-function form: `bfs(net, alice)`.
 
-Free-function calls retain explicit type arguments for the legitimate
-case where a type parameter appears only in the return type or where-
-clause constraints (e.g., `make_vec<i32>()`, `parse<f64>("3.14")`).
+**Constructor and static-method calls are not method calls.**
+`Class<T>(args)` and `Class<T>.static_method(args)` retain explicit
+type arguments — there is no receiver to pin the type parameter from,
+so the user supplies it:
+
+```lyric
+let d = Dict<Sym, i32>()              // OK — constructor
+let ch = make_channel<i32>(10)        // OK — free function (already legal today)
+let s = StringBuilder<i32>.empty()    // OK — static method on parameterized class
+```
+
+The distinguishing rule: type arguments live on **the receiver/class
+name**, not on the method name. `Foo<T>.bar(...)` is fine; `foo.bar<T>(...)`
+is not.
+
+Free-function calls also retain explicit type arguments for the
+legitimate case where a type parameter appears only in the return
+type or where-clause constraints (e.g., `make_vec<i32>()`,
+`parse<f64>("3.14")`).
 
 ### 4.6 No free-function form of relation-derived methods
 
 Today's spec offers both `team.array_append(player)` and
-`array_append<Team, Player>(t, p)` (§1190). The free-function form is
+`array_append<Team, Player>(t, p)`. The free-function form is
 a holdover from the textual-prefix scheme and provides no expressive
 power that UFCS doesn't. It is removed in this redesign.
 
@@ -513,7 +642,7 @@ that declares a minimal contract. The universal capability for
 relation-shaped storage is:
 
 ```lyric
-interface ManyToOne<P, C> {
+interface Collection<P, C> {
     pub func P.iter(self) -> gen C
     pub func P.count(self) -> i32
     pub func C.parent(self) -> P?
@@ -521,11 +650,11 @@ interface ManyToOne<P, C> {
 ```
 
 Every relation hint (`ArrayList`, `DoublyLinked`, `HashedList`)
-automatically satisfies `ManyToOne<P, C>` because each provides
+automatically satisfies `Collection<P, C>` because each provides
 iter+count on the parent side and a parent back-pointer on the child
 side.
 
-Specialized capabilities cover what `ManyToOne` doesn't:
+Specialized capabilities cover what `Collection` doesn't:
 
 ```lyric
 interface Numeric<T> {
@@ -556,15 +685,15 @@ its own:
 
 ```lyric
 constraint DirectedGraph<G, N, E> =
-    ManyToOne<G:nodes, N:graph> +
-    ManyToOne<N:out,   E:source> +
-    ManyToOne<N:in,    E:target>
+    Collection<G:nodes, N:graph> +
+    Collection<N:out,   E:source> +
+    Collection<N:in,    E:target>
 
 constraint WeightedDirectedGraph<G, N, E, W> =
     DirectedGraph<G, N, E> + EdgeWeight<E, W>
 
 constraint Tree<T, N> =
-    HasRoot<T, N> + ManyToOne<N:children, N:parent>
+    HasRoot<T, N> + Collection<N:children, N:parent>
 ```
 
 Constraint aliases are pure naming substitution. The compiler expands
@@ -595,12 +724,12 @@ satisfies the constraint:
 
 ```lyric
 constraint DirectedGraph<G, N, E> =
-    ManyToOne<G:nodes, N:graph> +
-    ManyToOne<N:out,   E:source> +
-    ManyToOne<N:in,    E:target>
+    Collection<G:nodes, N:graph> +
+    Collection<N:out,   E:source> +
+    Collection<N:in,    E:target>
 ```
 
-`ManyToOne<N:out, E:source>` reads as "a `ManyToOne` whose parent
+`Collection<N:out, E:source>` reads as "a `Collection` whose parent
 scope is named `out` on N and whose child scope is named `source` on
 E." This is the syntactic mechanism for binding capability-interface
 slots to specific relation labels.
@@ -641,7 +770,7 @@ Two forms:
 **Long form** with method bodies:
 
 ```lyric
-impl ManyToOne<Route:out, Via:source> {
+impl Collection<Route:out, Via:source> {
     pub func P.iter(self) -> gen Via { for v in self.a { yield v } }
     pub func P.count(self) -> i32 { return len(self.a) }
     pub func C.parent(self) -> Route? { return self.a }
@@ -651,7 +780,7 @@ impl ManyToOne<Route:out, Via:source> {
 **Alias form** for pure label-renaming:
 
 ```lyric
-impl ManyToOne<Route:out, Via:source> = ManyToOne<Route:a, Via:a>
+impl Collection<Route:out, Via:source> = Collection<Route:a, Via:a>
 ```
 
 The alias form is sugar for the long form with delegation bodies. The
@@ -663,9 +792,9 @@ impl block on the constraint alias**:
 
 ```lyric
 impl DirectedGraph<Net, Route, Via> {
-    ManyToOne<Net:nodes, Route:graph> = ManyToOne<Net:routes, Route:net>
-    ManyToOne<Route:out, Via:source>  = ManyToOne<Route:a, Via:a>
-    ManyToOne<Route:in,  Via:target>  = ManyToOne<Route:b, Via:b>
+    Collection<Net:nodes, Route:graph> = Collection<Net:routes, Route:net>
+    Collection<Route:out, Via:source>  = Collection<Route:a, Via:a>
+    Collection<Route:in,  Via:target>  = Collection<Route:b, Via:b>
 }
 ```
 
@@ -730,11 +859,11 @@ interface Graph<G, N, E> {
 The `ParseGraph` non-method function desugars to:
 
 ```lyric
-pub func ParseGraph(spec: string) -> G? where Graph<G, N, E> { ... }
+pub func<G, N, E> ParseGraph(spec: string) -> G? where Graph<G, N, E> { ... }
 ```
 
-with G, N, E as inferred type parameters and `Graph<G, N, E>` as the
-implicit constraint. Callers invoke it via explicit instantiation:
+with G, N, E as the interface's type parameters and `Graph<G, N, E>`
+as the implicit constraint. Callers invoke via explicit instantiation:
 `ParseGraph<Net, Route, Via>("a -> b")` returns `Net?`.
 
 ### 5.8 Interface where-clauses are dropped (in favor of constraint aliases)
@@ -750,39 +879,95 @@ constraints under a name). Picking one mechanism keeps the spec
 smaller and removes the temptation to write methods inside a constraint-
 aggregator interface.
 
+### 5.9 Error message shape
+
+Three failure modes that show up at the `impl`/auto-derive boundary,
+with the diagnostic shape each should produce. Concrete examples
+serve as the bar for the implementation.
+
+**Auto-derive ambiguity** — multiple candidates match an interface
+method's name+signature in the class scope:
+
+```
+error: cannot auto-derive Graph<Net, Route, Via>:
+   method N.outgoing(self) -> gen Via is ambiguous on Route
+     candidates:
+       Route.a.iter (from relation :a)
+       Route.b.iter (from relation :b)
+   note: provide an explicit impl block to choose.
+   suggestion:
+       impl Graph<Net, Route, Via> {
+           Collection<Route:out, Via:source> = Collection<Route:a, Via:a>
+       }
+```
+
+**Constraint not satisfied** — at the use site of a generic
+algorithm, the receiver's type doesn't provide the required surface:
+
+```
+error: net.bfs(alice): constraint DirectedGraph<Network, Person, ?> not satisfied
+   missing: Collection<Person:out, ?:source>
+     no method Person.outgoing nor relation accessor matching :out on Person.
+   note: bfs is declared at graph.ly:114 with
+         where DirectedGraph<G, N, E>.
+   suggestion: add `relation DoublyLinked Person:out refs [Follow:source]`,
+               or provide an explicit impl block.
+```
+
+The error originates at the user's call site (`net.bfs(alice)`), not
+inside the synthesized generic body, so the user reads the failure in
+their own code.
+
+**Field/method collision** — Phase 1's universal unification rule:
+
+```
+error: Counter declares both `count: i32` (field) and `count(self) -> i32` (method).
+   field is at counter.ly:3
+   method is at counter.ly:7
+   note: field and zero-arg method names share a namespace; rename one.
+```
+
+These are the three commonest failure modes; others (e.g., destructor
+collision, hint-interface arity mismatch) follow the same pattern:
+quote the offending name, cite the two declaration sites, suggest the
+canonical fix.
+
 ---
 
 ## 6. Generic System Rules
 
-### 6.1 Implicit type parameter declaration
+### 6.1 Type parameters on function declarations are explicit
 
-A function's generic type parameters are inferred from its signature
-(receiver type + argument types + return type) and its where-clause.
-Any identifier used as a type that is not in lexical scope as a class
-or built-in is treated as a generic type parameter:
+Every generic type parameter on a function declaration must be declared
+explicitly inside `<>` between the `func` keyword and the function
+name (or, for class-scoped methods, between `func` and the receiver
+class name):
 
 ```lyric
-// Explicit (legal):
-pub func bfs<G, N, E>(g: G, start: N) -> [N] where DirectedGraph<G, N, E> { ... }
+// Free function:
+pub func<G, N, E> bfs(g: G, start: N) -> [N] where DirectedGraph<G, N, E> { ... }
 
-// Implicit (equivalent — preferred):
-pub func bfs(g: G, start: N) -> [N] where DirectedGraph<G, N, E> { ... }
+// Class-scoped method:
+pub func<G, N, E> G.bfs(self, start: N) -> [N] where DirectedGraph<G, N, E> { ... }
+
+// Multi-class impl method (type params inherited from the impl header):
+impl Graph<Net, Route, Via> {
+    pub func G.nodes(self) -> [Route] { return self.routes }
+}
 ```
 
-The compiler scans the signature and where-clause, collects identifiers
-that don't resolve to in-scope declarations, and treats them as
-generic type parameters. Order of declaration = order of first
-appearance in the signature scan, used for explicit instantiation
-(`bfs<Net, Route, Via>(...)`).
+This is the same explicit-declaration rule as today's spec. The
+redesign does **not** change it. A draft considered inferring type
+parameters from the signature scan; the original spec rationale ("a
+typo silently becomes a type variable") held up under review and the
+inference proposal was rejected.
 
-When the user wants to pin the parameter order for explicit
-instantiation (rare), the explicit `<G, N, E>` form remains available.
-
-Naming rule: **a type identifier is a generic parameter iff no
-declaration with that name is in scope.** No case-based rule (no
-"single capital letter is a type var"). This works for any naming
-convention; `Pair` and `Net` resolve as classes (in-scope), `G` and
-`T` resolve as type parameters (not in scope).
+**Call-site type inference is unchanged.** Callers still write
+`max(a, b)` and `identity(42)` without explicit type arguments —
+the compiler infers from argument types. Explicit type arguments at
+the call site remain optional for free functions
+(`bfs<Net, Route, Via>(net, start)`) and forbidden for method calls
+(see §4.5).
 
 ### 6.2 Numeric constraint
 
@@ -882,7 +1067,8 @@ The redesign deletes several pieces of today's machinery:
   the abstract name and the label-prefixed name). Method registration
   is just per-class-scope, no dual registration needed.
 
-- **The "field == zero-arg method" special case** (spec §1216). It
+- **The "field == zero-arg method" special case** (spec section
+  "Field vs Method Access for Relation Accessors"). It
   becomes the universal rule, not a relation-accessor-only sugar.
 
 - **The free-function form of relation-derived methods**
@@ -909,54 +1095,74 @@ construction, not by patching the existing machinery.
 
 ## 8. Spec Text Changes
 
-Concrete edits to `cr/docs/lyric-language-spec.md`:
+Concrete edits to `cr/docs/lyric-language-spec.md`. Section references
+use **names**, not line numbers (line numbers drift across edits).
 
 ### Additions
 
-- **§new "Capability Interfaces and Constraint Aliases"** — small
-  multi-class interfaces, constraint alias syntax (`constraint Name<...>
-  = ... + ...`), labels in where-clauses.
-- **§new "Methods as Class-Scoped Functions"** — declaration rules,
-  receiver explicitness contexts, UFCS at call sites, field/method
-  unification with collision-is-error.
-- **§new "Static Methods"** — distinguished by absence of `self`; call
-  via long-form `Class.method(args)`; interfaces may require them;
+- **New section "Capability Interfaces and Constraint Aliases"** —
+  small multi-class interfaces; constraint alias syntax
+  (`constraint Name<...> = ... + ...`); labels in where-clauses.
+- **New section "Interfaces as Relation Hints"** — the unified
+  `interface` mechanism; checker rules that validate an interface for
+  use as a relation hint (2 type params, `P.member`/`C.member` form,
+  no cross-side body references); diagnostic shapes when validation
+  fails.
+- **New section "Methods as Class-Scoped Functions"** — declaration
+  rules, receiver-explicitness contexts, UFCS at call sites,
+  field/method unification with collision-is-error.
+- **New section "Static Methods"** — distinguished by absence of `self`;
+  call via long-form `Class.method(args)`; interfaces may require them;
   static calls on type variables resolve at monomorphization.
-- **§new "Auto-Derive of Interface Satisfaction"** — three priority
-  rules (explicit impl > unique name match > ambiguous error);
-  examples for each.
-- **§new "Generic Type Parameter Inference"** — implicit declaration
-  from signature scan; explicit form remains available; ordering
-  semantics.
-- **§new "Desugar and Monomorphization"** — desugar handles concrete
-  bindings via text substitution; monomorphizer handles per-use-site
-  specialization; checker sees only concrete code.
-- **§new "Numeric Constraint"** — built-in constraint covering all
-  numeric types; declared methods (`zero`, `one`, `add`, `mul`);
+- **New section "Auto-Derive of Interface Satisfaction"** — three
+  priority rules (explicit impl > unique name match > ambiguous
+  error); examples for each.
+- **New section "Desugar and Monomorphization"** — desugar handles
+  concrete bindings via text substitution; monomorphizer handles per-
+  use-site specialization; checker sees only concrete code.
+- **New section "Numeric Constraint"** — built-in constraint covering
+  all numeric types; declared methods (`zero`, `one`, `add`, `mul`);
   algorithm-parameterization examples.
+- **New subsection "Error Message Shape"** — at least the three
+  worked examples from §5.9 of this doc.
 
 ### Edits to existing sections
 
-- **§1037 "Interfaces and Multi-Class Contracts"** — drop "where" on
-  the interface header (use constraint aliases); update impl-block
-  syntax to use type-variable-name receiver form for multi-class
-  impls; document the grouped-impl-on-constraint-alias sugar.
-- **§1166 "Relations"** — replace "labels prefix injected names" with
-  "labels are scopes"; remove the field-method-equivalence special
-  case (subsumed by the universal field/method unification rule);
-  rename `OwningList`/`RefList` to `DoublyLinked` with `owns`/`refs`
-  modifier; update the hint table.
-- **§1216 "Field vs Method Access for Relation Accessors"** —
-  generalized to all class scopes; no longer a special case.
-- **§1170 hint table** — three hints (`ArrayList`, `DoublyLinked`,
-  `HashedList`); cross-table with `owns`/`refs` modifiers.
-- **§1190 free-function form** — removed. Only UFCS method form
+- **"Interfaces and Multi-Class Contracts"** — drop the `where` clause
+  on the interface header (use constraint aliases); update impl-block
+  syntax to use type-variable-name receiver form for multi-class impls;
+  document the grouped-impl-on-constraint-alias sugar.
+- **"Relations"** — replace "labels prefix injected names" with the
+  two-rule structure: labeled = scope, unlabeled = flat injection;
+  document the "at most one unlabeled per (P, C) pair" rule; remove
+  the field-method-equivalence special case (subsumed by the universal
+  field/method unification rule); rename `OwningList`/`RefList` to
+  `DoublyLinked` with `owns`/`refs` modifier; update the hint table.
+- **"Field vs Method Access for Relation Accessors"** — generalized
+  to all class scopes; no longer a special case.
+- **Hint table** — three hints (`ArrayList`, `DoublyLinked`,
+  `HashedList`); cross-table with `owns`/`refs` modifiers. Hints are
+  declared as ordinary interfaces; the checker validates fit at the
+  `relation` declaration site (no special keyword).
+- **Free-function form of relation-derived methods**
+  (`array_append<P,C>(p, c)` etc.) — removed. Only UFCS method form
   remains.
+- **"Generics and Type Variables"** — type-parameter declaration on
+  function signatures is unchanged (explicit only); the redesign adds
+  the multi-class impl-header form (`impl<G, N, E> Graph<...>`) and
+  the constraint-alias form (`constraint Name<...> = ...`).
 
 ### Removals
 
-- **§1097 "short-form receiver" inside impl blocks** — replaced by the
-  receiver-explicitness rule (§4.4).
+- **"Short-form receiver" inside impl blocks** — replaced by the
+  receiver-explicitness rule (§4.4 of this doc).
+- **`embed` keyword** — the only consumers were `OwningList` and
+  `RefList`, both of which fold into `DoublyLinked` with the
+  `owns`/`refs` modifier (§3.5 of this doc). No other interface uses
+  `embed` today. Delete from lexer, parser, AST, desugar.
+- **Auto-projection of child-side scopes** — explicitly rejected
+  (§3.4 of this doc). Any earlier spec text proposing implicit
+  `scope` → `scope.parent` conversion is dropped.
 - **Any text suggesting `_method_aliases` or textual prefixing as
   the dispatch mechanism** — removed.
 
@@ -964,16 +1170,35 @@ Concrete edits to `cr/docs/lyric-language-spec.md`:
 
 ## 9. Implementation Phases
 
-Proposed order to build, each phase shippable and testable:
+Proposed order to build, each phase shippable and testable.
+
+### Phase 0 (prerequisite): Field/method collision audit
+
+Before Phase 1 lands the universal field/method unification rule,
+sweep the bootstrap source (`src/`, `stdlib/`, `testdata/`) for
+existing classes that declare a field and a method with the same
+name (e.g., `count: i32` alongside `func count(self) -> i32`). Each
+collision needs a manual rename decision (cached-field vs. computed-
+method semantic distinction).
+
+This is real work, not sed. Allocate one focused session. Block
+Phase 1 on its completion.
 
 ### Phase 1: Methods as class-scoped functions + UFCS
 
 - Implement field-auto-getter/setter.
 - Implement zero-arg-method-as-property sugar.
 - Implement assignment-as-setter sugar (`obj.field = v`).
-- Field/method collision-is-error.
+- Field/method collision-is-error — applies to **user-declared names
+  only** in this phase. Relation-injected names retain today's
+  flat-prefix scheme until Phase 3 reorganizes them into scopes;
+  the collision check on relation-injected names lands in Phase 3.
+  (Without this carve-out, every existing relation that injects a
+  `roster_children` field plus a `roster_children()` getter would
+  trip the new rule immediately.)
 - Migrate existing test data and stdlib to the new form (sed-grade
-  changes for getters; manual review for collisions).
+  changes for getters; manual review for the collisions identified
+  in Phase 0).
 
 **Why first**: smallest, most self-contained, no dependencies on the
 other phases. Pays for itself immediately in code readability.
@@ -982,36 +1207,67 @@ other phases. Pays for itself immediately in code readability.
 
 - Add `DoublyLinked` as a hint name accepting both `owns` and `refs`.
 - Mark `OwningList` and `RefList` as deprecated aliases (warning, not
-  error). 
+  error).
 - Migrate stdlib, ast.ly, testdata via sed.
 - Eventually remove the old names.
+- Delete the `embed` keyword and its lexer/parser/AST/desugar paths
+  (its only consumers were `OwningList` and `RefList`).
 
 **Why second**: also small, mostly mechanical. Independent of phases
 3-5. Cleans up the hint table before the bigger labels-as-scopes work.
 
 ### Phase 3: Labels-as-scopes for storage layer
 
-- Rewrite hint interface declarations to use `P.method` / `C.method`
-  receiver form.
+- Implement the checker's relation-hint shape validation: 2 type
+  params, `P.member`/`C.member` form on every member, no cross-side
+  body references. Emit clean diagnostics at the `relation`
+  declaration site (the three error shapes in §3.7) when validation
+  fails.
+- Rewrite hint interface declarations (`ArrayList`, `DoublyLinked`,
+  `HashedList`) to use `P.method` / `C.method` receiver form.
 - Rewrite desugar pass to emit relation-injected fields and methods
-  into per-relation scopes on parent and child classes.
+  into per-relation scopes on parent and child classes (labeled
+  relations) or flat into the class namespace (unlabeled relations).
 - Implement scope iteration (`for x in scope`), `len(scope)`.
-- Implement auto-projection of singleton child-side scopes.
+- Enforce the multi-relation rule: at most one unlabeled per `(P, C)`
+  pair; labels don't collide in any class's namespace.
+- Extend the field/method collision check (carved out in Phase 1) to
+  cover relation-injected names now that they live in proper scopes.
 - Delete `_method_aliases` and `_method_labels` globals; delete the
   per-relation rename map in `DesugarDestructors`; delete the
-  registerImplMethods dual-registration patch.
-- Migrate all user code from `obj.label_field` to `obj.label.field`.
+  `registerImplMethods` dual-registration patch.
 
 **Why third**: this is the architectural change. Phase 1 and 2 set
 the table; this phase rewrites the storage layer.
 
+### Phase 3.5: `lyric migrate` tool
+
+A standalone driver subcommand that rewrites a `.ly` source tree from
+the pre-Phase-3 syntax to the post-Phase-3 syntax:
+
+- `obj.label_field` → `obj.label.field` (labeled relations).
+- `obj.label_field` → `obj.field` (when the user's relation can be
+  expressed unlabeled — exactly one relation on its `(P, C)` pair).
+- `array_append<P, C>(p, c)` → `p.append(c)` (and similar for
+  `dll_append`, `hash_insert`, etc.).
+- `OwningList`/`RefList` → `DoublyLinked` (covered by Phase 2 sed,
+  but the tool absorbs it for one-shot migration).
+
+Implementation: reuses the compiler's relation table to disambiguate
+underscores (which are label separators vs. ordinary snake_case). Sed
+cannot do this reliably; a parser-aware tool can.
+
+Block migrating the bootstrap compiler on shipping this tool. The
+bootstrap source is ~30K lines; manual migration is not viable.
+
 ### Phase 4: Capability interfaces and constraint aliases
 
 - Implement `constraint Name<...> = A + B` declarations.
-- Implement labels-in-where-clauses syntax (`ManyToOne<N:out, E>`).
-- Implement aggressive auto-derive (three priority rules).
-- Implement the grouped-impl-on-constraint-alias sugar.
-- Add `ManyToOne` to the stdlib (auto-satisfied by all three hints).
+- Implement labels-in-where-clauses syntax (`Collection<N:out, E:source>`).
+- Implement aggressive auto-derive (three priority rules from §5.4).
+- Implement the grouped-impl-on-constraint-alias sugar (§5.5).
+- Implement the three error-message shapes from §5.9.
+- Add `Collection` to the stdlib (auto-satisfied by all three hints).
 
 **Why fourth**: depends on labels-as-scopes (Phase 3) for the
 constraint instantiations to work. Lays the groundwork for algorithm
@@ -1020,37 +1276,46 @@ libraries.
 ### Phase 5: Static methods + Numeric constraint
 
 - Implement `Numeric<T>` as a built-in constraint with built-in impls
-  for the numeric types.
-- Implement static-call resolution on type variables.
-- Document the `func T.method(self?, args)` syntax (presence of `self`
-  is the only distinction).
+  for the numeric types (`i8`–`i64`, `u8`–`u64`, `f32`, `f64`).
+- Implement static-call resolution on type variables (`T.zero()` when
+  `T: Numeric`).
+- Document the `func T.method(self?, args)` syntax (presence of
+  `self` is the only distinction between instance and static).
 
 **Why fifth**: enables generic numeric algorithms. Smaller than
 Phase 4. Could be done concurrently with Phase 4.
 
-### Phase 6: Implicit generic parameter declaration + parse-error on method-call type args
+### Phase 6: Parse-error on method-call type args + constructor exception
 
-- Implement signature-scan inference of type parameters.
 - Implement parse-error on `obj.method<T>(...)`.
+- Confirm `Class<T>(args)` and `Class<T>.static_method(args)` still
+  parse (the type args live on the class name, not the method name —
+  see §4.5).
 
-**Why last**: cosmetic improvements over the existing explicit form.
-No semantic change, just spec hygiene.
+**Why last**: smallest semantic change. Pure spec hygiene; the
+existing behavior of accepting `obj.method<T>(...)` is rare in
+practice and the parse-error is a five-minute change once the rest of
+the redesign is in.
 
 ---
 
 ## 10. Examples
 
-Two worked-out examples in `testdata/`, exercising the design end-to-end:
+Two worked-out examples in `testdata/`, exercising the design end-to-
+end:
 
-- **`testdata/graph.ly`** (312 lines) — multi-class capability
-  interfaces, constraint aliases, two consumer cases (FPGA antifuse
-  router with neutral labels requiring explicit binding; follower
+- **`testdata/graph.ly`** — multi-class capability interfaces,
+  constraint aliases, two consumer cases (FPGA antifuse router with
+  neutral labels requiring an explicit bridging impl; follower
   network with semantic labels auto-deriving everything). Demonstrates
-  the multi-relation-same-pair case that breaks today's spec.
-- **`testdata/tree.ly`** (204 lines) — self-relation case (Folder
-  owning Folders), constraint subsetting (algorithms that need only
-  the node-level capability vs. the full tree wrapper), auto-projection
-  of singleton scopes (`n.parent` returns `N?` directly).
+  the multi-relation-same-pair case that breaks today's spec, and the
+  use of labeled relations + labeled constraint signatures.
+- **`testdata/tree.ly`** — self-relation case (Folder owning Folders)
+  using the unlabeled-flat-injection form. Demonstrates that a
+  single self-relation needs no labels, constraint subsetting
+  (algorithms that need only the node-level capability vs. the full
+  tree wrapper), and that algorithm authors choose whether their
+  constraints carry labels (graph.ly does; tree.ly doesn't).
 
 Both files compile under the proposed design (assuming the
 implementation phases land). They do not compile under today's spec.
@@ -1058,6 +1323,32 @@ implementation phases land). They do not compile under today's spec.
 ---
 
 ## 11. Deferred / Open Questions
+
+### Decided in the 2026-06-21 review (kept here for the record)
+
+- **Implicit type parameter inference on function declarations** —
+  *rejected.* Explicit `<T>` declaration on decls is required (the
+  current spec rule survives); call-site inference is unchanged.
+  See §6.1.
+- **Special `hint interface` keyword** — *rejected.* One unified
+  `interface` mechanism. Any interface may be used as a relation
+  hint provided it passes the checker's shape validation (2 type
+  params, members in `P.method`/`C.method` form, no cross-side
+  references in bodies). The checker emits clean diagnostics at the
+  `relation` declaration site when the fit fails. See §3.7.
+- **Auto-projection of child-side scopes** — *rejected.* No implicit
+  `scope` → `scope.parent` conversion. See §3.4.
+- **`embed` keyword** — *removed.* Its only consumers (`OwningList`,
+  `RefList`) fold into `DoublyLinked` with the `owns`/`refs` modifier.
+  See §3.5 and Phase 2 in §9.
+- **Explicit `static` keyword** — *rejected.* Presence/absence of
+  `self` is the only distinction between instance and static methods.
+  See §5.6.
+- **Interface where-clauses retained as sugar** — *rejected.* Use
+  constraint aliases instead. See §5.8.
+- **`ManyToOne` naming** — *renamed to `Collection`.* The natural
+  English word for "P has a bunch of C's"; doesn't oversell
+  cardinality.
 
 ### Deferred to follow-up
 
@@ -1078,19 +1369,17 @@ implementation phases land). They do not compile under today's spec.
   SoA (parallel-array iteration). Implementation detail, not a design
   question.
 
-### Open questions for spec-writing time
+### Still-open questions for spec-writing time
 
-- **Explicit `static` keyword on declarations** as a marker, or
-  rely solely on presence/absence of `self`? Current proposal: no
-  keyword. Alternative: optional `static` for readability.
-- **Naming `ManyToOne` differently** (e.g., `Container`, `Aggregate`,
-  `Collection`). The current name describes the cardinality but not
-  what you do with it. Bike-shed candidate.
-- **Whether `field T.name` in non-hint interfaces should be explicitly
-  marked** (e.g., `inject field T.name`) vs. implicit (today's syntax).
-- **Whether to retain interface where-clauses** as a sugar that
-  desugars to constraint aliases. Current proposal: drop them. Open
-  if migration cost is prohibitive.
+- **Whether `field T.name` in capability (non-hint) interfaces should
+  be explicitly marked** (e.g., `inject field T.name`) vs. implicit
+  (`field T.name`). Today's syntax is ambiguous between "this
+  interface declares a field requirement" and "this interface
+  injects a field into the bound class." Under the unified-interface
+  model (§3.7), the distinction is whether the field is referenced by
+  a method body — in which case it must be injected so the body can
+  read/write it. Explicit marking would document intent at the point
+  of use, but isn't strictly necessary.
 
 ### Out of scope for this redesign
 
