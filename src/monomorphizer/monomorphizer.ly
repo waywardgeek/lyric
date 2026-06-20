@@ -3728,6 +3728,18 @@ func monomorphize(prog: LProgram?) {
     prog!.structs[i] = s
     i = i + 1
   }
+  // Rewrite global var types so generic class handles get mangled.
+  // Without this, c_backend falls back to class_renames[base_name],
+  // which is a single-entry-per-generic map keyed by the unmangled name,
+  // so unrelated globals (e.g. _method_aliases: Dict<Sym, string>?)
+  // pick up whichever Dict specialization was registered last.
+  i = 0
+  while i < len(prog!.globals) {
+    let mut g = prog!.globals[i]
+    g.typ = m.subst_type_remove_vars(g.typ)
+    prog!.globals[i] = g
+    i = i + 1
+  }
 
   // Phase 6: Resolve bare generic class names using per-function ClassRenameMap
   resolve_class_names(prog)
