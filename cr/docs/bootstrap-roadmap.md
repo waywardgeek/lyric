@@ -1,6 +1,8 @@
 # Lyric Roadmap
 
-*Updated 2026-06-13. Tracks completed work and remaining priorities.*
+*Updated 2026-06-20. Tracks completed work and remaining priorities.*
+
+For language-level bugs and surgical fixes, see `TODO.md` (especially the "Spec / Reference Cleanup Findings" section added 2026-06-20).
 
 ---
 
@@ -36,21 +38,76 @@
 
 ## Phase 4: Language Ergonomics
 
+### Type system soundness (spec/reference audit, 2026-06-20)
+
+- [ ] **Tighten `null` assignability** — currently assignable to every type; should be `T?` / class / interface / error only
+- [ ] **Tighten `as` cast** — currently accepts any target type; restrict to numeric ↔ numeric (or document as wide-cast and add other safety checks)
+- [ ] **Make narrowing / cross-sign integer assignment explicit** — today `i32 ↔ u8` is silent
+- [ ] **Enforce `implements I` method completeness** at check time (today: declarative only)
+- [ ] **Unify branch types for `if` / `match` as expressions** (today: first branch wins, others unchecked)
+
+### Operators (spec/reference audit, 2026-06-20)
+
+- [ ] **Add `~` (unary bitwise NOT)** — lexer has no token; LIR `UnBitNot` is phantom
+- [ ] **Add compound bit assigns**: `%= &= |= ^= <<= >>=`
+- [ ] **Fix bitwise precedence** — promote `& | ^ << >>` above non-integer ops (above `== != < <= > >=` and above `&& ||`). Today inherits C's broken precedence (`a & 1 == 0` mis-parses). Bitops take integers and return integers; arithmetic tier, not boolean tier
+- [ ] **Hex / octal / binary integer literals** (`0xFF`, `0o755`, `0b1010`)
+- [ ] **Integer type suffixes** (`123u64`)
+
+### Phantom / obsolete to remove (spec/reference audit, 2026-06-20)
+
+- [ ] **Remove `cascade { body }` from the language** — obsolete from earlier design; today's cascade lives in `owns` / `refs` on relations; current code path is a no-op
+- [ ] **Remove `defer` / `StDefer` / `LDeferData`** — no lexer token, no parser path, no use site
+- [ ] **Remove `Mutex` (capital M) recognition** in `lowerer.lower_named_type` — standardize on lowercase `lock`
+- [ ] **Rename `KNil` / `Nil` → `KNull` / `Null`** — kind name is historical; today the lexer emits it for `null`
+- [ ] **Decide `map[K]V` fate** — parses but C backend emits stub `void*`; either implement or remove from grammar
+- [ ] **Decide Go-style stdlib aliases fate** — `fmt.Println`, `strconv.Itoa`, etc. are hardcoded in `c_backend.emit_call_expr` and emit working code. Officially document as legacy or remove
+
+### Imports (spec/reference audit, 2026-06-20)
+
+- [ ] **Bare `import "path"` form** — null-derefs in `modules.ly:36`; reject in parser OR derive alias from path basename
+- [ ] **Recursive import resolution** — imports of imports today silently dropped
+- [ ] **`pub`-filtering on imports** — all declarations currently accessible
+- [ ] **Circular import detection**
+- [ ] **Parse `lyric.mod` content** — today only file existence matters
+- [ ] **Recursive subdirectory `.ly` discovery** in module mode
+
+### Desugar — error on silent skips (spec/reference audit, 2026-06-20)
+
+- [ ] Error on undefined `embed Iface`
+- [ ] Error on bad `relation Hint Parent ...` hint (today silently skipped)
+- [ ] Fix `Lock()` Stmt and `Match()` Expr enum-variant name collisions causing shallow-copy fallbacks in `deep_copy_*`
+
+### Function annotations (entire table currently roadmap)
+
+The function-annotation table in the spec (`requires:`, `ensures:`, `raises:`, `concurrent:`, `requires_lock`, `excludes_lock`, `spawns:`, `pure:`) is not parsed today. Only `guarded_by(name)` on class fields is implemented.
+
+- [ ] **`requires:` / `ensures:`** — pre/postconditions (initially design-doc; later runtime)
+- [ ] **`raises: E1, E2`** — named error conditions
+- [ ] **`requires_lock` / `excludes_lock`** — runtime enforcement of `guarded_by`
+- [ ] **`concurrent:` / `spawns:` / `pure:`** — concurrency / purity contracts
+- [ ] **`destroys` annotation** — compiler-inferred mark on functions that may destroy class instances; static UAF prevention
+- [ ] **`mut resize` annotation** — prevent element-access during slice resize
+
+### Larger numeric tower
+
+- [ ] **`i128 i256 u128 u256 f128`** — register in checker, add LType variants, emit via `__int128` / compiler-rt
+
 ### Must-Fix (high friction)
 
 - [ ] **`lyric fmt` lexer bug** — keywords inside string literals are tokenized as keywords, breaking formatting. Showstopper for dogfooding
 - [ ] **String methods** — `.contains()`, `.starts_with()`, `.split()`, `.replace()`, `.trim()` etc. via stdlib
 - [ ] **Generic sort** — stdlib sort function
-- [ ] **Map literal codegen** — `{"key": val}` syntax parses but lowerer has `// TODO`
-- [ ] **`for..in` on maps** — `for key, value in m { ... }`
+- [ ] **`for..in` on Dicts** — `for key, value in d { ... }` (today: `for k in d.keys()`)
 
 ### Should-Fix
 
-- [ ] **UTF-8 support** — lexer is ASCII-only. Need proper UTF-8 decoding for identifiers and string ops
+- [ ] **UTF-8 support** — lexer is ASCII-only; `string` operations are byte-oriented. Need: `\u{NNNN}` escapes, code-point iteration (`for c in s.chars()`), Unicode-aware case ops, normalization. Keep `string` as type name; UTF-8 sits on top
+- [ ] **`Hashable.equals`** — interface today requires only `get_hash`; add `equals` to make hash tables work correctly with custom keys
 - [ ] **Error stack traces** — currently errors are bare strings; add source location
-- [ ] **Generic HashMap** — `map[K]V` with non-string keys (currently Dict is string-keyed only)
 - [ ] **Deep `==` for structs and slices** — field-by-field / element-by-element comparison
 - [ ] **`not` keyword** — `not x` as alternative to `!x`
+- [ ] **Generic lambdas** — lambda type_param_names is always empty today
 
 ### Nice-to-Have
 
@@ -58,7 +115,9 @@
 - [ ] **UFCS** — `x.foo()` as sugar for `foo(x)`
 - [ ] **Named impls** — `as byEmail` disambiguation
 - [ ] **First-arg-wins type inference** — reduce need for explicit `<T>`
-- [ ] **Checker-side generic constraint validation** — currently only at monomorphization
+- [ ] **Checker-side generic constraint validation** — currently only structural at monomorphization; user-defined constraints accepted but minimally validated
+- [ ] **Block comments** `/* */`
+- [ ] **`.ly` formatter** — today `lyric fmt` handles `.lyric` only
 
 ---
 
@@ -93,7 +152,12 @@ AST/LIR/C backend support exists for spawn/channels/select/lock. Needs hardening
 - [ ] **Source maps** — map C output back to Lyric source for debugging
 - [ ] **LLVM backend** — optimization beyond GCC; eventual C backend replacement
 - [ ] **Package manager** — dependency resolution, versioning
-- [ ] **i128/i256 support** — via compiler-rt or `__int128`
+- [ ] **i128/i256 support** — via compiler-rt or `__int128` (also listed under Phase 4)
+- [ ] **Per-test timing** in test runner output (or remove `(0.1ms)` from documented examples)
+- [ ] **`assert_eq_approx`** for floats
+- [ ] **Test filtering** (`lyric test --filter pattern`)
+- [ ] **Rewrite `lyric.lyric`** (stale — describes the old Go-compiler `pkg/` layout)
+- [ ] **Rewrite `stdlib/stdlib.lyric`** header (references `pkg/ast/stdlib.go`)
 
 ---
 

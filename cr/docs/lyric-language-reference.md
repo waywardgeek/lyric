@@ -1,429 +1,480 @@
 # Lyric Language Reference
 
-Concise reference for writing Lyric code. Based on parser, checker, stdlib, and test files as of 2026-06-16.
+Daily-driver reference for Lyric (`.ly`) code. Every feature listed here is implemented today — verified against the bootstrap compiler in `src/`, the stdlib in `stdlib/`, and the test suite in `testdata/`. For aspirational features see `lyric-language-spec.md`. For the active backlog see `cr/docs/bootstrap-roadmap.md` and `TODO.md`.
 
-## Bootstrap Philosophy
+*Source of truth: bootstrap compiler self-compiles to a fixed point. Last reviewed 2026-06-20.*
 
-**The #1 goal of the bootstrap is to make Lyric as awesome as Go — maybe even better — for writing compilers.** The bootstrap compiler is being ported from Go to Lyric. Every time we hit jank, friction, or missing features, we fix the compiler rather than work around the issue. The bootstrap process is the design feedback loop that makes Lyric great.
+---
 
-**Key principles:**
-- Don't work around language issues — fix them in the compiler
-- If something feels janky, that's a signal to improve the language
-- The bootstrap .ly files (ast.ly, lexer.ly, parser.ly, etc.) are the primary test of language ergonomics
-- Target: C backend via monomorphization (Go backend deleted)
-
-## Modules and Packages
-
-### Package = Directory
-
-A **package** is a directory of `.ly` files. All `.ly` files in a directory belong to the same package. The package name is the **directory name** (not the filename).
-
-```
-myproject/
-  lyric.mod              # module root
-  main.ly                # package "myproject" (or "main" if entry point)
-  ast/
-    ast.ly               # package "ast"
-    expr.ly              # package "ast" (same directory)
-  parser/
-    parser.ly            # package "parser"
-    expr_parser.ly       # package "parser"
-```
-
-All `.ly` files within a package are merged into a single compilation unit — declaration order across files doesn't matter.
-
-### Module = Project
-
-A **module** is a project rooted at a `lyric.mod` file. A module defines the import path prefix and is the unit of compilation — it produces either a program binary or a shared library.
-
-```
-# lyric.mod
-module github.com/user/mycompiler
-```
-
-### Imports
-
-Import a package by name — the compiler resolves it to a directory relative to the module root:
+## 1. File Structure
 
 ```lyric
+// optional: lyric <BlockName> { ... } wrapper. When absent, bare top-level
+// declarations belong to the directory's package.
+
 import ast
 import parser
 
 func main() {
-  let file = parser.parse("hello.ly")
-  let node = ast.new_node("expr")
-  print(node.name)
+    println("hello")
 }
 ```
 
-The package name is both the import identifier and the directory name. Access is always qualified: `ast.Node`, `parser.parse()`.
+- A **package** is a directory of `.ly` files. All files in a directory share one namespace.
+- A **module** is a directory containing a `lyric.mod` marker file. The file's *content* is reserved for future use; only its presence matters today.
+- Newlines terminate statements. Inside `()` and `[]` newlines are whitespace. Inside `{}` they are not (statement blocks).
+- Comments: `//` to end of line. No block comments.
+- One file may contain multiple `lyric BlockName { ... }` blocks.
 
-**Visibility**: Only `pub` declarations are accessible through an import. Non-pub declarations are package-private.
+## 2. Lexical Structure
+
+### Hard keywords
+```
+as       break       case        cascade      class       continue
+destructor   else    embed       enum         false       for
+from     func        if          impl         import      in
+interface     is     let         lyric        match       mut
+null     owns        pub         refs         relation    return
+select   self        spawn       struct       true        type
+where    while       yield
+```
+
+### Contextual keywords (lex as identifiers; can be used as identifier names)
+- Modifiers: `permanent`, `trusted`, `final`
+- Field annotations: `field`, `lock`, `implements`, `guarded_by`
+- Type names: `gen`, `channel`, `unit`, `error`, `fn`, `map`
+- Built-ins used as functions: `ref`, `unref`, `isnull`, `sym`, `default`
+
+### Literals
+
+| Form | Examples | Notes |
+|---|---|---|
+| Integer | `42`, `1_000_000` | Default type `i32`. Underscores allowed. No `0x`/`0o`/`0b` prefixes (roadmap). No type suffix. |
+| Float | `1.5`, `3.14` | Default type `f64`. `1.` alone does not parse. |
+| Char | `'a'`, `'\n'`, `'\xFF'` | A `u8` byte. Escapes: `\n \r \t \\ \' \" \0 \xHH`. No `\u` (roadmap: UTF-8). |
+| String | `"hello"` | UTF-8 bytes. Same escapes as char. |
+| Triple | `"""..."""` | Preserves newlines. Content is `str_trim`-ed. |
+| F-string | `f"x={x + 1}"` | `{expr}` interpolates; `{{` and `}}` escape braces. |
+| Backtick sym | `` `name` `` | Sugar for `sym("name")`. |
+| Bool | `true`, `false` | |
+| Null | `null` | The only null literal. `nil` is not accepted. |
+
+## 3. Primitive Types
+
+| Type | Implemented |
+|---|---|
+| `bool` | ✓ |
+| `i8 i16 i32 i64` | ✓ |
+| `u8 u16 u32 u64` | ✓ |
+| `f32 f64` | ✓ |
+| `string` | ✓ (a byte slice — see §6) |
+| `unit` | ✓ (function return only; the void type) |
+| `any` | ✓ (top type / interface dispatch) |
+| `error` | ✓ (built-in interface — see §11) |
+| `int`, `uint` | ✓ (platform-width; mostly for stdlib interop) |
+
+Larger int/float widths (`i128/i256/u128/u256/f128`) are on the roadmap.
+
+- Default integer literal type: `i32`. Cast with `x as u64`.
+- Implicit numeric widening: smaller → larger (`i32 + i64` → `i64`). Cross-sign assignment is also implicit (loose; explicit `as` is good style).
+
+## 4. Composite Types
+
+```
+T?              // optional (nullable)
+T | U           // union (tagged)
+[T]             // slice — fat pointer (data + len + cap)
+(T, U)          // tuple — positional, access via ._0 ._1
+fn(T1, T2) -> R // function type (also accepts func(...) or T -> U for single-arg)
+channel<T>      // CSP channel
+lock            // mutex type (lowercase)
+gen T           // generator return type
+```
+
+Tuples are positional. Access via `t._0`, `t._1`. Destructure with `let (a, b) = t`.
+
+**Note**: `map[K]V` is reserved syntax that compiles to a stub today. Use `Dict<K,V>` (stdlib) for hash maps.
+
+## 5. Variables and Bindings
 
 ```lyric
-// ast/ast.ly
-pub struct Node { name: string }     // visible to importers
-func helper() -> i32 { return 42 }  // package-private
+let x = 42                  // immutable
+let mut y: i32 = 0          // mutable
+let x: i32                  // declared, assigned later (statement scope)
+let _ = expr                // discard
+let (a, b) = pair()         // tuple destructure
+let ref view = data[5:10]   // zero-copy view
+let mut ref buf = packet[0:16]
 ```
 
-**Cycle detection**: Circular imports are a compile error.
+Grammar: `let [mut] [ref] (name | (name1, name2, ...) | Pat(bindings)) [: Type] [= expr]`.
 
-**Nested packages**: For packages in subdirectories, use a path with an alias:
-```lyric
-import v2 from "parser/v2"
-```
+Module-level `let` and `let mut` are allowed (compile to C `static` globals).
 
-### The `lyric` Block (Optional)
+- **Copy-on-assign** for value types (primitives, structs, tuples, slices).
+- **`ref` bindings** create a zero-copy view; the source must outlive the binding.
+- **Move semantics** are inferred: single-use locals transfer ownership (no retain+release).
 
-```lyric
-lyric BlockName {
-  // types, functions, relations, impls, constants
-}
-```
+## 6. Strings
 
-The `lyric` wrapper is optional. Bare `.ly` files with top-level declarations are valid — the package name comes from the directory, not the block name or filename:
-
-```lyric
-// ast/expr.ly — no wrapper needed, package is "ast"
-enum Color { Red, Green, Blue }
-func greet(name: string) -> string { return f"Hello {name}" }
-```
-
-When a `lyric` block is present, its name is used for C symbol prefixing but does not affect the package name.
-
-### Compilation Model
-
-Lyric compiles an entire module at once — all packages are resolved, merged with namespace prefixing, and emitted as a single C file compiled to one binary. There is no separate compilation of individual files or packages.
-
-```bash
-lyric compile .                       # compile module in current directory
-lyric compile ~/projects/mycompiler/  # compile module at path
-lyric compile main.ly -o myprogram    # single-file, no module needed
-lyric compile main.ly ast.ly          # multi-file, no module needed
-```
-
-When given a directory, the compiler looks for `lyric.mod`, finds `main()` in the root package, and recursively resolves all imports. When given a `.ly` file, it checks parent directories for `lyric.mod` — if found, uses module mode; otherwise, single-file mode.
-
-The stdlib (`stdlib/std.ly`, `stdlib/string.ly`, etc.) is auto-imported into all packages.
-
-
-## Newlines and Multi-line Expressions
-
-Newlines are statement terminators. However, **inside `()` and `[]` brackets, newlines are treated as whitespace**, enabling multi-line expressions:
+Strings are byte slices (`string == [u8]` internally) with a hidden trailing `\0` for C interop. Indexing returns `u8`; slicing returns a new string sharing backing data.
 
 ```lyric
-let result = add(
-    first_arg,
-    second_arg,
-    third_arg
-)
-
-let xs: [i32] = [
-    10, 20, 30,
-    40, 50, 60
-]
+let s = "hello"
+let ch = s[0]            // u8 (104)
+let sub = s[1:4]          // "ell"
+let cat = "hello" + " world"
 ```
 
-Note: `{}` braces do NOT suppress newlines (they delimit blocks with statements).
+UTF-8-aware operations (`\u{...}` escapes, code-point iteration) are on the roadmap. Today, `len(s)` and `s.char_at(i)` are byte-oriented.
 
-## Primitives
+### Built-in string methods
+| Method | Returns | Notes |
+|---|---|---|
+| `s.len()`, `s.length()` | `i32` | byte length |
+| `s.is_empty()` | `bool` | |
+| `s.contains(sub)` | `bool` | |
+| `s.has_prefix(p)`, `s.starts_with(p)` | `bool` | synonyms |
+| `s.has_suffix(p)`, `s.ends_with(p)` | `bool` | synonyms |
+| `s.index_of(sub)` | `i32` | -1 if not found |
+| `s.substring(lo, hi)` | `string` | also use `s[lo:hi]` |
+| `s.char_at(i)` | `string` | one-byte string |
+| `s.trim()`, `s.to_lower()`, `s.to_upper()` | `string` | |
+| `s.replace(old, new)` | `string` | all occurrences |
+| `s.repeat(n)` | `string` | |
+| `s.split(sep)` | `[string]` | |
+| `s.join(parts)` | `string` | (on a separator string) |
 
-`bool`, `u8`, `u16`, `u32`, `u64`, `u128`, `u256`, `i8`, `i16`, `i32`, `i64`, `i128`, `i256`, `f32`, `f64`, `f128`, `string`, `unit`, `any`
+### Stdlib string utilities (`stdlib/string.ly`, namespace `string_utils`)
+`str_concat`, `str_split_n`, `str_trim_left`, `str_trim_right`, `str_replace`, `str_repeat`, `str_join`, `str_has_prefix`, `str_has_suffix`, `str_index_of`, `str_to_upper`, `str_to_lower`. Same byte-oriented semantics.
 
-- Default integer literal: `i32`. Cast with `x as u64`.
-- Implicit numeric widening: smaller types widen to larger in binary ops (e.g. `i32 + i64` → `i64`).
-- `unit` — void/no-value type (for functions with no return value).
-- `int`/`uint` — platform-width, Go interop only. NOT part of the Lyric numeric tower.
-- `any` — stdlib union alias / `void*`.
-- Character literals: `'A'` → `u8` (65). Escapes: `\n \r \t \\ \' \" \0 \x##`.
-- Both `null` and `null` accepted by the lexer (mapped to the same token).
+## 7. Slices
 
-## Type Expressions
-
-```
-T?                  // optional (nullable)
-T | U               // union type (exhaustively typed)
-[T]                 // slice (fat pointer: data + len + cap)
-(T1, T2)            // tuple (access via ._0, ._1)
-fn(T1, T2) -> R     // function type
-channel<T>          // channel
-```
-
-**No built-in `map[K]V`** — use `Dict<K,V>` from stdlib (see [Stdlib Classes](#stdlib-classes)).
-
-## Slices
-
-Slices are dynamic arrays: a fat pointer with `data`, `len`, and `cap`. Type syntax: `[T]`.
+`[T]` is a dynamic array — fat pointer (data + len + cap). Assignment copies the slice header; backing storage is shared (parameter passing) or copied (variable assignment).
 
 ```lyric
 let xs: [i32] = [1, 2, 3]
 let empty: [string] = []
+xs[0]                // index
+xs[1:3]              // sub-slice (shares backing)
+let more = xs + [4, 5, 6]
 ```
 
-**Indexing and slicing:**
-```lyric
-xs[0]               // element access (0-indexed)
-xs[1:3]             // sub-slice [low:high) — shares underlying data
-```
+### Built-ins
+- `len(xs)` — length (`i32`)
+- `append(xs, elem)` — return new slice
 
-**Concatenation:**
-```lyric
-let combined = xs + [4, 5, 6]   // returns new slice
-xs.extend(other)                 // append other's elements in-place
-```
+### Methods
+| Method | Returns | Mutates |
+|---|---|---|
+| `xs.len()`, `xs.length()` | `i32` | |
+| `xs.is_empty()` | `bool` | |
+| `xs.push(x)`, `xs.append(x)` | `unit` | ✓ |
+| `xs.pop()` | `T` | ✓ |
+| `xs.contains(x)` | `bool` | |
+| `xs.index_of(x)`, `xs.find(x)` | `i32` | |
+| `xs.first()`, `xs.last()` | `T?` | |
+| `xs.sort()`, `xs.reverse()`, `xs.clear()` | `unit` | ✓ |
+| `xs.remove(x)` | `unit` | ✓ |
+| `xs.extend(other)` | `unit` | ✓ |
+| `xs.join(sep)` | `string` | (on `[string]`) |
+| `xs.slice(lo, hi)` | `[T]` | |
 
-**Builtin functions:**
-```lyric
-len(xs)             // length
-append(xs, 42)      // returns new slice with element appended
-```
+Mutating methods on a class field (e.g. `obj.items.push(x)`) automatically use a reference to avoid copy-then-discard.
 
-**Methods:**
-```lyric
-xs.push(elem)       // append in-place (mutates xs)
-xs.pop()             // remove and return last element
-xs.len()             // same as len(xs)
-xs.contains(elem)    // linear search, returns bool
-xs.index_of(elem)    // returns i32 index, -1 if not found
-xs.first()           // returns T? (null if empty)
-xs.last()            // returns T? (null if empty)
-xs.is_empty()        // returns bool
-xs.sort()            // in-place sort
-xs.reverse()         // in-place reverse
-xs.remove(elem)      // remove first occurrence
-xs.join(sep)         // join string slice with separator → string
-xs.extend(other)     // append all elements of other in-place
-```
+## 8. Structs
 
-**Mutating methods** (`.push`, `.pop`, `.sort`, `.reverse`, `.remove`, `.clear`, `.extend`) modify the receiver in-place. When called on a class field (`obj.items.push(x)`), the compiler automatically uses a reference to avoid the copy-then-discard problem.
-
-## Strings
-
-Strings are `[u8]` byte slices. String literals create `lyric_string` values (length-prefixed, with hidden trailing `\0` for C interop).
+Value types — copied on assign, no identity, no methods.
 
 ```lyric
-let s = "hello"
-let ch = s[0]          // u8 (104)
-let sub = s[1:4]       // "ell" — sub-slice, shares data
+struct Point { x: f64, y: f64 }
+struct Range<T> { lo: T, hi: T }
+
+let p = Point { x: 1.0, y: 2.0 }       // named-field literal
+let q = Point { 1.0, 2.0 }             // positional — only inside parens/args/lists
+struct Config { timeout: u32 = 30 }     // field defaults
+let cfg = Config {}                     // uses defaults
 ```
 
-**Concatenation:**
-```lyric
-let s = "hello" + " world"   // returns new string
-push_bytes(dst, src)          // append src bytes to dst in-place
-```
+Structs cannot be relation targets.
 
-**Methods:**
-```lyric
-s.len()              // byte length (i32)
-s.contains(needle)   // bool
-s.has_prefix(p)      // bool
-s.has_suffix(p)      // bool
-s.index_of(needle)   // i32 (-1 if not found)
-s.is_empty()         // bool
-s.trim()             // strip whitespace from both ends → new string
-s.to_lower()         // → new string
-s.to_upper()         // → new string
-s.replace(old, new)  // replace all occurrences → new string
-s.repeat(n)          // repeat n times → new string
-s.split(sep)         // → [string]
-s.char_at(i)         // → string (single-byte string)
-```
+## 9. Classes
 
-**Stdlib** (`string.ly`): `str_concat(a, b)`, `str_split_n(s, sep, n)`, `str_trim_left(s)`, `str_trim_right(s)`, `str_replace(s, old, new)`, `str_repeat(s, n)`, `str_join(parts, sep)`, `str_has_prefix(s, p)`, `str_has_suffix(s, p)`, `str_index_of(s, needle)`, `str_to_upper(s)`, `str_to_lower(s)`.
-
-## Structs (Value Types)
-
-```lyric
-struct Point {
-  x: f64
-  y: f64
-}
-```
-
-- Copied by value. No methods (use classes for methods).
-- Direct field access: `p.x`.
-- Fields can have defaults: `width: i32 = 800`.
-- **Generic structs are supported**: `struct Pair<T> { first: T, second: T }`.
-- Positional construction inside expressions: `Point { 1.0, 2.0 }` (inside parens, brackets, or arg lists where `{` is unambiguous).
-- Cannot be relation targets (no identity, no heap allocation).
-
-## Classes (Heap-Allocated, By Reference)
+Heap-allocated, by reference. Identity. Methods. Eligible for relations and RC.
 
 ```lyric
 class Counter {
     count: i32
     items: [string]
 
-    func increment(self) {
-        self.count = self.count + 1
-    }
-
-    func get(self) -> i32 {
-        return self.count
-    }
+    func increment(self) { self.count = self.count + 1 }
+    func get(self) -> i32 { return self.count }
 }
 
-// Struct-literal construction
 let c = Counter { count: 10 }
 c.increment()
 ```
 
-- Fields declared in body. Unset fields zero-initialized.
-- Fields can have defaults: `count: i32 = 0`.
-- `pub` prefix for public fields: `pub name: string`.
-- Construction uses struct-literal syntax: `ClassName { field: value }`.
-- `self` for receiver. Direct field access: `self.count`.
-- Generic: `class Pair<T> { first: T  second: T }`
-- `.destroy()` — deterministic destruction (from relation destructors).
+- Construction: struct-literal `Counter { count: 10 }` when no explicit constructor.
+- **Explicit constructor**: `func ClassName(self, args) { ... }` — call site uses `Counter(args)`.
+- **Generics**: `class Pair<T> { first: T  second: T }`; construction `Pair<i32> { first: 1, second: 2 }`.
+- **`final func name(self)`** — pre-destruction hook, runs before the auto-generated `destroy`.
+- **`implements I1, I2`** — declares interface satisfaction (declarative today; method completeness is not yet checker-enforced — runtime/codegen will fail).
+- **`permanent class`** — opt out of refcounting / destruction. Never freed. Used for singletons like `SymTable`.
+- **No inheritance.** Use interfaces.
 
-### Explicit Constructors
+### Auto-generated destruction
+Every non-permanent class gets a `pub func destroy(mut self)` generated by the compiler from `owns`/`refs` relations. You do not write it. Use `final` for pre-destroy cleanup.
 
-```lyric
-class HttpClient {
-    url: string
-    timeout: u32 = 30
-    pool: ConnectionPool?
+Execution order on destroy: `final` → relation cascade/unlink → slab free.
 
-    func HttpClient(self, base_url: string, timeout: u32) {
-        self.url = base_url
-        self.timeout = timeout
-        self.pool = ConnectionPool { base_url: base_url }
-    }
-}
-
-// Call syntax when explicit constructor exists
-let client = HttpClient("http://api.com", 60)
-```
-
-Without an explicit constructor, only struct-literal syntax is allowed.
-
-### `final` Function
-
-Classes may declare a `final` function, called immediately before the auto-generated destructor:
+## 10. Enums
 
 ```lyric
-class Connection {
-    fd: i32
-    final func cleanup(self) {
-        close_fd(self.fd)
-    }
-}
-```
+enum Color { Red, Green, Blue }                // simple — compiles to C typedef enum
 
-Execution order on `.destroy()`: `final` → auto-destructor (cascade + unlink) → free slot.
-
-### No Inheritance
-
-Lyric does not support classical inheritance. Classes can declare `implements` to signal interface satisfaction (compiler-checked):
-
-```lyric
-class Task implements Displayable, Prioritizable { ... }
-```
-
-Shared behavior belongs in interfaces or in separate classes held as dependencies.
-
-## Enums
-
-```lyric
-// Simple (no associated data — emits C typedef enum)
-enum Color { Red Green Blue }
-
-// With associated data (tagged union)
 enum Shape {
-  Circle(radius: f64)
-  Rect(w: f64, h: f64)
-  Point
+    Circle(radius: f64)
+    Rect(w: f64, h: f64)
+    Point
 }
 
-// Qualified access
 let c = Color.Red
 ```
 
-Match on enums:
+### Match
 ```lyric
 match shape {
-  Circle(r) => { println(f"radius: {r}") }
-  Rect(w, h) => { println(f"{w}x{h}") }
-  Point => { println("point") }
+    Circle(r) => { println(f"radius: {r}") }
+    Rect(w, h) => { println(f"{w}x{h}") }
+    Point => { println("point") }
 }
-```
 
-### Multi-pattern match arms
-
-Multiple patterns per arm separated by `|`:
-```lyric
+// multi-pattern
 match kind {
-  OPlus | OMinus => { PREC_ADDITIVE }
-  OStar | OSlash | OPercent => { PREC_MULT }
-  OEqEq | OBangEq => { PREC_EQUALITY }
-  _ => { PREC_NONE }
+    OPlus | OMinus => { PREC_ADDITIVE }
+    _ => { PREC_NONE }
 }
-```
 
-This works for simple variants, variants with bindings (if all alternatives bind the same names), and wildcard `_`.
-
-### Match guards
-
-```lyric
+// guards
 match token {
-  Ident(name) if name == "self" => { handle_self() }
-  Ident(name) => { handle_ident(name) }
-  _ => { handle_other() }
+    Ident(name) if name == "self" => { handle_self() }
+    Ident(name) => { handle_ident(name) }
+    _ => {}
 }
-```
 
-### Match as expression
-
-`match` can be used as an expression (returns a value):
-```lyric
+// match as expression
 let prec = match kind {
-  OPlus => { 9 }
-  OStar => { 10 }
-  _ => { 0 }
+    OPlus => { 9 }
+    _ => { 0 }
+}
+
+// qualified-variant patterns
+match k { ExprKind.Call(f, args) => { ... } _ => {} }
+
+// tuple patterns
+match (x, y) {
+    (1, 2) => { ... }
+    (a, b) if a > b => { ... }
+    (_, _) => {}
 }
 ```
 
-### Match on non-enum values
+**Context-driven disambiguation**: When two enums share a variant name (e.g. `Pair`), the construction `Pair(a, b)` resolves by the expected field type at the use site.
 
-Match works on enum types. For non-enum dispatch, use `if`/`else if` chains.
+### Variant check: `is`
+```lyric
+if expr.kind is ExprCall { ... }
+if !(node is Leaf) { ... }
+```
+`is` returns `bool` and does not bind.
 
-### `if let` — conditional pattern match
+### `if let` and `let..else`
+```lyric
+if let Circle(r) = shape { println(r) } else { println("not a circle") }
 
-Extract a single variant without a full `match`:
+// extract or bail; else must diverge
+let Circle(r) = shape else { return -1.0 }
+println(r)  // r in scope here
+```
+
+## 11. Interfaces
+
+Multi-class interfaces declare relationships between type parameters.
 
 ```lyric
-if let Circle(r) = shape {
-    println(f"radius: {r}")
-} else {
-    println("not a circle")
+interface Graph<G, N, E> {
+    func G.nodes(self) -> [N]
+    func N.out_edges(self) -> [E]
+    func E.tgt_node(self) -> N
+
+    pub func count_edges(graph: G) -> i32 {
+        let mut total = 0
+        let nodes = graph.nodes()
+        for n in nodes { total = total + len(n.out_edges()) }
+        return total
+    }
+
+    field P.parent: G?            // injects fields into implementing classes
+    destructor P { ... }
+}
+
+interface OwningList<P, C> {
+    embed DoublyLinked<P, C>      // copies fields and destructors (not methods)
+    destructor P { ... }
 }
 ```
 
-Bindings (`r`) are scoped to the then-block. The `else` branch is optional.
-
-### `let..else` — assertive pattern extract
-
-Extract variant data into the surrounding scope, with a mandatory diverging `else`:
-
+### Impl blocks
 ```lyric
-let Circle(r) = shape else {
-    return -1.0
+// Alias: interface method ↔ class method
+impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
+    G.nodes = SimpleGraph.get_nodes
+    N.out_edges = SimpleNode.get_edges
+    E.tgt_node = SimpleEdge.get_target
 }
-// r is now in scope
-println(f"radius: {r}")
+
+// Field bind: interface field ↔ concrete field
+impl DoublyLinked<Folder, File> {
+    P.children <-> Folder.items
+    C.label <-> File.title
+}
+
+// Inline body
+impl Printable<Widget> {
+    P.to_string = (self) -> string { return f"Widget({self.name})" }
+}
 ```
 
-The `else` block must diverge (`return`, `break`, `continue`). Bindings escape into the outer scope — this avoids rightward drift for the common "extract or bail" pattern.
-
-## Type Aliases
+### `error` interface
+Built-in. Any class with a `message(self) -> string` method satisfies it.
 
 ```lyric
-type Name = string
-type Callback = fn(i32) -> bool
+class ParseError {
+    msg: string
+    pub func message(self) -> string { return self.msg }
+}
 ```
 
-## Union Types
+### `where` clauses
+```lyric
+func clamp<T: Comparable>(v: T, lo: T, hi: T) -> T { ... }
+func count<P, C>(p: P) -> i32 where DoublyLinked<P, C> { ... }
+```
+
+Built-in constraints: `Comparable` (numeric, string, bool), `Equatable` (numeric, string, bool), `Hashable` (`Sym`, numeric, bool — **not** `string`; wrap with `sym()`).
+
+## 12. Relations
+
+Declare ownership using a stdlib interface as a hint. The compiler injects fields, generates impl bindings, and writes destructors.
+
+```
+relation Hint Parent[:p_label] (owns | refs) [Child[:c_label]]
+```
+
+- `Hint` ∈ `ArrayList | OwningList | RefList | HashedList`.
+- `owns`: cascade-destroy children when parent destroyed.
+- `refs`: unlink children only (children survive).
+- **Labels** prefix the injected field/method names.
+
+```lyric
+class Team { name: string }
+class Player { name: string }
+
+relation ArrayList Team:roster owns [Player:team]
+```
+
+Injected: `Team.roster_children: [Player]`, `Player.team_parent: Team?`, `Player.team_index: i32`.
+Functions: `array_append<Team, Player>(t, p)`, `array_remove<Team, Player>(p)`.
+
+| Hint | Functions | Notes |
+|---|---|---|
+| `ArrayList` | `array_append`, `array_remove` | O(1) swap-remove |
+| `OwningList` | `dll_append`, `dll_remove` | doubly-linked, cascade destroy |
+| `RefList` | `dll_append`, `dll_remove` | doubly-linked, no cascade |
+| `HashedList` | `hash_insert`, `hash_lookup`, `hash_remove` | open-addressing, 75% load factor; child must implement `hash_key(self) -> u64` |
+
+Relations support generic class participants (`relation HashedList Dict<K, V>:d owns [DictEntry<K, V>:d]`).
+
+## 13. Functions
+
+```lyric
+func add(a: i32, b: i32) -> i32 { return a + b }
+
+pub func public_fn() { ... }
+
+// generic
+func identity<T>(x: T) -> T { return x }
+
+// external method (multi-class interface pattern)
+func T.method(self) -> i32 { ... }
+
+// lambda — two equivalent syntaxes
+let f = (x: i32) -> i32 { return x * 2 }
+let g = |x: i32| -> i32 { x * 2 }
+```
+
+`func` declares functions. `fn` is the canonical type-syntax keyword (`fn(i32) -> bool`); `func(...) -> R` and `T -> U` (single-arg) also parse.
+
+Lambdas may not be generic. Lambdas capture variables from their enclosing scope.
+
+### Mutable parameters
+```lyric
+struct Point { x: i32, y: i32 }
+func translate(mut p: Point, dx: i32, dy: i32) { p.x = p.x + dx }
+
+let mut pt = Point { x: 10, y: 20 }
+translate(mut pt, 5, 0)        // `mut` required on both sides
+translate(mut points[0], 1, 0) // slice elements OK
+```
+
+Rules:
+- `mut` required on both the parameter and the call site (Swift `inout` pattern).
+- Don't use `mut` on class parameters — classes are already references, and `mut` creates double-pointer segfaults.
+- `mut self` is accepted but redundant; mutation through `self` is always allowed.
+
+### Field annotations
+```lyric
+class Counter {
+    count: i32 guarded_by(mu)
+    mu: lock
+}
+```
+`guarded_by(name)` declares thread-safety intent. It is parsed and stored; runtime enforcement is on the roadmap.
+
+## 14. Optional and Error Handling
+
+### Optional ops
+```lyric
+let v: i32 = opt!              // unwrap; panics if null
+if !isnull(result) { ... }     // explicit null test
+if result != null { ... }      // also works (equivalent)
+```
+
+Implicit wrapping: `T` is assignable to `T?` without conversion. Empty `[]`, empty `{}`, and `null` infer their type from context (variable type, function param type, field type, return type).
+
+### `(T, error)` and `?`
+Go-style. Functions that can fail return `(T, error)`:
+
+```lyric
+func divide(a: i32, b: i32) -> (i32, error) {
+    if b == 0 { return (0, Error { msg: "division by zero" }) }
+    return (a / b, null)
+}
+
+func compute(x: i32) -> (i32, error) {
+    let r = divide(x, 2)?         // propagates error on failure; r is i32
+    return (r, null)
+}
+
+let (val, err) = divide(10, 2)    // explicit destructure also works
+```
+
+Rules for `?`: operand returns `(T, error)`; enclosing function returns `(..., error)`; statement-level only.
+
+There is **no** `try` / `catch` / `throw`. `?` is the "try operator" in the Rust sense.
+
+## 15. Union Types
 
 ```lyric
 let value: string | i32 = 42
@@ -436,562 +487,236 @@ func process(x: string | i32) -> string {
 }
 ```
 
-Any member type is assignable to the union. C backend emits tagged unions; Go backend emits `any` with `switch val.(type)`.
+Any member type is assignable to the union; a union is assignable to another type only if all variants match.
 
-## Variables & Constants
-
-```lyric
-let x = 42              // immutable
-let mut y: i32 = 0      // mutable, typed
-let ref view = data[5:10]     // immutable view (no copy, shared backing)
-let mut ref buf = packet[0:16] // mutable view (write through, no copy)
-```
-
-**Copy-on-assign**: Assignment always copies for value types (primitives, structs, tuples, slices). `let mut y = x` creates an independent mutable copy.
-
-**`ref` bindings**: `let ref` creates a zero-copy view into existing data instead of copying. Useful for parsing, serialization, and crypto. The source must outlive the `ref` binding. `let mut ref` allows writing through the view.
-
-**Binding grammar**: `let [mut] [ref] name [: Type] = expr`
-
-**Top-level constants** can be declared directly inside `lyric` blocks:
-
-```lyric
-lyric parser {
-  let PREC_NONE: i32 = 0
-  let PREC_OR: i32 = 1
-  // ...
-}
-```
-
-These compile to `static` globals in C.
-
-## Control Flow
+## 16. Control Flow
 
 ```lyric
 if cond { ... } else if cond2 { ... } else { ... }
-
-// if-expression (both branches required, same type)
-let result = if cond { a } else { b }
+let r = if cond { a } else { b }           // expression form requires else
 
 while cond { ... }
-
 for item in collection { ... }
 for item, idx in collection { ... }
-
-match expr {
-  Pattern => ...
-}
 ```
 
-### Variant Check: `is`
+Block scoping: any `{ ... }` creates a new scope. `let x = 1; { let x = 2; ... }; ...` works.
+
+## 17. Concurrency
 
 ```lyric
-if expr.kind is ExprCall { ... }
-if !(node is Leaf) { ... }
-```
+spawn { do_work() }
 
-Returns `bool`. Does not bind variables — use `if let` for destructuring.
+let ch: channel<i32> = make_channel<i32>()           // unbuffered
+let ch2 = make_channel<i32>(10)                       // buffered
+ch.send(42)
+let v = ch.receive()                                  // also: ch.recv()
+ch.close()
 
-### Type Casts: `as`
-
-Postfix `as` for numeric conversions:
-```lyric
-let x: i32 = 42
-let y: i64 = x as i64        // widen
-let z: i32 = y as i32        // narrow (may truncate)
-```
-
-Only numeric ↔ numeric casts are supported. All casts are unchecked.
-
-### Block Scoping
-
-Lyric has block-level scoping. Any `{ }` block creates a new scope — variables declared inside are local to that block:
-
-```lyric
-func example() {
-    let x = 1
-    {
-        let x = 2       // shadows outer x, legal
-        println(x)      // prints 2
-    }
-    println(x)          // prints 1
-}
-```
-
-## Functions
-
-```lyric
-func add(a: i32, b: i32) -> i32 { return a + b }
-
-pub func public_fn() { ... }
-
-// Generic
-func identity<T>(x: T) -> T { return x }
-
-// External method (multi-class interface pattern)
-func T.method(self) -> i32 { ... }
-
-// Lambdas (two syntaxes)
-let f = (x: i32) -> i32 { return x * 2 }       // paren-lambda
-let g = |x: i32| -> i32 { return x * 2 }       // pipe-lambda
-```
-
-`func` is the function declaration keyword. `fn` is for type syntax only (e.g., `fn(i32) -> bool`) and is a contextual keyword — it can be used as a variable name. `func` and `fn` are interchangeable in declarations.
-
-### Mutable Parameters (`mut`)
-
-Structs are value types — passing them to a function copies them.
-Use `mut` on both the parameter declaration and call site to pass by mutable reference:
-
-```lyric
-struct Point { x: i32, y: i32 }
-
-func translate(mut p: Point, dx: i32, dy: i32) {
-    p.x = p.x + dx   // modifies caller's copy
-    p.y = p.y + dy
+select {
+    case v = ch.receive() => { use(v) }
+    case ch2.send(99)     => { ... }
+    default               => { ... }
 }
 
-let mut pt = Point { x: 10, y: 20 }
-translate(mut pt, 5, 3)
-assert_eq(pt.x, 15)   // mutation visible to caller
+let mu: lock
+lock(mu) { critical_section() }                       // scoped
 ```
 
-Slice elements can also be passed as `mut`, enabling in-place mutation:
+C backend uses pthreads. **Known limitations** (see roadmap):
+- `spawn` captures variables **by pointer** → races possible. Use channels for safe sharing.
+- `select` uses a `usleep(100)` polling loop — not real wait/notify.
+- `receive()` on a closed channel returns the zero value with no `(value, ok)` signal.
+
+## 18. Generators
 
 ```lyric
-func double_x(mut p: Point) {
-    p.x = p.x * 2
+func range(start: i32, end: i32) -> gen i32 {
+    let mut i = start
+    while i < end { yield i; i = i + 1 }
 }
 
-let mut points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
-double_x(mut points[0])   // mutates the element in-place
-assert_eq(points[0].x, 2) // doubled
-assert_eq(points[1].x, 3) // unchanged
+for val in range(0, 10) { println(val) }
 ```
 
-Rules:
-- `mut` required on both parameter and call site (prevents accidental mutation)
-- Variables and slice element accesses can be passed as `mut`
-- For classes (already heap-allocated), `mut` is unnecessary — they're already pointers
-- Don't use `mut` on class params — creates double-pointer segfaults
-- In C backend: `mut` params become `T*`, call sites emit `&x` or `&slice.data[i]`
-
-## Try Operator and Error Handling
-
-Lyric uses `(T, error)` tuples for error handling, similar to Go.
-
-### The `error` interface
-
-`error` is a built-in interface declared in stdlib:
-
-```lyric
-interface error {
-  func error.message(self) -> string
-}
-```
-
-Any class with a `message(self) -> string` method satisfies `error` via structural subtyping. The stdlib provides a default concrete implementation:
-
-```lyric
-class Error {
-    msg: string
-    pub func message(self) -> string { return self.msg }
-}
-```
-
-### Custom error types
-
-```lyric
-class ParseError {
-    msg: string
-    span: Span
-    source_line: string
-
-    pub func message(self) -> string {
-        return f"{self.span.start.line}: {self.msg}"
-    }
-}
-```
-
-Any class with `message(self) -> string` can be used where `error` is expected.
-
-### The `?` operator
-
-The `?` operator propagates errors from `(T, error)` returns:
-
-```lyric
-func load() -> (string, error) {
-  let data = read_file("x.txt")?    // propagates error on failure, data is string
-  return (data, null)
-}
-```
-
-`?` unwraps the success value: after `let x = foo()?`, `x` is `T` (not `T?`). If the error is non-null, the function returns immediately with the error.
-
-Statement-level only. Containing function must return `(T, error)`.
-
-## F-strings
-
-```lyric
-let msg = f"Hello {name}, count={x + 1}"
-```
-
-Escaped braces: `{{` → literal `{`, `}}` → literal `}`.
-
-### Triple-quote Strings
-
-Triple-quoted strings preserve newlines and don't require escaping quotes:
-
-```lyric
-let sql = """
-    SELECT *
-    FROM users
-    WHERE name = "Alice"
-"""
-```
-
-## Multi-Class Interfaces
-
-Interfaces span multiple type parameters, defining relationships between types.
-
-```lyric
-interface Graph<G, N, E> {
-  // Abstract methods bound to type params
-  func G.nodes(self) -> [N]
-  func N.out_edges(self) -> [E]
-  func E.tgt_node(self) -> N
-
-  // Default method
-  pub func count_edges(graph: G) -> i32 {
-    let mut total: i32 = 0
-    let nodes = graph.nodes()
-    let mut i: i32 = 0
-    while i < len(nodes) {
-      total = total + len(nodes[i].out_edges())
-      i = i + 1
-    }
-    return total
-  }
-
-  // Field injection — adds fields to implementing classes
-  field P.first: C?
-  field C.parent: P?
-
-  // Destructor injection
-  destructor P { ... }
-  destructor C { ... }
-}
-```
-
-### Interface Embedding
-
-```lyric
-interface OwningList<P, C> {
-  embed DoublyLinked<P, C>    // copies fields and destructors (not methods)
-  destructor P { ... }        // can add/override
-}
-```
-
-### Impl Blocks
-
-```lyric
-// Alias: wire interface method → class method
-impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
-  G.nodes = SimpleGraph.get_nodes
-  N.out_edges = SimpleNode.get_edges
-  E.tgt_node = SimpleEdge.get_target
-}
-
-// Field bind: wire interface field → concrete field
-impl DoublyLinked<Folder, File> {
-  P.children <-> Folder.items
-  C.label <-> File.title
-}
-
-// Inline implementation
-impl Printable<Widget> {
-  P.to_string = (self) -> string { return f"Widget({self.name})" }
-}
-```
-
-### Where Clauses
-
-```lyric
-pub func count<P, C>(p: P) -> i32 where DoublyLinked<P, C> {
-  return len(p.children())
-}
-```
-
-## Relations
-
-Relations declare ownership between classes using stdlib interfaces. They trigger field injection and auto-generate impl bindings.
-
-**Syntax:**
-```
-relation [Hint] Parent[:parent_label] owns|refs [Child[:child_label]]
-```
-
-- **Hint** — stdlib interface name (ArrayList, OwningList, RefList, HashedList)
-- **Labels** — prefix for injected field names. Parent label prefixes parent's fields, child label prefixes child's fields.
-- **owns** — cascade destroy children when parent destroyed
-- **refs** — unlink children when parent destroyed (no cascade)
-
-### ArrayList — dynamic array ownership
-
-```lyric
-class Team {
-    name: string
-}
-class Player {
-    name: string
-}
-
-relation ArrayList Team:roster owns [Player:team]
-
-impl ArrayList<Team, Player> {
-  P.children <-> Team.roster_children
-}
-```
-
-Injected fields: `Team.roster_children: [Player]`, `Player.team_parent: Team?`, `Player.team_index: i32`.
-
-Functions: `array_append<Team, Player>(t, p)`, `array_remove<Team, Player>(p)`.
-
-### OwningList — doubly-linked list, cascade destroy
-
-```lyric
-relation OwningList Team:team owns [Player:player]
-```
-
-Injected fields: `Team.team_first: Player?`, `Team.team_last: Player?`, `Player.player_next: Player?`, `Player.player_prev: Player?`, `Player.player_parent: Team?`.
-
-Functions: `dll_append<Team, Player>(t, p)`, `dll_remove<Team, Player>(p)`.
-
-### RefList — doubly-linked list, no cascade
-
-```lyric
-relation RefList Room:room refs [Guest:guest]
-```
-
-Same fields as OwningList but parent destruction only unlinks, doesn't destroy children.
-
-### HashedList — hash table ownership
-
-```lyric
-class Entry {
-    key: u64
-    value: i32
-
-    pub func hash_key(self) -> u64 { return self.key }
-}
-
-relation HashedList Registry:reg owns [Entry:entry]
-
-impl HashedList<Registry, Entry> {
-  P.children <-> Registry.reg_children
-  P.buckets <-> Registry.reg_buckets
-  P.hash_cap <-> Registry.reg_hash_cap
-  P.hash_count <-> Registry.reg_hash_count
-  C.parent <-> Entry.entry_parent
-  C.index <-> Entry.entry_index
-}
-```
-
-Child must implement `hash_key(self) -> u64`. Functions: `hash_insert`, `hash_lookup`, `hash_remove`, `hash_init`.
-
-## Builtins
-
-**Core:**
-- `len(x)` — length of slice, string, or map
-- `append(slice, elem)` — returns new slice with element appended
-- `push_bytes(dst, src)` — append string `src` bytes to string `dst` in-place
-- `println(x)`, `print(x)`, `eprint(x)`, `eprintln(x)` — output (auto `to_string`)
-- `isnull(x)` — test if optional/class is null
-
-**Strings:**
-- `hash_string(s) -> u64`
-- `itoa(n) -> string` — integer to string
-- `atoi(s) -> (i64, bool)` — string to integer
-- `char_to_string(b) -> string` — single byte to string
-
-**IO/OS:**
-- `read_file(path) -> (string, bool)`, `write_file(path, content) -> bool`
-- `os_args() -> [string]`, `os_exit(code)`, `os_getwd() -> string`
-- `exec_command(name, args) -> (string, bool)`
-- `path_join(parts: [string]) -> string`, `path_dir(p)`, `path_base(p)`, `path_ext(p)`
-- `list_dir(path) -> ([string], bool)`, `file_exists(path) -> bool`, `mkdtemp() -> string`
-
-**Testing:** `assert(cond, msg)`, `assert_eq(actual, expected, msg)`. See [Testing](#testing).
-
-**Operators:**
-- `x!` — unwrap optional (panic if null)
-- `expr as T` — type cast
-- `x[i]` — index into slice/string
-- `x[lo:hi]` — sub-slice
-- `+` — addition for numerics; concatenation for strings and slices (returns new value)
-
-## Testing
-
-Lyric has built-in testing support. No frameworks, no ceremony — just assertions, a naming convention, and a CLI command.
-
-### Test Functions
-
-Any function whose name starts with `test_` is a test. No arguments, no return value:
-
-```lyric
-func test_lexer_keywords() {
-    let lex = Lexer { source: "if else while" }
-    let tok = lex.next()
-    assert_eq(tok.kind, TIf, "expected if keyword")
-}
-
-func test_lower_type_primitives() {
-    let lowerer = Lowerer { temp_id: 0, scope: Dict<Sym, LType> {} }
-    let te = TypeExpr { kind: TEIdent, name: "i32" }
-    let lt = lowerer.lower_type(te)
-    assert(!isnull(lt), "should resolve i32")
-    assert_eq(lt!.kind, TyI32, "should be TyI32")
-}
-```
-
-### Assertions
-
-Two builtins, both compiler-provided (they inject file and line automatically):
-
-| Builtin | Behavior |
+The stdlib provides `range(start, end) -> gen i32`. C backend uses a Duff's-device state machine.
+
+## 19. Memory Model
+
+- **Primitives** — registers/stack.
+- **Structs / tuples** — stack, copied on assign. `mut` params pass by reference (scoped).
+- **Classes** — slab-allocated. Two modes: **AoS** (default, pointer handles) and **SoA** (`--soa` flag, `u32` handles + parallel arrays). Owned classes destroyed via their owning relation; unowned classes are refcounted.
+- **Slices `[T]`** — fat pointer. Assignment copies the header; backing storage shared. `let ref` creates a zero-copy view.
+- **Relations** — ownership graph. `owns` cascades destroy; `refs` only unlinks.
+- **Scope-exit freeing** — escape analysis injects free calls for locally-allocated slices and non-escaping classes.
+- **`final`** — pre-destroy hook on classes.
+- **`trusted`** — functions / blocks where manual `ref(x)` and `unref(x)` are allowed.
+- **`permanent`** — class never freed, never refcounted. Pairing with a relation produces a compiler warning.
+- **Inferred moves** — single-use locals transfer ownership instead of retain+release.
+
+There is no GC, no borrow checker, and no lifetime annotations.
+
+## 20. Built-in Functions
+
+| Function | Signature | |
+|---|---|---|
+| `len(x)` | `[T] \| string -> i32` | |
+| `append(xs, e)` | `([T], T) -> [T]` | new slice |
+| `push_bytes(dst, src)` | `(mut string, string) -> unit` | in-place byte append |
+| `print`, `println`, `eprint`, `eprintln` | `(any...) -> unit` | auto `to_string` |
+| `panic(msg)` | `string -> unit` | aborts |
+| `exit(code)` | `i32 -> unit` | process exit |
+| `isnull(x)` | `T? -> bool` | |
+| `assert(cond, msg)` | `(bool, string) -> unit` | injects file/line — see §22 |
+| `assert_eq(a, b, msg?)` | `(T, T, string?) -> unit` | message optional |
+| `to_string(x)` | `any -> string` | auto-generated for every type |
+| `format(fmt, args...)` | | f-string-like |
+| `sym(s)` | `string -> Sym` | also `` `name` `` |
+| `hash_string(s)` | `string -> u64` | FNV-1a |
+| `itoa(n) atoi(s)` | | int↔string; atoi returns `(i64, bool)` |
+| `parse_float(s)` | `string -> (f64, bool)` | |
+| `char_to_string(b)` | `u8 -> string` | |
+| `string_to_bytes(s)`, `bytes_to_string(b)` | | byte-slice / string conversion |
+| `new_string_builder()` | `-> StringBuilder` | |
+| `new_error(msg)` | `string -> Error` | shortcut |
+| `make_channel<T>()` / `make_channel<T>(n)` | | unbuffered / buffered |
+
+### Character predicates
+`char_is_digit`, `char_is_alpha`, `char_is_space`, `char_is_upper`, `char_is_lower`, `char_is_alnum` — all `u8 -> bool`.
+
+### Files & OS
+`read_file(path)` → `(string, bool)`, `write_file(path, content)` → `bool`, `os_args()`, `os_exit(code)`, `os_getwd()`, `exec_command(name, args)` → `(string, bool)`, `path_join(parts)`, `path_dir(p)`, `path_base(p)`, `path_ext(p)`, `list_dir(path)` → `([string], bool)`, `file_exists(path)`, `mkdtemp()`.
+
+### Relation functions (manually callable in `trusted` contexts)
+`array_append`, `array_remove`, `dll_append`, `dll_remove`, `hash_insert`, `hash_lookup`, `hash_remove`. (`hash_init`, `hash_rehash`, `hash_find_slot` exist but are internal.)
+
+## 21. Stdlib Classes
+
+| Class | Notes |
 |---|---|
-| `assert(cond, msg)` | If `cond` is false, prints `FAIL file:line: msg` and exits with code 1 |
-| `assert_eq(a, b, msg)` | If `a != b`, prints `FAIL file:line: msg` with expected/actual values and exits with code 1 |
+| `Sym` | Interned symbol with pre-computed FNV-1a hash. `sym("name")` or `` `name` ``. `get_name() -> string`, `get_hash() -> u64`. Implements `Hashable`. |
+| `Dict<K, V>` | Hash table where `K: Hashable`. Constructor `Dict<K,V>()`. Methods: `set(k, v)`, `get(k) -> DictEntry<K,V>?`, `has(k) -> bool`, `remove(k) -> bool`, `keys() -> [K]`, `len()` / `length()`. |
+| `DictEntry<K, V>` | Fields `key: K`, `value: V`. |
+| `Hashable` | Interface with `get_hash(self) -> u64`. (Note: `equals(self, other) -> bool` is on the roadmap.) |
+| `Comparable`, `Equatable` | Built-in constraints — see §11. |
+| `Error` | `{ msg: string }`. `message() -> string`. |
+| `StringBuilder` | `write(s)`, `write_byte(b)`, `to_string()`, `len()`. Create via `new_string_builder()`. |
 
-`assert_eq` uses auto-generated `to_string()` for enums (variant name), structs and classes (field dump, e.g., `Pos{line: 1, col: 5}`), and primitives.
+## 22. Testing
 
-### Running Tests
+Built into the compiler. No frameworks, no fixtures, no mocks.
 
+- Any function whose name starts with `test_` is a test. No arguments, no return.
+- `assert(cond, msg)` and `assert_eq(actual, expected, msg?)` are compiler-provided builtins. They inject file and line into failure messages and exit the test on failure.
+- `assert_eq` displays both values via auto-generated `to_string`. Enum variants are shown by name; structs and classes dump fields (`Point{x: 1.0, y: 2.0}`).
+
+```lyric
+func test_lexer_basic() {
+    let lex = Lexer { source: "let x = 42" }
+    let tok = lex.next()
+    assert_eq(tok.kind, TLet, "first token should be let")
+}
+```
+
+Run:
 ```
 lyric test test_lexer.ly lexer.ly ast.ly
 ```
 
-`lyric test` compiles all listed `.ly` files, discovers `test_*` functions, generates a `main()` that calls each one, compiles the C output with gcc, and runs it:
-
+Output:
 ```
-PASS  test_lexer_keywords (0.1ms)
-PASS  test_lexer_strings (0.1ms)
+PASS  test_lexer_keywords
 FAIL  test_lexer_escapes
   assert_eq failed at test_lexer.ly:47
     expected: TStringLit
     got:      TError
 
-3 tests, 2 passed, 1 failed
+N tests, P passed, F failed
 ```
 
-Tests run sequentially in declaration order. A failed assertion exits that test immediately but does not stop the suite — remaining tests still run.
+Tests run sequentially in declaration order. A failed assertion stops that one test; the suite continues. Exit code 0/1.
 
-### Test File Conventions
+## 23. Toolchain
 
-- Test files are regular `.ly` files — no special syntax or annotations
-- Name test files `test_*.ly` by convention (not enforced)
-- Test functions can use all language features including classes, generics, and relations
-- Tests share a compilation unit with the code they test
+```
+lyric compile <file.ly | dir>  [-o out] [flags]
+lyric test    <files.ly...>     [-o out] [flags]
+lyric fmt     <files.lyric...>
+lyric help
+```
 
-## Stdlib Classes
+Subcommand resolution accepts unique prefixes (`lyric c` = compile).
 
-- **`Sym`** — interned symbol with pre-computed FNV-1a hash. Create via `sym("name")` or backtick syntax `` `name` `` (which desugars to `sym("name")` at parse time). Methods: `get_name() -> string`, `get_hash() -> u64`. Implements `Hashable`.
-- **`Dict<K,V>`** — generic hash table where `K: Hashable`. Methods: `set(key, val)`, `get(key) -> V?`, `has(key) -> bool`, `remove(key)`, `keys() -> [K]`, `len() -> i32`. Constructor: `Dict<K,V>()`.
-- **`Hashable`** — interface requiring `get_hash(self) -> u64`. `Sym` implements it. **`string` does NOT implement `Hashable`** — wrap strings with `sym()` to use as hash keys.
-- **`Comparable`** — interface for ordering (numeric, string, bool).
-- **`Equatable`** — interface for equality comparison (numeric, string, bool).
-- **`Error`** — for `(T, error)` returns. `message() -> string`. Create via `Error { msg: "..." }`.
-- **`StringBuilder`** — `write(s)`, `write_byte(b)`, `to_string()`, `len()`. Create via `new_string_builder()`.
+### Compile flags
+| Flag | Effect |
+|---|---|
+| `-o name` | Output binary name |
+| `--soa` | Struct-of-Arrays slab layout |
+| `--detect-uaf` | Mark freed slots; check on every access (debug builds) |
+| `--rc-free` | Auto-destroy on ref-count zero (default on) |
+| `--no-rc` | Disable auto-destruction; only decrement |
+| `--lir-dump path` | Write LIR text dump |
 
-## Concurrency
+### Module mode
+If the target directory contains a `lyric.mod` marker, all `.ly` files in that directory's **top level** are compiled together. `lyric.mod`'s content is reserved. Recursive subdirectory discovery and recursive import resolution are on the roadmap.
+
+### `lyric fmt`
+Reformats the human-reviewed zone of a `.lyric` file. Zones 2 & 3 (function index / dependencies) are preserved verbatim. (Generating zones 2 & 3 lives in `lyre`, not in the Lyric compiler.)
+
+## 24. Operator Precedence
+
+Lowest first:
+```
+ 1  ||         (or)
+ 2  &&         (and)
+ 3  |          (bitwise OR)    — same level as C
+ 4  ^          (bitwise XOR)
+ 5  &          (bitwise AND)
+ 6  == !=
+ 7  < <= > >=
+ 8  << >>
+ 9  + -
+10  * / %
+11  - !        (unary)
+12  . () [] ! ? is as   (postfix)
+```
+
+Compound assigns: `+= -= *= /=`. Bitwise compound assigns (`%= &= |= ^= <<= >>=`) and unary `~` are on the roadmap; bitwise-op precedence is scheduled to move above `==`/`<` (above all non-integer operators) — see roadmap.
+
+## 25. Imports
 
 ```lyric
-spawn { ... }
-let ch: channel<i32> = make_channel<i32>()
-ch.send(value)
-let v = ch.receive()
-select { case v = <- ch => ... default => ... }
-lock(mutex) { ... }
+import ast                          // package in directory ./ast/
+import v2 from "parser/v2"          // aliased nested path
 ```
 
-Compiles to pthreads in the C backend. `spawn` auto-captures referenced variables into a context struct.
+Three syntactic forms parse: `import name`, `import alias from "path"`, `import "path"` (no alias — known crasher today; avoid).
 
-## Generators
+**Current limitations** (roadmap):
+- Single level only — imports of imports are not resolved.
+- `pub` visibility is not enforced — all imported declarations are accessible.
+- No cycle detection.
 
-```lyric
-func range(start: i32, end: i32) -> gen i32 {
-    let mut i = start
-    while i < end {
-        yield i
-        i = i + 1
-    }
-}
+## 26. Known Gotchas
 
-for val in range(0, 10) {
-    println(val)
-}
-```
+- **`null`** is the only null literal; `nil` is not accepted.
+- **Cross-sign integer assignment** is currently implicit and lossy. Use explicit `as` for narrowing.
+- **`null` is currently assignable to any type** (should be tightened to `T?`/class/interface/error).
+- **`as` casts accept any target type** today (not just numeric ↔ numeric); narrow uses of this are recommended.
+- **`implements I`** is declarative — method completeness is not yet checker-enforced.
+- **`if`/`match` as expressions** do not yet unify branch types — the checker takes the first branch's type.
+- **Structs are value types** — read → modify → write back when modifying nested struct fields.
+- **`string` is NOT `Hashable`** — wrap with `sym()` for hash keys.
+- **`mut` on class parameters** — don't. Classes are already references.
+- **`fn` vs `func`** — both work; `fn` is preferred for type syntax.
+- **Tuple field access** — `t._0`, `t._1` (underscore-prefixed).
+- **`recv`** is a synonym for channel `receive()`.
+- **`length()`** is a synonym for `len()` on Dict and slices.
+- **C identifier collisions** — the C backend appends `_` to identifiers colliding with C keywords. Mostly invisible at the Lyric level.
+- **`map[K]V`** parses but compiles to a stub today. Use `Dict<K,V>`.
 
-C backend: Duff's device state machine with `_init/_next/_free`. The stdlib provides `range(start, end) -> gen i32` for common iteration.
+## 27. Self-Hosting Status
 
-## Memory Model
+Lyric is **self-hosting** as of June 2026. The bootstrap compiler is written in Lyric (~30K lines across `src/`) and compiles itself to a fixed point. The runtime header (`runtime/lyric_runtime.h`) provides slab allocators, strings, channels, and the test-harness macros.
 
-- **Primitives** — registers/stack, copied by value.
-- **Structs/Tuples** — stack, copied on assign. `mut` params pass by reference (scoped, cannot escape).
-- **Classes** — slab-allocated. Two modes: **AoS** (default, pointer-based) and **SoA** (parallel arrays, u32 handles, enabled via `--soa` flag). Owned classes destroyed by owner; non-owned classes ref-counted.
-- **Slices `[T]`** — fat pointer (data + len + cap). Assignment copies backing data. Parameter passing shares backing data (no copy). `let ref` creates a zero-copy view.
-- **Relations** — ownership graph. `owns` = cascade destroy, `refs` = auto-unlink on destroy. No dangling references.
-- **Scope-exit freeing** — escape analysis injects `StSliceFree`/`StSlabFree` for locally-allocated slices and classes that don't escape their scope.
-- **`final`** — optional pre-destroy hook on classes, called before auto-generated destructor.
-- **`trusted`** — blocks/functions where manual `ref(x)`/`unref(x)` is allowed and auto ref-counting is disabled. For stdlib containers.
-- **`destroys`** — compiler-inferred annotation on functions that may destroy class instances. References become dead after such calls.
-- **`mut resize`** — annotation on parameters that may grow/shrink a slice. Prevents use while element references exist.
-- **No GC** — deterministic destruction via ownership + ref counting.
-
-## Design Annotations
-
-```lyric
-class Foo {
-  why: "Explanation of design intent"
-}
-
-doc "Section" {
-  "Documentation content"
-}
-
-invariant: "claim" verified_at: "date"
-source: ["file.go"]
-```
-
-These are for human/AI understanding, not runtime behavior.
-
-**Note**: Annotation keywords (`source`, `why`, `doc`, `fake`, `field`, `lock`, `implements`) are **contextual** — they lex as identifiers and are only interpreted as keywords in annotation contexts. They CAN be used as variable/field names. The parser uses targeted lookahead to disambiguate (e.g., `lock` is only a keyword when followed by `(`).
-
-## Known Gotchas
-
-- **Annotation keywords are contextual** — `source`, `why`, `doc`, `fake`, `field`, `lock`, `implements` can be used as variable/field names (they lex as identifiers).
-- **`fn` vs `func`** — both work for declarations; `fn` also works in type syntax (`fn(i32) -> bool`).
-- **Structs are value types** — must read→modify→write-back for nested fields. Recurring source of bugs.
-- **`string` is NOT `Hashable`** — use `sym("key")` or backtick `` `key` `` for hash table keys.
-- **Enum variant construction** — must use positional args: `Variant(a, b, c)`. Named args like `Variant(x: a, y: b)` are not supported in call-syntax construction (use struct literal syntax `Struct { x: a }` for structs only).
-- **`append(slice, item)` builtin** — exists for plain slices; for relation-owned lists use `array_append<P,C>(parent, child)`.
-- **`mut` on class params** — don't do it. Classes are already pointers; `mut` creates double-pointer segfaults.
-- **Tuple access** — use `._0`, `._1` (underscore-prefixed indices), not `.0`, `.1`.
-- **`null` and `null`** — both accepted by the lexer (mapped to same token). Book convention uses `null`.
-
-## Self-Hosting Status
-
-Lyric is **self-hosting** as of June 2026. The bootstrap compiler (`lyric.c`, ~90K lines of C) is compiled from ~30K lines of Lyric source across 12 packages (`src/ast/`, `src/lir/`, `src/parser/`, etc.) plus stdlib. The compiler achieves a **fixed point**: `bootstrap2.c == bootstrap3.c`. 78 tests pass. The legacy Go compiler has been moved to `legacy/go-compiler/`.
-
-**Compiler architecture notes** (learned during bootstrap):
-- `CheckFile` uses three-phase processing: Phase 0 (preregister type names), Phase 1 (register signatures), Phase 2 (check bodies) across ALL files before proceeding.
-- `DesugarDestructors` wraps each relation's destructor body in a `StmtBlock` to avoid variable name collisions.
-- `MergeStdlib` merges stdlib into the first block only (not every block) to avoid duplicate type definitions. Must merge ALL files BEFORE desugar/check.
-- Monomorphization is iterative — Phase 2 re-collects from specialized bodies.
-- **AST `Expr` is a VALUE TYPE** — any copy loses checker annotations; always use `&slice[i]`.
-
-**Key design rules for bootstrap code**:
-- Classes for most things, structs only for simple value types (Pos, Span, LexerState)
-- ArrayList relations for parent→child ownership
-- Dict<K,V> for hash tables, Sym for identifiers (hash once)
-- All parameters must be named: `func foo(x: i32)` not `func foo(i32)`
+**For language design changes**: read the spec first (`lyric-language-spec.md`), this reference, and the roadmap (`cr/docs/bootstrap-roadmap.md`). The language is designed for AI-assisted compiler engineering — every feature exists because it earns its keep in the bootstrap source.
