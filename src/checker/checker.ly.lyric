@@ -152,6 +152,26 @@ module checker
     from another (e.g. impl Hashable for concrete types in stdlib).
     """
 
+  invariant "Phase 1.6 — Relation-Hint Shape Validation":
+    procedural
+    """
+    validate_relation_hints runs after register_interface_methods and
+    before bodies are checked. It enforces that every interface used
+    as the hint in a `relation` declaration fits the relation-hint
+    shape laid out in multi-class-interface-redesign §3.7:
+      (1) exactly two type parameters (parent, child);
+      (2) every field, destructor, and abstract method-with-receiver
+          names one of the two type parameters; free-function helpers
+          with no receiver are exempt; bodied methods are validated
+          via their lifted-function form because desugar moves them
+          to top level before the checker runs;
+      (3) [DEFERRED to Phase 3c] no cross-side body references.
+    Today's stdlib hints (ArrayList, DoublyLinked, HashedList) satisfy
+    these conditions by construction, so the pass is silent on the
+    bootstrap source. Diagnostics fire at the `relation` declaration
+    site, once per offending hint interface per file.
+    """
+
   typedef TypeKind: enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
     source: checker.ly:19
 
@@ -399,6 +419,10 @@ module checker
       source: checker.ly:4816
     method validate_all_types_resolved(self, file: File)
       source: checker.ly:4856
+    method validate_relation_hints(self, file: File)
+      source: checker.ly:4877
+    method validate_one_hint_interface(self, rel: RelationDecl, iface: InterfaceDecl)
+      source: checker.ly:4896
 
   func new_checker() -> Checker
     source: checker.ly:178

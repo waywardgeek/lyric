@@ -4856,6 +4856,114 @@ lyric checker {
   }
 
   // =====================================================================
+  // Relation-hint shape validation (multi-class-interface-redesign §3.7)
+  //
+  // An interface used as the hint in a `relation` declaration must:
+  //   (1) have exactly two type parameters (parent, child);
+  //   (2) annotate every field declaration and destructor block with a
+  //       type parameter naming one of those two sides; abstract methods
+  //       (no body) with a receiver must use one of the two type-
+  //       parameter names as the receiver — free-function helpers with
+  //       no receiver are exempt;
+  //   (3) NOT cross sides inside a method body (rule deferred to
+  //       Phase 3c; see redesign doc).
+  //
+  // Caveat on (2): methods with bodies are extracted to top-level
+  // functions by desugar_default_impls BEFORE the checker runs, so the
+  // receiver check below sees only abstract members. Bodied methods
+  // are validated by the existing checker via their lifted-function
+  // form; full receiver-side enforcement on bodied members lands in
+  // Phase 3c when desugar gains per-scope substitution.
+  //
+  // Today's stdlib hints (ArrayList, DoublyLinked, HashedList) satisfy
+  // these conditions by construction, so this pass is silent on a
+  // healthy code base.
+  // =====================================================================
+
+  func Checker.validate_relation_hints(self, file: File) {
+    let blocks = file.fb_children()
+    let mut validated: Dict<Sym, bool> = Dict<Sym, bool>()
+    for bi in range(0, len(blocks)) {
+      let rels = blocks[bi].rd_children()
+      for ri in range(0, len(rels)) {
+        let rel = rels[ri]
+        if rel.hint == null { continue }
+        let hint_name = rel.hint!
+        if validated.has(hint_name) { continue }
+        validated.set(hint_name, true)
+        if !self.iface_decls.has(hint_name) { continue }
+        let entry = self.iface_decls.get(hint_name)
+        if isnull(entry) { continue }
+        self.validate_one_hint_interface(rel, entry!.value)
+      }
+    }
+  }
+
+  func Checker.validate_one_hint_interface(self, rel: RelationDecl, iface: InterfaceDecl) {
+    if iface.name == null { return }
+    let iface_name = sym_to_string(iface.name!)
+    let tps = iface.itp_children()
+
+    let prefix = "cannot use " + iface_name + " as a relation hint; "
+
+    // Rule 1: exactly two type parameters.
+    if len(tps) != 2 {
+      self.error_at(rel.span, prefix + "an interface used as a relation hint must have exactly 2 type parameters (parent, child); " + iface_name + " has " + itoa(len(tps)) + " type parameters.")
+      return
+    }
+    if tps[0].name == null || tps[1].name == null { return }
+    let p_name = sym_to_string(tps[0].name!)
+    let c_name = sym_to_string(tps[1].name!)
+    let sides = "(" + p_name + ", " + c_name + ")"
+
+    // Rule 2a: every field declaration must name P or C.
+    let fields = iface.ifd_children()
+    for fi in range(0, len(fields)) {
+      let f = fields[fi]
+      let fname = if f.name != null { sym_to_string(f.name!) } else { "?" }
+      if f.type_param == null {
+        self.error_at(rel.span, prefix + "field `" + fname + "` of " + iface_name + " has no side annotation. An interface used as a relation hint must annotate every member with `P.` or `C.`.")
+        return
+      }
+      let tp = sym_to_string(f.type_param!)
+      if tp != p_name && tp != c_name {
+        self.error_at(rel.span, prefix + "field `" + tp + "." + fname + "` of " + iface_name + " does not name either type parameter " + sides + ".")
+        return
+      }
+    }
+
+    // Rule 2b: every destructor block must name P or C.
+    let destrs = iface.idb_children()
+    for di in range(0, len(destrs)) {
+      let d = destrs[di]
+      if d.type_param == null { continue }
+      let tp = sym_to_string(d.type_param!)
+      if tp != p_name && tp != c_name {
+        self.error_at(rel.span, prefix + "destructor on `" + tp + "` of " + iface_name + " does not name either type parameter " + sides + ".")
+        return
+      }
+    }
+
+    // Rule 2c: every method with a receiver must use a receiver naming P or C.
+    // Methods with no receiver are free-function helpers and are exempt.
+    let methods = iface.im_children()
+    for mi in range(0, len(methods)) {
+      let m = methods[mi]
+      if m.receiver_type == null { continue }
+      let rt = sym_to_string(m.receiver_type!)
+      if rt != p_name && rt != c_name {
+        let mname = if m.name != null { sym_to_string(m.name!) } else { "?" }
+        self.error_at(rel.span, prefix + "method `" + rt + "." + mname + "` of " + iface_name + " has a receiver that names neither type parameter " + sides + ".")
+        return
+      }
+    }
+
+    // Rule 3 (cross-side body references): deferred to Phase 3c. The
+    // meaningful check requires per-scope substitution of `self`-relative
+    // field accesses, which lands when desugar gains scope-style emission.
+  }
+
+  // =====================================================================
   // Helper
   // =====================================================================
 
@@ -4884,6 +4992,10 @@ lyric checker {
 
     // Phase 1.5: register interface methods using ALL impl blocks
     c.register_interface_methods(file)
+
+    // Phase 1.6: validate that every interface used as a relation hint
+    // has the right shape (multi-class-interface-redesign §3.7).
+    c.validate_relation_hints(file)
 
     // Phase 2: check all function bodies
     for b in blocks {
