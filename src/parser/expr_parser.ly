@@ -759,7 +759,6 @@ lyric parser {
         return (Stmt { Break, tok.span }, null) }
       KContinue => { self.next()
         return (Stmt { Continue, tok.span }, null) }
-      KCascade  => { return self.parse_cascade() }
       KSpawn    => { return self.parse_spawn() }
       KSelect   => { return self.parse_select() }
       KLock     => { return self.parse_lock() }
@@ -1169,18 +1168,6 @@ lyric parser {
         return (null, self.make_error(tok.span, f"expected pattern, got {tok.kind} ({tok.text})"))
       }
     }
-  }
-
-  // ---- Cascade ----
-
-  func Parser.parse_cascade(self) -> (Stmt?, error) {
-    let start = self.peek().span.start
-    self.next()  // consume 'cascade'
-    let body = self.parse_block()?
-    return (Stmt {
-      Cascade(body!),
-      span: Span { start: start, end: body!.span.end }
-    }, null)
   }
 
   // ---- Spawn ----

@@ -1037,9 +1037,6 @@ lyric desugar {
       LetElse(pattern, value, else_block) => {
         result.kind = LetElse(pattern, deep_copy_expr(value), deep_copy_block_val(else_block))
       }
-      Cascade(body) => {
-        result.kind = Cascade(deep_copy_block_val(body))
-      }
       Spawn(body) => {
         result.kind = Spawn(deep_copy_block_val(body))
       }

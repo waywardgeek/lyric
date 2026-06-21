@@ -2530,11 +2530,6 @@ lyric checker {
         self.check_block(block)
         self.pop_scope()
       }
-      Cascade(body) => {
-        self.push_scope()
-        self.check_block(body)
-        self.pop_scope()
-      }
       Spawn(body) => {
         self.push_scope()
         self.check_block(body)
@@ -4199,7 +4194,7 @@ lyric checker {
           if arm.body != null { self.walk_block(arm.body!, callback) }
         }
       }
-      BlockStmt(block) | Cascade(block) | Spawn(block) => {
+      BlockStmt(block) | Spawn(block) => {
         self.walk_block(block, callback)
       }
       Select(cases) => {
@@ -4463,9 +4458,6 @@ lyric checker {
       BlockStmt(block) => {
         self.vwalk_block(block, ctx)
       }
-      Cascade(body) => {
-        self.vwalk_block(body, ctx)
-      }
       Spawn(body) => {
         self.vwalk_block(body, ctx)
       }
@@ -4693,7 +4685,7 @@ lyric checker {
           if arm.body != null { self.validate_access_block(arm.body!) }
         }
       }
-      BlockStmt(block) | Cascade(block) | Spawn(block) => {
+      BlockStmt(block) | Spawn(block) => {
         self.validate_access_block(block)
       }
       Lock(mutex, body) => {

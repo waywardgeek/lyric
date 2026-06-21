@@ -172,8 +172,6 @@ module parser
       source: expr_parser.ly:1041
     method parse_pattern(self) -> (Pattern?, error)
       source: expr_parser.ly:1068
-    method parse_cascade(self) -> (Stmt?, error)
-      source: expr_parser.ly:1176
     method parse_spawn(self) -> (Stmt?, error)
       source: expr_parser.ly:1188
     method parse_select(self) -> (Stmt?, error)

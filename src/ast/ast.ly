@@ -324,7 +324,6 @@ lyric ast {
     While(condition: Expr, body: Block)
     Match(value: Expr, arms: [MatchArm])
     BlockStmt(block: Block)
-    Cascade(body: Block)
     Break
     Continue
     Spawn(body: Block)
@@ -745,9 +744,6 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         BlockStmt(block) => {
             ast_collect_call_names_block(block, names)
         }
-        Cascade(body) => {
-            ast_collect_call_names_block(body, names)
-        }
         Spawn(body) => {
             ast_collect_call_names_block(body, names)
         }
@@ -945,9 +941,6 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
         }
         BlockStmt(block) => {
             ast_collect_var_refs_in_block(block, names)
-        }
-        Cascade(body) => {
-            ast_collect_var_refs_in_block(body, names)
         }
         Spawn(body) => {
             ast_collect_var_refs_in_block(body, names)

@@ -1185,10 +1185,6 @@ lyric lowerer {
       LetElse(pattern, value, else_block) => {
         self.lower_let_else(pattern, value, else_block)
       }
-      Cascade(body) => {
-        // Lower cascade block inline
-        self.lower_block(body)
-      }
       Ref(expr) => {
         let val = self.lower_expr(expr)
         let class_name = if !isnull(val) && !isnull(val!.typ) { val!.typ!.name } else { "" }

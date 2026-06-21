@@ -19,7 +19,7 @@ lyric lexer {
     KOwns KRefs KMut KSelf KFrom KTrue KFalse KNil KPub
     // Statement keywords
     KLet KIf KElse KFor KIn KWhile KMatch KReturn KBreak KContinue
-    KCascade KSpawn KSelect KCase KLock KYield
+    KSpawn KSelect KCase KLock KYield
     // Literals
     LIdent LIntLit LFloatLit LStringLit LTripleString LFString LCharLit LBacktickSym
     // Punctuation
@@ -81,7 +81,6 @@ lyric lexer {
     d.set(`return`, KReturn)
     d.set(`break`, KBreak)
     d.set(`continue`, KContinue)
-    d.set(`cascade`, KCascade)
     d.set(`spawn`, KSpawn)
     d.set(`select`, KSelect)
     d.set(`case`, KCase)

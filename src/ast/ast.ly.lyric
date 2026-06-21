@@ -321,7 +321,7 @@ module ast
     field patterns: [Pattern]
     field span: Span
 
-  typedef StmtKind: enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Cascade(body: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block), Ref(expr: Expr), Unref(expr: Expr) }
+  typedef StmtKind: enum { VarDecl(name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?), Assign(target: Expr, value: Expr), Return(value: Expr?), ExprStmt(expr: Expr), If(condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?), For(var_name: Sym, index_var: Sym?, collection: Expr, body: Block), While(condition: Expr, body: Block), Match(value: Expr, arms: [MatchArm]), BlockStmt(block: Block), Break, Continue, Spawn(body: Block), Select(cases: [SelectCase]), Yield(value: Expr?), Lock(mutex: Expr, body: Block), IfLet(pattern: Pattern, value: Expr, then_block: Block, else_block: Block?), LetElse(pattern: Pattern, value: Expr, else_block: Block), Ref(expr: Expr), Unref(expr: Expr) }
     source: ast.ly:317
 
   class Stmt
