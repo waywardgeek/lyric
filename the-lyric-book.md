@@ -3664,7 +3664,7 @@ func main() {
 }
 ```
 
-Variables from the enclosing scope are captured automatically. The compiler analyzes which variables the block references, generates a context struct with those fields, and passes a pointer to it when launching the thread. 🚧 **Captured variables are passed by pointer** — mutations in the spawned block are visible to the parent, and vice versa. This means two `spawn` blocks capturing the same variable can race. The roadmap intent is copy-by-value capture with explicit shared mutation through channels or locks; until that lands, if you need isolation, copy the value into a local before spawning. For shared mutable state, use `lock` (§12.5). Each `spawn` creates an OS thread via `pthread_create` — there's no green thread runtime or thread pool. In the C output, this becomes a `pthread_create` call with an auto-generated wrapper function:
+Variables from the enclosing scope are captured automatically. You don't declare what to capture — the compiler walks the block, finds every name that resolves to the enclosing scope, generates a context struct with those fields, and passes a pointer to it when launching the thread. Each `spawn` becomes a `pthread_create` call with an auto-generated wrapper. There's no green-thread runtime and no thread pool — one `spawn`, one OS thread. The generated C looks roughly like this:
 
 ```c
 typedef struct {
@@ -3680,7 +3680,7 @@ void* _spawn_1(void* _arg) {
 }
 ```
 
-You don't declare what to capture. The compiler figures it out by walking the block for variable references that resolve to the enclosing scope. Captured variables are passed by pointer — mutations in the spawned block are visible to the parent, and vice versa. This is deliberate. If you want isolation, copy the value into a local before spawning.
+🚧 **`spawn` captures by pointer, which is a data race waiting to happen.** Both the parent and the spawned block see the same memory for every captured variable, so a write on either side races with a read or write on the other. Channels are safe to capture this way because they're already class pointers with internal locking, but a captured `let mut counter: i32 = 0` mutated by two `spawn` blocks is a textbook race — no warning, no help. The roadmap intent is copy-by-value capture with explicit shared mutation through channels or locks. Until that lands: if you need isolation, copy the value into a local *inside* the spawned block (`let local = captured`) before mutating; for genuinely shared mutable state, use `lock` (§12.5) or — better — funnel updates through a channel and let one owner do the writes.
 
 ### 12.2 Channels
 
@@ -3721,8 +3721,8 @@ Channels and spawn combine naturally into producer-consumer patterns:
 
 ```lyric
 func producer(ch: channel<i32>, count: i32) {
-    let mut i: i32 = 0
-    while i < count {
+    let mut i: i32 = 1
+    while i <= count {
         ch.send(i)
         i = i + 1
     }
@@ -3736,7 +3736,7 @@ func main() {
     }
 
     let mut val = ch.receive()
-    while val >= 0 {
+    while val > 0 {
         println(f"got: {val}")
         val = ch.receive()
     }
@@ -3744,11 +3744,11 @@ func main() {
 }
 ```
 
-The producer sends values and closes the channel when finished. The consumer receives until the channel signals completion.
+The producer sends `1, 2, 3, 4, 5` and closes the channel. The consumer receives until it gets a zero — which is what a closed channel returns for `i32`. Notice the deliberate choice to start counting from `1`: we need a real sentinel.
 
-A note on `receive()` when the channel is closed: it returns the zero value for the type (0 for integers, empty string for strings). 🚧 *There's no `(value, ok)` tuple like Go's `v, ok := <-ch` — you need to use a sentinel value or a separate `done` channel to signal completion. The roadmap target is a `(T, bool)` form: `let (v, ok) = ch.receive()`.* In this example, the producer sends values 0–4, so we use `val >= 0` as our loop condition (the zero-value `0` on close terminates the loop only because the producer happens to send positive values first). For robustness, prefer a separate done channel or a known sentinel.
+🚧 *`receive()` on a closed channel returns the zero value for the type (`0` for integers, `""` for strings, `false` for `bool`) with no indication that the channel closed. There's no `(value, ok)` tuple like Go's `v, ok := <-ch`. The roadmap target is a `(T, bool)` form: `let (v, ok) = ch.receive()`. Until that lands, you have three options: (1) pick a domain value that the producer will never send and use it as a sentinel (what this example does — `0` is the sentinel because we start sending from `1`); (2) use a separate `done` channel to signal completion; (3) wrap your real values in an `Optional` and treat `null` as the close signal. Option 2 is the most robust when you don't control the producer's value range.*
 
-Channels are passed by reference — the spawned block and the main function share the same channel object.
+Channels are passed by reference — the spawned block and the main function share the same channel object, which is exactly what you want. Channels carry their own internal mutex and condition variables, so capturing a channel by pointer (§12.1) is safe; concurrent `send`s and `receive`s serialize correctly.
 
 ### 12.4 Select
 
@@ -3811,7 +3811,7 @@ func main() {
 
 The `default` branch runs immediately if no channel is ready — turning a blocking select into a non-blocking poll. Send cases (`case ch.send(val) =>`) succeed when the channel has buffer space or a receiver is waiting.
 
-The C backend compiles `select` into a polling loop: try each case, run `default` if present, otherwise `sched_yield()` and retry. Each case becomes a non-blocking `tryrecv` or `trysend` call on the underlying channel. 🚧 *This burns CPU on hot selects — the roadmap target is condvar / epoll-based wake. Until then, profile for tight select loops and consider alternative designs.*
+🚧 *`select` is not a true blocking primitive today. The C backend compiles it into a polling loop: try each case in turn, run `default` if present and no case is ready, otherwise `usleep(100)` and retry. Each case becomes a non-blocking `tryrecv` or `trysend` call on the underlying channel. This burns CPU on hot selects and adds ~100µs of latency on cold ones — the roadmap target is condvar / epoll-based wake. Until that lands, avoid tight select loops in latency-sensitive code, and prefer a dedicated channel-per-source design where possible.*
 
 ### 12.5 Locks
 
@@ -3837,7 +3837,7 @@ Output: `final count: 11`.
 
 `lock` is a built-in type that zero-initializes — `let mut mu: lock` is valid without a constructor call. The C backend generates `pthread_mutex_t` with `PTHREAD_MUTEX_INITIALIZER`. `lock(mu) { ... }` acquires the mutex, runs the block, and releases it — even if the block returns early. In C, this compiles to `pthread_mutex_lock` and `pthread_mutex_unlock` bracketing the block body. The scoped syntax makes it impossible to forget the unlock.
 
-(Older code, or code translated from Rust, may use `Mutex` or `Lock` — both are lowerer-level synonyms that are slated for removal. Lowercase `lock` is canonical.)
+Lowercase `lock` is the only spelling that compiles today. Older drafts (and some testdata files that haven't been updated yet) use `Mutex` or capital `Lock`; both have been removed and now fail with `unresolved type var 'Lock'`. If you're reading code from before mid-2026, expect to mechanically rename it.
 
 ### 12.6 Guarded Fields
 
@@ -3878,7 +3878,7 @@ Note that `guarded_by` is a contextual keyword — the lexer emits it as an iden
 
 ### 12.7 Putting It Together
 
-Channels, spawn, select, and locks compose naturally. Here's a concurrent accumulator — two spawned workers increment a shared counter through a channel, and the main function collects the results:
+Channels, spawn, select, and locks compose naturally. Here's a concurrent accumulator — two spawned workers each compute a partial sum and ship it back through a channel, and the main function collects and combines:
 
 ```lyric
 func main() {
