@@ -181,3 +181,51 @@ let mut s = Stack<f64> { items: [] }   // checker: TypeVar leak 'T' in main
 ```
 
 Both bugs logged in `~/projects/lyric/TODO`. The book's Ch 6 §6.9 `Stack<T>` example is preserved as illustrative with an explicit 🚧 callout; the chapter's working generic code is all *free functions* (`max_val<T: Comparable>`, `identity<T>`, `first<T>`, `print_it<T: Printable>` — all compile + run end-to-end, verified).
+
+---
+
+## Ch 7 reviser, 2026-06-21
+
+### `assert` and `assert_eq` builtins are no-ops in the C backend
+
+**Severity: critical.** The compiler defines runtime macros `lyric_assert(cond, msg, file, line)` and `lyric_assert_eq(eq, actual_str, expected_str, msg, file, line)` in the generated C header (both with the correct FAIL output format from spec §Testing and both calling `exit(1)` on failure), but the lowerer never emits a call to either macro. Repro:
+
+```lyric
+func test_boom() {
+    assert(false, "should fail")
+}
+```
+
+Generated C body: `void test_boom(void) {}` — the `assert` call is dropped on the floor. Same for `assert_eq(1, 2, "boom")`. Same drop happens in non-test functions: `func main() { println("before"); assert(false, "x"); println("after") }` prints both lines and exits 0.
+
+Consequence: every Lyric test silently passes regardless of correctness. The 78 tests in the compiler's own test suite (§7.6 references `test_field_generates_getter_and_setter` and the spec advertises 78 tests) provide zero regression protection today.
+
+The checker accepts the calls correctly; only the lowerer is missing arms for the `assert` / `assert_eq` builtins. Fix: lower `assert(cond, msg)` to `lyric_assert(cond, msg, __FILE__, __LINE__)` and `assert_eq(a, b, msg?)` to `lyric_assert_eq(a == b, to_string(a), to_string(b), msg ?? "", __FILE__, __LINE__)`.
+
+Logged in `~/projects/lyric/TODO`. Hewitt indicated he would fix this overnight; per his instruction the Ch 7 chapter is written as if the lowering works.
+
+### `(T, error)` destructure on self-recursive method calls emits malformed C
+
+Discovered while building the Ch 5 calculator to verify Ch 7 tests against it. In a method like `Parser.parse_primary(self) -> (f64, error)`, replacing the working `?` form with an explicit destructure of a self-recursive call:
+
+```lyric
+let (val, err) = self.parse_expr()    // self.parse_expr returns (f64, error)
+if err != null {
+    return (0.0, err)
+}
+```
+
+emits this C:
+
+```c
+double val = _t14;
+const char* err = _t14;
+```
+
+where `_t14` is typed `LyricResult_double` (the tuple-return temp). gcc rejects with `incompatible types when initializing type 'double' using type 'LyricResult_double'`.
+
+The non-recursive destructure form works (e.g. `main` calling `parse()` and destructuring its `(f64, error)` return), and the `?` form on the recursive call works. So the bug is the combination of (a) destructuring a `(T, error)` return, (b) inside a method whose own return type is `(T, error)`, (c) when the called method is `self.<recursive>`. The lowerer reuses the tuple-temp slot directly instead of unpacking it into the named locals.
+
+Workaround: use `?` instead of explicit destructure for self-recursive `(T, error)` calls. The Ch 5 calculator's `parse_primary` already uses `?` here, so the calculator compiles fine.
+
+Logged in `~/projects/lyric/TODO`.

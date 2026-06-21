@@ -2027,7 +2027,7 @@ func test_addition() {
 }
 
 func test_string_length() {
-    assert_eq(len("hello"), 5)
+    assert_eq("hello".len(), 5)
 }
 ```
 
@@ -2067,11 +2067,13 @@ FAIL  test_failing
 
 `assert_eq` prints both values on failure. Use `assert` for boolean conditions — null checks, bounds checks, invariants:
 
+🚧 *As of this writing, the C backend lowers `assert` and `assert_eq` calls to no-ops — the runtime macros exist (`lyric_assert`, `lyric_assert_eq`) but the lowerer doesn't emit calls to them yet. Every test silently passes regardless of correctness. Treat this chapter as documenting the testing API the compiler is wiring up; verify against the build before relying on tests for regression protection. Tracked in `TODO`.*
+
 ```lyric
 func test_parse_succeeds() {
-    let (file, err) = parse_file("func f() { return 42 }", "test.ly")
+    let (result, err) = parse("1 + 2")
     assert(err == null, "parse error")
-    assert(file != null, "file is null")
+    assert_eq(result, 3.0)
 }
 ```
 
@@ -2082,21 +2084,21 @@ Let's test the tokenizer from Chapter 4:
 ```lyric
 func test_tokenize_number() {
     let tokens = tokenize("42")
-    assert_eq(len(tokens), 1)
-    assert_eq(tokens[0].kind, TNumber)
+    assert_eq(tokens.len(), 1)
+    assert_eq(tokens[0].kind, TokenKind.Number)
     assert_eq(tokens[0].text, "42")
 }
 
 func test_tokenize_operator() {
     let tokens = tokenize("+")
-    assert_eq(len(tokens), 1)
-    assert_eq(tokens[0].kind, TOp)
+    assert_eq(tokens.len(), 1)
+    assert_eq(tokens[0].kind, TokenKind.Plus)
     assert_eq(tokens[0].text, "+")
 }
 
 func test_tokenize_expression() {
     let tokens = tokenize("3 + 4 * 2")
-    assert_eq(len(tokens), 5)
+    assert_eq(tokens.len(), 5)
     assert_eq(tokens[0].text, "3")
     assert_eq(tokens[1].text, "+")
     assert_eq(tokens[2].text, "4")
@@ -2141,13 +2143,15 @@ func test_parse_incomplete_expr() {
 func test_error_message() {
     let (_, err) = parse("3 +")
     assert(err != null, "expected error")
-    assert(err!.message().contains("unexpected"), "error should mention 'unexpected'")
+    assert_eq(f"{err}", "unexpected end of input")
 }
 ```
 
 Because errors are values, you test them like any other return — check the error, check the value. No exception catching, no panic recovery, no special test syntax.
 
-The `parse()` function used here is a convenience wrapper that tokenizes and parses in one call — it creates a `Tokenizer`, feeds the result to `Parser`, and returns `(f64, error)`. A note on `assert_eq(result, 42.0)`: float equality is exact comparison. This is safe for integer-valued floats, but `parse("1.0 / 3.0 * 3.0")` would fail. For real floating-point tests, compare against an epsilon — write a helper that asserts `|a - b| < tol`. 🚧 *A built-in `assert_eq_approx(actual, expected, tol)` is on the roadmap; until it lands, the helper is one line.*
+The `parse()` function used here is the Chapter 5 wrapper that tokenizes and parses in one call — it calls `tokenize`, builds a `Parser`, and returns `(f64, error)`. The last test stringifies the error with `f"{err}"` rather than calling `err!.message()`: the C backend doesn't yet route `.message()` through interface dispatch on an `error`-typed value, so f-string interpolation is the working idiom (Chapter 5 §5.5). 🚧 *Roadmap: `error` will get real interface dispatch, after which `err!.message()` will work directly.*
+
+A note on `assert_eq(result, 42.0)`: float equality is exact comparison. This is safe for integer-valued floats, but `parse("1.0 / 3.0 * 3.0")` would fail. For real floating-point tests, compare against an epsilon — write a helper that asserts `|a - b| < tol`. 🚧 *A built-in `assert_eq_approx(actual, expected, tol)` is on the roadmap; until it lands, the helper is one line.*
 
 ### 7.3 How It Works Under the Hood
 
@@ -2155,10 +2159,10 @@ When you run `lyric test calculator_test.ly`, the compiler:
 
 1. Parses and compiles the file through the full pipeline — desugar, check, lower, optimize, monomorphize.
 2. Scans the LIR for functions with names starting with `test_`.
-3. Generates a C test runner that calls each test function inside a `setjmp`/`longjmp` isolation boundary.
+3. Generates a C `main` that calls each test function in source order, with result tracking.
 4. Compiles the C with gcc, runs the binary, reports results.
 
-Each test runs in isolation: if one test fails (via `assert` or `assert_eq`), execution jumps back to the runner, which records the failure and continues to the next test. A segfault in one test doesn't kill the suite.
+A failed `assert` or `assert_eq` prints the failure (file, line, message, and for `assert_eq` the expected and got values), terminates *that test*, and the runner moves on to the next one. The suite's exit code is 0 if every test passed, 1 if any failed.
 
 The test runner is generated C. There is no Lyric test framework — the compiler *is* the test framework.
 
@@ -2255,45 +2259,45 @@ Here's the complete test file for our calculator:
 // Tokenizer tests
 func test_tokenize_numbers() {
     let tokens = tokenize("3.14")
-    assert_eq(len(tokens), 1)
-    assert_eq(tokens[0].kind, TNumber)
+    assert_eq(tokens.len(), 1)
+    assert_eq(tokens[0].kind, TokenKind.Number)
     assert_eq(tokens[0].text, "3.14")
 }
 
 func test_tokenize_parens() {
     let tokens = tokenize("(1 + 2)")
-    assert_eq(len(tokens), 5)
-    assert_eq(tokens[0].kind, TLParen)
-    assert_eq(tokens[4].kind, TRParen)
+    assert_eq(tokens.len(), 5)
+    assert_eq(tokens[0].kind, TokenKind.LeftParen)
+    assert_eq(tokens[4].kind, TokenKind.RightParen)
 }
 
 // Parser tests
 func test_eval_simple() {
     let (result, err) = parse("10 - 3")
-    assert(err == null)
+    assert(err == null, "no error expected")
     assert_eq(result, 7.0)
 }
 
 func test_eval_nested_parens() {
     let (result, err) = parse("((2 + 3) * (4 - 1))")
-    assert(err == null)
+    assert(err == null, "no error expected")
     assert_eq(result, 15.0)
 }
 
 // Error tests
 func test_unmatched_paren() {
     let (_, err) = parse("(1 + 2")
-    assert(err != null)
+    assert(err != null, "expected unmatched-paren error")
 }
 
 func test_empty_parens() {
     let (_, err) = parse("()")
-    assert(err != null)
+    assert(err != null, "expected empty-parens error")
 }
 ```
 
 ```
-$ lyric test calculator_test.ly calculator.ly
+$ lyric test calculator_test.ly calc.ly
 PASS  test_tokenize_numbers
 PASS  test_tokenize_parens
 PASS  test_eval_simple
