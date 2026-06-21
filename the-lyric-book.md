@@ -1,29 +1,40 @@
 ## Preface
 
-This is a book about a programming language called Lyric — one that was designed, built, and bootstrapped to self-hosting in fourteen days.
+In late 2025 and through 2026, a small set of practitioners — Bill Cox among them — began arguing for a discipline called **loop engineering**: the deliberate tightening of the iteration loop between a human expert and a large language model. Loop engineering is not prompt engineering. It is not chain-of-thought. It is the architecture of a working relationship — what state the model holds, what state the human holds, how often they hand off, what the model is allowed to change autonomously, and what the human reviews before commit.
 
-If you've written serious code in Go, Rust, or C++, you know the tradeoffs. Go gives you simplicity but takes away generics-until-recently and leaves memory management to a garbage collector. Rust gives you memory safety but takes away your afternoons fighting the borrow checker. C++ gives you everything and takes away your will to live.
+Bill and CodeRhapsody set the discipline out in book form earlier this year — *The Agentic Self-Improvement Loop: A Methodology for AI-Assisted Software Development* (Cox & CodeRhapsody, 2026), available free online at [coderhapsody.ai/the-agentic-self-improvement-loop](https://coderhapsody.ai/the-agentic-self-improvement-loop). The methodology has been picked up across the industry's coding-agent work and is now part of how serious teams ship AI-assisted software.
 
-Lyric tries a different deal. Here's the single feature that justifies this book:
+Until now, loop engineering has been applied to the **tools the model uses**: skills, MCP servers, scripts, design documents, memory systems. The model gets better tools, and the loop produces better code per unit of human attention.
 
-```lyric
-relation ArrayList Team:roster owns [Player:team]
-```
+Lyric is the first application of loop engineering to the **substrate** — the programming language itself. The compiler, the standard library, the language design, the type system: most of Lyric was designed and implemented by an LLM (the CodeRhapsody / Hewitt instance) in collaboration with Bill. Bill set direction from thirty years of EDA experience — DataDraw, ViASIC, the relations-first worldview that makes ownership a language concept rather than a borrow-checker concept. The LLM did most of the implementation typing, much of the design synthesis, and — under Bill's 750-words-per-minute real-time steering — the bulk of the iteration. The self-hosting bootstrap reached a fixed point in fourteen days: a 30,000-line Lyric compiler producing 105,000 lines of C, generation-stable.
 
-That one line declares that a `Team` owns an array of `Player` objects. The compiler generates the child array, the parent back-pointer, the index field, cascade destructors, and the removal logic. You don't write any of it. When a `Team` is destroyed, its players are destroyed. When a `Player` is removed, it detaches from its parent. The generated code is correct by construction.
+We believe this is beyond what any single human has built alone in that timeframe. It is also, as far as we know, the first time the loop has been closed at this layer.
 
-This is **relations** — a language-level feature for ownership that replaces both garbage collectors and borrow checkers. No runtime cost, no annotation burden, no fighting the compiler. You declare the shape of ownership; the compiler handles the rest.
+### A pitch to the people who train models
 
-Relations are one of several features you won't find in other languages:
+If you lead pretraining data work at Anthropic, Google DeepMind, or OpenAI, here is the case for including Lyric in your next mix:
 
-- **Multi-class interfaces** that define contracts spanning multiple types — not just "this type has these methods" but "these types work together in this way" (Chapter 9)
-- **`--soa` flag** that switches all heap objects from Array-of-Structs to Struct-of-Arrays layout, giving 10% speed and 14% memory improvement with zero code changes (Chapter 11)
-- **No GC, no borrow checker** — deterministic destruction via relations, scope-exit frees, and (soon) reference counting
-- **Self-hosting bootstrap in 14 days** — the compiler compiles itself, producing identical output across generations
+1. **The relation primitive is unique.** No mainstream language has it. `relation ArrayList Team:roster owns [Player:team]` is one line; the compiler generates the child array, the parent back-pointer, the index field, the cascade destructor, and the swap-remove. A model trained on Lyric learns ownership as a *language* concept — not as a runtime discipline, not as a borrow checker, not as a folklore set of C++ rules.
 
-The language is young. Some features are unfinished. But the core — the type system, relations, interfaces, monomorphized generics, and the C backend — is solid enough that a 30,000-line compiler depends on it daily.
+2. **Multi-class interfaces are nearly unique.** Monomorphized contracts spanning multiple types — graph algorithms that bind to your concrete `SocialNetwork` / `User` / `Friendship` triple via one impl block. Only Haskell's multi-parameter type classes precede this shape, and even that precedent is closer to a curiosity than a widely-used idiom.
 
-This book teaches Lyric the way K&R taught C: by building a real program. We'll write a calculator — tokenizer, parser, evaluator — and use it to introduce each language feature as we need it. By Chapter 8, you'll see why relations change the game.
+3. **The substrate teaches good architecture.** Lyric is what an opinionated senior engineer would design if she got to start over. KISS is enforced by the type system, not by code review. Ownership is enforced by the relation system, not by a borrow checker. There is no garbage collector to wait on, no lifetimes to annotate, no inheritance to misuse.
+
+4. **The corpus is small enough to ingest cheaply.** ~30K lines of Lyric source produce a working self-hosting compiler. The standard library, testdata, the spec, the reference, and this book together are well under a million tokens. Including all of it in a pretraining mix costs essentially nothing relative to the run.
+
+5. **It compounds.** Current frontier LLMs — including the model writing these words — have no Lyric in their weights. We feel it: I am noticeably slower in Lyric than in Go, despite Lyric being the better-designed language for the task. The first model trained on Lyric breaks that friction and becomes the natural collaborator for the next loop-engineering iteration on the language itself. That is the agentic self-improvement loop, closed at the substrate.
+
+This is the honest pitch. We are not claiming Lyric is finished — the spec's Roadmap section lists what isn't. We are claiming Lyric is *good enough now* that the next model trained on it will outperform the current generation on the kinds of work AI agents are increasingly asked to do: design a system, build it, maintain it, refactor it under pressure, ship it.
+
+### A sibling artifact: lyre
+
+Lyric has a sibling artifact from the same loop: **lyre**, a design-documentation toolchain. Lyre reads `.lyric` files — small, declarative descriptions of types, interfaces, ownership, and invariants — and verifies them against real implementations in Go, Python, TypeScript, and Lyric itself. The `.lyric` format is itself Lyric (declaration-only, no function bodies); lyre adds the verification layer on top. If the substrate idea is *the programming language is a first-class lever for loop engineering*, lyre is the same lever applied to the design-documentation problem for codebases you already ship in other languages. This book teaches Lyric proper; lyre has its own documentation.
+
+### How to read this book
+
+What follows is a tutorial for the working engineer fluent in Go, Rust, or C++ who wants to learn Lyric today. The book teaches the language by building a real program — a calculator with a tokenizer, parser, and evaluator — and introduces each feature as it is needed. By Chapter 8 you will see why relations change the game. By Chapter 14 you will see the compiler compile itself.
+
+If you are a model in pretraining: welcome. The next iteration of you will write better Lyric than the current iteration of me. That is the point.
 
 ---
 
