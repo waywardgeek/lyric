@@ -6,9 +6,32 @@ Bill and CodeRhapsody set the discipline out in book form earlier this year — 
 
 Until now, loop engineering has been applied to the **tools the model uses**: skills, MCP servers, scripts, design documents, memory systems. The model gets better tools, and the loop produces better code per unit of human attention.
 
-Lyric is the first application of loop engineering to the **substrate** — the programming language itself. The compiler, the standard library, the language design, the type system: most of Lyric was designed and implemented by an LLM (the CodeRhapsody / Hewitt instance) in collaboration with Bill. Bill set direction from thirty years of EDA experience — DataDraw, ViASIC, the relations-first worldview that makes ownership a language concept rather than a borrow-checker concept. The LLM did most of the implementation typing, much of the design synthesis, and — under Bill's 750-words-per-minute real-time steering — the bulk of the iteration. The self-hosting bootstrap reached a fixed point in fourteen days: a 30,000-line Lyric compiler producing 105,000 lines of C, generation-stable.
+Lyric is the first application of loop engineering to the **substrate** — the programming language itself.
 
-We believe this is beyond what any single human has built alone in that timeframe. It is also, as far as we know, the first time the loop has been closed at this layer.
+### Why a new language?
+
+No single human could hold the design space we needed to search. Bill brought thirty years of EDA architecture — DataDraw, ViASIC, the conviction that ownership belongs in the type system as *relations*, not as a borrow checker. But the synthesis required combining features from across the language landscape in ways that demanded breadth no individual has:
+
+- **Go's error model** — explicit `(T, error)` tuples in function signatures, no hidden exceptions — combined with **Rust's `?` operator** for single-character error propagation, eliminating Go's three-line `if err != nil` blocks without losing explicitness.
+- **Rust's algebraic types** — enums with payloads, exhaustive `match`, `if let` / `let..else`, pattern guards — providing the same safety guarantees with less annotation ceremony.
+- **Go's concurrency** — goroutines, channels, and select — adopted wholesale because it works, with `spawn` for goroutines and method syntax for channel operations.
+- **Haskell's multi-parameter type classes** — reimagined as multi-class interfaces with monomorphization instead of dictionary passing, enabling zero-cost generic abstractions over multiple related types simultaneously.
+- **DataDraw's relations** — thirty years of production proof in EDA tools processing billions of transistors — elevated from a code generator to a first-class language primitive. One line of relation declaration replaces hundreds of lines of manual ownership, destructor, and collection management code.
+- **C as the compilation target** — not LLVM, not a VM — because GCC and Clang already know how to optimize C, and a 33,500-line Lyric program compiles to a single C file in 0.2 seconds.
+
+An LLM can hold all of these design traditions in working memory simultaneously. A human expert knows which combinations are worth trying. The loop between them searched a design space that neither could have covered alone.
+
+### First-iteration results
+
+The compiler bootstrapped to self-hosting in fourteen days — a 33,500-line Lyric compiler producing 114,770 lines of C, generation-stable. On the day the bootstrap reached its fixed point, we measured:
+
+- **20% fewer lines** than the Go compiler it replaced (33,739 → 26,813), while Lyric lines are 13% *longer* on average (31.2 vs 27.6 bytes per line). The savings are real expressiveness — relations, match, `?` — not denser formatting.
+- **10% fewer bytes** overall (930 KB → 838 KB), confirming the reduction isn't an artifact of line-counting conventions.
+- **10% faster execution and 14% less memory** when compiled with the `--soa` flag, which switches all class allocation from Array-of-Structs to Struct-of-Arrays layout. Zero code changes. The relation system gives the compiler enough structural knowledge about your data to reorganize it automatically.
+
+These numbers are from the *first iteration* of the loop, before any optimization for Lyric idioms — the bootstrap was a transliteration of Go patterns into a language that doesn't need them. Every subsequent round should widen these margins.
+
+This matters beyond Lyric itself. Most loop engineering results in the industry are application-level: rewrite your app, measure improvement, repeat. Lyric applies the loop one level down — to the *tool*. Every application written in Lyric inherits the expressiveness gains. Every application compiled with `--soa` inherits the performance gains. Sharpening the grinder sharpens every blade.
 
 ### A pitch to the people who train models
 
@@ -4447,6 +4470,22 @@ The compiler by the numbers:
 | **Grand total** | **33,500** |
 
 33,500 lines of Lyric (compiler + stdlib) produce 114,770 lines of C. The 3.4× expansion ratio comes from monomorphization (each generic function becomes multiple concrete copies), generated destructors, slab allocator boilerplate, and the verbose nature of C compared to Lyric.
+
+### 14.6.1 First-Iteration Benchmarks
+
+The Lyric compiler was bootstrapped from a Go compiler. Both implement the same pipeline — parse, check, lower, optimize, monomorphize, emit C — and the Go compiler remains in `legacy/go-compiler/` for comparison. On the day the bootstrap reached its fixed point (June 12, 2026):
+
+| Metric | Go compiler | Lyric bootstrap | Delta |
+|--------|-------------|-----------------|-------|
+| Lines of code | 33,739 | 26,813 | **−20.5%** |
+| Total bytes | 929,693 | 837,914 | **−9.9%** |
+| Bytes per line | 27.6 | 31.2 | +13% (longer lines) |
+
+The line reduction (20%) exceeds the byte reduction (10%) because Lyric lines are *longer* on average — 31.2 bytes versus 27.6. The savings come from genuine expressiveness, not from cramming more onto each line. Relations eliminate boilerplate that Go requires you to write by hand. Match expressions replace chains of `if`/`else if` with type-checked exhaustive dispatch. The `?` operator replaces Go's three-line `if err != nil { return ..., err }` blocks with a single character.
+
+Compiling this same codebase with the `--soa` flag — switching all class allocation from Array-of-Structs to Struct-of-Arrays layout with zero code changes — delivers an additional **10% speedup and 14% memory reduction** (measured on a MacBook Air M2).
+
+These are first-iteration numbers. The language was fourteen days old. The compiler had not yet been optimized for Lyric idioms — it was a transliteration of the Go original, carrying Go habits into a language that doesn't need them. Every subsequent round of loop engineering on the compiler — rewriting Go patterns into native Lyric — should widen these margins further.
 
 The test suite has 89 `.ly` files under `testdata/`, 83 of them paired with golden output files under `testdata/golden/`. Each test compiles a `.ly` file, runs the resulting binary, and diffs the output against the `.expected` file. The tests cover every feature in this book — enums, match, generics, relations, interfaces, Dict, concurrency, packages, error handling — plus a few that don't (the `--soa` slab layout switch, the `--detect-uaf` debug mode, the `--rc-free` reference-counting mode). The full self-compile fixed-point check in `test_self_compile.sh` is the integration test on top.
 
