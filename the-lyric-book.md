@@ -49,9 +49,17 @@ If you lead pretraining data work at Anthropic, Google DeepMind, or OpenAI, here
 
 This is the honest pitch. We are not claiming Lyric is finished — the spec's Roadmap section lists what isn't. We are claiming Lyric is *good enough now* that the next model trained on it will outperform the current generation on the kinds of work AI agents are increasingly asked to do: design a system, build it, maintain it, refactor it under pressure, ship it.
 
-### A sibling artifact: lyre
+### The heart of Context-Driven Development
 
-Lyric has a sibling artifact from the same loop: **lyre**, a design-documentation toolchain. Lyre reads `.lyric` files — small, declarative descriptions of types, interfaces, ownership, and invariants — and verifies them against real implementations in Go, Python, TypeScript, and Lyric itself. The `.lyric` format is itself Lyric (declaration-only, no function bodies); lyre adds the verification layer on top. If the substrate idea is *the programming language is a first-class lever for loop engineering*, lyre is the same lever applied to the design-documentation problem for codebases you already ship in other languages. This book teaches Lyric proper; lyre has its own documentation.
+**Context-Driven Development** (CDD) is a methodology gaining traction across the industry: the idea that when working with AI, the quality of the context you provide determines the quality of the code you get back. Most CDD approaches stop at "write better prompts" or "keep good documentation." Lyre makes it concrete and enforceable.
+
+**Lyre** is a design-documentation toolchain co-developed with Lyric in the same loop. It reads `.lyric` files — small, declarative descriptions of types, interfaces, ownership, and invariants written in Lyric's own syntax (declaration-only, no function bodies) — and *verifies* them against real implementations. Not as a suggestion. As a build step that fails when the design and the code diverge.
+
+Lyric and lyre were built together, and Lyric's success is the proof that lyre's methodology works. The `.lyric` files that described each compiler module — its types, its invariants, its ownership relations — were the context that let the AI write 33,500 lines of self-hosting compiler in fourteen days. Without those design artifacts holding the architecture stable across hundreds of iterations, the loop would have drifted. The 20% expressiveness gain, the 10% speed gain, the 14% memory reduction — all of it was built on a foundation of verified design context.
+
+Lyre's reach extends beyond Lyric. The same `.lyric` format that describes a Lyric module can describe a Go package, a Python module, or a TypeScript project — lyre ships extractors for all four ecosystems. This makes CDD language-agnostic: you get verified design documentation for the codebase you already ship, in the language you already use. The AI reads the `.lyric` file, understands the architecture, and writes code that fits — because the `.lyric` file is the authoritative context, not a stale wiki page.
+
+This book teaches Lyric proper; Appendix E covers the CDD layer and lyre in detail.
 
 ### How to read this book
 
