@@ -23,7 +23,7 @@ Throughout, features are marked:
 - ❌ **Not in scope** — Considered and rejected, with rationale.
 
 The Lyric compiler self-hosts at a fixed point as of June 2026
-(~30K lines of Lyric → ~105K lines of C). Every implemented feature lives
+(~33,500 lines of Lyric → ~114,770 lines of C). Every implemented feature lives
 because it earned its place in the bootstrap source.
 
 **CDD layer moved out.** The Context-Driven Development annotations
