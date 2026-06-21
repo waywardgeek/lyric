@@ -410,7 +410,8 @@ func CGen.c_type(self, t: LType?) -> string {
       if !isnull(self.prog!.class_renames) {
         let ren = self.prog!.class_renames!.get(sym(name))
         if !isnull(ren) {
-          name = ren!.value
+          eprintln(f"c_backend[c_type/TyClassHandle]: unmangled generic class '{name}' reached c_backend (class_renames last-write-wins is '{ren!.value}'); monomorphizer missed a TyClassHandle site — fix mono, do not fall back here")
+          os_exit(1)
         }
       }
       if self.prog!.slab_mode_soa {
@@ -1082,7 +1083,8 @@ func CGen.resolve_field_type(self, owner_type: LType?, field: string) -> LType? 
   if !isnull(self.prog!.class_renames) {
     let ren = self.prog!.class_renames!.get(sym(name))
     if !isnull(ren) {
-      name = ren!.value
+      eprintln(f"c_backend[resolve_field_type]: unmangled generic class '{name}' on field-owner LType (class_renames last-write-wins is '{ren!.value}'); monomorphizer missed this site — fix mono, do not fall back here")
+      os_exit(1)
     }
   }
   let s_entry = self.struct_by_name!.get(sym(name))
@@ -2154,7 +2156,8 @@ func CGen.emit_method_call_expr(self, e: LExpr?) -> string {
   if !isnull(self.prog!.class_renames) {
     let ren = self.prog!.class_renames!.get(sym(class_name))
     if !isnull(ren) {
-      class_name = ren!.value
+      eprintln(f"c_backend[destructor-receiver]: unmangled generic class '{class_name}' as destructor receiver (class_renames last-write-wins is '{ren!.value}'); monomorphizer missed this site — fix mono, do not fall back here")
+      os_exit(1)
     }
   }
   if class_name == "" {
@@ -3629,7 +3632,8 @@ func CGen.infer_expr_type(self, e: LExpr?) -> LType? {
       if !isnull(self.prog!.class_renames) {
         let ren = self.prog!.class_renames!.get(sym(type_name))
         if !isnull(ren) {
-          type_name = ren!.value
+          eprintln(f"c_backend[method-call-resolve]: unmangled generic class '{type_name}' as method-call receiver (class_renames last-write-wins is '{ren!.value}'); monomorphizer missed this site — fix mono, do not fall back here")
+          os_exit(1)
         }
       }
       let key = f"{type_name}.{d.method}"
@@ -3756,7 +3760,8 @@ func CGen.resolve_type_name(self, name: string) -> string {
   if !isnull(self.prog!.class_renames) {
     let ren = self.prog!.class_renames!.get(sym(name))
     if !isnull(ren) {
-      return ren!.value
+      eprintln(f"c_backend[resolve_type_name]: unmangled generic class '{name}' (class_renames last-write-wins is '{ren!.value}'); monomorphizer missed this site — fix mono, do not fall back here")
+      os_exit(1)
     }
   }
   return name
