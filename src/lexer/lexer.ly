@@ -15,7 +15,7 @@ lyric lexer {
   enum TokenKind {
     // Keywords
     KLyric KFunc KClass KStruct KEnum KInterface KRelation KField
-    KDestructor KEmbed KImport KImplements KImpl KAs KIs KType KWhere
+    KDestructor KImport KImplements KImpl KAs KIs KType KWhere
     KOwns KRefs KMut KSelf KFrom KTrue KFalse KNil KPub
     // Statement keywords
     KLet KIf KElse KFor KIn KWhile KMatch KReturn KBreak KContinue
@@ -54,7 +54,6 @@ lyric lexer {
     d.set(`interface`, KInterface)
     d.set(`relation`, KRelation)
     d.set(`destructor`, KDestructor)
-    d.set(`embed`, KEmbed)
     // "field" is contextual — parsed by parser.peek_annotation()
     d.set(`import`, KImport)
     // "implements" is contextual — parsed by parser.peek_annotation()

@@ -35,58 +35,8 @@ lyric desugar_tests {
     assert(len(iface.im_children()) >= 4, "expected 4 methods for 2 fields")
   }
 
-  // ---- Pass 1: InterfaceEmbeds ----
+  // (Pass 1 InterfaceEmbeds removed — embed keyword deleted.)
 
-  func test_embed_copies_fields() {
-    let src = """lyric t {
-      interface Base<T> {
-        field T.x: i32
-      }
-      interface Child<T> {
-        embed Base<T>
-      }
-    }"""
-    let file = td_parse(src)
-    desugar_interface_embeds(file)
-    let child = file.fb_children()[0].id_children()[1]
-    // Child should now have the field copied from Base
-    assert(len(child.ifd_children()) >= 1, "embed should copy fields")
-  }
-
-  func test_embed_copies_destructors() {
-    let src = """lyric t {
-      interface Closable<T> {
-        destructor T { print("closing") }
-      }
-      interface Resource<T> {
-        embed Closable<T>
-      }
-    }"""
-    let file = td_parse(src)
-    desugar_interface_embeds(file)
-    let resource = file.fb_children()[0].id_children()[1]
-    assert(len(resource.idb_children()) >= 1, "embed should copy destructors")
-  }
-
-  func test_embed_does_not_copy_methods() {
-    let src = """lyric t {
-      interface Base<T> {
-        func T.foo(self) -> i32
-      }
-      interface Child<T> {
-        embed Base<T>
-      }
-    }"""
-    let file = td_parse(src)
-    let child_before = file.fb_children()[0].id_children()[1]
-    let methods_before = len(child_before.im_children())
-    desugar_interface_embeds(file)
-    let child_after = file.fb_children()[0].id_children()[1]
-    // Embeds do NOT copy methods -- this is a critical invariant
-    assert(len(child_after.im_children()) == methods_before, "embed must NOT copy methods")
-  }
-
-  // ---- Pass 5: DefaultImpls ----
 
   func test_default_impl_extracted() {
     let src = """lyric t {

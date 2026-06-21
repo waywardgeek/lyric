@@ -1296,26 +1296,8 @@ func fmt_interface(sb: StringBuilder, iface: InterfaceDecl) {
     i = i + 1
   }
 
-  // Embeds
-  let embeds = iface.ie_children()
-  i = 0
-  while i < len(embeds) {
-    let ename = if !isnull(embeds[i].name) { embeds[i].name!.get_name() } else { "?" }
-    sb.write(f"    embed {ename}")
-    let eargs = embeds[i].ie_arg_children()
-    if len(eargs) > 0 {
-      sb.write("<")
-      let mut j = 0
-      while j < len(eargs) {
-        if j > 0 { sb.write(", ") }
-        fmt_type_expr(sb, eargs[j])
-        j = j + 1
-      }
-      sb.write(">")
-    }
-    sb.write("\n")
-    i = i + 1
-  }
+  // (Embeds section removed — embed keyword deleted.)
+
 
   // Fields
   let ifields = iface.ifd_children()

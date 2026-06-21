@@ -638,7 +638,6 @@ module lir
 
   class LInterfaceDecl
     source: lir.ly:665
-    field embeds: [string]
     field is_exported: bool
     field methods: [LInterfaceMethod]
     field name: string

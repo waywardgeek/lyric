@@ -666,7 +666,6 @@ lyric lir {
     name: string
     type_params: [LTypeParam]
     methods: [LInterfaceMethod]
-    embeds: [string]
     is_exported: bool
   }
 

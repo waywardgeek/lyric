@@ -2635,7 +2635,7 @@ Lyric's standard library provides three relation hints. Each works in either `ow
 
 `ArrayList` is the default choice. Dynamic array, O(1) swap-remove, compact memory. Use `DoublyLinked` when you need stable iteration order during removal — a linked list won't shuffle elements around. Use `HashedList` when you need lookup by key, which is how `Dict` is built (Chapter 10). Switch between cascading and non-owning by changing one keyword (`owns` ↔ `refs`).
 
-All three are written in Lyric, defined in the standard library. None of them are compiler builtins. The `relation` keyword and the `field`/`destructor`/`embed` machinery are the builtins — the data structures are just interfaces that use them.
+All three are written in Lyric, defined in the standard library. None of them are compiler builtins. The `relation` keyword and the `field`/`destructor` machinery are the builtins — the data structures are just interfaces that use them.
 
 And there's nothing magic about *these* three interfaces. The `relation` declaration accepts **any binary interface** (one with two type parameters in `(parent, child)` order) as its hint — including ones you write yourself. We'll see how to build one in Chapter 9.
 
@@ -2800,7 +2800,7 @@ You won't write `final` functions often. Most classes only own other Lyric objec
 
 Relations don't prevent use-after-free at compile time — if you hold a reference to a destroyed object, you'll crash. The trade-off is deliberate. We proved over 30 years of EDA tools processing billions of objects that this almost never happens when the ownership graph is explicit. The bugs come from *implicit* ownership — when you can't see who owns what. Relations make it visible.
 
-The next chapter shows how the interfaces behind relations work — `field` injection, `embed`, `destructor`, and the impl blocks that wire everything together.
+The next chapter shows how the interfaces behind relations work — `field` injection, `destructor`, and the impl blocks that wire everything together.
 
 ## Chapter 9: Interfaces — Multi-Class Contracts
 
@@ -3003,51 +3003,37 @@ When you write `relation ArrayList Team:roster owns [Player:team]`, the desugar 
 
 Destructors cascade. When `team.destroy()` runs, it calls `player.destroy()` for each player. If `Player` is itself a parent in another relation, that destructor fires too. The compiler chains them automatically, in the order the relations were declared.
 
-### 9.6 Embed
+### 9.6 User-Defined Hint Interfaces
 
-`embed` lets one interface inherit fields and destructors from another. Stdlib's three relation hints don't use `embed` — they each carry their own paired destructors directly — but `embed` is still the right tool when you want to compose your own hint on top of an existing one.
+The three stdlib hints (`ArrayList`, `DoublyLinked`, `HashedList`) cover the storage shapes you'll reach for 99% of the time. When they don't fit, you can write your own. A hint is just an interface that declares the parent-side and child-side fields the relation needs, plus a pair of `owns`/`refs` destructors describing how to clean up.
 
-Say you want a doubly-linked list with a live counter on the parent. The list operations and the lifetime contract come from `DoublyLinked`; you only want to add a counter field plus your own destructor pair:
+Say you want a stack-shaped relation — children are pushed and popped from one end, no iteration in the middle, no back-pointer needed on the child. You'd write:
 
 ```lyric
-pub interface CountedLinked<P, C> {
-    embed DoublyLinked<P, C>
+pub interface Stack<P, C> {
+    field P.top: C?
 
-    field P.count: i32
-
-    // Override the owns destructor: zero the counter as we cascade.
     destructor owns P {
-        let mut cur = self.first()
+        let mut cur = self.top()
         while !isnull(cur) {
-            let next = cur!.next()
-            cur!.set_parent(null)
+            let next: C? = null   // children have no back-link in this hint
             cur!.destroy()
             cur = next
         }
-        self.set_count(0)
+        self.set_top(null)
     }
 
-    // Override the refs destructor: zero the counter as we unlink.
     destructor refs P {
-        let mut cur = self.first()
-        while !isnull(cur) {
-            let next = cur!.next()
-            cur!.set_parent(null)
-            cur!.set_prev(null)
-            cur!.set_next(null)
-            cur = next
-        }
-        self.set_first(null)
-        self.set_last(null)
-        self.set_count(0)
+        self.set_top(null)
     }
 }
+
+relation Stack Editor:undo owns [Action:owner]
 ```
 
-`embed` copies **fields and destructors** from `DoublyLinked` into `CountedLinked`. Methods stay abstract bindings — their concrete behavior comes from the impl block at instantiation time, or from a separate `where DoublyLinked<P, C>` constraint on a generic function. After expansion, `CountedLinked` has `first`, `last`, `next`, `prev`, `parent` fields as if they had been declared directly, plus the new `count` field. The desugar pass expands embeds first, before processing anything else. Each copied destructor block keeps its original `owns`/`refs` tag; declaring blocks with the same tag in the embedder overrides the inherited ones.
+The compiler treats `Stack` exactly like a stdlib hint: it injects `top` onto `Editor` under the `undo` label, runs the `owns` destructor when `editor.destroy()` fires, and ignores the `refs` block for this relation because the keyword was `owns`. Switch to `refs` and the other destructor runs instead.
 
-As of mid-2026 the desugar pass honors this contract: methods are not copied across `embed`. If you need the embedded interface's methods on the embedder, add an explicit `where DoublyLinked<P, C>` constraint to your generic function (Chapter 9.7) or supply an `impl` block that wires them up.
-
+Earlier versions of Lyric had an `embed` keyword that let one interface inherit fields and destructors from another (so you could build `Stack` on top of `DoublyLinked` and only add what was different). It was removed once the stdlib hints stopped needing it — the three of them carry their own paired destructors directly. User-defined hints are uncommon enough that declaring fields and destructors inline (as `Stack` does above) reads more clearly than indirecting through a base interface.
 ### 9.7 Where Clauses on Functions
 
 You can write generic functions constrained by an interface using `where`:
@@ -3096,13 +3082,13 @@ External methods with where clauses and generics — the full power of the type 
 
 The desugar pipeline runs five passes in a fixed order:
 
-1. **Embeds** — expand `embed` declarations, copying fields and destructors (methods stay abstract bindings — see §9.6)
-2. **Interface fields** — inject `field` declarations into concrete classes
-3. **Relations** — process `relation` declarations, binding interfaces to class pairs
-4. **Destructors** — inject `destructor` blocks into classes
-5. **Default impls** — copy default method bodies, substituting concrete types
+1. **Interface fields** — turn `field T.name: Type` declarations on interfaces into matching getter/setter method signatures
+2. **Field access** — rewrite `obj.field` shorthand inside interface bodies into the getter/setter calls created by pass 1
+3. **Relations** — process `relation` declarations, binding interfaces to class pairs and injecting label-prefixed fields
+4. **Destructors** — copy each interface's matching `owns`/`refs` destructor block onto the concrete class's `destroy` method
+5. **Default impls** — extract interface methods that carry a body into top-level generic functions guarded by relational `where` clauses
 
-Order matters. Embeds must run before interface fields, because embedded fields need to exist before they can be injected. Relations must run before destructors, because relation declarations determine which destructors to inject. Default impls run last, because they need all fields and destructors already in place.
+Order matters. Field access must run after interface fields, because it rewrites accesses to the getters pass 1 just generated. Destructors must run after relations, because relation declarations determine which destructor (`owns` vs `refs`) to inject onto each concrete class. Default impls run last, so they see fully-formed classes with all fields and destructors already in place.
 
 After desugar, the checker sees only concrete classes with concrete fields and methods. It has no idea interfaces were involved. This is the key insight: interfaces are a *compile-time* mechanism. They generate code, then disappear. The runtime never sees an interface, never does dynamic dispatch, never pays for abstraction.
 
@@ -3116,7 +3102,7 @@ Every collection type in Lyric's standard library is built with interfaces and r
 - `Dict<K, V>` — uses `HashedList` internally (Chapter 10)
 - `Hashable` — single-method constraint for hash table keys
 
-733 lines of Lyric in `std.ly` alone (991 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, `destructor`, and `embed` that the standard library uses.
+733 lines of Lyric in `std.ly` alone (991 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, and `destructor` that the standard library uses.
 
 This is what it means when we say the standard library *is* the language. The language provides the mechanism. The library provides the policy. You can change the policy.
 
@@ -4394,7 +4380,7 @@ One design choice worth noting: the parser uses a `no_struct_lit` flag to resolv
 
 Between parsing and C emission, the source passes through three major transformations:
 
-**Desugar** (1,534 lines) runs six passes in fixed order: InterfaceEmbeds → InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
+**Desugar** (1,534 lines) runs five passes in fixed order: InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
 
 **Check** (4,919 lines) is four-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
 
@@ -4564,7 +4550,6 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `relation` | Ownership/reference declaration |
 | `type` | Type alias |
 | `impl` | Interface implementation block |
-| `embed` | Copy fields and destructors from another interface |
 | `import` | Package import |
 | `let` | Variable binding (immutable) |
 | `pub` | Public visibility modifier |
@@ -5536,8 +5521,6 @@ interface Graph<G, N, E> {
 **`--soa` flag** — Switch all class allocation to Struct-of-Arrays layout with no code changes. 10% faster, 14% less memory. (Chapter 11)
 
 **`.lyric` sibling artifacts** — Declaration-only Lyric files (no function bodies) consumed by the **lyre** toolchain, which layers Context-Driven Development annotations (`why:`, `doc`, `invariant:`, `source:`, `fake:`) on top. These annotations are **lyre features, not Lyric features** — they never appear in `.ly` source. See Chapter 13 §13.8 for the language-side framing and Appendix E for the full lyre walkthrough.
-
-**`embed`** — Copy fields and destructors from one interface into another. Not inheritance — flat composition at compile time. Methods stay abstract bindings; use `where Iface<...>` to pull in default-method behavior. (Chapter 9)
 
 
 

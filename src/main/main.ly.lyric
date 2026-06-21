@@ -21,7 +21,7 @@ module main
         1.  Parse all input files → merge into a single AST.
         2.  Resolve module imports (if lyric.mod is found).
         3.  Merge stdlib (selective, transitive on use).
-        4.  Desugar: 5 passes — embeds → fields → relations →
+        4.  Desugar: 5 passes — fields → field_access → relations →
             destructors → defaults.
         5.  Check: 3 phases — preregister type names → register
             decls → check function bodies (annotates resolved_type).

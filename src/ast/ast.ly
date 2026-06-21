@@ -144,12 +144,6 @@ lyric ast {
     span: Span
   }
 
-  class InterfaceEmbed {
-    name: Sym?
-    span: Span
-  }
-  relation ArrayList InterfaceEmbed:ie_arg owns [TypeExpr:ie_arg]
-
   class DestructorBlock {
     type_param: Sym?
     kind: RelationKind
@@ -164,7 +158,6 @@ lyric ast {
     span: Span
   }
   relation ArrayList InterfaceDecl:itp owns [TypeParam:itp]
-  relation ArrayList InterfaceDecl:ie owns [InterfaceEmbed:ie]
   relation ArrayList InterfaceDecl:im owns [FuncDecl:im]
   relation ArrayList InterfaceDecl:ifd owns [InterfaceFieldDecl:ifd]
   relation ArrayList InterfaceDecl:idb owns [DestructorBlock:idb]
@@ -1079,32 +1072,8 @@ func merge_stdlib(file: File?, std_file: File?) {
         }
     }
 
-    // Transitively pull in interfaces referenced by embeds
-    let mut queue: [Sym] = []
-    let iface_keys = used_ifaces.keys()
-    for i in range(0, len(iface_keys)) {
-        queue = append(queue, iface_keys[i])
-    }
-    let mut qi = 0
-    while qi < len(queue) {
-        let iname = queue[qi]
-        qi = qi + 1
-        let entry = std_iface_map.get(iname)
-        if entry != null {
-            let iface = entry!.value
-            let embeds = iface.ie_children()
-            for ei in range(0, len(embeds)) {
-                if embeds[ei].name != null {
-                    let emb_name = embeds[ei].name!
-                    let already = used_ifaces.get(emb_name)
-                    if already == null {
-                        used_ifaces.set(emb_name, true)
-                        queue = append(queue, emb_name)
-                    }
-                }
-            }
-        }
-    }
+    // (Transitive embed pull-in removed — embed keyword deleted.)
+
 
     // Collect referenced interface declarations, skipping those already defined in user file
     let mut std_ifaces: [InterfaceDecl] = []
@@ -1273,21 +1242,8 @@ func merge_stdlib(file: File?, std_file: File?) {
                         let hint_entry = std_iface_map.get(sym(hint_name))
                         if hint_entry != null {
                             std_ifaces = append(std_ifaces, hint_entry!.value)
-                            let embeds = hint_entry!.value.ie_children()
-                            for ei in range(0, len(embeds)) {
-                                if embeds[ei].name != null {
-                                    let emb_n = embeds[ei].name!.name
-                                    let emb_used = used_ifaces.get(sym(emb_n))
-                                    if emb_used == null {
-                                        used_ifaces.set(sym(emb_n), true)
-                                        let emb_entry = std_iface_map.get(sym(emb_n))
-                                        if emb_entry != null {
-                                            std_ifaces = append(std_ifaces, emb_entry!.value)
-                                        }
-                                    }
-                                }
-                            }
                         }
+
                     }
                 }
                 // Ensure both participant types are merged

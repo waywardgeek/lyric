@@ -75,7 +75,6 @@ lyric parser {
     // Accept certain reserved words as identifiers
     match tok.kind {
       KField => { return (tok, null) }
-      KEmbed => { return (tok, null) }
       KDestructor => { return (tok, null) }
       KImplements => { return (tok, null) }
       KFrom => { return (tok, null) }
@@ -595,10 +594,6 @@ lyric parser {
           let fn = self.parse_func()?
           array_append<InterfaceDecl, FuncDecl>(iface, fn!)
         }
-        KEmbed => {
-          let emb = self.parse_interface_embed()?
-          array_append<InterfaceDecl, InterfaceEmbed>(iface, emb!)
-        }
         KField => {
           let fd = self.parse_interface_field()?
           array_append<InterfaceDecl, InterfaceFieldDecl>(iface, fd!)
@@ -632,28 +627,6 @@ lyric parser {
       type_expr: te,
       span: self.make_span(start)
     }, null)
-  }
-
-  func Parser.parse_interface_embed(self) -> (InterfaceEmbed?, error) {
-    let start = self.peek().span.start
-    self.next()  // consume 'embed'
-    let name = self.expect(LIdent)?
-    let emb = InterfaceEmbed { name: sym(name!.text), span: Span { start: start, end: start } }
-
-    if self.peek().kind == PLt {
-      self.next()
-      while self.peek().kind != PGt && self.peek().kind != SEOF {
-        let te = self.parse_type_expr()?
-        array_append<InterfaceEmbed, TypeExpr>(emb, te!)
-        if self.peek().kind == PComma {
-          self.next()
-        }
-      }
-      self.expect(PGt)?
-    }
-
-    emb.span = self.make_span(start)
-    return (emb, null)
   }
 
   func Parser.parse_destructor_block(self) -> (DestructorBlock?, error) {

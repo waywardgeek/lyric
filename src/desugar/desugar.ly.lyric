@@ -1,22 +1,19 @@
 module desugar
   source: ["desugar.ly"]
-  why: "Six-pass AST desugaring layer that runs BEFORE the checker. Lowers high-level Lyric constructs — interface embeds, interface fields, relations, destructors, default impls, and field-access shorthand — into the simpler core forms (plain fields, methods, impl blocks, and getter/setter calls) that the checker and lowerer expect."
+  why: "Five-pass AST desugaring layer that runs BEFORE the checker. Lowers high-level Lyric constructs — interface fields, relations, destructors, default impls, and field-access shorthand — into the simpler core forms (plain fields, methods, impl blocks, and getter/setter calls) that the checker and lowerer expect."
 
   doc "Architecture":
     """
-    desugar rewrites the parsed AST in place through six ordered passes.
+    desugar rewrites the parsed AST in place through five ordered passes.
     Each pass produces AST that later passes consume; running out of order
     causes silent failures, so the fixed sequence in desugar_all is the
     single source of truth:
 
-    1. desugar_interface_embeds — copies fields/destructors from embedded
-       interfaces into their embedders, substituting type parameters and
-       propagating the destructor's RelationKind.  Stdlib no longer uses
-       embed for hint interfaces (ArrayList/DoublyLinked/HashedList each
-       carry their own paired destructor blocks), but user-defined
-       interfaces can still embed others.
-    2. desugar_interface_fields — turns `field T.name: Type` declarations
+    1. desugar_interface_fields — turns `field T.name: Type` declarations
        on interfaces into matching getter/setter method signatures.
+    2. desugar_field_access — rewrites `obj.field` shorthand inside
+       interface bodies into getter/setter method calls for fields lifted
+       by pass 1.
     3. desugar_relations — expands relation decls into label-prefixed
        fields on the parent class plus impl blocks on the child. Uses a
        GLOBAL class lookup across all blocks (relations frequently target
@@ -31,11 +28,8 @@ module desugar
     5. desugar_default_impls — extracts interface methods that carry a
        body into top-level generic functions guarded by relational
        `where` clauses, so any conforming class picks them up.
-    6. desugar_field_access — rewrites `obj.field` shorthand into
-       getter/setter method calls for fields that were lifted onto
-       interfaces by pass 2.
 
-    All six passes complete before the checker runs; the checker therefore
+    All five passes complete before the checker runs; the checker therefore
     only ever sees plain classes, fields, methods, and impl blocks.
 
     Two substitution strategies coexist. The simple variant
@@ -62,17 +56,15 @@ module desugar
     procedural
     """
     desugar_all MUST invoke the passes in this exact order:
-      1. desugar_interface_embeds
-      2. desugar_interface_fields
+      1. desugar_interface_fields
+      2. desugar_field_access
       3. desugar_relations
       4. desugar_destructors
       5. desugar_default_impls
-      6. desugar_field_access
 
     Each pass generates AST consumed by later passes. Running out of
     order produces silent failures (missing fields, unrenamed method
-    calls, destructors copied before embeds are resolved). All six
-    passes MUST complete before the checker runs.
+    calls). All five passes MUST complete before the checker runs.
     """
 
   invariant "Cross-Block Class Lookup":
@@ -149,9 +141,6 @@ module desugar
     the rest. Two impl blocks for the same (interface, type args) pair
     on one class is a bug, not a feature.
     """
-
-  func desugar_interface_embeds(file: File)
-    source: desugar.ly:17
 
   func desugar_interface_fields(file: File)
     source: desugar.ly:145

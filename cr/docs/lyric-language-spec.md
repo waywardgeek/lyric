@@ -140,7 +140,6 @@ inheritance is selective.
   generation
 - **Impl blocks** — wire interface methods to concrete class methods, bind
   fields, or provide inline implementations
-- **`embed` keyword** — interface embedding (copies fields and destructors)
 
 ---
 
@@ -1086,18 +1085,8 @@ pub func count_edges<G, N, E>(graph: G) -> i32 where Graph<G, N, E> { ... }
 Callers invoke it via method syntax (`graph.count_edges()`) when the
 interface is implemented on the receiver's type.
 
-### Interface Embedding
-
-```lyric
-interface Counted<P, C> {
-    embed DoublyLinked<P, C>    // copies fields and destructors
-    field P.count: i32          // adds new fields on top of what was embedded
-    destructor P { ... }        // can add/override
-}
-```
-
-`embed` copies **fields and destructors** only — it does not copy methods
-(those are abstract bindings; you'd duplicate the abstract surface).
+(Interface embedding via the `embed` keyword has been removed; see
+§Recently Removed.)
 
 ### Impl Blocks
 
@@ -2152,7 +2141,7 @@ debugging tests.
 
 ```
 lyric  func  class  struct  enum  interface  relation  destructor
-embed  import  impl  as  is  type  where  owns  refs  mut  self
+import  impl  as  is  type  where  owns  refs  mut  self
 from  true  false  null  pub  let  if  else  for  in  while
 match  return  break  continue  spawn  select  case  yield
 ```
@@ -2175,7 +2164,7 @@ disambiguates by context.
 
 ### Soft-Reserved (accepted as identifiers via `expect_ident`)
 
-`field`, `embed`, `destructor`, `implements`, `from`, `as`, `is`, `in`.
+`field`, `destructor`, `implements`, `from`, `as`, `is`, `in`.
 
 These can stand in for an identifier in any position that takes an
 identifier (e.g., function argument names).
@@ -2270,20 +2259,18 @@ Parse → ResolveImports → MergeStdlib → DesugarAll → Check → Lower
       → Optimize → Monomorphize → Emit C → gcc
 ```
 
-**Desugar order** (six passes — MUST run in this sequence):
+**Desugar order** (five passes — MUST run in this sequence):
 
-1. **InterfaceEmbeds** — flatten embedded interfaces (copy fields and
-   destructors).
-2. **InterfaceFields** — `field T.name: Type` → abstract getter and setter
+1. **InterfaceFields** — `field T.name: Type` → abstract getter and setter
    methods.
-3. **FieldAccess** — inside interface bodies, rewrite `self.field` →
+2. **FieldAccess** — inside interface bodies, rewrite `self.field` →
    `self.field()` and `self.field = x` → `self.set_field(x)`.
-4. **Relations** — for each relation, inject label-prefixed fields and
+3. **Relations** — for each relation, inject label-prefixed fields and
    impl-block field bindings.
-5. **Destructors** — generate `pub func destroy(mut self)` on concrete
+4. **Destructors** — generate `pub func destroy(mut self)` on concrete
    classes from interface destructor blocks (with type-param substitution
    and label-prefix method renaming).
-6. **DefaultImpls** — extract interface methods with bodies into top-level
+5. **DefaultImpls** — extract interface methods with bodies into top-level
    generic functions with relational `where` clauses.
 
 **Check phases** (four phases):
@@ -3151,6 +3138,27 @@ is the single source of truth for "what 🚧 means."
 Features previously documented in this spec that have been moved out or
 deleted. Listed here so readers of old branches and old `.lyric` files know
 where things went.
+
+### `embed` Keyword (Interface Embedding)
+
+Previously, an interface could embed another interface, copying its
+fields and destructors (but not its methods):
+
+```lyric
+interface Counted<P, C> {
+    embed DoublyLinked<P, C>    // copies fields and destructors
+    field P.count: i32
+    destructor P { ... }
+}
+```
+
+The keyword and its desugar pass have been deleted. Its only consumers
+in the stdlib (`OwningList`, `RefList`, `RefArrayList`) were collapsed
+into the three public hints with paired `owns`/`refs` destructors (see
+below); user-defined hint interfaces are uncommon and can declare the
+fields and destructors they need directly. Any remaining user code that
+used `embed` should inline the embedded interface's fields and
+destructor blocks into the embedding interface.
 
 ### CDD Annotations and the Three-Zone `.lyric` Layout (→ `lyre`)
 

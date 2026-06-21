@@ -1490,18 +1490,7 @@ lyric checker {
           for ib in all_impls {
             if ib.interface_name == null { continue }
             let ib_iface_name = sym_to_string(ib.interface_name!)
-            let mut iface_matches = ib_iface_name == iface_name
-            if !iface_matches {
-              // Check if the impl block's interface embeds the where-clause interface
-              let ib_iface = self.iface_decls.get(sym(ib_iface_name))
-              if ib_iface != null {
-                for emb in ib_iface!.value.ie_children() {
-                  if !isnull(emb.name) && emb.name!.name == iface_name {
-                    iface_matches = true
-                  }
-                }
-              }
-            }
+            let iface_matches = ib_iface_name == iface_name
             if !iface_matches { continue }
 
             let impl_args = ib.ib_arg_children()

@@ -1,96 +1,14 @@
 // desugar.ly — AST desugaring passes for the Lyric bootstrap compiler
 // Ported from pkg/ast/desugar.go
-//
 // Desugar order (must be maintained):
-//   1. DesugarInterfaceEmbeds — flatten embedded interfaces
-//   2. DesugarInterfaceFields — convert field decls to getter/setter methods
+//   1. DesugarInterfaceFields — convert field decls to getter/setter methods
+//   2. DesugarFieldAccess — rewrite self.field shorthand into getter/setter calls
 //   3. DesugarRelations — inject fields + impl blocks from relations
 //   4. DesugarDestructors — copy interface destructors to concrete classes
 //   5. DesugarDefaultImpls — extract interface methods with bodies to top-level functions
 
 lyric desugar {
 
-  // ---- 1. DesugarInterfaceEmbeds ----
-  // Flattens embedded interfaces by copying fields and destructors
-  // from the embedded interface into the embedding interface, substituting type params.
-  // Per spec §Interface Embedding, methods are NOT copied — they stay abstract
-  // bindings whose concrete behavior is supplied by the impl block at
-  // instantiation, or by a separate `where Parent<P, C>` constraint on a generic
-  // function.
-
-  func desugar_interface_embeds(file: File) {
-    // Build index of all interfaces by name
-    let iface_map = Dict<Sym, InterfaceDecl>()
-    for block in file.fb_children() {
-      for iface in block.id_children() {
-        if !isnull(iface.name) {
-          iface_map.set(sym(iface.name!.name), iface)
-        }
-      }
-    }
-
-    for block in file.fb_children() {
-      for iface in block.id_children() {
-        for emb in iface.ie_children() {
-          if isnull(emb.name) { continue }
-          let entry = iface_map.get(sym(emb.name!.name))
-          if isnull(entry) { continue }
-          let parent_iface = entry!.value
-
-          // Build type param substitution map: parent.TypeParams[i] -> emb.TypeArgs[i]
-          let type_map = Dict<Sym, string>()
-          let parent_tps = parent_iface.itp_children()
-          let emb_args = emb.ie_arg_children()
-          let mut i: i32 = 0
-          while i < len(parent_tps) {
-            if i < len(emb_args) {
-              let tp = parent_tps[i]
-              let arg = emb_args[i]
-              if !isnull(tp.name) {
-                let arg_name = type_expr_name(arg)
-                if !isnull(arg_name) {
-                  type_map.set(sym(tp.name!.name), arg_name!.name)
-                }
-              }
-            }
-            i = i + 1
-          }
-
-          // Copy fields with type param substitution
-          for field in parent_iface.ifd_children() {
-            let new_field = InterfaceFieldDecl {
-              type_param: substitute_sym(field.type_param, type_map),
-              name: field.name,
-              type_expr: substitute_type_expr_copy(field.type_expr, type_map),
-              span: field.span,
-            }
-            array_append<InterfaceDecl, InterfaceFieldDecl>(iface, new_field)
-          }
-
-          // Copy destructors with type param substitution
-          for db in parent_iface.idb_children() {
-            let body_copy = deep_copy_block(db.body)
-            if !isnull(body_copy) {
-              substitute_type_params_in_block(body_copy!, type_map)
-            }
-            let new_db = DestructorBlock {
-              type_param: substitute_sym(db.type_param, type_map),
-              kind: db.kind,
-              body: body_copy,
-              span: db.span,
-            }
-            array_append<InterfaceDecl, DestructorBlock>(iface, new_db)
-          }
-
-          // Per spec §Interface Embedding: embed copies fields and destructors
-          // only. Methods stay abstract bindings — their concrete behavior comes
-          // from the impl block at instantiation, or from a separate
-          // `where Parent<P, C>` constraint on a generic function. Do NOT copy
-          // methods from the embedded interface here.
-        }
-      }
-    }
-  }
 
   // ---- 2. DesugarInterfaceFields ----
   // Converts interface field declarations into getter/setter methods.
@@ -781,7 +699,6 @@ lyric desugar {
   // ---- Main entry point ----
 
   func desugar_all(file: File) {
-    desugar_interface_embeds(file)
     desugar_interface_fields(file)
     desugar_field_access(file)
     desugar_relations(file)

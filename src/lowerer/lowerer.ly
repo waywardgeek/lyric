@@ -670,7 +670,6 @@ lyric lowerer {
   func Lowerer.lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl {
     let mut methods: [LInterfaceMethod] = []
     let mut tps: [LTypeParam] = []
-    let mut embeds: [string] = []
     if !isnull(id) {
       for m in id!.im_children() {
         if !isnull(m.name) {
@@ -691,15 +690,10 @@ lyric lowerer {
           append(tps, LTypeParam { name: tp.name!.name, constraint: c })
         }
       }
-      for e in id!.ie_children() {
-        if !isnull(e.name) {
-          append(embeds, e.name!.name)
-        }
-      }
     }
     let name = if !isnull(id) && !isnull(id!.name) { id!.name!.name } else { "" }
     let exported = if !isnull(id) { id!.is_public } else { false }
-    return LInterfaceDecl { name: name, type_params: tps, methods: methods, embeds: embeds, is_exported: exported }
+    return LInterfaceDecl { name: name, type_params: tps, methods: methods, is_exported: exported }
   }
 
   // ---------- Impl block lowering ----------
@@ -749,24 +743,13 @@ lyric lowerer {
     }
     rename_prefix = iface_name + label_segment + type_arg_suffix
 
-    // Build additional prefixes for embedded interfaces (legacy: previously
-    // OwningList embedded DoublyLinked; today no stdlib hint uses embed but the
-    // mechanism stays for user-defined interfaces that do).
     // NOTE: Use let ref on concat temps — slice holds pointers, scope-exit free would UAF
     let mut all_rename_prefixes: [string] = [rename_prefix]
-    for embed_name in iface.embeds {
-      let ref ep = embed_name + label_segment + type_arg_suffix
-      all_rename_prefixes = append(all_rename_prefixes, ep)
-    }
     // Also register under unlabeled prefix so free-function API (array_append etc.) still works
     if label_segment != "" {
       // Use let ref to prevent scope-exit freeing — slice holds these pointers
       let ref unlabeled = iface_name + type_arg_suffix
       all_rename_prefixes = append(all_rename_prefixes, unlabeled)
-      for embed_name in iface.embeds {
-        let ref embed_unlabeled = embed_name + type_arg_suffix
-        all_rename_prefixes = append(all_rename_prefixes, embed_unlabeled)
-      }
     }
 
     // Lower each mapping

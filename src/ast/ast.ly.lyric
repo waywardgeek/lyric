@@ -92,12 +92,11 @@ module ast
   invariant "Desugaring":
     procedural
     """
-    Five desugar passes run BEFORE the checker, in strict order:
-    1. InterfaceEmbeds — flatten embedded interfaces
-    2. InterfaceFields — field decls → getter/setter methods
-    3. Relations — inject ownership/reference fields + impl blocks
-    4. Destructors — copy interface destructor bodies to classes
-    5. DefaultImpls — extract interface methods to top-level functions
+    Four desugar passes run BEFORE the checker, in strict order:
+    1. InterfaceFields — field decls → getter/setter methods
+    2. Relations — inject ownership/reference fields + impl blocks
+    3. Destructors — copy interface destructor bodies to classes
+    4. DefaultImpls — extract interface methods to top-level functions
 
     Each pass creates AST consumed by later passes. Order is critical.
     """
@@ -198,11 +197,6 @@ module ast
     field span: Span
     field type_expr: TypeExpr?
     field type_param: Sym?
-
-  class InterfaceEmbed
-    source: ast.ly:147
-    field name: Sym?
-    field span: Span
 
   class DestructorBlock
     source: ast.ly:153

@@ -239,8 +239,6 @@ module parser
       source: parser.ly:544
     method parse_interface_field(self) -> (InterfaceFieldDecl?, error)
       source: parser.ly:621
-    method parse_interface_embed(self) -> (InterfaceEmbed?, error)
-      source: parser.ly:637
     method parse_destructor_block(self) -> (DestructorBlock?, error)
       source: parser.ly:659
     method parse_impl(self) -> (ImplBlock?, error)

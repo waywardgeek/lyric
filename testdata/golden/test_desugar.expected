@@ -1,8 +1,5 @@
 PASS  test_field_generates_getter_and_setter
 PASS  test_field_generates_multiple_fields
-PASS  test_embed_copies_fields
-PASS  test_embed_copies_destructors
-PASS  test_embed_does_not_copy_methods
 PASS  test_default_impl_extracted
 PASS  test_abstract_method_preserved
 PASS  test_desugar_all_runs_all_passes
@@ -11,4 +8,4 @@ PASS  test_sym_eq_one_null
 PASS  test_sym_eq_same
 PASS  test_sym_eq_different
 
-12 tests, 12 passed, 0 failed
+9 tests, 9 passed, 0 failed
