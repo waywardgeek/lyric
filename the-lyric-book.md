@@ -2989,7 +2989,7 @@ pub interface OwningList<P, C> {
 }
 ```
 
-`embed` copies fields, methods, and destructors from `DoublyLinked` into `OwningList`. After expansion, `OwningList` has `first`, `last`, `next`, `prev`, `parent` fields, and `dll_append`/`dll_remove` methods — as if they had been declared directly. The desugar pass expands embeds first, before processing anything else. This is why Chapter 8's `OwningList` relations get `first`, `last`, `next`, `prev`, and `parent` fields even though `OwningList` doesn't declare them directly.
+`embed` copies **fields and destructors** from `DoublyLinked` into `OwningList`. Methods stay abstract bindings — their concrete behavior comes from the impl block at instantiation time, or from a separate `where DoublyLinked<P, C>` constraint on a generic function. After expansion, `OwningList` has `first`, `last`, `next`, `prev`, `parent` fields as if they had been declared directly. The desugar pass expands embeds first, before processing anything else. This is why Chapter 8's `OwningList` relations get `first`, `last`, `next`, `prev`, and `parent` fields even though `OwningList` doesn't declare them directly. 🚧 *The current desugar over-copies — it also drags methods across the `embed`, which is how stdlib's `dll_append`/`dll_remove` show up on `OwningList` relations today. The intended semantics are fields-and-destructors only; expect the over-copy to be removed and the stdlib factoring to grow explicit `where DoublyLinked<P, C>` constraints in its place.*
 
 ### 9.7 Where Clauses on Functions
 
@@ -3039,7 +3039,7 @@ External methods with where clauses and generics — the full power of the type 
 
 The desugar pipeline runs five passes in a fixed order:
 
-1. **Embeds** — expand `embed` declarations, copying fields, methods, and destructors
+1. **Embeds** — expand `embed` declarations, copying fields and destructors (methods stay abstract bindings — 🚧 the current desugar over-copies methods too; see §9.6)
 2. **Interface fields** — inject `field` declarations into concrete classes
 3. **Relations** — process `relation` declarations, binding interfaces to class pairs
 4. **Destructors** — inject `destructor` blocks into classes
@@ -5462,7 +5462,7 @@ interface Graph<G, N, E> {
 
 **`.lyric` sibling artifacts** — Declaration-only Lyric files (no function bodies) consumed by the **lyre** toolchain, which layers Context-Driven Development annotations (`why:`, `doc`, `invariant:`, `source:`, `fake:`) on top. These annotations are **lyre features, not Lyric features** — they never appear in `.ly` source. See Chapter 13 §13.8 for the language-side framing and Appendix E for the full lyre walkthrough.
 
-**`embed`** — Copy fields, methods, and destructors from one interface into another. Not inheritance — flat composition at compile time. (Chapter 9)
+**`embed`** — Copy fields and destructors from one interface into another. Not inheritance — flat composition at compile time. Methods stay abstract bindings; use `where Iface<...>` to pull in default-method behavior. (Chapter 9)
 
 
 
