@@ -128,3 +128,56 @@ This blocks the Ch 4 tokenizer example from compiling end-to-end. Ch 5's parser 
 ### Ch 6's pre-edit opening over-promises what Ch 5 delivers
 
 Ch 6's first paragraph claims: "Our calculator parses and evaluates expressions, handles errors, **and reports line and column numbers**." Ch 5 introduces `ParseError { line, col, msg }` as a custom-error *example* in §5.5, but the actual calculator's `Parser` keeps the simple `Error { msg }` form — there's no `Lexer` carrying source positions yet. The Ch 6 reviser should either soften that opening to match Ch 5's actual state, or add a small "Lexer with positions" step at the start of Ch 6 that lifts the §5.5 `ParseError` into the parser. The Ch 4 carry-forward note already anticipated this: "A `Lexer` class with line/column tracking is a natural extension for Ch 5 or later when error messages need source positions." Ch 5 chose *later*; Ch 6 needs to choose now.
+
+---
+
+## Ch 6 reviser, 2026-06-21
+
+### Generic class methods that access `self.<field>` lower to a null receiver
+
+Spec §Generics (under "Generics" on the class side, line ~967) and §Class Generics show the canonical form:
+
+```lyric
+class Pair<T> {
+    first: T
+    second: T
+}
+let p = Pair<i32> { first: 1, second: 2 }
+```
+
+Field *access* on `p` works. But the moment a method on a generic class touches `self.<field>`, the C backend drops the receiver pointer. Minimal repro:
+
+```lyric
+class Stack<T> {
+    items: [T]
+    pub func push(self, item: T) {
+        self.items.push(item)
+    }
+    pub func len(self) -> i32 {
+        return self.items.len()
+    }
+}
+
+func main() {
+    let empty: [f64] = []
+    let mut s = Stack<f64> { items: empty }
+    s.push(1.0)
+    println(f"len: {s.len()}")
+}
+```
+
+`./lyric compile` succeeds, but `gcc` errors on lines like:
+
+```c
+lyric_push(&/* null value */->items, item, LyricSlice_double);
+```
+
+The literal text `/* null value */` is in the generated C — i.e., the lowerer knows it has nothing to write for the receiver and emits a placeholder comment instead of `(self)`. Same shape for `pop` / `peek` (`lyric_pop(&/* null value */->items)`). Non-generic classes work fine; the bug is specific to monomorphized methods on generic classes.
+
+Secondary finding from the same investigation: the untyped empty slice literal does not seed type-variable inference for a generic class constructor.
+
+```lyric
+let mut s = Stack<f64> { items: [] }   // checker: TypeVar leak 'T' in main
+```
+
+Both bugs logged in `~/projects/lyric/TODO`. The book's Ch 6 §6.9 `Stack<T>` example is preserved as illustrative with an explicit 🚧 callout; the chapter's working generic code is all *free functions* (`max_val<T: Comparable>`, `identity<T>`, `first<T>`, `print_it<T: Printable>` — all compile + run end-to-end, verified).

@@ -1751,7 +1751,7 @@ The tradeoff is verbosity. In the parser, `?` keeps it manageable. In code that 
 
 ## Chapter 6: Generics
 
-Our calculator parses and evaluates expressions, handles errors, and reports line and column numbers. But everything is `f64`. What if we wanted integer-only arithmetic? Or complex numbers? Right now we'd have to copy the parser and change every type annotation. That's not engineering — that's a word processor.
+Our calculator parses and evaluates expressions, and reports errors when the parser hits something it can't handle. But everything is `f64`. What if we wanted integer-only arithmetic? Or complex numbers? Right now we'd have to copy the parser and change every type annotation. That's not engineering — that's a word processor.
 
 Lyric has generics. They look like this:
 
@@ -1822,7 +1822,7 @@ let f = first(nums)
 println(f"first([10,20,30]) = {f!}")  // first([10,20,30]) = 10
 ```
 
-The compiler sees `[i32]` for `xs`, matches it against `[T]`, and infers `T = i32`. The return type becomes `i32?`. Inference also works through lambda return types and multiple type parameters — if a function takes `(xs: [T], f: (T) -> U) -> [U]`, the compiler infers both `T` and `U` from the arguments.
+The compiler sees `[i32]` for `xs`, matches it against `[T]`, and infers `T = i32`. The return type becomes `i32?`. Inference also works through lambda return types and multiple type parameters — if a function takes `(xs: [T], f: func(T) -> U) -> [U]`, the compiler infers both `T` and `U` from the arguments.
 
 ### 6.3 Constraints
 
@@ -1957,7 +1957,7 @@ We said the compiler generates specialized copies. Here's what that means concre
 
 ### 6.9 A Generic Stack
 
-Let's put this together. Here's a generic stack built on slices:
+Let's put this together. Here's how a generic stack *would* read — built on slices, with the same shape as the concrete `Stack` from Chapter 3 but parameterized on the element type:
 
 ```lyric
 class Stack<T> {
@@ -1987,10 +1987,11 @@ class Stack<T> {
 }
 ```
 
-Use it:
+Use it like this:
 
 ```lyric
-let mut stack = Stack<f64> { items: [] }
+let empty: [f64] = []
+let mut stack = Stack<f64> { items: empty }
 stack.push(1.0)
 stack.push(2.0)
 stack.push(3.0)
@@ -1998,7 +1999,9 @@ let top = stack.pop()
 println(f"popped: {top!}")  // popped: 3
 ```
 
-The compiler generates `Stack_f64` with `push_f64`, `pop_f64`, and so on. If we also use `Stack<string>` somewhere, it generates a second complete set. Each is fully specialized — no indirection.
+Conceptually, the compiler generates `Stack_f64` with `push_f64`, `pop_f64`, and so on. If we also use `Stack<string>` somewhere, it generates a second complete set. Each is fully specialized — no indirection.
+
+🚧 *Roadmap: as of this writing, generic class methods that access `self.<field>` lower to a null receiver in the C backend — `s.push(1.0)` on a `Stack<T>` compiles through checking and monomorphization but generates C that segfaults. Generic free functions (like the `max_val<T: Comparable>` and `first<T>` above) work today; generic classes are next on the bring-up list. Also, `Stack<f64> { items: [] }` with an untyped empty literal fails earlier with a type-variable leak, so the example uses a typed `let empty: [f64] = []` to seed inference. Logged in `~/projects/lyric/TODO`.*
 
 ### 6.10 Toward a Generic Parser
 
