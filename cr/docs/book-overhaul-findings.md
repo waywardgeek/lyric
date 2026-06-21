@@ -283,3 +283,43 @@ The same factoring applies on the doubly-linked side: `DoublyLinked<P, C>` is th
 Spec §Relations (§ArrayList — Dynamic Array Ownership) shows only the free-function form (`array_append<Team, Player>(t, p)`); the spec should be updated to also show the method form (`t.roster_append(p)`) since that's the carry-forward's preferred form *and* it's what the stdlib actually generates today. The spec should also probably document `ArrayListBase` and `RefArrayList` so the four-vs-five-types discrepancy doesn't surprise readers who go from the book to the spec.
 
 No compiler bug — the stdlib just got more sophisticated than the docs. Book §8.2 now shows the real factoring; logged here so the spec can follow.
+
+---
+
+## Ch 9 reviser, 2026-06-21
+
+### Spec promises default-method method-call syntax that the checker doesn't resolve
+
+Spec §Default Methods says of `pub func count_edges(graph: G) -> i32 { ... }` inside `interface Graph<G, N, E>`:
+
+> Callers invoke it via method syntax (`graph.count_edges()`) when the interface is implemented on the receiver's type.
+
+Empirical (extracted from `testdata/interfaces.ly`'s working `Graph` example, kept identical except for the call site):
+
+```lyric
+let count = g.count_edges()    // checker: unknown method: count_edges
+```
+
+The checker rejects `g.count_edges()` for any `g` of a concrete type that has a `Graph<G, N, E>` impl block. The free-function form `count_edges<G, N, E>(g)` resolves and runs correctly (and is what `testdata/interfaces.ly` uses for `dll_append<Folder, File>(dir, f)`). So the spec's "method syntax for default methods" line is aspirational; only free-function-with-explicit-type-args works today.
+
+Same shape for default methods declared with the `P.` receiver-binding form (`pub func P.add(self, child: C) { ... }` inside `interface MyList<P, C>` with `relation MyList Panel:w owns [Widget:p]`): neither `panel.add(w1)` nor `panel.w_add(w1)` resolves; the underlying `Panel_add` / `Panel_w_add` C symbol is never emitted. By contrast, the stdlib hint relations (`ArrayList`, `OwningList`, `RefList`) *do* wire up label-prefixed methods (`team.roster_append(player)`, `dir.files_append(file)`) — that machinery is specific to the four stdlib hints, not a generic feature of `relation` over any binary interface.
+
+Book §9.3 was rewritten to use the working pattern: top-level default function (`pub func add(parent: P, child: C)`), getter/setter form inside the body (`parent.items()` / `parent.set_items(...)`), free-function call at the call site (`add<Panel, Widget>(panel, w1)`), and an explicit 🚧 callout pointing readers at the stdlib hints when they want method-call ergonomics today.
+
+Logged in `~/projects/lyric/TODO`.
+
+### Spec §Default Methods Are Label-Prefixed overstates the user-defined-hint story
+
+The spec explicitly says:
+
+> A relation's hint interface can declare default methods. The desugar pass binds those methods onto the parent type with the parent label as prefix… `panel.w_add(widget)` and `panel.w_count()`.
+
+This is true for the stdlib hints. For a user-defined `interface MyList<P, C>` used as a relation hint, the desugar pass does *not* inject label-prefixed methods — the checker reports `unknown method: w_add` and the abstract `field P.items` is not visible inside the default method body (`field items not found on type` when the body says `self.items` or `parent.items`). Verified end-to-end against `relation MyList Panel:w owns [Widget:p]` with three call shapes (`panel.add`, `panel.w_add`, free-function `add<Panel,Widget>(panel, w1)`); only the free-function form passes the checker, and even then the body must use getter/setter form (`parent.items()` not `parent.items`).
+
+Two ways to bring spec and reality into agreement: (a) extend the relation-desugar to inject label-prefixed methods for any binary interface used as a hint (the spec's intent); (b) demote the "any binary interface" framing and explicitly say only the four stdlib hints get method-injection today, with the rest of the family on the roadmap. The book takes path (b) for now.
+
+Logged in `~/projects/lyric/TODO`.
+
+### `self: P` parameter syntax inside interface default methods is a parser error
+
+Tried `pub func add(self: P, child: C) { ... }` inside an interface body to make the "self is the parent" hint explicit. Parser rejects with `expected identifier, got PColon`. Two workarounds both compile: (a) the receiver-binding declaration `pub func P.add(self, child: C)` (where `self` is implicitly typed as `P`); (b) a plain top-level default with a named parameter (`pub func add(parent: P, child: C)`). The book uses (b) because it matches the free-function call-site form readers must use today. Not a high-priority spec gap, but worth a line saying `self` is only valid as a receiver in the `Type.method` form, not as a typed positional parameter.

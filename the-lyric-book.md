@@ -2775,9 +2775,9 @@ interface Graph<G, N, E> {
         let mut total: i32 = 0
         let nodes = graph.nodes()
         let mut i: i32 = 0
-        while i < len(nodes) {
+        while i < nodes.len() {
             let edges = nodes[i].out_edges()
-            total = total + len(edges)
+            total = total + edges.len() as i32
             i = i + 1
         }
         return total
@@ -2841,6 +2841,8 @@ println(count)  // 1
 
 The three type parameters are explicit because the compiler can't always infer them — a class could participate in multiple `Graph` implementations. Monomorphization generates a `count_edges` specialized for these three concrete types. No vtables, no dynamic dispatch. The generated C code is a direct function call.
 
+🚧 *Roadmap: the spec promises method-call syntax on default methods too — `g.count_edges()` once the interface is wired up on `G`. Today the checker only resolves the free-function form `count_edges<G, N, E>(g)`, so that's what the examples use.*
+
 Classes can also declare which interfaces they satisfy with `implements`:
 
 ```lyric
@@ -2854,9 +2856,9 @@ This is documentation and a compiler check. Lyric uses structural interface sati
 
 🚧 *Today, `implements` is declarative only — the checker records the claim but doesn't yet verify that the required methods are actually present. Missing methods surface as errors later in lowering or codegen instead of at the declaration site. The roadmap item is to do the structural check up front so you get a clean "Task: method `display` required by Displayable is missing" error.*
 
-### 9.3 Method Syntax on Interfaces
+### 9.3 Default Methods and Field Accessors
 
-The `Graph` example uses method aliases — the concrete class already has a method, and the impl block maps the interface name to it. But you can also define methods directly on interface type parameters:
+The `Graph` example uses method aliases — the concrete class already has a method, and the impl block maps the interface name to it. The other style is to give the interface a body — a *default method* — that calls the abstract methods and field accessors it declares:
 
 ```lyric
 pub interface MyList<P, C> {
@@ -2864,41 +2866,25 @@ pub interface MyList<P, C> {
     field C.owner: P?
     field C.pos: i32
 
-    pub func P.add(self, child: C) {
-        let kids = self.items()
-        let num: i32 = len(kids)
+    pub func add(parent: P, child: C) {
+        let kids = parent.items()
+        let num: i32 = kids.len() as i32
         child.set_pos(num)
-        child.set_owner(self)
-        self.set_items(append(kids, child))
+        child.set_owner(parent)
+        parent.set_items(append(kids, child))
     }
 
-    pub func P.count(self) -> i32 {
-        return len(self.items()) as i32
+    pub func count(parent: P) -> i32 {
+        return parent.items().len() as i32
     }
 }
 ```
 
-`func P.add(self, child: C)` — a method on `P`, with `self` as the receiver. When `MyList` is bound to concrete types, `P.add` becomes a real method on the concrete parent class:
+Two things are happening here. Each `field` declaration auto-generates a getter (`parent.items()`) and a setter (`parent.set_items(...)`) on the type parameter — that's what the default method calls, because inside the interface body the compiler doesn't know `P` will be `Panel` yet. And `add` and `count` are *default methods*: top-level generic functions with a `where MyList<P, C>` clause, written once and specialized per binding.
+
+Bind it to concrete classes with a relation:
 
 ```lyric
-pub interface MyList<P, C> {
-    field P.items: [C]
-    field C.owner: P?
-    field C.pos: i32
-
-    pub func P.add(self, child: C) {
-        let kids = self.items()
-        let num: i32 = len(kids)
-        child.set_pos(num)
-        child.set_owner(self)
-        self.set_items(append(kids, child))
-    }
-
-    pub func P.count(self) -> i32 {
-        return len(self.items()) as i32
-    }
-}
-
 class Widget { label: string }
 class Panel {}
 
@@ -2909,13 +2895,15 @@ func main() {
     let w1 = Widget { label: "button" }
     let w2 = Widget { label: "text" }
 
-    panel.add(w1)
-    panel.add(w2)
-    println(panel.count())  // 2
+    add<Panel, Widget>(panel, w1)
+    add<Panel, Widget>(panel, w2)
+    println(count<Panel, Widget>(panel))  // 2
 }
 ```
 
-`panel.add(w1)` — natural method syntax. The compiler sees `Panel` has an impl block for `MyList`, matches `P.add` to `Panel.add`, substitutes `C = Widget`, and generates specialized code.
+The call site uses the free-function form `add<Panel, Widget>(panel, w1)`. The compiler monomorphizes `add` against `(Panel, Widget)`, rewrites `parent.items()` to read the relation-injected field `panel.w_items`, and emits a direct call — no vtables, no dispatch.
+
+🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w_add(w1)` and `panel.w_count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster_append(p)`, `dir.files_append(f)`) is wired up for the stdlib hints `ArrayList`, `OwningList`, `RefList`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
 
 ### 9.4 Field Injection
 
@@ -2940,10 +2928,9 @@ Interfaces can inject destructors into implementing classes:
 pub interface ArrayList<P, C> {
     // ...
     destructor P {
-        let children = self.children()
-        let mut i = len(children) - 1
+        let mut i = self.children.len() - 1
         while i >= 0 {
-            children[i].destroy()
+            self.children[i].destroy()
             i = i - 1
         }
     }
@@ -3011,7 +2998,7 @@ You can write generic functions constrained by an interface using `where`:
 ```lyric
 pub func count_children<P, C>(p: P) -> i32 where ArrayList<P, C> {
     let kids = p.children()
-    return len(kids)
+    return kids.len() as i32
 }
 ```
 
@@ -3074,7 +3061,7 @@ Every collection type in Lyric's standard library is built with interfaces and r
 - `Dict<K, V>` — uses `HashedList` internally (Chapter 10)
 - `Hashable` — single-method constraint for hash table keys
 
-617 lines of Lyric in `std.ly` alone (875 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, `destructor`, and `embed` that the standard library uses.
+733 lines of Lyric in `std.ly` alone (991 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, `destructor`, and `embed` that the standard library uses.
 
 This is what it means when we say the standard library *is* the language. The language provides the mechanism. The library provides the policy. You can change the policy.
 
