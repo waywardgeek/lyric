@@ -3119,7 +3119,7 @@ pub class Sym {
     pub func hash_key(self) -> u64 { return self.hash }
 }
 
-pub class SymTable { }
+pub permanent class SymTable { }
 relation HashedList SymTable:st owns [Sym:st]
 
 let mut _sym_table: SymTable? = null
@@ -3144,9 +3144,9 @@ pub func sym(name: string) -> Sym {
 }
 ```
 
-The global `SymTable` is itself a `HashedList` relation — the same hash table interface from Chapter 8. `hash_string` (a stdlib builtin using FNV hashing) computes the hash, `hash_lookup` checks if we've seen this string before, and if not, `hash_insert` adds a new `Sym` to the table.
+The global `SymTable` is itself a `HashedList` relation — the same hash table interface from Chapter 8. `hash_string` (a stdlib builtin using FNV-1a) computes the hash, `hash_lookup` checks if we've seen this string before, and if not, `hash_insert` adds a new `Sym` to the table. The `permanent` keyword on `SymTable` tells the slab allocator never to free instances of this class — interned symbols outlive every function that uses them, by design.
 
-A note on `HashedList`: it matches entries by `hash_key()` value alone — there's no separate equality check. For `Sym`, this is safe because the intern table guarantees one entry per unique string. For `Dict` with non-`Sym` keys, hash collisions would match the wrong entry. In practice, this means `Dict` is safest with `Sym` keys (which is why the language pushes you toward `sym()` wrapping). Future versions may add an `equals` method to the `Hashable` interface.
+🚧 *About `HashedList` collisions: today `HashedList` matches entries by `hash_key()` value alone — `Hashable` declares only `get_hash`, with no `equals`. For `Sym`, that's safe because the intern table guarantees one entry per unique string. For other key types, two values that happen to hash to the same `u64` would collide silently. The roadmap fix is to restore `equals` to `Hashable` so the table can disambiguate; until then, prefer `Sym` keys (which is why the language pushes you toward `sym()` and the backtick form).*
 
 Lyric also has backtick syntax for common symbols:
 
@@ -3207,7 +3207,7 @@ func main() {
     // Lookup
     let ex = d.get(`x`)
     if !isnull(ex) {
-        println(itoa(ex!.value))
+        println(f"x = {ex!.value}")
     }
 
     // Has
@@ -3220,7 +3220,7 @@ func main() {
 
     // Keys
     let keys = d.keys()
-    println(itoa(len(keys)))
+    println(f"key count = {keys.len()}")
 
     // Remove
     d.remove(`y`)
@@ -3233,10 +3233,10 @@ func main() {
 Output:
 
 ```
-10
+x = 10
 has y
 no w
-3
+key count = 3
 y removed
 ```
 
@@ -3256,12 +3256,11 @@ This is because `Dict` is built on `HashedList`, which stores children — and a
 
 ### Dict Literals
 
-For dictionaries you know up front, there's a brace-literal shorthand. The keys can be string literals, backtick syms, or integer literals — the parser disambiguates a Dict literal from a struct literal by looking at the first key form:
+For dictionaries you know up front, there's a brace-literal shorthand. The parser disambiguates a Dict literal from a struct literal by looking at the first key form:
 
 ```lyric
-let names  = {`alice`: 1, `bob`: 2}                 // Dict<Sym, i32>
-let cities = {"NYC": 8_000_000, "SF": 875_000}       // Dict<string, i32>
-let nums   = {1: "one", 2: "two"}                    // Dict<i32, string>
+let names = {`alice`: 1, `bob`: 2}      // Dict<Sym, i32>
+let nums  = {1: "one", 2: "two"}        // Dict<i32, string>
 ```
 
 An empty dictionary literal needs a type annotation so the compiler knows what `K` and `V` are:
@@ -3272,7 +3271,9 @@ let empty: Dict<Sym, string> = {}
 
 The auto-import pass adds the `Dict` class to the compilation unit whenever it sees a Dict literal — you don't write an `import` for it.
 
-🚧 *Heads-up on collisions: today `HashedList` matches entries by `hash_key()` value alone, with no separate equality check. For `Sym` keys, this is safe because the intern table guarantees one entry per unique string. For other key types, two values that happen to hash the same would collide silently. The roadmap fix is to add an `equals` method to `Hashable` so the table can disambiguate. Until then, prefer `Sym` keys (which is why the language pushes you that way with `sym()` and backticks).*
+🚧 *Roadmap: the spec lists string-literal keys as a third form (`{"NYC": 8_000_000, "SF": 875_000}`), but the parser doesn't recognize that shape today — it commits to a struct-literal interpretation when the opening token is a string and trips at the closing brace. Until that's fixed, build string-keyed dictionaries with `let d = Dict<string, i32>()` and explicit `d.set(...)` calls.*
+
+🚧 *About collisions: today `HashedList` matches entries by `hash_key()` value alone — `Hashable` declares only `get_hash`. For `Sym` keys this is safe (the intern table guarantees one entry per unique string); for other key types, two values that happen to hash the same would collide silently. The roadmap fix is to restore an `equals` method to `Hashable`. Until then, prefer `Sym` keys.*
 
 ### 10.4 How Dict Works
 
@@ -3312,43 +3313,52 @@ pub func Dict.get<K, V>(self, key: K) -> DictEntry<K, V>? where K: Hashable {
 
 This is the payoff of the interface/relation system. `HashedList` is written once — 200 lines of Lyric handling buckets, probing, rehashing, and removal. `Dict` is 30 lines that wire it to a key-value pair. `SymTable` is 10 lines that wire it to interned strings. Neither duplicates any hash table logic.
 
-### 10.5 A Symbol Table for the Calculator
+### 10.5 A Symbol Table for Variable Bindings
 
-Let's give our calculator variables:
+Hash tables are the workhorse of every interpreter, compiler, and config loader. Here's a self-contained example: a tiny set of variable bindings that maps names to values, looks them up, and reports an `error` when a name isn't bound.
 
 ```lyric
-class Calculator {
-    vars: Dict<Sym, f64>
+func get_var(d: Dict<Sym, f64>, name: string) -> (f64, error) {
+    let entry = d.get(sym(name))
+    if isnull(entry) {
+        return (0.0, Error { msg: f"undefined variable: {name}" })
+    }
+    return (entry!.value, null)
+}
 
-    func set_var(self, name: string, value: f64) {
-        self.vars.set(sym(name), value)
+func main() {
+    let vars = Dict<Sym, f64>()
+    vars.set(sym("pi"), 3.14159)
+    vars.set(sym("e"), 2.71828)
+
+    let (vpi, e1) = get_var(vars, "pi")
+    if e1 == null {
+        println(f"pi = {vpi}")
     }
 
-    func get_var(self, name: string) -> (f64, error) {
-        let entry = self.vars.get(sym(name))
-        if isnull(entry) {
-            return (0.0, Error { msg: f"undefined variable: {name}" })
-        }
-        return (entry!.value, null)
+    let (_, e2) = get_var(vars, "tau")
+    if e2 != null {
+        println(f"{e2}")
     }
 }
 ```
 
-Now the parser can handle variables. When it sees an identifier token, it looks up the symbol:
+Output:
 
-```lyric
-// Inside parse_primary:
-if tok!.kind == TokenKind.Ident {
-    let val = self.calc.get_var(tok!.text)?
-    return (val, null)
-}
+```
+pi = 3.14159
+undefined variable: tau
 ```
 
-The `?` propagates the "undefined variable" error. Variable assignment would use `set_var`. The `Dict` handles all the storage — no manual arrays, no linear search, no reimplemented hash function.
+The `Dict<Sym, f64>` holds the bindings; `sym(name)` interns the lookup key on the way in. If the name was already interned (a previous assignment, a previous lookup), `sym` returns the cached `Sym` — an O(1) hash table hit. If it's the first time, it interns the string. Either way, the `Dict` lookup uses the pre-computed `u64` hash, not the raw bytes.
 
-The `sym()` call in `get_var` is not wasteful. If the variable name was already interned (from a previous lookup or from the assignment), `sym` returns the cached instance — an O(1) hash table lookup. If it's the first time, it interns the string. Either way, the `Dict` lookup uses the pre-computed hash, not the raw string.
+The error path uses the same `Error { msg: ... }` literal and `(T, error)` tuple-return shape from Chapter 5, with `f"{e2}"` to stringify the error value. No `new_error` shortcut, no `.message()` call — just the idioms the language already has.
 
-None of this uses garbage collection. The `Dict` is a hash table built on relations. Variables are cleaned up when the `Calculator` is destroyed, which cascade-destroys the `Dict`, which cascade-destroys every `DictEntry`. The next chapter looks at how all of this maps to memory — where structs live, where classes live, and what happens when you compile with `--soa`.
+🚧 *A natural next step is to wrap the `Dict<Sym, f64>` inside a `Calculator` or `VarTable` class so the bindings travel with the rest of the evaluator state. That doesn't compile today: declaring `vars: Dict<Sym, f64>` as a field on a non-generic class trips a `TypeVar leak 'V'` in the checker when a method calls `self.vars.get(...)` — the concrete `V = f64` from the field type isn't being propagated into `Dict.get`'s where-clause typevar. Making the outer class generic trips a different downstream monomorphization failure. Until both are fixed, the working pedagogy is a top-level `let vars = Dict<Sym, f64>()` plus free functions that take the dict as a parameter (as above).*
+
+None of this uses garbage collection. The `Dict` is a hash table built on relations. When `main` returns, `vars` goes out of scope, its `HashedList`-injected destructor walks the children and frees every `DictEntry`, and the slabs reclaim the slots. The intern table — the `permanent` `SymTable` from §10.1 — lives for the lifetime of the process, which is what you want: a `Sym` value is a stable handle that never goes stale.
+
+The next chapter looks at how all of this maps to memory — where structs live, where classes live, where slabs live, and what `permanent` actually does to a class.
 
 
 ## Chapter 11: Memory Management — No GC, No Borrow Checker

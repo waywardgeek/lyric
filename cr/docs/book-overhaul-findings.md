@@ -323,3 +323,73 @@ Logged in `~/projects/lyric/TODO`.
 ### `self: P` parameter syntax inside interface default methods is a parser error
 
 Tried `pub func add(self: P, child: C) { ... }` inside an interface body to make the "self is the parent" hint explicit. Parser rejects with `expected identifier, got PColon`. Two workarounds both compile: (a) the receiver-binding declaration `pub func P.add(self, child: C)` (where `self` is implicitly typed as `P`); (b) a plain top-level default with a named parameter (`pub func add(parent: P, child: C)`). The book uses (b) because it matches the free-function call-site form readers must use today. Not a high-priority spec gap, but worth a line saying `self` is only valid as a receiver in the `Type.method` form, not as a typed positional parameter.
+
+---
+
+## Ch 10 reviser, 2026-06-21
+
+### Spec §Dict<K,V> overstates Dict literal key support; string-keyed form doesn't parse
+
+Spec §Standard Library Reference §Dict<K,V> (line ~2780) advertises three Dict-literal key forms:
+
+```lyric
+let names = {`alice`: 1, `bob`: 2}              // Dict<Sym, i32>
+let cities = {"NYC": 8_000_000, "SF": 875_000}   // Dict<string, i32>
+let lookup = {1: "one", 2: "two"}                // Dict<i32, string>
+```
+
+Empirical (verified end-to-end against `./lyric compile` + gcc + run):
+
+- Backtick-keyed: parses, compiles, runs. ✅
+- Integer-keyed: parses, compiles, runs. ✅
+- **String-keyed**: parser rejects with `expected PRParen, got SEOF ()` at the opening of the literal — the disambiguator commits to a struct-literal interpretation when the first key is a string-literal and trips trying to close it.
+
+Book §10.3 removes the string-keyed example and adds a 🚧 callout pointing readers at `let d = Dict<string, i32>()` + explicit `.set(...)` calls for that case. Logged in `~/projects/lyric/TODO`.
+
+### `Dict.length()` vs spec's `Dict.len()`
+
+Spec §Dict<K,V> methods table lists `len() -> i32`. Stdlib reality (`stdlib/std.ly:599`):
+
+```lyric
+pub func Dict.length<K, V>(self) -> i32 where K: Hashable {
+    return self.d_hash_count
+}
+```
+
+There is no `len()` method on `Dict`; `d.len()` fails with `checker: unknown method: len`. Two options: rename the stdlib method to `len()` (matches `xs.len()` everywhere else in the stdlib and the carry-forward §Idiomatic Lyric stance) or fix the spec table. Book Ch 10 sidesteps by using `keys.len()` on the slice returned by `d.keys()` (which works), and avoids `d.length()` / `d.len()` in code examples until this is resolved. Logged in `~/projects/lyric/TODO`.
+
+### `Dict<K, V>` as a non-generic class field leaks the inner typevar
+
+Pre-edit Ch 10 §10.5 declared:
+
+```lyric
+class Calculator {
+    vars: Dict<Sym, f64>
+    func get_var(self, name: string) -> (f64, error) {
+        let entry = self.vars.get(sym(name))
+        ...
+    }
+}
+```
+
+Empirical: `checker: validateAllExprsResolved: TypeVar leak 'V' in Calculator.get_var`. The concrete `V = f64` from the field type isn't being propagated into `Dict.get<K, V>`'s where-clause typevar at the call site. Making the outer class generic (`class VarTable<V> { vars: Dict<Sym, V> }`) trips a different downstream failure:
+
+```
+c_backend[c_type/TyClassHandle]: unmangled generic class 'Dict' reached c_backend
+(class_renames last-write-wins is 'Dict_CSym_f64'); monomorphizer missed a
+TyClassHandle site
+```
+
+So neither the non-generic-outer nor the generic-outer route works for "Dict as a field of another class" today. Both bugs logged in `~/projects/lyric/TODO`. Same family as the Ch 6 `Stack<T>` generic-class bug — generic class methods don't compose cleanly with other generic class types yet.
+
+Workaround in the book: §10.5 was rewritten from a `Calculator` class with a `Dict` field to a top-level `let vars = Dict<Sym, f64>()` in `main` plus a free function `get_var(d: Dict<Sym, f64>, name: string) -> (f64, error)`. That shape compiles and runs end-to-end. A 🚧 callout names the limitation and points at the workaround.
+
+### Pre-edit §10.5 also referenced types that don't exist in the running calculator
+
+The pre-edit's "Inside parse_primary:" snippet read `if tok!.kind == TokenKind.Ident { let val = self.calc.get_var(tok!.text)? ... }`. The Ch 4 / Ch 5 calculator's `TokenKind` enum has variants `Number | Plus | Minus | Star | Slash | LeftParen | RightParen` — there is no `Ident` variant — and the Ch 5 `Parser` class has fields `tokens: [Token]` and `pos: i32`, not a `calc` field referencing a `Calculator`. The snippet was aspirational code for a calculator that doesn't exist in the book.
+
+Carry-forward already records "Calculator through-line is complete by Ch 8. Ch 10+ uses standalone examples." Ch 10's §10.5 was the one place the carry-forward rule was being violated; the rewrite to a standalone variable-bindings example brings Ch 10 into compliance and removes the broken cross-reference. No additional bug filed — this is a book-side fix, not a compiler issue.
+
+### `pub permanent class SymTable` — `permanent` was missing from the §10.1 stdlib excerpt
+
+`stdlib/std.ly:503` declares `pub permanent class SymTable { }`, but the pre-edit §10.1 stdlib-excerpt code block showed it as `pub class SymTable { }` — dropping the `permanent` keyword that's load-bearing for sym interning (interned `Sym` instances must outlive every function that holds a handle). Fixed in §10.1; added a one-sentence prose mention that `permanent` opts the class out of slab reclamation. No compiler bug — the chapter's excerpt was simply incomplete.
