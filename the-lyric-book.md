@@ -4250,9 +4250,9 @@ The whole thing compiles to one 114,770-line C file. `gcc` compiles that in a fe
 ## Chapter 14: The Self-Hosting Compiler
 
 
-The Lyric compiler is written in Lyric. It parses Lyric source, type-checks it, lowers it to an intermediate representation, optimizes, monomorphizes generics, and emits C. Then GCC compiles the C. The whole process — 29,921 lines of Lyric to 105,458 lines of C — takes about 0.2 seconds on a MacBook Air.
+The Lyric compiler is written in Lyric. It parses Lyric source, type-checks it, lowers it to an intermediate representation, optimizes, monomorphizes generics, and emits C. Then GCC compiles the C. The whole process — 32,509 lines of Lyric across 14 files (plus 991 lines of stdlib) producing 114,770 lines of C — takes a few seconds end-to-end.
 
-This chapter is a tour. Not a tutorial on how to write a compiler — that's a different book — but a walk through the pipeline that compiles every example in this one.
+This chapter is a tour. Not a tutorial on how to write a compiler — that's a different book — but a walk through the pipeline that compiles every example in this one. By the end, you should understand how `./lyric compile` turns the `.ly` files you've been writing into a running binary, and why running it on its own source code reaches a fixed point.
 
 ### 14.1 The Pipeline
 
@@ -4327,7 +4327,7 @@ Let's walk through the interesting ones.
 
 ### 14.2 Parse
 
-The parser (`src/parser/parser.ly`, 1,552 lines; `src/parser/expr_parser.ly`, 1,417 lines) is a recursive descent parser that produces an AST defined in `src/ast/ast.ly` (1,477 lines).
+The parser (`src/parser/parser.ly`, 1,383 lines; `src/parser/expr_parser.ly`, 1,496 lines) is a recursive descent parser that produces an AST defined in `src/ast/ast.ly` (1,476 lines).
 
 Splitting the parser into two files was practical, not architectural. Expression parsing is complex enough to deserve its own file — operator precedence, prefix/postfix, function calls, match expressions, if-expressions, lambdas. Both files declare `lyric parser { }` and share all declarations without imports.
 
@@ -4337,20 +4337,20 @@ One design choice worth noting: the parser uses a `no_struct_lit` flag to resolv
 
 Between parsing and C emission, the source passes through three major transformations:
 
-**Desugar** (1,298 lines) runs six passes in fixed order: InterfaceEmbeds → InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
+**Desugar** (1,534 lines) runs six passes in fixed order: InterfaceEmbeds → InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
 
-**Check** (4,689 lines) is four-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
+**Check** (4,919 lines) is four-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
 
-**Lower** (3,555 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
+**Lower** (3,669 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
 
-**Optimize** (1,535 lines) runs six LIR→LIR passes: fuse side-effect temps, destructure multi-returns, destructure extract-pairs from the `?` operator, fix nil-zero values on non-class returns, eliminate unused temps recursively while preserving side effects, and blank out unused multi-assign names. Each pass is small and local; together they undo the lowerer's verbose-but-correct first cut.
+**Optimize** (1,556 lines) runs six LIR→LIR passes: fuse side-effect temps, destructure multi-returns, destructure extract-pairs from the `?` operator, fix nil-zero values on non-class returns, eliminate unused temps recursively while preserving side effects, and blank out unused multi-assign names. Each pass is small and local; together they undo the lowerer's verbose-but-correct first cut.
 
-**Monomorphize** (3,857 lines) eliminates generics by creating specialized copies: `identity<i32>` becomes `identity_i32`. This is iterative — specializing a function may reveal new generic calls in its body. In practice, it converges in two or three iterations. The tradeoff vs. vtables is code size for speed; for a compiler where types are known at compile time, monomorphization wins.
+**Monomorphize** (3,939 lines) eliminates generics by creating specialized copies: `identity<i32>` becomes `identity_i32`. This is iterative — specializing a function may reveal new generic calls in its body. In practice, it converges in two or three iterations. The tradeoff vs. vtables is code size for speed; for a compiler where types are known at compile time, monomorphization wins.
 
 
 ### 14.4 Emit C
 
-The C backend (`src/c_backend/c_backend.ly`, 5,302 lines — the second largest file) translates monomorphized LIR into C source.
+The C backend (`src/c_backend/c_backend.ly`, 5,551 lines — the largest file in the compiler) translates monomorphized LIR into C source.
 
 Type ordering matters. C requires types to be defined before use. The backend topologically sorts struct definitions using Kahn's algorithm, emits forward declarations for all classes, then emits struct definitions, then function definitions. Fieldless enums become C `typedef enum`. Enums with payloads become tagged unions — a `tag` field plus a `union` of variant structs.
 
@@ -4358,22 +4358,65 @@ Classes become heap-allocated structs. In AoS mode (the default), each class typ
 
 Lambdas are hoisted to top-level C functions. Captured variables are packed into a context struct that's passed as the first argument. Spawned blocks work the same way — the captured variables become fields of a context struct passed to a `pthread_create` wrapper.
 
-The output is one C file. The compiler's own output — `lyric.c` — is 105,458 lines. GCC compiles it with `-O2` in a few seconds. The resulting binary is the Lyric compiler.
+The output is one C file. The compiler's own output — `lyric.c` — is 114,770 lines. GCC compiles it with `-O2` in a few seconds. The resulting binary is the Lyric compiler.
 
 ### 14.5 The Bootstrap
 
-The Lyric compiler was not always written in Lyric. The first compiler was written in Go — 33,740 lines that could parse Lyric, type-check it, lower it, and emit C. That Go compiler compiled the Lyric compiler (written in Lyric), producing a C file. GCC compiled the C file into a binary. That binary — the Lyric compiler compiled by the Go compiler — could then compile itself.
+A self-hosting compiler has a peculiar property: it compiles itself. Feed `./lyric` its own 14 source files, and out comes a C file. Compile that C file with GCC, and you have a new `./lyric` binary. Feed *that* binary its own source, and out comes a C file again. If the two C files are byte-for-byte identical, you've hit a **fixed point** — the compiler has converged on a stable representation of itself.
 
-The bootstrap test is:
+That fixed point is the definition of self-hosting, and it's the thing that makes the whole edifice non-magical. Each new feature in the language has to keep compiling the compiler, because the compiler is the largest Lyric program in the world and any breakage shows up immediately.
 
-1. **Stage 1**: Go compiler compiles `src/*.ly` → `bootstrap1.c`
-2. **Stage 2**: GCC compiles `bootstrap1.c` → `bootstrap2` binary. `bootstrap2` compiles `src/*.ly` → `bootstrap2.c`
-3. **Stage 3**: GCC compiles `bootstrap2.c` → `bootstrap3` binary. `bootstrap3` compiles `src/*.ly` → `bootstrap3.c`
-4. **Verify**: `bootstrap2.c == bootstrap3.c`
+The build commits to this property in two places. First, `lyric.c` — all 114,770 lines of generated C — is checked into the repository. That's how anyone with GCC can build the compiler without already having a working Lyric toolchain:
 
-If Stage 2 and Stage 3 produce identical C output, the compiler has reached a fixed point — it compiles itself to produce a compiler that compiles itself to produce the same compiler. This is the definition of self-hosting.
+```
+$ make
+gcc -std=gnu11 -O2 -w -I runtime -o lyric lyric.c -lm
+```
 
-The Go compiler is retired. It lives in `legacy/go-compiler/` for historical reference. The canonical compiler is `lyric.c` — 105,458 lines of C checked into the repository that any system with GCC can build, no Lyric toolchain required. Every PR diffs against this file; `.gitattributes` marks it as generated so code review tools collapse it by default.
+Second, `make update` regenerates `lyric.c` from `src/` using the current binary:
+
+```makefile
+BOOTSTRAP_FILES = \
+  src/ast/ast.ly src/ast/modules.ly \
+  src/lexer/lexer.ly \
+  src/parser/parser.ly src/parser/expr_parser.ly \
+  src/desugar/desugar.ly \
+  src/checker/checker.ly \
+  src/lir/lir.ly \
+  src/lowerer/lowerer.ly \
+  src/optimizer/optimizer.ly \
+  src/monomorphizer/monomorphizer.ly \
+  src/memory/memory.ly \
+  src/c_backend/c_backend.ly \
+  src/main/main.ly
+
+update: lyric
+	./lyric compile $(BOOTSTRAP_FILES) -o lyric.c
+```
+
+The 14 files are listed explicitly because, as Chapter 13 explained, the compiler uses zero `import` statements — it relies on flat-namespace merging across all files passed on the command line. The Makefile *is* the module graph.
+
+The fixed-point check itself lives in `test_self_compile.sh`:
+
+1. **Stage 0**: build `./lyric` from the checked-in `lyric.c` with GCC.
+2. **Stage 1**: that `./lyric` compiles `src/` → `stage2.c`. GCC compiles `stage2.c` → `stage2` binary.
+3. **Stage 2**: `stage2` compiles `src/` → `stage3.c`.
+4. **Verify**: `diff stage2.c stage3.c` is empty.
+
+When Stage 1 and Stage 2 produce identical C output, the compiler has reached a fixed point — it compiles itself to produce a compiler that compiles itself to produce the same compiler:
+
+```
+$ bash test_self_compile.sh
+...
+✅ FIXED POINT REACHED — lyric_stage2.c == lyric_stage3.c
+
+=== Verifying checked-in lyric.c is current ===
+✅ lyric.c matches compiler output
+```
+
+The reason this matters in practice: when you edit a `.ly` file in `src/`, the *checked-in* `lyric.c` is still the old compiler. You run `make` (rebuilds the binary from old `lyric.c`), `make update` (the old binary compiles your new source into a new `lyric.c`), `make` again (rebuilds the binary from the new `lyric.c`), and now everything matches. If something is subtly wrong — a generated identifier whose hash depends on iteration order, say — the second `lyric.c` won't match what the new binary would produce when run on itself, and `test_self_compile.sh` will print a diff instead of `FIXED POINT REACHED`. That's the regression net.
+
+**Origin.** The Lyric compiler was not always written in Lyric. The first compiler was written in Go — a few tens of thousands of lines that could parse Lyric, type-check it, lower it, and emit C. The Go compiler compiled the first Lyric-written compiler, GCC compiled that C, and the resulting binary could compile itself. Once the Lyric-written compiler stopped needing the Go version to bootstrap, the Go compiler was retired. The checked-in `lyric.c` replaced it: any future change to the language only needs GCC and the current `lyric.c` to bootstrap. Every PR diffs against `lyric.c`; `.gitattributes` marks it as generated so code review tools collapse it by default.
 
 ### 14.6 The Numbers
 
@@ -4381,25 +4424,29 @@ The compiler by the numbers:
 
 | Component | Lines |
 |-----------|-------|
-| `c_backend.ly` | 5,302 |
-| `checker.ly` | 4,689 |
-| `monomorphizer.ly` | 3,857 |
-| `lowerer.ly` | 3,555 |
-| `main.ly` | 1,621 |
-| `optimizer.ly` | 1,535 |
-| `parser.ly` | 1,552 |
-| `ast.ly` | 1,477 |
-| `expr_parser.ly` | 1,417 |
-| `desugar.ly` | 1,298 |
-| `memory.ly` | 1,311 |
+| `c_backend.ly` | 5,551 |
+| `checker.ly` | 4,919 |
+| `monomorphizer.ly` | 3,939 |
+| `lowerer.ly` | 3,669 |
+| `memory.ly` | 2,855 |
+| `main.ly` | 1,602 |
+| `optimizer.ly` | 1,556 |
+| `desugar.ly` | 1,534 |
+| `expr_parser.ly` | 1,496 |
+| `ast.ly` | 1,476 |
+| `parser.ly` | 1,383 |
+| `lir.ly` | 943 |
 | `modules.ly` | 907 |
-| `lir.ly` | 683 |
-| `lexer.ly` | 717 |
-| **Total** | **29,921** |
+| `lexer.ly` | 679 |
+| **Compiler total** | **32,509** |
+| `stdlib/std.ly` | 733 |
+| `stdlib/string.ly` | 258 |
+| **Stdlib total** | **991** |
+| **Grand total** | **33,500** |
 
-29,921 lines of Lyric produce 105,458 lines of C. The 3.5x expansion ratio comes from monomorphization (each generic function becomes multiple concrete copies), generated destructors, slab allocator boilerplate, and the verbose nature of C compared to Lyric.
+33,500 lines of Lyric (compiler + stdlib) produce 114,770 lines of C. The 3.4× expansion ratio comes from monomorphization (each generic function becomes multiple concrete copies), generated destructors, slab allocator boilerplate, and the verbose nature of C compared to Lyric.
 
-75 tests run against golden output files. Each test compiles a `.ly` file, runs the resulting binary, and diffs the output against a `.expected` file. The tests cover every feature in this book — enums, match, generics, relations, interfaces, Dict, concurrency, modules, error handling.
+The test suite has 89 `.ly` files under `testdata/`, 83 of them paired with golden output files under `testdata/golden/`. Each test compiles a `.ly` file, runs the resulting binary, and diffs the output against the `.expected` file. The tests cover every feature in this book — enums, match, generics, relations, interfaces, Dict, concurrency, packages, error handling — plus a few that don't (the `--soa` slab layout switch, the `--detect-uaf` debug mode, the `--rc-free` reference-counting mode). The full self-compile fixed-point check in `test_self_compile.sh` is the integration test on top.
 
 ### 14.7 Every Feature Used
 
@@ -4415,7 +4462,7 @@ The compiler uses every feature this book teaches:
 - **Dict** for symbol tables, type registries, function lookups, class rename maps
 - **Sym** for all identifier comparison — the compiler interns every identifier, keyword, and operator
 - **Error handling** with `(T, error)` tuples and `?` propagation through the parser
-- **Modules** organizing the 12 packages
+- **Multi-file packages** — 14 `.ly` files across 12 directories, each directory a `lyric <name> { }` block, all flat-merged via `BOOTSTRAP_FILES` on the command line (no `import` statements — see §13.9)
 - **F-strings** for error messages and C code generation
 - **StringBuilder** for the C backend's output buffer
 - **Slices** for parameter lists, field lists, statement blocks, everywhere
@@ -4423,6 +4470,8 @@ The compiler uses every feature this book teaches:
 - **External methods** for the Dict/ArrayList/Sym method APIs
 
 The compiler is the language's most comprehensive test. If a feature works in the compiler, it works. If it doesn't work in the compiler, it gets fixed — because the compiler can't compile itself until it does.
+
+And that, finally, is what self-hosting buys you. The Lyric you've been learning across these fourteen chapters is the same Lyric that compiles itself, at a fixed point, in a few seconds. Every enum, every relation, every f-string, every `?` propagation — load-bearing. There is no second-class implementation language hiding behind the curtain. You've been reading the source code of the thing that built it.
 
 
 
