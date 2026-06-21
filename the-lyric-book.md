@@ -5383,7 +5383,7 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 | Interface/trait | `type Writer interface { Write([]byte) }` | `trait Write { fn write(&self, buf: &[u8]); }` | `class Writer { virtual void write() = 0; };` | `interface Writable { func write(self, data: [u8]) }` |
 | Satisfaction | structural (implicit) | `impl Write for File` | inheritance | structural + optional `implements` annotation |
 | Multi-type interface | — | — (workaround: associated types) | — | `interface Graph<G, N, E> { func G.nodes(self) -> [N] }` |
-| Default methods | — | `fn default() { ... }` | virtual with body | `func P.count(self) -> i32 { ... }` in interface body |
+| Default methods | — | `fn default() { ... }` | virtual with body | `func count(parent: P) -> i32 { ... }` in interface body |
 | Field injection | — | — | — | `field P.children: [C]` in interface body |
 
 **This is the big one.** No other language has multi-class interfaces. In Go, Rust, and C++, an interface describes one type. Lyric interfaces can span multiple type parameters — `Graph<G, N, E>` defines methods on `G`, `N`, and `E` simultaneously. One `impl` block binds all three to concrete types. Monomorphization means zero runtime cost. (Chapters 8-9)
@@ -5395,8 +5395,9 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 | Memory safety | GC | borrow checker | manual / smart pointers | relations |
 | Ownership declaration | — | single owner by default | `unique_ptr<T>` | `relation ArrayList Parent:label owns [Child:label]` |
 | Non-owning reference | — | `&T` / `Rc<T>` | raw pointer / `shared_ptr` | `relation RefList Parent:label refs [Child:label]` |
-| Destructor | — (finalizers, unreliable) | `impl Drop` | `~ClassName()` | auto-generated from `owns` relations |
+| Destructor | — (finalizers, unreliable) | `impl Drop` | `~ClassName()` | auto-generated from `owns` relations; `final func cleanup(self)` for user code at destruction |
 | Cascade delete | — | manual | manual | automatic — destroying parent destroys all `owns` children |
+| Scope-exit cleanup | `defer f.Close()` | RAII / `impl Drop` | RAII / destructors | scope-exit destructors (automatic) + `final func` for explicit cleanup; **no `defer` keyword** |
 
 **The pitch:** In C++ you write destructors and get them wrong. In Rust you fight the borrow checker. In Go you accept GC pauses. In Lyric you declare `relation ArrayList Team:roster owns [Player:team]` — one line — and the compiler generates all destructors, parent/child fields, add/remove functions, and cascade delete. Thirty years of proof in production EDA tools. (Chapter 8)
 
@@ -5423,7 +5424,7 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 | Select | `select { case ... }` | `tokio::select!` | — | `select { case v = ch.receive() => ... }` |
 | Mutex | `sync.Mutex` | `std::sync::Mutex<T>` | `std::mutex` | `lock` type + `lock(mu) { ... }` |
 
-Lyric's concurrency is Go's model with method syntax for channels. `spawn` captures variables from the enclosing scope automatically — no explicit move or clone. (Chapter 12)
+Lyric's concurrency is Go's model with method syntax for channels. `spawn` captures variables from the enclosing scope automatically — but *by pointer*, which means a captured `let mut counter: i32 = 0` mutated from two `spawn` blocks is a textbook data race. Channels are class pointers with internal locking and are the recommended primitive for cross-spawn communication; for shared mutable values, use `lock` from §12.5 or funnel writes through a channel. (*🚧 Roadmap: copy-by-value captures with explicit shared-mutation through channels or locks — see Chapter 12 §12.1.*) (Chapter 12)
 
 ### D.9 Modules
 
@@ -5431,7 +5432,7 @@ Lyric's concurrency is Go's model with method syntax for channels. `spawn` captu
 |---------|-----|------|-----|-------|
 | Module file | `go.mod` | `Cargo.toml` | `CMakeLists.txt` | `lyric.mod` |
 | Package unit | directory | file (with `mod`) | file / target | directory |
-| Import | `import "pkg"` | `use crate::pkg` | `#include` | `import pkg` |
+| Import | `import "pkg"` | `use crate::pkg` | `#include` | `import pkg from "pkg"` |
 | Visibility | uppercase = exported | `pub` | `public:` | `pub` |
 | Build | `go build` | `cargo build` | `cmake --build` | `lyric compile .` |
 
@@ -5459,7 +5460,7 @@ interface Graph<G, N, E> {
 
 **`--soa` flag** — Switch all class allocation to Struct-of-Arrays layout with no code changes. 10% faster, 14% less memory. (Chapter 11)
 
-**`.lyric` design files** — Declaration-only design artifacts with `why:`, `doc`, and `invariant:` annotations. Not comments — structured, verifiable, parseable. (Chapter 14)
+**`.lyric` sibling artifacts** — Declaration-only Lyric files (no function bodies) consumed by the **lyre** toolchain, which layers Context-Driven Development annotations (`why:`, `doc`, `invariant:`, `source:`, `fake:`) on top. These annotations are **lyre features, not Lyric features** — they never appear in `.ly` source. See Chapter 13 §13.8 for the language-side framing and Appendix E for the full lyre walkthrough.
 
 **`embed`** — Copy fields, methods, and destructors from one interface into another. Not inheritance — flat composition at compile time. (Chapter 9)
 
