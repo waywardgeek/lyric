@@ -135,7 +135,7 @@ inheritance is selective.
   constraints, including relational where-clauses
   (`where DoublyLinked<P, C>`)
 - **`error` as a built-in interface** — uniform error handling
-- **Relations with code generation** — `ArrayList`, `OwningList`, `RefList`,
+- **Relations with code generation** — `ArrayList`, `DoublyLinked`,
   `HashedList` hints trigger field injection, impl binding, and destructor
   generation
 - **Impl blocks** — wire interface methods to concrete class methods, bind
@@ -1085,8 +1085,9 @@ interface is implemented on the receiver's type.
 ### Interface Embedding
 
 ```lyric
-interface OwningList<P, C> {
+interface Counted<P, C> {
     embed DoublyLinked<P, C>    // copies fields and destructors
+    field P.count: i32          // adds new fields on top of what was embedded
     destructor P { ... }        // can add/override
 }
 ```
@@ -1176,13 +1177,14 @@ relation [Hint] Parent[<Args>][:parent_label] (owns|refs) (Child[<Args>][:child_
 ```
 
 - **Hint** — the interface that defines the relation's field-injection and
-  method-injection contract. The four stdlib hints (`ArrayList`,
-  `OwningList`, `RefList`, `HashedList`) provide canonical patterns, but
+  method-injection contract. The three stdlib hints (`ArrayList`,
+  `DoublyLinked`, `HashedList`) provide canonical patterns, but
   **any binary interface** (two type parameters, in `(parent, child)`
-  order) can serve as a hint. The desugar pass uses the hint's `field`,
-  `destructor`, and default-method declarations to wire up the
-  relation. Optional; if a single ident precedes the parent, it's the
-  hint.
+  order) can serve as a hint. The desugar pass uses the hint's `field`
+  and default-method declarations to wire up the relation; the
+  `owns`/`refs` modifier on the relation line selects which destructor
+  the desugar pass synthesizes (cascade vs unlink). Optional; if a
+  single ident precedes the parent, it's the hint.
 - **Labels** — `:name` after parent and/or child becomes the prefix for
   injected field and method names. `:roster` on the parent side, for
   example, injects `roster_children`, `roster_first`, etc.
@@ -1244,10 +1246,11 @@ relation ArrayList Team:roster owns [Player:team]
 **Functions:** `array_append<Team, Player>(t, p)`,
 `array_remove<Team, Player>(p)`.
 
-### OwningList — Doubly-Linked List, Cascade Destroy
+### DoublyLinked — Intrusive Doubly-Linked List
 
 ```lyric
-relation OwningList Team:team owns [Player:player]
+relation DoublyLinked Team:team owns [Player:player]   // cascade-destroys children
+relation DoublyLinked Room:room refs [Guest:guest]     // unlinks children, does not destroy them
 ```
 
 **Injected fields:** `Team.team_first: Player?`, `Team.team_last: Player?`,
@@ -1257,10 +1260,10 @@ relation OwningList Team:team owns [Player:player]
 **Functions:** `dll_append<Team, Player>(t, p)`,
 `dll_remove<Team, Player>(p)`.
 
-### RefList — Doubly-Linked List, No Cascade
-
-Same fields as `OwningList`, but parent destruction only unlinks children —
-they survive independently.
+The `owns`/`refs` modifier on the relation line selects the destructor the
+desugar pass synthesizes: `owns` cascades through the list calling
+`.destroy()` on each child; `refs` walks the list nulling sibling links
+but leaves children alive.
 
 ### HashedList — Hash Table Ownership
 
@@ -2667,10 +2670,12 @@ array_append<Team, Player>(t, p)
 // t.roster_children == [p]
 ```
 
-### DoublyLinked<P, C> — Intrusive Doubly-Linked List (Base)
+### DoublyLinked<P, C> — Intrusive Doubly-Linked List
 
-Base interface providing fields and traversal. No destruction semantics —
-use `OwningList` or `RefList` which embed this.
+Doubly-linked list ownership. The `owns`/`refs` modifier on the relation
+line selects the destructor: `owns` cascade-destroys children when the
+parent dies; `refs` walks the list nulling sibling links but leaves
+children alive.
 
 **Injected fields:**
 
@@ -2685,21 +2690,11 @@ use `OwningList` or `RefList` which embed this.
 | `dll_append(parent: P, child: C)` | Append child to end of list |
 | `dll_remove(child: C)` | Remove child from list, relink siblings |
 
-### OwningList<P, C> — Doubly-Linked List, Cascade Destroy
-
-Embeds `DoublyLinked<P, C>`. Parent death cascade-destroys all children.
+**Usage:**
 
 ```lyric
-relation OwningList Document:doc owns [Paragraph:para]
-```
-
-### RefList<P, C> — Doubly-Linked List, No Cascade
-
-Embeds `DoublyLinked<P, C>`. Parent death unlinks children but does NOT
-destroy them — children survive independently.
-
-```lyric
-relation RefList Room:room refs [Guest:guest]
+relation DoublyLinked Document:doc owns [Paragraph:para]   // cascade
+relation DoublyLinked Room:room    refs [Guest:guest]      // unlink only
 ```
 
 ### HashedList<P, C> — Hash Table Ownership
@@ -3209,6 +3204,15 @@ the C backend emits the body inline with a `/* defer (executed inline): */`
 comment. There is no `defer` keyword in the lexer — these LIR pieces are
 unreachable from user syntax and are slated for removal pending a proper
 design.
+
+### `OwningList` and `RefList` Relation Hints
+
+Previously documented as user-facing stdlib hints. The user-facing
+linked-list surface is now `DoublyLinked` with the `owns`/`refs`
+modifier on the relation line selecting cascade vs unlink, parallel to
+how `ArrayList` already works. Any remaining `OwningList`/`RefList`
+interfaces are stdlib implementation detail, not part of the language
+surface.
 
 ---
 
