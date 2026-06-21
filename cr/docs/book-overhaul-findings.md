@@ -229,3 +229,57 @@ The non-recursive destructure form works (e.g. `main` calling `parse()` and dest
 Workaround: use `?` instead of explicit destructure for self-recursive `(T, error)` calls. The Ch 5 calculator's `parse_primary` already uses `?` here, so the calculator compiles fine.
 
 Logged in `~/projects/lyric/TODO`.
+
+---
+
+## Ch 8 reviser, 2026-06-21
+
+### `final func` fires twice when `.destroy()` is called explicitly on a stack-local class
+
+Spec §Class Destruction documents the execution order as `final → auto-destructor (cascade + unlink) → slab free`, but doesn't say whether `final` is one-shot or whether explicit `.destroy()` interacts with the implicit scope-exit teardown.
+
+Empirical repro:
+
+```lyric
+class Connection {
+  name: string
+  final func cleanup(self) {
+    println(f"closing {self.name}")
+  }
+}
+
+func main() {
+  let c = Connection { name: "db" }
+  println("before destroy")
+  c.destroy()
+  println("after destroy")
+}
+```
+
+Output:
+```
+before destroy
+closing db
+after destroy
+closing db
+```
+
+`cleanup` fires twice — once for the explicit `c.destroy()`, once again on scope-exit cleanup of the now-freed slot. Omitting the explicit `c.destroy()` (relying on scope exit alone) produces exactly one `closing db`, which is the workaround used in Ch 8 §8.7.
+
+Fix candidates: (a) the explicit `.destroy()` should mark the slab slot so scope-exit doesn't re-fire `final`; (b) `final` should carry an idempotency guard checked at the top of its emitted body. The spec should also be tightened to say `final` is one-shot, so the contract is unambiguous regardless of which fix lands.
+
+Logged in `~/projects/lyric/TODO`.
+
+### Stdlib reality has diverged from spec/book examples around `ArrayList` / `ArrayListBase`
+
+Pre-edit Ch 8 §8.2 showed a monolithic `ArrayList<P, C>` interface containing both the `array_append` / `array_remove` functions and the destructors. The current `stdlib/std.ly` factors this differently:
+
+- `ArrayListBase<P, C>` holds the fields and *both* forms of the operation: free-function (`array_append(parent, child)`, `array_remove(child)`) **and** method-form (`P.append(self, child)`, `P.remove(self, child)`). All four are marked `pub trusted func` because they reach into `ref child` / `unref child`.
+- `ArrayList<P, C>` `embed`s `ArrayListBase` and adds the cascade destructors.
+- `RefArrayList<P, C>` `embed`s the same base and adds the non-cascading destructors — the chapter's pre-edit "four relation types" table doesn't mention this one (the spec's §Standard Library Reference also doesn't list `RefArrayList`).
+
+The same factoring applies on the doubly-linked side: `DoublyLinked<P, C>` is the base, `OwningList<P, C>` and `RefList<P, C>` embed it. The book §8.3 already names this correctly.
+
+Spec §Relations (§ArrayList — Dynamic Array Ownership) shows only the free-function form (`array_append<Team, Player>(t, p)`); the spec should be updated to also show the method form (`t.roster_append(p)`) since that's the carry-forward's preferred form *and* it's what the stdlib actually generates today. The spec should also probably document `ArrayListBase` and `RefArrayList` so the four-vs-five-types discrepancy doesn't surprise readers who go from the book to the spec.
+
+No compiler bug — the stdlib just got more sophisticated than the docs. Book §8.2 now shows the real factoring; logged here so the spec can follow.
