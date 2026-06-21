@@ -1445,9 +1445,9 @@ func main() {
     let (val, err) = divide(10, 2)
     if err != null {
         println(f"Error: {err}")
-        return
+    } else {
+        println(f"10 / 2 = {val}")
     }
-    println(f"10 / 2 = {val}")
 
     let (_, err2) = divide(10, 0)
     if err2 != null {
@@ -1541,7 +1541,7 @@ class Item {
 
 func make_item(s: string) -> (Item, error) {
     if s == "" {
-        return (Item { name: "" }, new_error("empty name"))
+        return (Item { name: "" }, Error { msg: "empty name" })
     }
     return (Item { name: s }, null)
 }
@@ -1560,7 +1560,7 @@ func collect(names: [string]) -> ([Item], error) {
 
 When `?` fires inside the loop, it returns from `collect`, not just from the loop iteration.
 
-`new_error("empty name")` is the stdlib shortcut for building an `Error { msg: "..." }` in one call — cleaner than spelling out the class literal every time you want a quick error.
+`Error { msg: "empty name" }` builds the stdlib `Error` class directly — that's the literal form we'll use throughout the rest of the chapter. The spec also lists a free-function shortcut, `new_error(msg)`, that does the same thing. *🚧 Roadmap: `new_error(msg)` type-checks today but the C backend doesn't yet emit a definition for it, so any program that calls it fails to link. Use the `Error { msg: ... }` literal until the lowering lands.*
 
 ## 5.5 Custom Errors
 
@@ -1592,12 +1592,13 @@ func parse_token(input: string, pos: i32) -> (Token, error) {
 
 The caller doesn't need to know it's a `ParseError` — it just sees `error` and can print the message. This is the same pattern as Go's `error` interface: any class with a `pub func message(self) -> string` method satisfies it.
 
-For one-off errors where a dedicated class is overkill, use the stdlib `Error` class or its shortcut constructor `new_error(msg)`:
+For one-off errors where a dedicated class is overkill, the stdlib `Error` class is the right tool — that's exactly what it's there for:
 
 ```lyric
 return (0, Error { msg: "division by zero" })
-return (0, new_error("division by zero"))    // same thing, less typing
 ```
+
+A note on stringifying errors: `f"{err}"` automatically prints the error's message (the f-string lowerer knows about the `error` type), which is why every example so far reaches for `f"...: {err}"` rather than calling `err.message()` explicitly. *🚧 Roadmap: calling `err.message()` directly on an `error`-typed value doesn't compile today — interface dispatch for `error` isn't wired up in the C backend. The f-string form works because it has a dedicated lowering path. Concrete classes that satisfy `error` (like `ParseError`) can have `.message()` called on them directly; only the interface-typed receiver is the problem.*
 
 ## 5.6 A Parser for the Calculator
 
@@ -1646,9 +1647,9 @@ class Parser {
             let val = str_to_float(tok!.text)  // stdlib: converts string to f64
             return (val, null)
         }
-        if tok!.kind == TokenKind.LParen {
+        if tok!.kind == TokenKind.LeftParen {
             let val = self.parse_expr()?
-            self.expect(TokenKind.RParen)?
+            self.expect(TokenKind.RightParen)?
             return (val, null)
         }
         return (0.0, Error { msg: f"unexpected token: {tok!.text}" })
@@ -1705,7 +1706,7 @@ func parse(input: string) -> (f64, error) {
 
 The `?` operator makes the recursive descent clean. Every call to `parse_primary()` or `parse_term()` can fail, and `?` propagates the error upward without cluttering the logic. Compare `let right = self.parse_primary()?` to the alternative: a three-line `let`/`if`/`return` block at every call site. The parser would be twice as long.
 
-Notice `parse_primary` handles parenthesized sub-expressions by calling `parse_expr` recursively — mutual recursion between the precedence levels. The `?` on `self.expect(TokenKind.RParen)?` discards the returned token (we don't need it) but propagates the error if the closing paren is missing.
+Notice `parse_primary` handles parenthesized sub-expressions by calling `parse_expr` recursively — mutual recursion between the precedence levels. The `?` on `self.expect(TokenKind.RightParen)?` discards the returned token (we don't need it) but propagates the error if the closing paren is missing.
 
 A note on `tok!` after a null check: Lyric doesn't narrow optional types through control flow. After `if tok == null { return ... }`, the compiler still considers `tok` a `Token?`, so `tok!` is required. This is a deliberate simplicity tradeoff. And since `Parser` is a class (not a struct), its methods mutate `self.pos` without needing `mut` — classes are reference types, so mutation is implicit.
 

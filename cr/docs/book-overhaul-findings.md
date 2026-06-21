@@ -92,3 +92,39 @@ Empirical: `func apply(x: i32, f: fn(i32) -> i32) -> i32 { ... }` fails to parse
 Either the parser needs to accept `fn` as a type-position keyword (matching the spec's "preferred" guidance), or the spec needs to swap the canonical/accepted order and demote `fn` to 🚧. Book Ch 3 §3.8 uses `func(i32) -> i32`, which works today.
 
 Logged in `~/projects/lyric/TODO`.
+
+---
+
+## Ch 5 reviser, 2026-06-21
+
+### `new_error(msg)` is checker-only — no C-backend lowering
+
+Spec §Built-in Functions §String / Conversion (line ~1780) lists:
+
+> `new_error(msg)` | `string -> error` | Build an `Error`
+
+The checker types it correctly (`src/checker/checker.ly:3609` → `make_error_type()`), but the C backend emits a literal `new_error(LYRIC_STR(...))` call with no corresponding declaration or definition. gcc rejects with `implicit declaration of function 'new_error'`. The working alternative is the stdlib class literal `Error { msg: "..." }`, which compiles + runs end-to-end (verified). Either implement the lowering as sugar for `Error { msg: ... }`, or demote in the spec.
+
+Book §5.4 introduces `Error { msg: ... }` and adds a 🚧 callout for `new_error`. Logged in `~/projects/lyric/TODO`.
+
+### Interface dispatch on `error`-typed values doesn't work; f-string interpolation does
+
+`err.message()` where `err: error` (e.g. from a `(T, error)` destructure) passes the checker but the C backend models `error` as `const char*` and generates `Error_message((const char*)err)` against the concrete `Error_message(Error*)` signature — gcc rejects with "incompatible types". The chapter teaches `f"{err}"` for stringifying errors, which works because the f-string lowerer has a dedicated path for the `error` type.
+
+Subtler corollary: f-string interpolation of an `error` value always pulls the `Error.msg` field, regardless of the dynamic type. A custom `class ParseError { line, col, msg; pub func message(self) -> string { f"{line}:{col}: {msg}" } }` will print just `msg` through `f"{err}"`, silently dropping the user-defined `message()` formatting. Both bugs share the same root cause (no real interface dispatch / vtable for `error`).
+
+Logged in `~/projects/lyric/TODO`.
+
+### Bare `return` inside `main()` is a compile error
+
+`func main() { ...; if cond { return } ... }` fails to compile because the C backend lowers `func main()` as `int main(int _argc, char** _argv)` and a Lyric `return` with no value becomes a bare `return;`, which gcc rejects with `'return' with no value, in function returning non-void`. Workaround in the book: restructure with `if/else` instead of early `return`. The §5.1 `main` was refactored accordingly. Logged in `~/projects/lyric/TODO`.
+
+### `char_is_space` / `char_is_digit` C-backend lowering is missing
+
+While trying to compile the full Ch 4 → Ch 5 calculator pipeline end-to-end, the tokenizer (which uses `char_is_space(b)` and `char_is_digit(b)`) failed to compile: `lyric compile` printed `c_backend: unhandled builtin: char_is_space` and `c_backend: unhandled builtin: char_is_digit`, and the generated C contained lines like `bool _t4 = ;` (assignment with empty RHS) that gcc rejects. The checker accepts the calls; only the lowerer is missing arms. The other `char_is_*` predicates listed in spec §Built-in Functions probably need an audit too.
+
+This blocks the Ch 4 tokenizer example from compiling end-to-end. Ch 5's parser was verified against a hand-built `[Token]` literal as a workaround. Logged in `~/projects/lyric/TODO`. The Ch 4 reviser should be alerted — their tokenizer example is currently aspirational rather than verified.
+
+### Ch 6's pre-edit opening over-promises what Ch 5 delivers
+
+Ch 6's first paragraph claims: "Our calculator parses and evaluates expressions, handles errors, **and reports line and column numbers**." Ch 5 introduces `ParseError { line, col, msg }` as a custom-error *example* in §5.5, but the actual calculator's `Parser` keeps the simple `Error { msg }` form — there's no `Lexer` carrying source positions yet. The Ch 6 reviser should either soften that opening to match Ch 5's actual state, or add a small "Lexer with positions" step at the start of Ch 6 that lifts the §5.5 `ParseError` into the parser. The Ch 4 carry-forward note already anticipated this: "A `Lexer` class with line/column tracking is a natural extension for Ch 5 or later when error messages need source positions." Ch 5 chose *later*; Ch 6 needs to choose now.
