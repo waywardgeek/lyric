@@ -5236,15 +5236,13 @@ PASS  test_tokenize_parens
 
 The test command compiles your files to C, links them with GCC (using `-O0 -g` for debuggability), then runs the resulting binary. It discovers test functions by scanning for any function whose name starts with `test_` — no framework, no registration, no annotations.
 
-The generated runner calls each `test_*` function in source order and tracks pass/fail counts. The runtime `assert` and `assert_eq` macros call `exit(1)` on failure, so the first failed assertion ends the suite — there is no per-test isolation today. A segfault in one test will also abort the suite. The exit code is non-zero if any test failed.
+The generated runner calls each `test_*` function in source order and tracks pass/fail counts. The runtime `assert` and `assert_eq` macros `longjmp` back to a `setjmp` in the runner on failure, so a failed assertion ends *that* test but the suite continues with the next one. (Outside the test runner — e.g. an `assert` in `main()` of a regular compile — the macros fall back to `exit(1)`, since there's no jump buffer to land in.) A segfault in one test still aborts the whole binary. The exit code is non-zero if any test failed.
 
-*🚧 Roadmap: per-test isolation (so a failure in one test doesn't end the suite), parallel execution, test filtering, and per-test timing are all planned. None of them are implemented today.*
+*🚧 Roadmap: parallel execution, test filtering, and per-test timing are all planned. None of them are implemented today.*
 
 The same backend flags accepted by `compile` (`--soa`, `--detect-uaf`, `--rc-free` / `--no-rc`, `--lir-dump`, `-o`) are accepted here too — useful when you want to run a test suite under SoA or UAF-detection mode without changing your build script. The `-o` flag writes the generated C to disk and exits without running, for when you want to inspect what the runner looks like.
 
 The test command accepts the same file arguments as `compile`. You can pass multiple files, and all `test_*` functions across all files will be discovered and run.
-
-*🚧 Roadmap: the C-backend lowering for `assert` and `assert_eq` is still landing. While that work is in flight, calls to either builtin may be silently dropped — every test passes regardless of correctness. Re-run your suites once the lowering is in.*
 
 ### C.3 lyric fmt
 
