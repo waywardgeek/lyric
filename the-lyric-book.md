@@ -2448,10 +2448,10 @@ Three players appended — indices 0, 1, 2. Remove Bob (index 1) — Carol swaps
 
 `t.roster_append(p1)` and `t.roster_remove(p2)` are the methods the `relation` declaration generated. The label `roster` on the parent side of the relation prefixes the method names — that's why it's `roster_append`, not just `append`. If you'd declared `relation ArrayList Team:squad owns [Player:team]` instead, the methods would be `t.squad_append(...)` and `t.squad_remove(...)`. The label keeps method names from colliding when one class participates in several relations (see §8.5).
 
-The methods aren't generated from thin air. They come from a stdlib interface called `ArrayListBase`, which is what the `ArrayList` hint embeds. Here's the relevant part of `stdlib/std.ly`:
+The methods aren't generated from thin air. They come from a stdlib interface called `ArrayList`. Here's the relevant part of `stdlib/std.ly`:
 
 ```lyric
-pub interface ArrayListBase<P, C> {
+pub interface ArrayList<P, C> {
     field P.children: [C]
     field C.parent: P?
     field C.index: i32
@@ -2481,12 +2481,9 @@ pub interface ArrayListBase<P, C> {
         child.index = 0
         unref child
     }
-}
 
-pub interface ArrayList<P, C> {
-    embed ArrayListBase<P, C>
-
-    destructor P {
+    // 'owns' → cascade-destroy every child on parent death.
+    destructor owns P {
         let kids = self.children
         let mut i: i32 = len(kids) - 1
         while i >= 0 {
@@ -2496,21 +2493,37 @@ pub interface ArrayList<P, C> {
         }
     }
 
-    destructor C {
+    destructor owns C {
+        array_remove<P, C>(self)
+    }
+
+    // 'refs' → unlink children; they survive parent death.
+    destructor refs P {
+        let kids = self.children
+        let mut i: i32 = len(kids) - 1
+        while i >= 0 {
+            kids[i].parent = null
+            kids[i].index = 0
+            i = i - 1
+        }
+        self.children = []
+    }
+
+    destructor refs C {
         array_remove<P, C>(self)
     }
 }
 ```
 
-`ArrayListBase` declares the fields and the append/remove operations. `ArrayList` `embed`s it — copying the fields in — and adds the destructors that make it an *owning* relation. There's a sibling interface `RefArrayList` that embeds the same base but uses non-cascading destructors; we'll see the linked-list analogue (`OwningList` vs `RefList`) in §8.3.
+A single interface, two paired destructors. The relation line's `owns`/`refs` keyword selects which pair the desugar pass copies onto the concrete classes. `relation ArrayList Team:roster owns [Player:team]` picks up the `destructor owns P/C` pair (cascade); change `owns` to `refs` and you get the unlink-only pair instead. We'll see the same shape on `DoublyLinked` and `HashedList` in §8.3 and §8.4.
 
-`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` with the parent label as prefix — so `Team.append` becomes `Team.roster_append`. That's where `t.roster_append(p1)` comes from. The `roster_remove` method is the same story. The `array_remove<P, C>` call inside `destructor C` is the *free-function* form of the same operation, lifted from `ArrayListBase` unchanged — both forms exist, and Lyric's UFCS rule means `t.roster_append(p)` and `array_append<Team, Player>(t, p)` lower to the same generated code. The book prefers the method form.
+`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` with the parent label as prefix — so `Team.append` becomes `Team.roster_append`. That's where `t.roster_append(p1)` comes from. The `roster_remove` method is the same story. The `array_remove<P, C>` call inside `destructor owns C` is the *free-function* form of the same operation — both forms exist, and Lyric's UFCS rule means `t.roster_append(p)` and `array_append<Team, Player>(t, p)` lower to the same generated code. The book prefers the method form.
 
 The `array_remove` body uses swap-remove for O(1) deletion — the last element swaps into the removed slot, then the slice shrinks by one. **Don't cache array indices across removals** — swap-remove changes the index of whatever element used to be at the end.
 
-The `trusted` keyword on the methods opens a small window where the interface can call the raw `ref child` / `unref child` ops to manage the child's reference count by hand — these are the back-pointer fix-ups that make the relation's lifetime contract work. You don't write `trusted` code yourself unless you're building your own container interface; the four stdlib relation types are the only ones most programs need.
+The `trusted` keyword on the methods opens a small window where the interface can call the raw `ref child` / `unref child` ops to manage the child's reference count by hand — these are the back-pointer fix-ups that make the relation's lifetime contract work. You don't write `trusted` code yourself unless you're building your own container interface; the three stdlib relation types are the only ones most programs need.
 
-The interface is generic over `P` and `C`. It works for any parent-child pair. The `relation` declaration tells the compiler which concrete types to bind — `Team` as `P`, `Player` as `C` — and auto-generates the field bindings so that when `ArrayListBase` code accesses `self.children`, it reaches `Team.roster_children`.
+The interface is generic over `P` and `C`. It works for any parent-child pair. The `relation` declaration tells the compiler which concrete types to bind — `Team` as `P`, `Player` as `C` — and auto-generates the field bindings so that when `ArrayList` code accesses `self.children`, it reaches `Team.roster_children`.
 
 ### 8.3 owns vs refs
 
@@ -2520,7 +2533,7 @@ The interface is generic over `P` and `C`. It works for any parent-child pair. T
 class Room { name: string }
 class Guest { name: string }
 
-relation RefList Room:room refs [Guest:guest]
+relation DoublyLinked Room:room refs [Guest:guest]
 
 func main() {
     let r = Room { name: "Lobby" }
@@ -2575,15 +2588,15 @@ g2 name: Bob
 g3 name: Carol
 ```
 
-`refs` instead of `owns`. When the room is destroyed, all three guests are unlinked — their parent pointers become null — but they survive. Bob is doubly interesting: we explicitly removed him from the room with `r.room_remove(g2)` before the destroy, and he's still alive at the end because nobody owns him.
+`refs` instead of `owns`. Same hint (`DoublyLinked`) — only the keyword changes. When the room is destroyed, all three guests are unlinked — their parent pointers become null — but they survive. Bob is doubly interesting: we explicitly removed him from the room with `r.room_remove(g2)` before the destroy, and he's still alive at the end because nobody owns him.
 
 The methods this time are `r.room_append(...)` and `r.room_remove(...)` — same label-prefix rule as `ArrayList`, just bound to a doubly-linked-list interface. Walking the list uses the injected fields directly: `r.room_first` (the list head) and `cur!.guest_next` (each child's forward pointer). The `room` and `guest` labels prefix the fields the same way they prefix the methods.
 
-The `RefList` destructor walks the linked list and nulls out all the pointers, but doesn't call `.destroy()` on the children. Compare with the `OwningList` destructor, which does call `.destroy()`:
+`DoublyLinked` carries the same shape as `ArrayList`: one interface, two paired destructors, with the `owns`/`refs` keyword choosing which pair runs. Here are the two parent destructors side by side:
 
 ```lyric
-// From stdlib — OwningList destructor
-destructor P {
+// From stdlib — DoublyLinked's owns parent destructor (cascade)
+destructor owns P {
     let mut cur = self.first()
     while !isnull(cur) {
         let next = cur!.next()
@@ -2593,8 +2606,8 @@ destructor P {
     }
 }
 
-// From stdlib — RefList destructor
-destructor P {
+// From stdlib — DoublyLinked's refs parent destructor (unlink only)
+destructor refs P {
     let mut cur = self.first()
     while !isnull(cur) {
         let next = cur!.next()
@@ -2608,24 +2621,23 @@ destructor P {
 }
 ```
 
-Both `OwningList` and `RefList` embed `DoublyLinked<P, C>`, which provides the linked-list fields (`first`, `last`, `next`, `prev`, `parent`) and both forms of append/remove — the free-function form (`dll_append`, `dll_remove`) and the method form (`P.append`, `P.remove`) we used above. The difference between `OwningList` and `RefList` is purely in the destructors.
+The same interface provides the fields (`first`, `last`, `next`, `prev`, `parent`) and both forms of append/remove — the free-function form (`dll_append`, `dll_remove`) and the method form (`P.append`, `P.remove`) we used above. The destructor pair the desugar pass picks depends entirely on the relation line's `owns`/`refs` keyword.
 
-### 8.4 The Four Relation Types
+### 8.4 The Three Relation Hints
 
-Lyric's standard library provides four relation types:
+Lyric's standard library provides three relation hints. Each works in either `owns` or `refs` mode, picked by the relation line's keyword:
 
-| Type | Storage | Destruction | Use case |
-|------|---------|-------------|----------|
-| `ArrayList` | Dynamic array | Cascade (owns) | Most parent-child relationships |
-| `OwningList` | Doubly-linked list | Cascade (owns) | When insertion order matters, frequent middle removal |
-| `RefList` | Doubly-linked list | Unlink (refs) | References without ownership |
-| `HashedList` | Hash table | Cascade (owns) | Keyed lookup by hash |
+| Hint | Storage | `owns` | `refs` | Use case |
+|------|---------|--------|--------|----------|
+| `ArrayList` | Dynamic array | Cascade-destroys all children | Unlinks children; they survive | Most parent-child relationships |
+| `DoublyLinked` | Doubly-linked list | Cascade-destroys all children | Unlinks children; they survive | Stable iteration during removal |
+| `HashedList` | Hash table | Cascade-destroys all children | Unlinks children (keys retained on the child) | Keyed lookup by hash |
 
-`ArrayList` is the default choice. Dynamic array, O(1) swap-remove, compact memory. Use `OwningList` when you need stable iteration order during removal — a linked list won't shuffle elements around. Use `RefList` for non-owning references. Use `HashedList` when you need lookup by key, which is how `Dict` is built (Chapter 10).
+`ArrayList` is the default choice. Dynamic array, O(1) swap-remove, compact memory. Use `DoublyLinked` when you need stable iteration order during removal — a linked list won't shuffle elements around. Use `HashedList` when you need lookup by key, which is how `Dict` is built (Chapter 10). Switch between cascading and non-owning by changing one keyword (`owns` ↔ `refs`).
 
-All four are written in Lyric, defined in the standard library. None of them are compiler builtins. The `relation` keyword and the `field`/`destructor`/`embed` machinery are the builtins — the data structures are just interfaces that use them.
+All three are written in Lyric, defined in the standard library. None of them are compiler builtins. The `relation` keyword and the `field`/`destructor`/`embed` machinery are the builtins — the data structures are just interfaces that use them.
 
-And there's nothing magic about *these* four interfaces. The `relation` declaration accepts **any binary interface** (one with two type parameters in `(parent, child)` order) as its hint — including ones you write yourself. We'll see how to build one in Chapter 9.
+And there's nothing magic about *these* three interfaces. The `relation` declaration accepts **any binary interface** (one with two type parameters in `(parent, child)` order) as its hint — including ones you write yourself. We'll see how to build one in Chapter 9.
 
 ### 8.5 Multiple Relations
 
@@ -2657,15 +2669,15 @@ Output: `1101`
 
 The labels (`c1` and `c2`) keep both the method names and the field names from colliding: `p.c1_append` vs `p.c2_append`, `c1_children` vs `c2_children`, `c1_parent` vs `c2_parent`. Each relation is independent — removing a `Child1` doesn't affect the `Child2` collection. The output reads left to right (we used `print`, not `println`): after both appends, c1 has 1 child, c2 has 1 child. After removing the `Child1`, c1 has 0, c2 still has 1.
 
-A child can also belong to multiple parents. In `destroy_shared.ly`, a `Player` belongs to both `TeamA` and `TeamB` via separate `OwningList` relations. Destroying `TeamA` cascade-destroys the player, which automatically removes itself from `TeamB`:
+A child can also belong to multiple parents. In `destroy_shared.ly`, a `Player` belongs to both `TeamA` and `TeamB` via separate `DoublyLinked owns` relations. Destroying `TeamA` cascade-destroys the player, which automatically removes itself from `TeamB`:
 
 ```lyric
 class TeamA { name: string }
 class TeamB { name: string }
 class Player { name: string }
 
-relation OwningList TeamA:team_a owns [Player:pa]
-relation OwningList TeamB:team_b owns [Player:pb]
+relation DoublyLinked TeamA:team_a owns [Player:pa]
+relation DoublyLinked TeamB:team_b owns [Player:pb]
 
 func main() {
     let a = TeamA { name: "Alphas" }
@@ -2693,7 +2705,7 @@ b has player: true
 b has player after destroy: false
 ```
 
-Alice was in both teams. Destroying TeamA triggers Alice's destructor, which (from `OwningList`'s `destructor C`) unlinks her from every list she's in — including TeamB's. TeamB's list is now empty — no dangling pointers, no manual cleanup.
+Alice was in both teams. Destroying TeamA triggers Alice's destructor, which (from `DoublyLinked`'s `destructor owns C`) unlinks her from every list she's in — including TeamB's. TeamB's list is now empty — no dangling pointers, no manual cleanup.
 
 ### 8.6 An AST with Relations
 
@@ -2792,7 +2804,7 @@ The next chapter shows how the interfaces behind relations work — `field` inje
 
 ## Chapter 9: Interfaces — Multi-Class Contracts
 
-Chapter 8 showed what relations *do*. This chapter shows how they work. The `ArrayList`, `OwningList`, `RefList`, and `HashedList` from the standard library aren't compiler builtins — they're interfaces written in Lyric, using the same features available to you.
+Chapter 8 showed what relations *do*. This chapter shows how they work. The `ArrayList`, `DoublyLinked`, and `HashedList` from the standard library aren't compiler builtins — they're interfaces written in Lyric, using the same features available to you.
 
 ### 9.1 The Multi-Class Problem
 
@@ -2934,7 +2946,7 @@ func main() {
 
 The call site uses the free-function form `add<Panel, Widget>(panel, w1)`. The compiler monomorphizes `add` against `(Panel, Widget)`, rewrites `parent.items()` to read the relation-injected field `panel.w_items`, and emits a direct call — no vtables, no dispatch.
 
-🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w_add(w1)` and `panel.w_count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster_append(p)`, `dir.files_append(f)`) is wired up for the stdlib hints `ArrayList`, `OwningList`, `RefList`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
+🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w_add(w1)` and `panel.w_count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster_append(p)`, `dir.files_append(f)`) is wired up for the stdlib hints `ArrayList`, `DoublyLinked`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
 
 ### 9.4 Field Injection
 
@@ -2953,12 +2965,12 @@ This tells the compiler: when the `DoublyLinked` interface accesses `P.children`
 
 ### 9.5 Destructors
 
-Interfaces can inject destructors into implementing classes:
+Interfaces can inject destructors into implementing classes. A `destructor` block is tagged with the relation kind it applies to — `owns` for cascading destruction, `refs` for unlink-only — and the desugar pass picks the block whose tag matches the relation line's keyword:
 
 ```lyric
 pub interface ArrayList<P, C> {
     // ...
-    destructor P {
+    destructor owns P {
         let mut i = self.children.len() - 1
         while i >= 0 {
             self.children[i].destroy()
@@ -2966,61 +2978,75 @@ pub interface ArrayList<P, C> {
         }
     }
 
-    destructor C {
+    destructor owns C {
+        array_remove(self)
+    }
+
+    destructor refs P {
+        let mut i = self.children.len() - 1
+        while i >= 0 {
+            self.children[i].parent = null
+            i = i - 1
+        }
+        self.children = []
+    }
+
+    destructor refs C {
         array_remove(self)
     }
 }
 ```
 
-`destructor P` is injected into whatever concrete class plays `P`. When you call `team.destroy()`, this code runs — iterating the children array in reverse so that children added last are cleaned up first (matching C++ RAII conventions). `destructor C` calls `array_remove` to unlink the child before it's freed.
+When you write `relation ArrayList Team:roster owns [Player:team]`, the desugar pass copies the `owns` pair onto `Team` and `Player`. Switch the keyword to `refs` and you get the `refs` pair instead — same hint, different lifetime contract. `destructor P` (no kind keyword) is a legacy shorthand that defaults to `owns`.
+
+`destructor owns P` is injected into whatever concrete class plays `P` for an `owns` relation. When you call `team.destroy()`, this code runs — iterating the children array in reverse so that children added last are cleaned up first (matching C++ RAII conventions). `destructor owns C` calls `array_remove` to unlink the child before it's freed.
 
 Destructors cascade. When `team.destroy()` runs, it calls `player.destroy()` for each player. If `Player` is itself a parent in another relation, that destructor fires too. The compiler chains them automatically, in the order the relations were declared.
 
 ### 9.6 Embed
 
-`OwningList` and `RefList` both need linked-list fields and traversal operations. They differ only in their destructors — `OwningList` cascade-destroys children, `RefList` just unlinks them. The common behavior lives in `DoublyLinked`:
+`embed` lets one interface inherit fields and destructors from another. Stdlib's three relation hints don't use `embed` — they each carry their own paired destructors directly — but `embed` is still the right tool when you want to compose your own hint on top of an existing one.
+
+Say you want a doubly-linked list with a live counter on the parent. The list operations and the lifetime contract come from `DoublyLinked`; you only want to add a counter field plus your own destructor pair:
 
 ```lyric
-pub interface DoublyLinked<P, C> {
-    field P.first: C?
-    field P.last: C?
-    field C.next: C?
-    field C.prev: C?
-    field C.parent: P?
-
-    pub func dll_append(parent: P, child: C) {
-        // ... linked list insertion
-    }
-
-    pub func dll_remove(child: C) {
-        // ... linked list removal
-    }
-}
-```
-
-`OwningList` embeds it:
-
-```lyric
-pub interface OwningList<P, C> {
+pub interface CountedLinked<P, C> {
     embed DoublyLinked<P, C>
 
-    destructor P {
+    field P.count: i32
+
+    // Override the owns destructor: zero the counter as we cascade.
+    destructor owns P {
         let mut cur = self.first()
         while !isnull(cur) {
             let next = cur!.next()
             cur!.set_parent(null)
-            cur!.destroy()    // cascade destroy
+            cur!.destroy()
             cur = next
         }
+        self.set_count(0)
     }
 
-    destructor C {
-        // ... unlink from list
+    // Override the refs destructor: zero the counter as we unlink.
+    destructor refs P {
+        let mut cur = self.first()
+        while !isnull(cur) {
+            let next = cur!.next()
+            cur!.set_parent(null)
+            cur!.set_prev(null)
+            cur!.set_next(null)
+            cur = next
+        }
+        self.set_first(null)
+        self.set_last(null)
+        self.set_count(0)
     }
 }
 ```
 
-`embed` copies **fields and destructors** from `DoublyLinked` into `OwningList`. Methods stay abstract bindings — their concrete behavior comes from the impl block at instantiation time, or from a separate `where DoublyLinked<P, C>` constraint on a generic function. After expansion, `OwningList` has `first`, `last`, `next`, `prev`, `parent` fields as if they had been declared directly. The desugar pass expands embeds first, before processing anything else. This is why Chapter 8's `OwningList` relations get `first`, `last`, `next`, `prev`, and `parent` fields even though `OwningList` doesn't declare them directly. 🚧 *The current desugar over-copies — it also drags methods across the `embed`, which is how stdlib's `dll_append`/`dll_remove` show up on `OwningList` relations today. The intended semantics are fields-and-destructors only; expect the over-copy to be removed and the stdlib factoring to grow explicit `where DoublyLinked<P, C>` constraints in its place.*
+`embed` copies **fields and destructors** from `DoublyLinked` into `CountedLinked`. Methods stay abstract bindings — their concrete behavior comes from the impl block at instantiation time, or from a separate `where DoublyLinked<P, C>` constraint on a generic function. After expansion, `CountedLinked` has `first`, `last`, `next`, `prev`, `parent` fields as if they had been declared directly, plus the new `count` field. The desugar pass expands embeds first, before processing anything else. Each copied destructor block keeps its original `owns`/`refs` tag; declaring blocks with the same tag in the embedder overrides the inherited ones.
+
+🚧 *The current desugar over-copies — it also drags methods across the `embed`, which means stdlib free-function operations like `dll_append`/`dll_remove` automatically resolve on the embedder. The intended semantics are fields-and-destructors only; expect the over-copy to be removed and explicit `where DoublyLinked<P, C>` constraints to take its place for the method side.*
 
 ### 9.7 Where Clauses on Functions
 
@@ -3084,11 +3110,9 @@ After desugar, the checker sees only concrete classes with concrete fields and m
 
 Every collection type in Lyric's standard library is built with interfaces and relations:
 
-- `ArrayList<P, C>` — field injection + destructors + `array_append`/`array_remove`
-- `DoublyLinked<P, C>` — field injection + `dll_append`/`dll_remove`
-- `OwningList<P, C>` — embeds `DoublyLinked`, adds cascade destructors
-- `RefList<P, C>` — embeds `DoublyLinked`, adds unlink-only destructors
-- `HashedList<P, C>` — field injection + hash table operations + destructors
+- `ArrayList<P, C>` — field injection + paired owns/refs destructors + `array_append`/`array_remove`
+- `DoublyLinked<P, C>` — field injection + paired owns/refs destructors + `dll_append`/`dll_remove`
+- `HashedList<P, C>` — field injection + paired owns/refs destructors + hash table operations
 - `Dict<K, V>` — uses `HashedList` internally (Chapter 10)
 - `Hashable` — single-method constraint for hash table keys
 
@@ -3507,8 +3531,8 @@ class TeamA { name: string }
 class TeamB { name: string }
 class Player { name: string }
 
-relation OwningList TeamA:team_a owns [Player:pa]
-relation OwningList TeamB:team_b owns [Player:pb]
+relation DoublyLinked TeamA:team_a owns [Player:pa]
+relation DoublyLinked TeamB:team_b owns [Player:pb]
 
 func main() {
     let a = TeamA { name: "Alphas" }
@@ -3564,7 +3588,7 @@ The previous section showed `owns` driving destruction, but `owns` is one of thr
 Two compiler details worth knowing because they show up in the generated C:
 
 - **Move inference, not move syntax.** If you assign a local class variable into a struct field or pass it to a function, and you never touch that local again afterward, the lowerer treats the assignment as a *move* — no retain/release pair is emitted around it. You never write `move x` or anything like Rust's `&T` vs `T`; dataflow analysis figures it out. The effect is invisible at the Lyric level, but it's why you'll see fewer RC operations in the generated C than you might expect.
-- **`ref` and `unref` are escape hatches.** The stdlib's `ArrayList`, `OwningList`, and `RefList` implementations call `ref child` and `unref child` directly — bare RC primitives that are only legal inside a `trusted` function. You won't write these unless you're building your own ownership container.
+- **`ref` and `unref` are escape hatches.** The stdlib's `ArrayList`, `DoublyLinked`, and `HashedList` implementations call `ref child` and `unref child` directly — bare RC primitives that are only legal inside a `trusted` function. You won't write these unless you're building your own ownership container.
 
 ### 11.6 Scope-Exit Analysis
 
@@ -4058,7 +4082,7 @@ You've been using `println`, `append`, `assert_eq`, `Dict`, `ArrayList`, and doz
 
 The stdlib is two files totaling 991 lines of Lyric:
 
-- **`std.ly`** (733 lines): `ArrayList`, `OwningList`, `RefList`, `HashedList`, `Dict`, `Sym`, `StringBuilder`, `Error` — all the interfaces, relations, and data structures from Chapters 8–10.
+- **`std.ly`** (740 lines): `ArrayList`, `DoublyLinked`, `HashedList`, `Dict`, `Sym`, `StringBuilder`, `Error` — all the interfaces, relations, and data structures from Chapters 8–10.
 - **`string.ly`** (258 lines): string methods — `split`, `trim`, `contains`, `index_of`, `replace`, `has_prefix`, `has_suffix`, `to_upper`, `to_lower`, `join`, and the rest.
 
 Every line is Lyric. No C escape hatches, no compiler magic. When you call `dict.set(key, value)`, you're calling a Lyric method defined in `std.ly` using the same interfaces and relations this book taught you. The stdlib is the proof that Lyric's features compose into real libraries.
@@ -5445,7 +5469,7 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 |---------|-----|------|-----|-------|
 | Memory safety | GC | borrow checker | manual / smart pointers | relations |
 | Ownership declaration | — | single owner by default | `unique_ptr<T>` | `relation ArrayList Parent:label owns [Child:label]` |
-| Non-owning reference | — | `&T` / `Rc<T>` | raw pointer / `shared_ptr` | `relation RefList Parent:label refs [Child:label]` |
+| Non-owning reference | — | `&T` / `Rc<T>` | raw pointer / `shared_ptr` | `relation DoublyLinked Parent:label refs [Child:label]` |
 | Destructor | — (finalizers, unreliable) | `impl Drop` | `~ClassName()` | auto-generated from `owns` relations; `final func cleanup(self)` for user code at destruction |
 | Cascade delete | — | manual | manual | automatic — destroying parent destroys all `owns` children |
 | Scope-exit cleanup | `defer f.Close()` | RAII / `impl Drop` | RAII / destructors | scope-exit destructors (automatic) + `final func` for explicit cleanup; **no `defer` keyword** |
