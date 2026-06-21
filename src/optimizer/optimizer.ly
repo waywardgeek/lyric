@@ -136,6 +136,9 @@ func is_side_effect_expr(e: LExpr) -> bool {
           b!.name == "print" ||
           b!.name == "eprintln" ||
           b!.name == "eprint" ||
+          b!.name == "assert" ||
+          b!.name == "assert_eq" ||
+          b!.name == "panic" ||
           b!.name == "append" ||
           b!.name == "slice_push" ||
           b!.name == "push_bytes" ||

@@ -2067,8 +2067,6 @@ FAIL  test_failing
 
 `assert_eq` prints both values on failure. Use `assert` for boolean conditions — null checks, bounds checks, invariants:
 
-🚧 *As of this writing, the C backend lowers `assert` and `assert_eq` calls to no-ops — the runtime macros exist (`lyric_assert`, `lyric_assert_eq`) but the lowerer doesn't emit calls to them yet. Every test silently passes regardless of correctness. Treat this chapter as documenting the testing API the compiler is wiring up; verify against the build before relying on tests for regression protection. Tracked in `TODO`.*
-
 ```lyric
 func test_parse_succeeds() {
     let (result, err) = parse("1 + 2")
