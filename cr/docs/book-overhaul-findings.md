@@ -53,7 +53,31 @@ Empirical: this compiles, runs, and prints `value: 0` — the write to `o.data!.
 
 Spec says auto-deref applies "only to class optionals" (line 1553) — but it doesn't extend that "class only" caveat to the lvalue-unwrap section, which presents the struct form as the canonical example. Recommend the spec either (a) constrain the lvalue example to class-typed inner, or (b) the compiler implement true lvalue write-through for struct-typed optionals.
 
-Logged in `~/projects/lyric/TODO`. Book §3.4 now uses `class Inner` and adds a 🚧 callout for the struct case.
+Logged in `~/projects/lyric/TODO`.
+
+---
+
+## Ch 4 reviser, 2026-06-21
+
+### `xs.extend(ys)` is a silent no-op on slices
+
+Spec §Built-in Methods §Slices (line ~1855) lists `extend(other) -> unit` as "In-place append-all", and §Composite Types says "In-place slice extension: `xs.extend(ys)`." Empirical:
+
+```lyric
+let mut xs = [1, 2, 3]
+xs.extend([4, 5, 6])
+println(f"after extend: {xs.len()}")  // prints 3, not 6
+```
+
+Same result whether `xs` starts as a literal or is built up with `.push()`. The `append(xs, elem)` built-in (which returns a new slice and requires `xs = append(xs, elem)`) works correctly — `[1,2,3]` + two `append` calls → `len=5`. So the workaround for the book is to use `.push()` in a loop, or repeated `append(xs, elem)`, instead of `.extend()`.
+
+Spec doesn't say `extend` is 🚧 — it's listed as if implemented. Either the method needs to be wired up to actually append, or the spec needs to demote it to 🚧 and the `len(xs).extend` row removed from §Built-in Methods.
+
+Logged in `~/projects/lyric/TODO`. Book §4.3 demotes `.extend()` to 🚧 and shows the working forms (`push` in a loop, or `+` for concatenation).
+
+### `;` is not a statement separator
+
+Cosmetic but tripped me up while writing a test: `ys.push(1); ys.push(2)` produces `undefined variable: ;`. The spec implies one statement per line and doesn't enumerate `;` as legal; this is the empirical confirmation. Not a bug, just a gotcha — and worth documenting because most C-family programmers reach for `;` instinctively when squeezing onto one line in a snippet. Book §3.4 now uses `class Inner` and adds a 🚧 callout for the struct case.
 
 ### Spec lists `fn(T) -> U` as canonical function-type syntax, but the parser rejects it
 

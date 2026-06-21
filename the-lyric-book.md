@@ -1024,7 +1024,7 @@ We ended Chapter 3 with a calculator that evaluates expressions — but only whe
 
 ## 4.1 Strings Are Byte Slices
 
-In Lyric, `string` is an alias for `[u8]`. A string is a slice of bytes. This means everything you learn about slices in this chapter applies to strings, and vice versa.
+In Lyric, `string` is represented as `[u8]` — a slice of bytes. The type keeps its own name (`string` everywhere in your code), but everything you learn about slices in this chapter applies to strings, and the string-specific methods are a thin layer over byte operations.
 
 ```lyric
 func main() {
@@ -1050,7 +1050,11 @@ func main() {
 }
 ```
 
-This is the same model as C and Go: strings are bytes, not Unicode code points. There's no built-in UTF-8 decoding — if you need Unicode, you work with bytes directly or build a library. For the calculator we're building — and for compilers, network protocols, and most systems code — bytes are exactly what you want.
+This is the same model as C and Go: a string is a sequence of bytes, not Unicode code points. `s.len()` is the **byte** length; `s[i]` is the byte at offset `i`. ASCII text works perfectly. UTF-8 text round-trips through I/O and concatenation just fine, but iterating "characters" means iterating bytes — a multi-byte code point shows up as several consecutive `u8` values.
+
+*🚧 Roadmap: a UTF-8 layer is planned — `\u{NNNN}` escapes, code-point iteration (`for c in s.chars()`), `char_at` returning an `i32` code point, Unicode-aware case operations. The `string` type name stays; the byte-level operations stay; the new operations layer on top. Until then, treat `string` as `[u8]` and write Unicode-aware code by hand.*
+
+For the calculator we're building — and for compilers, network protocols, and most systems code — bytes are exactly what you want.
 
 ## 4.2 String Methods
 
@@ -1112,15 +1116,28 @@ func main() {
 }
 ```
 
-The `+` operator creates a new slice. The originals are unmodified. For in-place concatenation, use `.extend()`:
+The `+` operator creates a new slice. The originals are unmodified. For in-place growth, push elements one at a time, or use the `append` built-in:
 
 ```lyric
 func main() {
     let mut xs = [1, 2, 3]
-    xs.extend([4, 5, 6])
+    let more = [4, 5, 6]
+    let mut i = 0
+    while i < more.len() {
+        xs.push(more[i])
+        i = i + 1
+    }
     println(f"length: {xs.len()}")  // 6
+
+    // Or use the append built-in (returns a new slice — re-bind):
+    let mut ys = [1, 2, 3]
+    ys = append(ys, 4)
+    ys = append(ys, 5)
+    println(f"length: {ys.len()}")  // 5
 }
 ```
+
+*🚧 A method `xs.extend(ys)` is listed in the spec as the canonical in-place append-all, but today it's a silent no-op — the slice's length doesn't change. Until that's wired up, use `push` in a loop or the `append` built-in.*
 
 Slice expressions extract a sub-range:
 
@@ -1147,11 +1164,31 @@ let copy = s[:]       // full descriptor copy (shares backing array)
 
 `xs[:n]` defaults the low end to 0, `xs[n:]` defaults the high end to the slice length, and `xs[:]` does both. The last form is the idiomatic way to take a fresh slice descriptor that shares the same backing array — useful when you want to hand a slice to a function without letting its `push` operations resize your local view.
 
+### Copy semantics and `let ref`
+
+Slices are value types, but the value is just the descriptor — a pointer, a length, and a capacity. Assignment copies the descriptor; the backing array is shared:
+
+```lyric
+let a = [10, 20, 30]
+let b = a            // copies the descriptor; b and a point to the same bytes
+println(f"{b[0]} {b[1]} {b[2]}")   // 10 20 30
+```
+
+A `let ref` binding makes the sharing explicit and skips even the descriptor copy:
+
+```lyric
+let buf = "hello, world"
+let ref head = buf[0:5]    // zero-copy view into buf
+println(head)              // hello
+```
+
+`let ref` is the right binding when you're walking a buffer and want a name for "this slice of those bytes" without paying for any copy. The source must outlive the `ref`. Plain `let` is fine for almost everything; reach for `ref` when you're writing a parser, a serializer, or any hot loop that takes sub-views of a buffer thousands of times.
+
 ## 4.4 Scanning Text
 
-Now we have the tools to build a tokenizer. In Chapter 2, we defined `Token` as an enum with payloads — `Number(value: f64)`, `Operator(op: Op)`, and so on. That design was right for learning pattern matching, but a real tokenizer needs something different: the raw text of each token, not a pre-parsed value. Parsing `"3.14"` into `f64` is the parser's job, not the lexer's.
+Now we have the tools to build a tokenizer. In Chapter 2, we defined `Token` as an enum with payloads — `Number(value: f64)`, `Operator(op: Op)`, `LeftParen`, `RightParen`. That design was right for learning pattern matching, but a real tokenizer needs something different: the raw text of each token, not a pre-parsed value. Parsing `"3.14"` into `f64` is the parser's job, not the lexer's. We also want to be able to add source position later (line and column, for error messages) without rewriting every variant.
 
-So we redesign. A flat `TokenKind` enum for classification, and a `Token` struct that carries the source text:
+So we redesign in two pieces: a flat `TokenKind` enum that just names the *kind* of token, and a `Token` struct that carries the kind plus the source text the lexer saw. The paren variants keep their full names — `LeftParen` and `RightParen` — to match Chapter 2 and stay readable in `match` arms:
 
 ```lyric
 enum TokenKind {
@@ -1160,8 +1197,8 @@ enum TokenKind {
     Minus
     Star
     Slash
-    LParen
-    RParen
+    LeftParen
+    RightParen
 }
 
 struct Token {
@@ -1169,6 +1206,8 @@ struct Token {
     text: string
 }
 ```
+
+Why the split? The enum-with-payloads form from Chapter 2 conflates two things: classifying the token (it's a number) and holding the data the parser needs (the value 3.14). A real lexer wants only the first — let the parser convert text to numbers, and let the lexer focus on slicing the input. The struct also gives us a single, stable place to add fields later (`line: i32`, `col: i32`, source-file index) without disturbing the seven variants.
 
 The interesting part of the tokenizer is scanning multi-character tokens. Single characters like `+` and `(` are trivial — one byte comparison, one token. Numbers require a loop:
 
@@ -1188,7 +1227,7 @@ if pos < input.len() && input[pos] == '.' {
 tokens.push(Token { kind: TokenKind.Number, text: input[start:pos] })
 ```
 
-`input[start:pos]` slices out the number's text — `"3"`, `"42"`, `"3.14"`. The byte comparisons `ch >= '0' && ch <= '9'` are the same digit check you'd write in C. Character literals make the intent readable: `input[pos] == '.'` instead of `input[pos] == 46`.
+`input[start:pos]` slices out the number's text — `"3"`, `"42"`, `"3.14"`. Because strings are byte slices, this is a descriptor copy, not a string allocation. The byte comparisons `ch >= '0' && ch <= '9'` are the same digit check you'd write in C. Character literals make the intent readable: `input[pos] == '.'` instead of `input[pos] == 46`.
 
 To include literal braces in f-string output, double them:
 
@@ -1249,7 +1288,7 @@ func main() {
 }
 ```
 
-We already saw this pattern with `atoi()`, which returns `(i32, bool)`. Tuples and destructuring eliminate the need for out-parameters or wrapper structs when a function returns two things.
+We already saw this pattern with `atoi()`, which returns `(i64, bool)` — the parsed integer and whether parsing succeeded. (Lyric's default integer literal type is `i32`, so the `99` you wrote in the input string becomes the `i64` value `99` here; cast with `val as i32` if you need it narrower.) Tuples and destructuring eliminate the need for out-parameters or wrapper structs when a function returns two things.
 
 ## 4.7 Conversion Functions
 
@@ -1280,7 +1319,7 @@ func main() {
 }
 ```
 
-`atoi` returns `(i32, bool)` — the parsed value and whether parsing succeeded. No exceptions, no error types. The `(T, bool)` pattern is Go-influenced; you could also use `i32?`, but for simple conversions the bool convention keeps call sites flat. We'll see proper error handling in Chapter 5.
+`atoi` returns `(i64, bool)` — the parsed value and whether parsing succeeded. No exceptions, no error types. The `(T, bool)` pattern is Go-influenced; you could also use `i64?`, but for simple conversions the bool convention keeps call sites flat. The companion `parse_float(s) -> (f64, bool)` does the same job for floating-point — that's the one the parser uses to turn a `Number` token's text into the numeric value it evaluates. We'll see proper error handling in Chapter 5.
 
 ## 4.8 The Complete Tokenizer
 
@@ -1293,8 +1332,8 @@ enum TokenKind {
     Minus
     Star
     Slash
-    LParen
-    RParen
+    LeftParen
+    RightParen
 }
 
 struct Token {
@@ -1315,10 +1354,10 @@ func tokenize(input: string) -> [Token] {
         }
 
         if ch == '(' {
-            tokens.push(Token { kind: TokenKind.LParen, text: "(" })
+            tokens.push(Token { kind: TokenKind.LeftParen, text: "(" })
             pos = pos + 1
         } else if ch == ')' {
-            tokens.push(Token { kind: TokenKind.RParen, text: ")" })
+            tokens.push(Token { kind: TokenKind.RightParen, text: ")" })
             pos = pos + 1
         } else if ch == '+' {
             tokens.push(Token { kind: TokenKind.Plus, text: "+" })
@@ -1345,7 +1384,7 @@ func tokenize(input: string) -> [Token] {
             }
             tokens.push(Token { kind: TokenKind.Number, text: input[start:pos] })
         } else {
-            pos = pos + 1  // skip unknown characters — we'll add errors in Ch5
+            pos = pos + 1  // skip unknown characters — we'll add errors in Ch 5
         }
     }
 
@@ -1355,12 +1394,8 @@ func tokenize(input: string) -> [Token] {
 func main() {
     let input = "(5 + 3) * 2"
     let tokens = tokenize(input)
-
-    let mut i = 0
-    while i < tokens.len() {
-        let tok = tokens[i]
+    for tok in tokens {
         println(f"{tok.kind}: {tok.text}")
-        i = i + 1
     }
 }
 ```
@@ -1368,18 +1403,18 @@ func main() {
 Output:
 
 ```
-LParen: (
+LeftParen: (
 Number: 5
 Plus: +
 Number: 3
-RParen: )
+RightParen: )
 Star: *
 Number: 2
 ```
 
-The tokenizer uses everything from this chapter: byte indexing (`input[pos]`), character literals (`'0'`, `'9'`, `'.'`), slice expressions (`input[start:pos]`), `.push()` on a slice, and `.len()` for bounds checking.
+The tokenizer uses everything from this chapter: byte indexing (`input[pos]`), character literals (`'0'`, `'9'`, `'.'`), slice expressions (`input[start:pos]`), `.push()` on a slice, and `.len()` for bounds checking. The `for tok in tokens` loop is the idiomatic iteration form — `tokens` is a `[Token]` slice, and `for ... in` walks it without a manual index.
 
-When we push a `Token` into the slice, a copy goes in — structs are value types. The tokenizer allocates no new strings for operators (those are literals), and only creates slice views for numbers.
+When we push a `Token` into the slice, a copy goes in — structs are value types. The tokenizer allocates no new strings for operators (those are literals), and only creates slice descriptors for numbers — the number's text is a view into the original `input`, not a fresh allocation.
 
 ## 4.9 The Calculator So Far
 

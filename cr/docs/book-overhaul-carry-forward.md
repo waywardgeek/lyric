@@ -46,6 +46,22 @@ If a code example in the current chapter uses a non-idiomatic form, replace it w
 ### Reference doc note
 - `cr/docs/lyric-language-reference.md` (722 lines) is the daily-driver companion. Cross-check examples against it but treat spec as authoritative when they disagree.
 
+### Empirical verification recipe (compile + run a snippet)
+The compiler emits C source, not a binary. To compile + run a snippet end-to-end:
+
+```bash
+cd ~/projects/lyric                              # must be project root for stdlib autoimport
+./lyric compile /tmp/snippet.ly -o /tmp/snippet.c
+gcc -std=gnu11 -O2 -w -x c /tmp/snippet.c -o /tmp/snippet_bin -I runtime -lm -lpthread
+/tmp/snippet_bin
+```
+
+Notes:
+- **Must `cd` to the lyric project root** — otherwise stdlib types (`StringBuilder`, `Dict`, etc.) fail to resolve with `checker: stdlib type X not found`.
+- The `-o` from `lyric compile` is a **`.c` file**, not a binary. If you give it a path without `.c`, gcc will refuse to read it as C (treats as linker script); use `-x c` or rename.
+- gcc flags taken from `test_lyric.sh` (the canonical test runner): `-std=gnu11 -O2 -w -I runtime -lm -lpthread`.
+- Statements must be one per line — `;` is **not** accepted as a statement separator (`a; b` is a checker error).
+
 ---
 
 ## Calculator Through-Line State (Ch 1–8)
@@ -83,7 +99,13 @@ If a code example in the current chapter uses a non-idiomatic form, replace it w
 - **Ch 4 inheritance:** Ch 4 already opens with "We ended Chapter 3 with a calculator that evaluates expressions — but only when we feed it values and operators by hand," which matches the §3.10 wrap-up. Ch 4 introduces strings/slices and the tokenizer that produces values for `ExprEval` to consume. Ch 4 does **not** depend on `Stack`, `Counter`, `Node`, `Outer/Inner`, or `Point` from Ch 3 — those are teaching scaffolds only.
 
 ### After Ch 4
-- ...
+- **File:** still `calc.ly` — single file, no module split yet.
+- **Types introduced (carrying forward):** `TokenKind` (flat enum, `Number | Plus | Minus | Star | Slash | LeftParen | RightParen`) and `Token` (struct, `{ kind: TokenKind, text: string }`). **This is the redesign Ch 2 promised** — Ch 2's `Token` enum-with-payloads is replaced by this enum+struct pair. The variant names `LeftParen` / `RightParen` are preserved exactly from Ch 2 (not abbreviated to `LParen`/`RParen`) so `match` arms read the same way.
+- **Functions:** `tokenize(input: string) -> [Token]` — a 70-line scanner driven by a `while pos < input.len()` loop, slicing `input[start:pos]` for number text. No `Lexer` *class*; the chapter chooses a free function because there's no per-tokenization state worth bundling beyond the local `pos`. (A `Lexer` class with line/column tracking is a natural extension for Ch 5 or later when error messages need source positions.) The chapter also exercises `make_pair() -> (i32, string)` and reuses Ch 3's `ExprEval` only by reference in §4.9.
+- **What the calculator computes:** `tokenize("(5 + 3) * 2")` returns a 7-element `[Token]`. The chapter's `main()` prints each token's kind and text; it does **not** yet feed them into an evaluator. Ch 5 builds the parser that bridges `tokenize` → `ExprEval`.
+- **Language features introduced and load-bearing for later chapters:** byte-level string indexing (`s[i] -> u8`), character literals (`'A'`, `'\n'`, `'\x41'`), slice expressions (`s[lo:hi]`, `s[:hi]`, `s[lo:]`, `s[:]`), slice `push`/`pop`/`+`/`for x in xs`, the `append(xs, x)` built-in, `let ref` for zero-copy views, `StringBuilder`, triple-quoted strings (`""" ... """`), f-string brace doubling (`{{`/`}}`), tuples (`(T, U)` + `._0`/`._1` + destructuring), and the `atoi`/`itoa`/`char_to_string`/`parse_float` conversion built-ins.
+- **Known gaps deliberately left for later:** (1) `xs.extend(ys)` is documented in the spec as the in-place append-all method, but the compiler silently drops the call — Ch 4 §4.3 demotes it to 🚧 and uses a `push` loop / `append` built-in instead; (2) UTF-8 is 🚧 — `string` is bytes today, and the chapter says so honestly with a roadmap callout in §4.1; (3) the tokenizer skips unknown characters silently — Ch 5 adds errors at the lexer/parser boundary.
+- **Ch 5 inheritance:** Ch 5's pre-edit text already references `TokenKind.LParen` and `TokenKind.RParen` in §5.6 (`Parser.parse_primary` and `Parser.expect(TokenKind.RParen)?`). **The Ch 5 reviser must rename these to `LeftParen` / `RightParen`** to match Ch 2 / Ch 3 / Ch 4. Ch 5 also calls `str_to_float(tok!.text)` — that's correct (stdlib `str_to_float: string -> f64`, distinct from the C-backend builtin `parse_float: string -> (f64, bool)`); leave it alone.
 
 ### After Ch 5
 - ...
@@ -175,3 +197,15 @@ Decided to rewrite §3.4's lvalue-unwrap example so the inner type is a `class I
 
 ## Decision (Ch 3): `Point` is re-introduced as a fresh `i32` struct in §3.7 (not Ch 2's `f64` `Point`)
 Decided to leave §3.7's `struct Point { x: i32, y: i32 }` mut-param demo as-is, even though Ch 2 already defined a `Point` with `f64` fields. The two `Point`s are pedagogical scaffolds in independent chapters — neither is carried into the calculator. Next chapters: if `Point` is reintroduced again, declare it fresh; do not assume either Ch 2's or Ch 3's `Point` is in scope. The calculator through-line uses `ExprEval` (class), `Op` (enum), `Token` (enum, Ch 2 / redesigned Ch 4), and `eval` (free function) — no `Point` at all.
+
+## Decision (Ch 4): `Token` redesigned into `TokenKind` enum + `Token` struct; paren variants stay `LeftParen`/`RightParen`
+Decided to land the redesign Ch 2 flagged: `Token` becomes a `struct { kind: TokenKind, text: string }` paired with a flat `TokenKind` enum (`Number | Plus | Minus | Star | Slash | LeftParen | RightParen`). The split lets the lexer carry source text (and, later, line/column info) without forcing the parser to live inside a payload pattern-match. Paren variant names stay long-form (`LeftParen`, `RightParen`) to match Ch 2's enum and avoid the "is it `L` or `Left`?" naming hazard. Next chapters: use `TokenKind.LeftParen` / `TokenKind.RightParen` everywhere. Ch 5's pre-edit text uses the abbreviated `LParen`/`RParen` in `Parser.parse_primary` and `Parser.expect`; the Ch 5 reviser must rename to `LeftParen`/`RightParen`. Ch 7's pre-edit test file uses `TLParen`/`TRParen` (a parallel naming scheme used by a hand-written test); the Ch 7 reviser should consider aligning that too.
+
+## Decision (Ch 4): `.extend()` on slices demoted to 🚧; teach `push` loop / `append` built-in instead
+Decided to demote `xs.extend(ys)` to a 🚧 callout in §4.3, even though the spec lists it as the canonical in-place append-all method, because the compiler silently drops the call (verified empirically: `let mut xs = [1,2,3]; xs.extend([4,5,6]); println(xs.len())` prints `3`). Two working alternatives in the chapter: (a) `push` in a loop, (b) re-bind with the `append(xs, x)` built-in. Logged in `cr/docs/book-overhaul-findings.md` and `~/projects/lyric/TODO`. Next chapters: do not show `.extend()` as a current Lyric idiom; if you need in-place append-all, use a `push` loop. When the compiler bug is fixed, this decision can be revisited.
+
+## Decision (Ch 4): UTF-8 framing is a 🚧 roadmap callout in §4.1, not silent
+Decided to keep §4.1's UTF-8 status as an explicit italic *🚧 Roadmap: ...* callout rather than the pre-edit's casual "no built-in UTF-8 decoding — if you need Unicode, work with bytes directly" framing. The roadmap callout names the specific operations that are planned (`\u{NNNN}` escapes, `for c in s.chars()`, code-point `char_at`, Unicode-aware case) and reassures the reader the byte-level API stays. The honest "strings are bytes today, code points are 🚧" message is now front-of-chapter, in the same voice as every other 🚧 callout. Next chapters: rely on byte-level string ops freely; don't pretend Unicode methods exist.
+
+## Decision (Ch 4): No `Lexer` class — `tokenize` stays a free function
+Decided to skip wrapping the tokenizer in a `Lexer` class. The 70-line `tokenize(input: string) -> [Token]` function has no per-tokenization state worth bundling beyond a local `pos` cursor — making it a class would just add `self.` noise. The class form becomes worthwhile when the lexer needs to carry line/column tracking and produce structured error messages, which is a natural Ch 5 (or later) extension when errors land. Next chapters: if you want a `Lexer` class for source positions, wrap `tokenize` then; Ch 4's free function form is intentional.
