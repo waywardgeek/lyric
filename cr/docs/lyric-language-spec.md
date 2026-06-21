@@ -1101,9 +1101,10 @@ impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
 }
 
 // Field bind: interface field ↔ concrete field
-impl DoublyLinked<Folder, File> {
-    P.children <-> Folder.items
-    C.label <-> File.title
+impl ArrayList<Team, Player> {
+    P.children <-> Team.roster
+    C.parent   <-> Player.team
+    C.index    <-> Player.team_idx
 }
 
 // Inline implementation

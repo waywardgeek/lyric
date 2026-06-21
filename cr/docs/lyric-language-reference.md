@@ -30,13 +30,13 @@ func main() {
 
 ### Hard keywords
 ```
-as       break       case        cascade      class       continue
-destructor   else    embed       enum         false       for
-from     func        if          impl         import      in
-interface     is     let         lyric        match       mut
-null     owns        pub         refs         relation    return
-select   self        spawn       struct       true        type
-where    while       yield
+as       break       case        class        continue     destructor
+else     enum        false       for          from         func
+if       impl        import      in           interface    is
+let      lyric       match       mut          null         owns
+pub      refs        relation    return       select       self
+spawn    struct      true        type         where        while
+yield
 ```
 
 ### Contextual keywords (lex as identifiers; can be used as identifier names)
@@ -314,16 +314,32 @@ interface Graph<G, N, E> {
         for n in nodes { total = total + len(n.out_edges()) }
         return total
     }
-
-    field P.parent: G?            // injects fields into implementing classes
-    destructor P { ... }
-}
-
-interface OwningList<P, C> {
-    embed DoublyLinked<P, C>      // copies fields and destructors (not methods)
-    destructor P { ... }
 }
 ```
+
+Relation hints (binary interfaces — see §12) additionally declare
+`field T.name: Type` (injected into the implementing class) and
+**paired destructors** keyed on the relation kind:
+
+```lyric
+interface ArrayList<P, C> {
+    field P.children: [C]
+    field C.parent:  P?
+    field C.index:   i32
+
+    pub trusted func P.append(self, child: C) { ... }
+    pub trusted func P.remove(self, child: C) { ... }
+
+    destructor owns P { ... }   // selected by `relation ArrayList X owns [Y]`
+    destructor owns C { ... }
+    destructor refs P { ... }   // selected by `relation ArrayList X refs [Y]`
+    destructor refs C { ... }
+}
+```
+
+The `owns` / `refs` keyword on the destructor block must match the relation's
+kind keyword; the desugar pass copies only the matching pair onto the
+concrete classes. A bare `destructor T { ... }` (no kind) defaults to `owns`.
 
 ### Impl blocks
 ```lyric
@@ -335,9 +351,11 @@ impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
 }
 
 // Field bind: interface field ↔ concrete field
-impl DoublyLinked<Folder, File> {
-    P.children <-> Folder.items
-    C.label <-> File.title
+//   (the `<->` token is the bidirectional field-binding arrow.)
+impl ArrayList<Team, Player> {
+    P.children <-> Team.roster
+    C.parent   <-> Player.team
+    C.index    <-> Player.team_idx
 }
 
 // Inline body
@@ -372,10 +390,12 @@ Declare ownership using a stdlib interface as a hint. The compiler injects field
 relation Hint Parent[:p_label] (owns | refs) [Child[:c_label]]
 ```
 
-- `Hint` ∈ `ArrayList | OwningList | RefList | HashedList`.
+- `Hint` ∈ `ArrayList | DoublyLinked | HashedList`.
 - `owns`: cascade-destroy children when parent destroyed.
 - `refs`: unlink children only (children survive).
-- **Labels** prefix the injected field/method names.
+- **Labels** prefix the injected field/method names. With no labels,
+  members inject flat into the class (only one unlabeled relation per
+  `(P, C)` pair is allowed).
 
 ```lyric
 class Team { name: string }
@@ -386,13 +406,19 @@ relation ArrayList Team:roster owns [Player:team]
 
 Injected: `Team.roster_children: [Player]`, `Player.team_parent: Team?`, `Player.team_index: i32`.
 Functions: `array_append<Team, Player>(t, p)`, `array_remove<Team, Player>(p)`.
+Methods: `team.roster_append(p)`, `team.roster_remove(p)`.
 
 | Hint | Functions | Notes |
 |---|---|---|
-| `ArrayList` | `array_append`, `array_remove` | O(1) swap-remove |
-| `OwningList` | `dll_append`, `dll_remove` | doubly-linked, cascade destroy |
-| `RefList` | `dll_append`, `dll_remove` | doubly-linked, no cascade |
-| `HashedList` | `hash_insert`, `hash_lookup`, `hash_remove` | open-addressing, 75% load factor; child must implement `hash_key(self) -> u64` |
+| `ArrayList` | `array_append`, `array_remove` | O(1) swap-remove. Both `owns` and `refs`. |
+| `DoublyLinked` | `dll_append`, `dll_remove` | Intrusive doubly-linked list. Both `owns` and `refs`. |
+| `HashedList` | `hash_insert`, `hash_lookup`, `hash_remove` | Open-addressing, 75% load factor; child must implement `hash_key(self) -> u64`. Both `owns` and `refs`. |
+
+`owns` / `refs` is orthogonal to the hint name — every hint supports both
+modifiers, with the modifier selecting the destructor pair the desugar
+pass copies onto the concrete classes (cascade vs unlink). The old
+`OwningList` / `RefList` hint names are gone; use `DoublyLinked owns` /
+`DoublyLinked refs` instead.
 
 Relations support generic class participants (`relation HashedList Dict<K, V>:d owns [DictEntry<K, V>:d]`).
 
