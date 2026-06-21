@@ -2713,7 +2713,7 @@ Notice that `Expr` is both a parent (of `operands`) and a child (of `Stmt` via `
 
 `prog.destroy()` destroys the program, which cascade-destroys all statements, which cascade-destroy all expressions, which cascade-destroy their operands. The entire tree is cleaned up deterministically, in reverse order, with no manual traversal and no GC.
 
-This is what the Lyric compiler itself does. The AST — 30,796 lines of Lyric source — uses relations throughout. `File` owns `Block`, `Block` owns `FuncDecl`, `FuncDecl` owns `Stmt`, and so on. One call to `file.destroy()` cleans up the entire compilation unit.
+This is what the Lyric compiler itself does. The AST — 33,500 lines of Lyric source — uses relations throughout. `File` owns `Block`, `Block` owns `FuncDecl`, `FuncDecl` owns `Stmt`, and so on. One call to `file.destroy()` cleans up the entire compilation unit.
 
 ### 8.7 `final` Functions: User Code at Destruction Time
 
@@ -3463,7 +3463,7 @@ Class handles change from `Node*` pointers to `uint32_t` indices. `Node { name: 
 
 Why does this matter? Cache lines. A modern CPU loads 64 bytes at a time. In AoS layout, loading a `Node`'s name pulls in the children, the lyric_next, and padding — wasting cache space on fields you don't need. In SoA layout, iterating over all names touches only the name array. Every cache line is full of names.
 
-The Lyric compiler itself benchmarks at **10% faster and 14% less memory** under SoA compared to AoS, measured by compiling the compiler's own 30,796-line codebase on a MacBook Air M2. The program doesn't change — same source code, same semantics. Only the `--soa` flag changes.
+The Lyric compiler itself benchmarks at **10% faster and 14% less memory** under SoA compared to AoS, measured by compiling the compiler's own 33,500-line codebase on a MacBook Air M2. The program doesn't change — same source code, same semantics. Only the `--soa` flag changes.
 
 We proved this at scale with DataDraw over 30 years: EDA tools processing billions of transistor records, where cache-line utilization determined whether a job finished in minutes or hours. Lyric brings the same technique to a general-purpose language, and you don't have to redesign your data structures to get it.
 
