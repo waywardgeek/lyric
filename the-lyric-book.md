@@ -4077,6 +4077,8 @@ lyric main {
 }
 ```
 
+This packaging adds an `End` variant to `TokenKind` for completeness — handy when a parser wants to look one past the last token without bounds-checking. The `End` token isn't produced by Chapter 4's `tokenize` shown there; treat §13.5 as a fresh package-split example, not a re-export of the calculator's runtime types.
+
 `parser.ly` uses `Token` and `TokenKind` directly — no `import`, no `lexer.` prefix:
 
 ```lyric
