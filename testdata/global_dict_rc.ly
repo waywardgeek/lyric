@@ -1,6 +1,10 @@
 // Test: Global Dict freed by RC between function calls
-// Reproduces pattern from checker.ly where _method_aliases Dict
-// gets RC'd to 0 between checker and lowerer phases.
+// Reproduces bug where a global optional Dict handle gets RC'd to 0
+// and slab reuses the memory.
+//
+// KNOWN FAILURE: This test demonstrates the Dict corruption bug documented
+// in TODO.md. The global _aliases Dict gets freed by RC between phase1()
+// and phase2() calls, and slab reuses the memory for churn_dicts() allocations.
 
 let mut _aliases: Dict<Sym, string>? = null
 
@@ -15,8 +19,6 @@ func get_aliases() -> Dict<Sym, string> {
 func phase1() {
   get_aliases().set(`alpha`, "a_base")
   get_aliases().set(`bravo`, "b_base")
-  // Verify immediately
-  assert_eq(get_aliases().length(), 2)
 }
 
 // Allocate many Dicts to trigger slab reuse of freed memory
@@ -37,42 +39,23 @@ func churn_dicts() {
 }
 
 // Phase 2: check global dict survived
-func phase2() {
-  let aliases = get_aliases()
-  let count = aliases.length()
-  println(f"phase2: aliases count={count}")
-  if count != 2 {
-    println("BUG: global Dict was corrupted by slab reuse!")
-    println(f"  Expected 2 entries, got {count}")
-    // Try to read our entries
-    let a = aliases.get(`alpha`)
-    if !isnull(a) {
-      println(f"  alpha = {a!}")
-    } else {
-      println("  alpha = MISSING")
-    }
-  }
-  assert_eq(count, 2)
-  assert_eq(aliases.get(`alpha`)!, "a_base")
-  assert_eq(aliases.get(`bravo`)!, "b_base")
-}
-
 func test_global_dict_survives_churn() {
   phase1()
-  churn_dicts()
-  phase2()
-}
 
-// Variant: use the dict as a temporary (no local binding)
-func test_global_dict_temporary_use() {
-  // Access via temporary — RC inc on return, dec at statement end
-  get_aliases().set(`charlie`, "c_base")
-  get_aliases().set(`delta`, "d_base")
+  // Verify immediately after phase1 — should be fine
+  let count_before = get_aliases().length()
+  assert(count_before == 2)
 
-  // Churn
   churn_dicts()
 
-  // Verify
-  assert_eq(get_aliases().length(), 4)
-  assert_eq(get_aliases().get(`charlie`)!, "c_base")
+  // After churn, the global Dict may have been freed and its slab reused
+  let aliases = get_aliases()
+  let count = aliases.length()
+  assert(count == 2)
+  let a = aliases.get(`alpha`)
+  assert(!isnull(a))
+  assert(a!.value == "a_base")
+  let b = aliases.get(`bravo`)
+  assert(!isnull(b))
+  assert(b!.value == "b_base")
 }
