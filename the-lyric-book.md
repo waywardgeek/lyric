@@ -3046,7 +3046,7 @@ pub interface CountedLinked<P, C> {
 
 `embed` copies **fields and destructors** from `DoublyLinked` into `CountedLinked`. Methods stay abstract bindings — their concrete behavior comes from the impl block at instantiation time, or from a separate `where DoublyLinked<P, C>` constraint on a generic function. After expansion, `CountedLinked` has `first`, `last`, `next`, `prev`, `parent` fields as if they had been declared directly, plus the new `count` field. The desugar pass expands embeds first, before processing anything else. Each copied destructor block keeps its original `owns`/`refs` tag; declaring blocks with the same tag in the embedder overrides the inherited ones.
 
-🚧 *The current desugar over-copies — it also drags methods across the `embed`, which means stdlib free-function operations like `dll_append`/`dll_remove` automatically resolve on the embedder. The intended semantics are fields-and-destructors only; expect the over-copy to be removed and explicit `where DoublyLinked<P, C>` constraints to take its place for the method side.*
+As of mid-2026 the desugar pass honors this contract: methods are not copied across `embed`. If you need the embedded interface's methods on the embedder, add an explicit `where DoublyLinked<P, C>` constraint to your generic function (Chapter 9.7) or supply an `impl` block that wires them up.
 
 ### 9.7 Where Clauses on Functions
 
@@ -3096,7 +3096,7 @@ External methods with where clauses and generics — the full power of the type 
 
 The desugar pipeline runs five passes in a fixed order:
 
-1. **Embeds** — expand `embed` declarations, copying fields and destructors (methods stay abstract bindings — 🚧 the current desugar over-copies methods too; see §9.6)
+1. **Embeds** — expand `embed` declarations, copying fields and destructors (methods stay abstract bindings — see §9.6)
 2. **Interface fields** — inject `field` declarations into concrete classes
 3. **Relations** — process `relation` declarations, binding interfaces to class pairs
 4. **Destructors** — inject `destructor` blocks into classes

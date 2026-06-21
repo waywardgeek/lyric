@@ -11,8 +11,12 @@
 lyric desugar {
 
   // ---- 1. DesugarInterfaceEmbeds ----
-  // Flattens embedded interfaces by copying fields, methods, and destructors
+  // Flattens embedded interfaces by copying fields and destructors
   // from the embedded interface into the embedding interface, substituting type params.
+  // Per spec §Interface Embedding, methods are NOT copied — they stay abstract
+  // bindings whose concrete behavior is supplied by the impl block at
+  // instantiation, or by a separate `where Parent<P, C>` constraint on a generic
+  // function.
 
   func desugar_interface_embeds(file: File) {
     // Build index of all interfaces by name
@@ -78,62 +82,11 @@ lyric desugar {
             array_append<InterfaceDecl, DestructorBlock>(iface, new_db)
           }
 
-          // Copy methods with type param substitution
-          for m in parent_iface.im_children() {
-            let body_copy = deep_copy_block(m.body)
-            if !isnull(body_copy) {
-              substitute_type_params_in_block(body_copy!, type_map)
-            }
-            let new_fn = FuncDecl {
-              name: m.name,
-              receiver_type: substitute_sym(m.receiver_type, type_map),
-              is_public: m.is_public,
-              is_final: m.is_final,
-              is_trusted: m.is_trusted,
-              body: body_copy,
-              span: m.span,
-            }
-            // Copy params with type substitution
-            for p in m.param_children() {
-              let new_param = Param {
-                name: p.name,
-                type_expr: substitute_type_expr_copy(p.type_expr, type_map),
-                is_mut: p.is_mut,
-                is_self: p.is_self,
-                span: p.span,
-              }
-              array_append<FuncDecl, Param>(new_fn, new_param)
-            }
-            // Copy type params
-            for tp in m.fp_children() {
-              let new_tp = TypeParam {
-                name: substitute_sym(tp.name, type_map),
-                constraint: tp.constraint,
-                span: tp.span,
-              }
-              array_append<FuncDecl, TypeParam>(new_fn, new_tp)
-            }
-            // Copy where clauses
-            for wc in m.where_children() {
-              let new_wc = WhereClause {
-                variable: wc.variable,
-                constraint: wc.constraint,
-                span: wc.span,
-              }
-              for arg in wc.wc_arg_children() {
-                let new_arg = substitute_type_expr_copy(arg, type_map)
-                if !isnull(new_arg) {
-                  array_append<WhereClause, TypeExpr>(new_wc, new_arg!)
-                }
-              }
-              array_append<FuncDecl, WhereClause>(new_fn, new_wc)
-            }
-            // Copy return type
-            if !isnull(m.return_type) {
-              new_fn.return_type = substitute_type_expr_copy(m.return_type, type_map)
-            }
-            array_append<InterfaceDecl, FuncDecl>(iface, new_fn)
-          }
+          // Per spec §Interface Embedding: embed copies fields and destructors
+          // only. Methods stay abstract bindings — their concrete behavior comes
+          // from the impl block at instantiation, or from a separate
+          // `where Parent<P, C>` constraint on a generic function. Do NOT copy
+          // methods from the embedded interface here.
         }
       }
     }
