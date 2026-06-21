@@ -9,8 +9,8 @@ lyric destroy_shared {
   class TeamB { name: string }
   class Player { name: string }
 
-  relation OwningList TeamA:team_a owns [Player:pa]
-  relation OwningList TeamB:team_b owns [Player:pb]
+  relation DoublyLinked TeamA:team_a owns [Player:pa]
+  relation DoublyLinked TeamB:team_b owns [Player:pb]
 
   func main() {
     let a = TeamA { name: "Alphas" }

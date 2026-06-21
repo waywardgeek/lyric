@@ -749,8 +749,9 @@ lyric lowerer {
     }
     rename_prefix = iface_name + label_segment + type_arg_suffix
 
-    // Build additional prefixes for embedded interfaces (e.g., OwningList embeds DoublyLinked)
-    // so that where-clause lookups on embedded interfaces find the correct renames.
+    // Build additional prefixes for embedded interfaces (legacy: previously
+    // OwningList embedded DoublyLinked; today no stdlib hint uses embed but the
+    // mechanism stays for user-defined interfaces that do).
     // NOTE: Use let ref on concat temps — slice holds pointers, scope-exit free would UAF
     let mut all_rename_prefixes: [string] = [rename_prefix]
     for embed_name in iface.embeds {

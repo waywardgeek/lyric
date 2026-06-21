@@ -6,7 +6,7 @@ lyric ref_list {
   class Room { name: string }
   class Guest { name: string }
 
-  relation RefList Room:room refs [Guest:guest]
+  relation DoublyLinked Room:room refs [Guest:guest]
 
   func main() {
     let r = Room { name: "Lobby" }

@@ -1063,9 +1063,13 @@ interface Graph<G, N, E> {
     field P.first: C?
     field C.parent: P?
 
-    // Destructor injection
-    destructor P { ... }
-    destructor C { ... }
+    // Destructor injection — paired by relation kind (owns vs refs).
+    // Desugar copies the block whose kind matches the relation's keyword.
+    destructor owns P { ... }   // runs when used as `relation Hint X owns [Y]`
+    destructor owns C { ... }
+    destructor refs P { ... }   // runs when used as `relation Hint X refs [Y]`
+    destructor refs C { ... }
+    // Bare `destructor P { }` (no kind keyword) defaults to `owns`.
 }
 ```
 
@@ -2650,10 +2654,12 @@ and index for O(1) swap-remove.
 | `array_append(parent: P, child: C)` | Append child to end of parent's array |
 | `array_remove(child: C)` | Remove child using O(1) swap-remove |
 
-**Destructors:**
+**Destructors** (selected by the relation's `owns`/`refs` keyword):
 
-- Parent: cascade-destroys all children (reverse order).
-- Child: removes self from parent's array.
+- `owns` parent: cascade-destroys all children (reverse order).
+- `owns` child: removes self from parent's array.
+- `refs` parent: walks the array nulling each child's parent backref and clears the array; children survive.
+- `refs` child: removes self from parent's array.
 
 **Usage:**
 
@@ -2661,7 +2667,8 @@ and index for O(1) swap-remove.
 class Team { name: string }
 class Player { name: string }
 
-relation ArrayList Team:roster owns [Player:team]
+relation ArrayList Team:roster owns [Player:team]   // cascade
+relation ArrayList Pool:p     refs [Player:p]       // unlink only
 
 let t = Team { name: "Eagles" }
 let p = Player { name: "Alice" }
@@ -2724,6 +2731,13 @@ bucket index maps hash slots to array positions.
 | `hash_remove(parent: P, key: u64) -> bool` | Remove by hash key |
 | `hash_find_slot(parent: P, key: u64) -> i32` | Find bucket slot (internal) |
 | `hash_rehash(parent: P)` | Rehash into larger bucket array (internal) |
+
+**Destructors** (selected by the relation's `owns`/`refs` keyword):
+
+- `owns` parent: cascade-destroys all children (reverse order).
+- `owns` child: removes self from parent's hash table.
+- `refs` parent: nulls each child's parent backref, clears children/buckets; children survive.
+- `refs` child: removes self from parent's hash table.
 
 **Usage:**
 
@@ -3203,14 +3217,19 @@ comment. There is no `defer` keyword in the lexer — these LIR pieces are
 unreachable from user syntax and are slated for removal pending a proper
 design.
 
-### `OwningList` and `RefList` Relation Hints
+### `OwningList`, `RefList`, `RefArrayList`, `ArrayListBase` Relation Hints
 
-Previously documented as user-facing stdlib hints. The user-facing
-linked-list surface is now `DoublyLinked` with the `owns`/`refs`
-modifier on the relation line selecting cascade vs unlink, parallel to
-how `ArrayList` already works. Any remaining `OwningList`/`RefList`
-interfaces are stdlib implementation detail, not part of the language
-surface.
+Previously the doubly-linked-list family had four interfaces
+(`DoublyLinked` base, `OwningList`/`RefList` cascade/unlink wrappers
+that `embed`ded it), and the array-backed family had three
+(`ArrayListBase` base, `ArrayList`/`RefArrayList` wrappers). They were
+collapsed: each user-facing hint (`ArrayList`, `DoublyLinked`,
+`HashedList`) is now a single interface carrying `destructor owns P/C`
+and `destructor refs P/C` blocks, selected by the relation's
+`owns`/`refs` keyword. Existing code that wrote `relation OwningList X
+owns [Y]` migrates to `relation DoublyLinked X owns [Y]`; `relation
+RefList X refs [Y]` becomes `relation DoublyLinked X refs [Y]`;
+`RefArrayList` becomes `ArrayList ... refs`.
 
 ---
 

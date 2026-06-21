@@ -17,11 +17,11 @@ lyric stdlib {
 
   doc "Identifiers": """
     // --- Interfaces (pulled when user relations reference them) ---
-    // ArrayList<P, C>: dynamic array with parent backref. Generates: array_append, array_remove, children()/parent()/index() getters
-    // DoublyLinked<P, C>: next/prev doubly-linked list operations
-    // OwningList<P, C>: owns + doubly-linked (composition)
-    // RefList<P, C>: refs + doubly-linked (non-owning)
-    // HashedList<P, C>: hashed lookup by key with open addressing (75% load rehash, linear probing)
+    // ArrayList<P, C>: dynamic array with parent backref. Single interface with
+    //   `destructor owns/refs P/C` pairs; desugar selects by relation kind.
+    // DoublyLinked<P, C>: intrusive doubly-linked list, same dual-destructor shape.
+    // HashedList<P, C>: hashed lookup by key with open addressing (75% load rehash, linear probing),
+    //   same dual-destructor shape.
     //
     // --- Classes ---
     // Sym { name: string, hash: u64 }: interned symbol with pre-computed FNV-1a hash

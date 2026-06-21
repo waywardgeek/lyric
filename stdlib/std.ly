@@ -3,10 +3,12 @@
 
 lyric std {
 
-  // ArrayListBase: base interface for array-backed parent-child relations.
-  // Provides fields and methods. No destruction semantics —
-  // use ArrayList or RefArrayList which embed this and add appropriate destructors.
-  pub interface ArrayListBase<P, C> {
+  // ArrayList: array-backed parent-child relation.
+  //   relation ArrayList Parent owns [Child]   — parent cascade-destroys children.
+  //   relation ArrayList Parent refs [Child]   — parent unlinks but does NOT destroy.
+  // The owns/refs keyword on the relation selects which destructor pair below
+  // gets copied onto the concrete classes by the desugar pass.
+  pub interface ArrayList<P, C> {
     // The parent's array of children
     field P.children: [C]
 
@@ -72,13 +74,8 @@ lyric std {
       unref child
     }
 
-  }
-
-  // ArrayList: parent owns children, cascade-destroys on parent death.
-  pub interface ArrayList<P, C> {
-    embed ArrayListBase<P, C>
-
-    destructor P {
+    // 'owns': parent cascade-destroys every child on death.
+    destructor owns P {
       let kids = self.children
       let mut i: i32 = len(kids) - 1
       while i >= 0 {
@@ -88,17 +85,12 @@ lyric std {
       }
     }
 
-    destructor C {
+    destructor owns C {
       array_remove<P, C>(self)
     }
-  }
 
-  // RefArrayList: parent references children but does not own their lifetime.
-  // On parent death, children are unlinked but NOT destroyed.
-  pub interface RefArrayList<P, C> {
-    embed ArrayListBase<P, C>
-
-    destructor P {
+    // 'refs': parent unlinks children on death; children survive.
+    destructor refs P {
       let kids = self.children
       let mut i: i32 = len(kids) - 1
       while i >= 0 {
@@ -109,15 +101,16 @@ lyric std {
       self.children = []
     }
 
-    destructor C {
+    destructor refs C {
       array_remove<P, C>(self)
     }
   }
+
   // --- Doubly-linked list family ---
 
-  // DoublyLinked: base interface for intrusive doubly-linked list.
-  // Provides fields and traversal methods. No destruction semantics —
-  // use OwningList or RefList which embed this and add appropriate destructors.
+  // DoublyLinked: intrusive doubly-linked list parent-child relation.
+  //   relation DoublyLinked Parent owns [Child]   — cascade-destroy on parent death.
+  //   relation DoublyLinked Parent refs [Child]   — unlink children, do NOT destroy.
   pub interface DoublyLinked<P, C> {
     field P.first: C?
     field P.last: C?
@@ -200,13 +193,9 @@ lyric std {
       child.next = null
       unref child
     }
-  }
 
-  // OwningList: parent owns children, cascade-destroys on parent death.
-  pub interface OwningList<P, C> {
-    embed DoublyLinked<P, C>
-
-    destructor P {
+    // 'owns': walk forward, detach each child, destroy it.
+    destructor owns P {
       let mut cur = self.first()
       while !isnull(cur) {
         let next = cur!.next()
@@ -216,17 +205,12 @@ lyric std {
       }
     }
 
-    destructor C {
+    destructor owns C {
       dll_remove<P, C>(self)
     }
-  }
 
-  // RefList: parent references children but does not own their lifetime.
-  // On parent death, children are unlinked but NOT destroyed.
-  pub interface RefList<P, C> {
-    embed DoublyLinked<P, C>
-
-    destructor P {
+    // 'refs': walk forward, null out links, do NOT destroy children.
+    destructor refs P {
       let mut cur = self.first()
       while !isnull(cur) {
         let next = cur!.next()
@@ -239,11 +223,10 @@ lyric std {
       self.set_last(null)
     }
 
-    destructor C {
+    destructor refs C {
       dll_remove<P, C>(self)
     }
   }
-
   // --- Hash table ---
 
   // HashedList: parent owns a hash table of children, keyed by hash_key().
@@ -467,7 +450,7 @@ lyric std {
     }
 
     // Destructor for parent: cascade destroy all owned children
-    destructor P {
+    destructor owns P {
       let kids = self.children()
       let mut i: i32 = len(kids) - 1
       while i >= 0 {
@@ -478,7 +461,31 @@ lyric std {
     }
 
     // Destructor for child: remove self from parent's hash table
-    destructor C {
+    destructor owns C {
+      let p = self.parent()
+      if !isnull(p) {
+        hash_remove<P, C>(p!, self.hash_key())
+      }
+    }
+
+    // 'refs' parent: detach all children from parent, do NOT destroy them.
+    // Children retain their hash_key but lose their parent link and bucket slot.
+    destructor refs P {
+      let kids = self.children()
+      let mut i: i32 = len(kids) - 1
+      while i >= 0 {
+        kids[i].set_parent(null)
+        kids[i].set_index(0)
+        i = i - 1
+      }
+      self.set_children([])
+      self.set_buckets([])
+      self.set_hash_cap(0)
+      self.set_hash_count(0)
+    }
+
+    // 'refs' child: identical to owns — remove self from parent's hash table.
+    destructor refs C {
       let p = self.parent()
       if !isnull(p) {
         hash_remove<P, C>(p!, self.hash_key())

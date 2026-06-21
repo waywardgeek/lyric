@@ -10,9 +10,11 @@ module desugar
     single source of truth:
 
     1. desugar_interface_embeds — copies fields/destructors from embedded
-       interfaces into their embedders, substituting type parameters. This
-       is what lets OwningList<T>/RefList<T> share the DoublyLinked<T>
-       mechanics.
+       interfaces into their embedders, substituting type parameters and
+       propagating the destructor's RelationKind.  Stdlib no longer uses
+       embed for hint interfaces (ArrayList/DoublyLinked/HashedList each
+       carry their own paired destructor blocks), but user-defined
+       interfaces can still embed others.
     2. desugar_interface_fields — turns `field T.name: Type` declarations
        on interfaces into matching getter/setter method signatures.
     3. desugar_relations — expands relation decls into label-prefixed

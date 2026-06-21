@@ -5,7 +5,7 @@ lyric owning_list {
   class Team { name: string }
   class Player { name: string }
 
-  relation OwningList Team:team owns [Player:player]
+  relation DoublyLinked Team:team owns [Player:player]
 
   func main() {
     let t = Team { name: "Wolves" }
