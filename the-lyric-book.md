@@ -4619,7 +4619,7 @@ From lowest to highest:
 | `isnull(x)` | `T?` → `bool` | Test for null |
 | `panic(msg)` | `string` → `unit` | Abort with message |
 | `exit(code)` | `i32` → `unit` | Exit process |
-| `atoi(s)` | `string` → `(i32, error)` | Parse integer from string |
+| `atoi(s)` | `string` → `(i64, bool)` | Parse integer from string; `bool` is `false` on parse failure |
 | `itoa(n)` | `i32` → `string` | Integer to string |
 | `char_to_string(c)` | `u8` → `string` | Single byte to string |
 | `sym(s)` | `string` → `Sym` | Create interned symbol |
