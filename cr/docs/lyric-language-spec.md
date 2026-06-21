@@ -2150,13 +2150,13 @@ debugging tests.
 lyric  func  class  struct  enum  interface  relation  destructor
 embed  import  impl  as  is  type  where  owns  refs  mut  self
 from  true  false  null  pub  let  if  else  for  in  while
-match  return  break  continue  spawn  select  case  yield  cascade
+match  return  break  continue  spawn  select  case  yield
 ```
 
 (The lexer also has `KLock` and `KField` and `KImplements` tokens, but
 those names are contextual — they are also accepted as ordinary identifiers
-in non-keyword contexts. `cascade` is a hard keyword today but the
-statement is a no-op — see [Recently Removed](#recently-removed).)
+in non-keyword contexts. The `cascade` keyword has been removed — see
+[Recently Removed](#recently-removed).)
 
 ### Contextual Keywords
 
@@ -3118,8 +3118,6 @@ is the single source of truth for "what 🚧 means."
 
 ### Cleanups (remove these from the implementation)
 
-- **`cascade { body }`** statement — no-op today; remove from lexer,
-  parser, AST, checker, lowerer.
 - **`Mutex` (capital) and `Lock` (capital)** as synonyms for `lock` type in the lowerer —
   standardize on lowercase `lock`.
 - **`defer`** — `StDefer` exists in LIR and emits inlined body; no syntax;
@@ -3180,10 +3178,10 @@ aliases for Lyric builtins). Those are scheduled for removal.
 
 ### `cascade { body }` Statement
 
-The `cascade` keyword still lexes and parses today, but its lowerer simply
-emits the body as a plain block — it is a no-op. Cascade semantics are now
-expressed via `owns`/`refs` on relations; the standalone statement is
-obsolete and slated for removal from the grammar.
+Removed. The `cascade` keyword no longer lexes; the AST `Cascade(body)`
+variant, the parser rule, and the lowerer arm have all been deleted.
+Cascade semantics are expressed via `owns`/`refs` on relations — the
+standalone statement was a long-deprecated no-op.
 
 ### `Mutex` / `Lock` (capital) Type
 
