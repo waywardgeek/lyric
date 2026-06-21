@@ -4793,15 +4793,15 @@ The CDD-layer commands `lyric verify`, `lyric update`, and `lyric gen` live in t
 
 ## Appendix B: Standard Library Reference
 
-The standard library is two files: `stdlib/std.ly` (618 lines) and `stdlib/string.ly` (259 lines). Both are auto-imported into every program — no `import` needed. Everything here is written in Lyric itself, using the same interfaces and relations covered in Chapters 8 and 9.
+The standard library is two files: `stdlib/std.ly` (733 lines) and `stdlib/string.ly` (258 lines) — 991 lines total. Both are auto-imported into every program — no `import` needed. Everything here is written in Lyric itself, using the same interfaces and relations covered in Chapters 8 and 9.
 
 ### Relation Interfaces
 
-These are multi-class interfaces (Chapter 9) that define ownership patterns. You don't call them directly — you declare a `relation` line, and the compiler generates concrete methods via `impl` blocks.
+These are multi-class interfaces (Chapter 9) that define ownership patterns. You name one on a `relation` line and the desugar pass injects fields, methods, and destructors onto the participating classes — you never write an `impl` block for them yourself. The three user-facing hints are `ArrayList`, `DoublyLinked`, and `HashedList`. (Any user-defined binary interface can also serve as a hint; see spec §Relations.)
 
 #### ArrayList\<P, C\>
 
-Dynamic array of children with O(1) swap-remove. The most common relation type.
+Dynamic array of children with O(1) swap-remove. The most common relation type, and the default when you don't know which list shape you want.
 
 **Injected fields:**
 
@@ -4811,14 +4811,18 @@ Dynamic array of children with O(1) swap-remove. The most common relation type.
 | `C.parent` | `P?` | Back-reference to owning parent |
 | `C.index` | `i32` | Position in parent's array |
 
-**Functions:**
+The injected field names are prefixed with the relation label; for `relation ArrayList Team:roster owns [Player:team]` you get `t.roster_children`, `p.team_parent`, `p.team_index`.
 
-| Function | Description |
-|----------|-------------|
-| `array_append(parent, child)` | Append child to parent's array |
-| `array_remove(child)` | Swap-remove child from parent's array (O(1)) |
+**Generated methods** (label-prefixed using the parent relation label, e.g. `:roster` below):
 
-**Destructor:** When the parent is destroyed, all children in the array are cascade-destroyed (if `owns`) or unlinked (if `refs`).
+| Method | Description |
+|--------|-------------|
+| `parent.roster_append(child)` | Append child to parent's array |
+| `parent.roster_remove(child)` | Swap-remove child from parent's array (O(1)) |
+
+The desugared free-function form is `array_append<Team, Player>(t, p)` / `array_remove<Team, Player>(p)`. The label-prefixed method form is the idiomatic call site.
+
+**Destructor:** When the parent is destroyed, all children in the array are cascade-destroyed (for `owns`) or unlinked (for `refs`); the `owns` vs `refs` choice on the `relation` line selects the variant.
 
 **Example:**
 
@@ -4831,20 +4835,20 @@ func main() {
     let t = Team { name: "Sharks" }
     let p1 = Player { name: "Alice" }
     let p2 = Player { name: "Bob" }
-    array_append(t, p1)
-    array_append(t, p2)
-    println(f"{len(t.roster_children)}")  // 2
-    array_remove(p1)                      // O(1) swap-remove
-    println(f"{len(t.roster_children)}")  // 1
-    t.destroy()                           // destroys remaining players
+    t.roster_append(p1)
+    t.roster_append(p2)
+    println(f"{t.roster_children.len()}")  // 2
+    t.roster_remove(p1)                    // O(1) swap-remove
+    println(f"{t.roster_children.len()}")  // 1
+    t.destroy()                            // destroys remaining players
 }
 ```
 
-`array_remove` uses swap-remove: the last element takes the removed element's slot, and the array shrinks by one. Order is not preserved, but removal is O(1).
+`roster_remove` uses swap-remove: the last element takes the removed element's slot, and the array shrinks by one. Order is not preserved, but removal is O(1).
 
 #### DoublyLinked\<P, C\>
 
-Base interface for intrusive doubly-linked lists. Provides fields and traversal; no destruction semantics. You don't use this directly — use OwningList or RefList, which `embed` it and add destructors.
+Intrusive doubly-linked list. Insertion preserves order; removal is O(1) without swap (siblings get relinked). Use when iteration order needs to be stable across removals, when you want to thread one child through several parents at once (each list lives on a separate label), or when you'd otherwise pay for swap-remove churn.
 
 **Injected fields:**
 
@@ -4856,24 +4860,32 @@ Base interface for intrusive doubly-linked lists. Provides fields and traversal;
 | `C.next` | `C?` | Next sibling |
 | `C.prev` | `C?` | Previous sibling |
 
-**Functions:**
+**Generated methods** (label-prefixed):
 
-| Function | Description |
-|----------|-------------|
-| `dll_append(parent, child)` | Append child to end of list |
-| `dll_remove(child)` | Unlink child from list (O(1)) |
+| Method | Description |
+|--------|-------------|
+| `parent.label_append(child)` | Append child to end of list |
+| `parent.label_remove(child)` | Unlink child from list (O(1)) |
 
-#### OwningList\<P, C\>
+The desugared free-function form is `dll_append<P, C>(parent, child)` / `dll_remove<P, C>(child)`. As with `ArrayList`, the `owns` vs `refs` choice on the `relation` line selects whether parent destruction cascades.
 
-Embeds `DoublyLinked<P, C>` — same fields and functions (`dll_append`, `dll_remove`). Adds cascade-destroy semantics: when the parent is destroyed, all children are destroyed. Use when insertion order matters or you need O(1) removal without swap.
+**Example** (excerpted from `testdata/graph.ly`):
 
-#### RefList\<P, C\>
+```lyric
+class Network { name: string }
+class Person   { handle: string }
+class Follow   { since: i64; weight: f64 = 1.0 }
 
-Embeds `DoublyLinked<P, C>` — same fields and functions. Adds unlink-only semantics: when the parent is destroyed, children are unlinked (parent set to `null`) but not destroyed. Use for non-owning associations.
+relation DoublyLinked Network:nodes owns [Person:graph]
+relation DoublyLinked Person:out    refs [Follow:source]
+relation DoublyLinked Person:in     refs [Follow:target]
+```
+
+Each `Person` is in three different lists (the network's `nodes` list, plus their outgoing and incoming `Follow` lists) — the relation labels keep the injected fields and methods (`nodes_first`, `out_append`, `in_remove`, …) distinct.
 
 #### HashedList\<P, C\>
 
-Hash table with linear probing and 75% load factor. The backbone of `Dict` and `Sym`.
+Hash table with linear probing and 75% load factor. The backbone of `Dict` and `SymTable`.
 
 **Injected fields:**
 
@@ -4881,6 +4893,7 @@ Hash table with linear probing and 75% load factor. The backbone of `Dict` and `
 |-------|------|-------------|
 | `P.children` | `[C]` | Dense array of entries |
 | `P.buckets` | `[i32]` | Bucket-to-index map (-1 = empty, -2 = tombstone) |
+| `P.hash_cap` | `i32` | Current bucket array capacity |
 | `P.hash_count` | `i32` | Number of live entries |
 | `C.parent` | `P?` | Back-reference to owner |
 | `C.index` | `i32` | Position in children array |
@@ -4891,11 +4904,14 @@ Children must implement a `hash_key(self) -> u64` method. The interface uses thi
 
 | Function | Description |
 |----------|-------------|
-| `hash_insert(parent, child)` | Insert or replace by hash key |
-| `hash_lookup(parent, hash) -> C?` | Find entry by hash value |
-| `hash_remove(parent, hash) -> bool` | Remove entry by hash value |
+| `hash_insert(parent, child)` | Insert or replace by hash key (auto-init, auto-rehash) |
+| `hash_lookup(parent, key) -> C?` | Find entry by hash value |
+| `hash_remove(parent, key) -> bool` | Remove entry by hash value |
+| `hash_init(parent, cap)` | Initialize with given capacity (rarely needed; auto on first insert) |
 
-The table grows (doubles capacity) when load exceeds 75%. Tombstones are used for deletion to preserve linear probe chains.
+The table grows (doubles capacity) when load exceeds 75%. Tombstones (-2) are used for deletion to preserve linear probe chains.
+
+> *🚧 Match semantics:* `HashedList` matches an entry by `hash_key()` alone — `Hashable` currently has only `get_hash()` and no `equals()`. For `Sym` keys this is collision-safe by construction (the intern table enforces one entry per string). For other key types, two distinct keys that hash to the same `u64` will silently match the wrong entry. Restoring `Hashable.equals` is on the roadmap.
 
 ### Sym
 
@@ -4913,11 +4929,12 @@ assert(s1 == s2, "same")  // pointer equality — same interned instance
 |--------|--------|-------------|
 | `.get_name()` | `string` | The original string |
 | `.get_hash()` | `u64` | Precomputed hash (implements `Hashable`) |
-| `.equals(other)` | `bool` | Pointer equality check |
+| `.hash_key()` | `u64` | Same as `get_hash` — used by `HashedList` |
+| `.equals(other)` | `bool` | Pointer equality check (external method on `Sym`) |
 
-All Sym instances are owned by a global `SymTable` via HashedList. Calling `sym("x")` twice returns the same instance.
+All `Sym` instances are owned by a global `SymTable` via `HashedList`. The table is declared `pub permanent class SymTable { }` — `permanent` opts the class out of slab reclamation so interned symbols live for the whole program. Calling `sym("x")` twice returns the same instance.
 
-**Why Sym exists:** String deliberately does not implement `Hashable`. If you want to use a string as a hash key, you must wrap it with `sym()`. This forces the hash-once discipline — you never accidentally hash the same string twice in a hot loop.
+**Why Sym exists:** `string` deliberately does not implement `Hashable`. If you want to use a string as a hash key, you must wrap it with `sym()`. This forces the hash-once discipline — you never accidentally hash the same string twice in a hot loop.
 
 ### Hashable
 
@@ -4927,7 +4944,9 @@ interface Hashable {
 }
 ```
 
-The constraint required for `Dict` keys. `Sym` implements it. `string` does not — by design.
+The constraint required for `Dict` keys. `Sym` implements it; so do all integer types (`i8`–`i64`, `u8`–`u64`). `string` does not — by design.
+
+> *🚧 Roadmap:* `Hashable.equals(self, other) -> bool` is planned but not present today. Until it lands, `HashedList` matches entries by hash alone — collision-safe for `Sym` keys (the intern table guarantees uniqueness) but not for arbitrary `Hashable` types.
 
 ### Dict\<K, V\>
 
@@ -4944,7 +4963,7 @@ if d.has(`x`) {
 }
 
 d.remove(`x`)
-println(f"{len(d.keys())}")     // 1
+println(f"{d.keys().len()}")    // 1
 ```
 
 **Constructor:** `Dict<K, V>()` — creates an empty dictionary.
@@ -4958,6 +4977,7 @@ println(f"{len(d.keys())}")     // 1
 | `.has(key)` | `bool` | Check if key exists |
 | `.remove(key)` | `bool` | Remove entry, returns true if found |
 | `.keys()` | `[K]` | All keys as a slice |
+| `.length()` | `i32` | Number of entries |
 
 `.get()` returns a `DictEntry<K,V>?`, not the value directly. Access the value via `.value`:
 
@@ -4967,6 +4987,18 @@ if !isnull(entry) {
     println(f"{entry!.value}")
 }
 ```
+
+> *🚧 Roadmap:* The stdlib spells the size method `d.length()`, while the spec's Dict table lists it as `len()`; the two will reconcile. Until they do, `d.keys().len()` is portable — `[K]` slices always have `.len()`.
+
+**Dict literal syntax.** `Dict<K, V>` can be constructed with a brace literal whose first key is a backtick sym or an integer literal:
+
+```lyric
+let names = {`alice`: 1, `bob`: 2}        // Dict<Sym, i32>
+let lookup = {1: "one", 2: "two"}          // Dict<i32, string>
+let empty: Dict<Sym, string> = {}          // type annotation needed for {}
+```
+
+> *🚧 Roadmap:* String-literal-keyed Dict literals (`{"NYC": 8_000_000}`) are listed in the spec but the parser currently commits to a struct-literal interpretation when it sees a string literal after `{` and rejects the closing brace. Workaround: `let d = Dict<string, V>()` plus explicit `.set(...)`.
 
 **Implementation:** Dict is built entirely in Lyric using HashedList:
 
@@ -5003,9 +5035,22 @@ println(f"{sb.len()}")    // 11
 
 ### Error
 
-The stdlib provides a concrete `Error` class and the `error` interface.
+The stdlib provides a concrete `Error` class and the `error` interface. Any class with a `message(self) -> string` method satisfies `error` via structural subtyping.
 
-Any class with a `message(self) -> string` method satisfies the `error` interface:
+The idiomatic way to construct an error value is the class literal `Error { msg: "..." }`:
+
+```lyric
+func divide(a: i32, b: i32) -> (i32, error) {
+    if b == 0 {
+        return 0, Error { msg: "division by zero" }
+    }
+    return a / b, null
+}
+```
+
+Stringify an `error`-typed value with an f-string: `f"{err}"`. (See Ch 5 for why `err.message()` doesn't compile today on `error`-typed values, and why custom `message()` overrides are bypassed by f-string interpolation until the `error` interface gets real dynamic dispatch.)
+
+For a custom error type, define a class with `message(self) -> string` and use it as the concrete return type when you want callers to dispatch to fields directly:
 
 ```lyric
 class ParseError {
@@ -5018,16 +5063,7 @@ class ParseError {
 }
 ```
 
-For simple cases, use the built-in `Error` class:
-
-```lyric
-func divide(a: i32, b: i32) -> (i32, error) {
-    if b == 0 {
-        return 0, Error { msg: "division by zero" }
-    }
-    return a / b, null
-}
-```
+> *🚧 Roadmap:* The spec lists `new_error(msg: string) -> error` as a one-liner shortcut, but the C backend doesn't lower it today — calls to `new_error(...)` reach `gcc` undeclared and fail to link. Use the `Error { msg: "..." }` class literal until the lowering lands.
 
 ### String Utilities
 
@@ -5067,11 +5103,12 @@ All functions in `stdlib/string.ly`. Since `string = [u8]`, these operate on byt
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `itoa` | `(n: i32) -> string` | Integer to string |
-| `atoi` | `(s: string) -> i32` | String to integer |
+| `itoa` | `(n: i64) -> string` | Integer to string |
+| `atoi` | `(s: string) -> (i64, bool)` | String to integer; `bool` is `false` on parse failure |
+| `parse_float` | `(s: string) -> (f64, bool)` | String to float; `bool` is `false` on parse failure |
 | `char_to_string` | `(c: u8) -> string` | Single byte to string |
-| `parse_int` | `(s: string) -> i64` | String to 64-bit integer |
-| `str_to_float` | `(s: string) -> f64` | String to float |
+| `parse_int` | `(s: string) -> i64` | Stdlib lenient int parser — returns 0 on failure |
+| `str_to_float` | `(s: string) -> f64` | Stdlib lenient float parser — returns 0.0 on failure |
 
 **Utility:**
 
@@ -5085,6 +5122,49 @@ All functions in `stdlib/string.ly`. Since `string = [u8]`, these operate on byt
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `range` | `(start, end) -> gen i32` | Generator yielding integers from `start` to `end - 1` |
+
+### I/O Built-ins
+
+I/O is currently a small set of built-in functions wired directly into the lowerer and C backend, not a stdlib library. The set is the minimum needed to bootstrap the compiler: read and write whole files, run external commands, manipulate paths.
+
+**Files and processes:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `read_file` | `(path: string) -> (string, bool)` | Read whole file; `bool` is `true` on success |
+| `write_file` | `(path: string, content: string) -> bool` | Write whole file; `true` on success |
+| `file_exists` | `(path: string) -> bool` | Check whether a path exists |
+| `list_dir` | `(path: string) -> ([string], bool)` | List directory entries |
+| `mkdtemp` | `(prefix?: string) -> string` | Create a temporary directory |
+| `exec_command` | `(name: string, args: [string]) -> (string, bool)` | Run an external command, capture stdout |
+
+**Path manipulation:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `path_join` | `(parts: [string]) -> string` | Join path components |
+| `path_dir` | `(p: string) -> string` | Directory portion of a path |
+| `path_base` | `(p: string) -> string` | Base filename portion |
+| `path_ext` | `(p: string) -> string` | File extension |
+
+**Process and environment:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `os_args` | `() -> [string]` | Command-line arguments |
+| `os_getwd` | `() -> string` | Current working directory |
+| `os_exit` | `(code: i32) -> unit` | Exit the process |
+| `exit` | `(code: i32) -> unit` | Alias of `os_exit` |
+| `panic` | `(msg: string) -> unit` | Print message and abort |
+
+**Output:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `println` / `print` | `(...) -> unit` | Print to stdout (`println` adds newline) |
+| `eprintln` / `eprint` | `(...) -> unit` | Print to stderr |
+
+> *🚧 Roadmap:* A proper I/O library with `Reader` / `Writer` interfaces, a `File` class with streaming reads and writes, `BufferedReader` / `BufferedWriter`, directory operations with structured errors, and stdin/stdout/stderr as `Reader`/`Writer` values is sketched in the spec (§I/O Library — Planned). For now, "open a file, read it all, do something with the string" is the supported shape.
 
 
 ## Appendix C: The Lyric Toolchain
