@@ -276,13 +276,17 @@ func main() {
 
 Output: `10,20`
 
-Fields are accessed with dot notation. You can also construct structs positionally when the meaning is obvious:
+Fields are accessed with dot notation. You can also construct structs positionally when the meaning is obvious — but only in contexts where the parser can distinguish a struct literal from a code block. Those contexts are: inside parentheses, inside function arguments, and inside list literals:
 
 ```lyric
-let p = Point { 10, 20 }  // same as Point { x: 10, y: 20 }
+let pair = (Point { 10, 20 }, "origin")    // inside parens — ok
+let pts = [Point { 1, 2 }, Point { 3, 4 }] // inside a list — ok
+draw(Point { 0, 0 })                       // function argument — ok
+
+let p = Point { x: 10, y: 20 }             // bare let: named form required
 ```
 
-Positional construction only works inside parentheses, function arguments, or list literals — contexts where the parser can distinguish a struct literal from a code block. A standalone `let p = Point { 10, 20 }` works because it follows `=`.
+A bare `let p = Point { 10, 20 }` is rejected — at statement level the `{` is ambiguous with a block, so you must name the fields.
 
 **Structs are value types.** This is the single most important thing to understand about Lyric's type system. When you assign a struct, you copy it:
 
@@ -326,7 +330,7 @@ No values, no payloads, just names. You use them directly:
 let c = Red
 ```
 
-Variants are unqualified — `Red`, not `Color.Red`. If two enums in the same scope have the same variant name, the compiler reports the ambiguity.
+Variants are normally unqualified — `Red`, not `Color.Red`. If two enums in the same scope share a variant name, you disambiguate by qualifying: `Color.Red` vs `Traffic.Red`. Both forms work in expressions and in `match` patterns; the qualified form is only required when bare resolution would be ambiguous.
 
 For the calculator, here's what we actually want:
 
@@ -449,7 +453,7 @@ enum Option {
 }
 ```
 
-We're defining our own `Option` here because we haven't covered generics yet. In Chapter 6, we'll use the built-in generic `T?` optional type instead.
+We're defining our own `Option` here because we haven't covered Lyric's built-in optional type yet. In Chapter 3 we'll meet `T?` — a built-in optional that subsumes this pattern for any type, no hand-rolled enum needed.
 
 ```lyric
 func describe(opt: Option) -> string {
@@ -518,7 +522,7 @@ func get_radius(s: Shape) -> f64 {
 
 `let..else` is particularly useful when the non-matching case is the early return. The variable `r` is available after the `let..else` statement, in the normal flow of the function.
 
-Both forms work with any enum, any pattern depth. Use `if let` when you want to do something specific with one variant. Use `let..else` when you want to bail early if the variant doesn't match.
+`if let` works with any pattern `match` accepts — variant patterns, nested patterns, all of it. `let..else` is narrower: today the pattern must be a variant pattern that starts with an uppercase identifier followed by `(...)` (e.g. `let Circle(r) = s else { ... }`). Use `if let` when you want to do something specific with one variant. Use `let..else` when you want to bail early if the variant doesn't match. 🚧 *The else block is required to diverge (return, break, or panic), but the checker doesn't enforce that yet — divergence is convention today.*
 
 ## 2.8 The `is` Operator
 

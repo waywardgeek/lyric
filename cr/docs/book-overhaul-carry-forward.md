@@ -12,6 +12,21 @@
 - **🚧 roadmap callouts** are italic in-line asides, not narrative inversions. Pattern: *🚧 Roadmap: F-strings will support `{expr:.2f}` precision specifiers; today they accept only bare `{expr}`.* — never inverts the lesson.
 - **No "AI at the Helm" interleaved roman/italic Bill-CR pattern**. This is a tutorial book, not Book 1.
 
+### Idiomatic Lyric — use the preferred form everywhere
+
+The spec usually presents both a low-level and an idiomatic form for an operation. **The book teaches the idiomatic form by default**, and only shows the lower-level form when explaining what the idiomatic form expands to.
+
+- **Method-call syntax for relation-generated methods.** When a `relation` (e.g. `relation ArrayList Team:roster owns [Player:team]`) generates child-iteration, child-add, child-remove, etc., use the method form: `team.append_player(p)`, `for player in team.players()`, `team.remove_player(p)`. The free-function form (`append_player(team, p)`) is the same thing under the hood (UFCS), but the book teaches the method form. The spec's relations section should confirm this preference; if the spec only shows the free-function form, the method form is still preferred — flag a spec doc gap in `book-overhaul-findings.md` and use the method form in the book.
+- **Method-call syntax over free-function for stdlib types** where both exist: `s.len()` not `len(s)`, `list.append(x)` not `append(list, x)`, etc. — unless the spec explicitly recommends the free-function form for a specific operation.
+- **F-strings** for any string interpolation that has more than one variable: `f"{name}={value}"` not `name + "=" + value.to_string()`.
+- **`let` (immutable) by default**, `let mut` only when actual mutation happens.
+- **`?.`** (auto-deref / Optional chaining) when accessing fields on an Optional class receiver, not a manual null-check + dereference.
+- **`new_error(msg)`** for error values, never a bare string-as-error (the checker has a hole that allows it; don't exploit the hole).
+- **Lowercase `lock`** as the mutex keyword (never `Mutex` or capital `Lock`).
+- **`Dict<K, V>`** from stdlib for dictionaries (never `map[K]V` — that's a removed built-in).
+
+If a code example in the current chapter uses a non-idiomatic form, replace it with the idiomatic form unless the chapter's specific pedagogical point requires the lower-level form (in which case, leave it but add a one-line `*Idiomatic Lyric: `team.append_player(p)` does the same thing.*` callout).
+
 ### Lyric-language facts (current per spec at `cr/docs/lyric-language-spec.md`, 3218 lines, commit `8e458fb`)
 - **Lyric vs `.lyric` vs lyre**: Lyric is the language. `.lyric` files are declaration-only Lyric (no function bodies). **lyre** is a separate toolchain (Go/Python/TypeScript/Lyric) that reads `.lyric` files and verifies them against implementations. CDD annotations (`why:`, `doc`, `invariant:`, `source:`, `fake:`) are **lyre features, not Lyric features** — never document them as Lyric syntax. The new preface already establishes lyre via the "A sibling artifact: lyre" subsection; chapters should not duplicate that pitch but may reference `.lyric` mode in passing.
 - **Lowercase `lock`** is the canonical mutex keyword. **Do not use `Mutex` or `Lock` (capital)** — both removed (spec §Recently Removed).
@@ -49,7 +64,13 @@
 - **Ch 2 inheritance:** Ch 2 renames `eval_simple` → `eval` and replaces `op: string` with `op: Op` (enum `Add Sub Mul Div`). Ch 2 also previews a `Token` enum (later redesigned in Ch 4). Ch 2's opening sentence already references "the calculator from Chapter 1 takes two numbers and an operator string" — keep that hook intact.
 
 ### After Ch 2
-- *(reviser of Ch 2 fills in)*
+- **File:** still `calc.ly` — single file, no module split yet.
+- **Types introduced:** `Op` (enum `Add Sub Mul Div`) and `Token` (enum with variants `Number(value: f64)`, `Operator(op: Op)`, `LeftParen`, `RightParen`). Also teaching-only types that don't carry into later chapters: `Point`, `Rect`, `Color`, `Shape` (`Circle(radius: f64) | Rect(w: f64, h: f64)`), and a hand-rolled `Option` (`Some(value: Shape) | None`) used only to motivate the built-in `T?` introduced in Ch 3.
+- **Functions:** `eval(a: f64, op: Op, b: f64) -> f64` (replaces Ch 1's `eval_simple` with the same dispatch but typed on `Op`). Helper `op_to_string(op: Op) -> string`. `main()` iterates `[Add, Sub, Mul, Div]` and prints `f"{a} {sym} {b} = {result}"` for each.
+- **What the calculator computes:** the same four binary expressions as Ch 1 (now with `a=2.0, b=3.0`), printed with operator symbol via `op_to_string`. Output: `2 + 3 = 5`, `2 - 3 = -1`, `2 * 3 = 6`, `2 / 3 = 0.666667`.
+- **Known gaps deliberately left for later:** (1) division by zero still crashes → Ch 5 fixes via `Result`/`?`/`new_error`; (2) `Token` is introduced as a teaching example for enum payloads but isn't *used* by `main` yet — it's there to motivate the Ch 4 tokenizer and the Ch 5 parser; (3) `as` is permissive today (see 🚧 in §2.9); (4) `match`-as-expression branch unification is not enforced (see 🚧 in §2.3).
+- **Ch 3 inheritance:** Ch 3 keeps the `Op` enum and the standalone `eval(a, op, b)` function from §2.10 (it's still called from `ExprEval.apply_top`). Ch 3 introduces the `ExprEval` *class* with two slice-backed stacks (`values: [f64]`, `ops: [Op]`) plus `push_value`, `push_op`, `pop_value`, `pop_op`, `apply_top`, `result`, and uses the built-in `T?` optional for `pop_*` returns. Ch 3 should **not** redefine `Op` or `eval`.
+- **Forward-reference hazard for the Ch 3 reviser:** the *pre-edit* Ch 3 §3.3 currently says "The Token **struct** from Chapter 2" — but Ch 2 defines `Token` as an *enum*, and Ch 4 §4.4 explicitly relies on that ("In Chapter 2, we defined `Token` as an enum with payloads ... So we redesign"). The Ch 4 redesign is what introduces the `TokenKind` enum + `Token` struct pair. Ch 3 reviser should fix the §3.3 line to read "The Token enum from Chapter 2" (or drop the example, since Token isn't used in Ch 3's code). Logged in `book-overhaul-findings.md`.
 
 ### After Ch 3
 - *(...)*
@@ -132,3 +153,12 @@ This is the consolidated list from the spec's §Roadmap and §Recently Removed s
 - `Mutex` / `Lock` (capital) type — use lowercase `lock`
 - `map[K]V` built-in — use `Dict<K, V>`
 - Go backend
+
+## Decision (Ch 2): `Token` stays an enum in Ch 2, becomes a `TokenKind` enum + `Token` struct in Ch 4
+Decided to keep Ch 2's `Token` definition as an *enum with payloads* (`Number(value: f64) | Operator(op: Op) | LeftParen | RightParen`) because the chapter's pedagogical point in §2.4 is "enums can carry data" and Ch 4 §4.4 explicitly hangs its tokenizer redesign on this earlier shape ("In Chapter 2, we defined `Token` as an enum with payloads. So we redesign..."). Next chapters: Ch 3 must say "Token enum from Chapter 2" (not "struct"); Ch 4 keeps its planned `TokenKind` enum + `Token` struct redesign untouched; the running calculator does not depend on Ch 2's `Token` at runtime, only conceptually.
+
+## Decision (Ch 2): The hand-rolled `Option` in §2.5 is a teaching scaffold only
+Decided to keep the `enum Option { Some(value: Shape) | None }` in §2.5 as a deliberate scaffold for teaching nested patterns *before* the reader has met Lyric's built-in `T?`. The forward pointer is to **Chapter 3** (where `T?` lands), not Chapter 6 — Ch 3 already uses `f64?` heavily, so promising the reader they'll have to wait until Ch 6 was misleading. Next chapters: do not redefine `Option`; do not use the §2.5 `Option` in any later calculator code.
+
+## Decision (Ch 2): Bare `let p = Point { 10, 20 }` is rejected — positional struct literals require an expression-depth context
+Decided to fix §2.1 to match parser reality: positional struct literals only work inside parens, function arguments, or list literals. The previous claim that a bare `let p = Point { 10, 20 }` "works because it follows `=`" was a fabrication contradicted by `testdata/positional_struct_lit.ly`. Next chapters: when introducing new structs in code examples, use the named-field form (`Point { x: 10, y: 20 }`) for bare `let` assignments; positional is fine inside `(...)`, arg lists, and `[...]`.
