@@ -742,7 +742,7 @@ This distinction matters and will keep coming back:
 | Identity | None — two copies are independent | Two references can point to the same object |
 | Passed to functions | By value (copied) | By reference (shared) |
 
-The Token struct from Chapter 2 is the right choice for tokens — they're small, immutable data. `ExprEval` is the right choice for the evaluator — it has identity (there's *this* evaluator), it mutates, and you want functions to see the same object.
+The `Token` enum from Chapter 2 is the right choice for tokens — each token is a small immutable variant (a number with its `f64` payload, an operator with its `Op` payload, or a paren). `ExprEval` is the right choice for the evaluator — it has identity (there's *this* evaluator), it mutates, and you want functions to see the same object.
 
 The rule of thumb: if it's data, use a struct. If it's a thing with behavior and identity, use a class.
 
@@ -821,18 +821,20 @@ The convenience pays for itself in linked-list and AST traversal code, where eve
 
 ### Lvalue Unwrap — Writing Through `!`
 
-`expr!` isn't just an rvalue; it's also a valid lvalue. You can write through the unwrap to mutate a field on the inner value in place:
+`expr!` isn't just an rvalue; it's also a valid lvalue. When the inner type is a class, you can write through the unwrap to mutate a field on the unwrapped object in place:
 
 ```lyric
 class Outer { data: Inner? }
-struct Inner { value: i32 }
+class Inner { value: i32 }
 
 let o = Outer { data: Inner { value: 0 } }
-o.data!.value = 42        // writes through the optional unwrap
+o.data!.value = 42        // writes through to the Inner object
 println(o.data!.value)    // 42
 ```
 
 This is the right idiom whenever you have a "this is initialized once, mutated many times" field. The unwrap panics on null exactly as in the rvalue case.
+
+🚧 *Lvalue write-through is reliable today only when the inner type is a **class** (a heap reference, as above). If `Inner` is a struct or primitive, the optional uses a tagged representation, and `o.data!.value = 42` silently writes to a temporary copy — the change is lost. Until that's fixed, model "mutable inner state" as a class, or pull the struct out, mutate it, and assign it back: `let mut tmp = o.data!; tmp.value = 42; o.data = tmp`.*
 
 ## 3.5 Methods Inside and Outside
 
@@ -884,7 +886,7 @@ Lyric's default is private because most fields are implementation details. You e
 | Kind | Convention | Example |
 |---|---|---|
 | Classes, structs, enums, interfaces | PascalCase | `Counter`, `Point`, `Color`, `Graph` |
-| Enum variants | PascalCase | `Red`, `Circle`, `LParen` |
+| Enum variants | PascalCase | `Red`, `Circle`, `LeftParen` |
 | Type variables | Short PascalCase | `T`, `U`, `P`, `C` |
 | Functions and methods | snake_case | `array_append`, `get_hash` |
 | Fields | snake_case | `roster_children`, `is_empty` |
@@ -966,7 +968,7 @@ Output:
 10
 ```
 
-The type `func(i32) -> i32` is a function type — any function or lambda matching that signature. We could use this to make `eval_simple` more flexible, or to let the caller define custom operations. In Chapter 6, we'll see lambdas compose with generic functions to build reusable higher-order operations like `transform` and `filter`.
+The type `func(i32) -> i32` is a function type — any function or lambda matching that signature. We could use this to make `eval` more flexible by letting the caller plug in operations beyond the four `Op` variants. In Chapter 6, we'll see lambdas compose with generic functions to build reusable higher-order operations like `transform` and `filter`.
 
 ## 3.9 A Proper Stack
 
@@ -984,9 +986,7 @@ class Stack {
         if self.items.len() == 0 {
             return null
         }
-        let last = self.items[self.items.len() - 1]
-        self.items = self.items[:self.items.len() - 1]
-        return last
+        return self.items.pop()
     }
 
     func size(self) -> i32 {

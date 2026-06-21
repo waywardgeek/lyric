@@ -31,3 +31,40 @@ Fix in book: §2.1 now shows positional construction only in arg/tuple/list cont
 ### Ch 3 references "Token **struct** from Chapter 2" but Ch 2 defines `Token` as an **enum**
 
 Ch 3 §3.3 says "The Token struct from Chapter 2 is the right choice for tokens". Ch 2 defines `Token` as an enum (and Ch 4 §4.4 explicitly says "In Chapter 2, we defined `Token` as an enum with payloads" before redesigning it into a `TokenKind` enum + `Token` struct). The mismatch is in Ch 3, not Ch 2 — Ch 2 reviser leaves Ch 2's `Token` as an enum (Ch 4 depends on that history) and flags the Ch 3 line for the Ch 3 reviser.
+
+---
+
+## Ch 3 reviser, 2026-06-21
+
+### Lvalue write-through on a struct-typed Optional silently drops the write
+
+Spec §Lvalue Unwrap and Write-Through (around line 1543) gives this example:
+
+```lyric
+class Outer { data: Inner? }
+struct Inner { value: i32 }
+
+let o = Outer { data: Inner { value: 0 } }
+o.data!.value = 42        // writes through the optional unwrap
+assert_eq(o.data!.value, 42)
+```
+
+Empirical: this compiles, runs, and prints `value: 0` — the write to `o.data!.value` is silently lost. The cause is that struct optionals use a tagged representation; `expr!` produces an rvalue copy, and assigning into a field of that copy doesn't propagate back to `o.data`. The same example works correctly if `Inner` is a `class` (output: `42`).
+
+Spec says auto-deref applies "only to class optionals" (line 1553) — but it doesn't extend that "class only" caveat to the lvalue-unwrap section, which presents the struct form as the canonical example. Recommend the spec either (a) constrain the lvalue example to class-typed inner, or (b) the compiler implement true lvalue write-through for struct-typed optionals.
+
+Logged in `~/projects/lyric/TODO`. Book §3.4 now uses `class Inner` and adds a 🚧 callout for the struct case.
+
+### Spec lists `fn(T) -> U` as canonical function-type syntax, but the parser rejects it
+
+Spec §Composite Types line 393 says:
+
+> - `fn(T, U) -> V` — canonical
+> - `func(T, U) -> V` — also accepted
+> - `T -> U` — single-argument shorthand
+
+Empirical: `func apply(x: i32, f: fn(i32) -> i32) -> i32 { ... }` fails to parse with `expected identifier, got PLParen (()` at the `(` after `fn`. `func(i32) -> i32` parses fine. So today only `func(...)` works; `fn(...)` is documentation-only.
+
+Either the parser needs to accept `fn` as a type-position keyword (matching the spec's "preferred" guidance), or the spec needs to swap the canonical/accepted order and demote `fn` to 🚧. Book Ch 3 §3.8 uses `func(i32) -> i32`, which works today.
+
+Logged in `~/projects/lyric/TODO`.
