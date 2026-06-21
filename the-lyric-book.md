@@ -3918,12 +3918,21 @@ No shared mutable state. No locks. Each worker computes independently and sends 
 
 ## Chapter 13: Modules and Packages
 
+For twelve chapters the calculator has lived in a single `calc.ly`. Real programs don't. This chapter is about how Lyric organizes code across files and directories — packages, modules, imports, the standard library — and about what's deliberately *missing* from that story today.
+
+The model is intentionally simple. A package is a directory. A module is a project. Visibility is `pub` or private. There's no separate compilation, no link step, no header files, no package registry. The whole program — your code plus the stdlib plus every imported package — is parsed, merged, type-checked, and emitted as a single C file. At 33,000-line scale (the compiler itself), that compiles in under a second; we'll add incremental compilation when it stops scaling.
+
+### 13.1 Packages, Imports, and `pub`
+
 Here's a project with two packages:
 
 ```
-mylib/
-├── types.ly
-└── utils.ly
+mylib_demo/
+├── lyric.mod
+├── main.ly
+└── mylib/
+    ├── types.ly
+    └── utils.ly
 ```
 
 `mylib/types.ly`:
@@ -3960,34 +3969,43 @@ lyric main {
     func main() {
         let p = mylib.new_point(1, 2)
         let sum = mylib.add(p.x, p.y)
-        print(sum)
+        println(f"{sum}")
     }
 }
 ```
 
-Output: `3`.
+The fourth file, `lyric.mod`, is one line: `module mylib_demo`. It marks the project root. Compile and run:
 
-Three things happened. First, each file wraps its declarations in `lyric mylib { }` — that's the package declaration. All `.ly` files in the same directory with the same block name belong to the same package. `Point` defined in `types.ly` is visible in `utils.ly` without any import.
+```
+$ lyric compile mylib_demo -o mylib_demo.c
+$ gcc -std=gnu11 -O2 -w -I runtime -o mylib_demo mylib_demo.c -lm -lpthread
+$ ./mylib_demo
+3
+```
 
-Second, `pub` controls visibility across packages. Without `pub`, a function or type is private to the package — the same keyword you've used throughout the book, now with a reason to exist.
+Four things happened. First, each file wraps its declarations in `lyric mylib { }` — that's the package declaration. The block name is conventional; the *real* package name is the directory's name. All `.ly` files in `mylib/` belong to package `mylib`, and `Point` defined in `types.ly` is visible in `utils.ly` without any import.
 
-Third, `import mylib` in `main.ly` makes all `pub` declarations accessible with the `mylib.` prefix: `mylib.Point`, `mylib.new_point`, `mylib.add`.
+Second, `pub` controls visibility across packages. Without `pub`, a function or type is package-private — the same keyword you've used throughout the book, now with a reason to exist. (🚧 *`pub` isn't actually filtered yet — see §13.7. Write it anyway so your code is correct when the filter lands.*)
 
-For single-file programs, the `lyric name { }` wrapper is optional — bare top-level declarations work fine. For multi-file projects, it's how you organize code.
+Third, `import mylib` in `main.ly` makes `pub` *functions* in `mylib` accessible with the `mylib.` prefix: `mylib.new_point(...)`, `mylib.add(...)`. The compiler finds the `mylib/` directory by name, relative to the module root. (Qualifying *types* — `let p: mylib.Point = ...` or `mylib.Point { x: 1, y: 2 }` — has sharp edges today; §13.5 walks through what works and what doesn't.)
+
+Fourth, `lyric compile mylib_demo` (passing the directory, not a file list) tells the compiler to look for `lyric.mod` and collect every top-level `.ly` file in that directory. Imports in the root file then pull in subdirectory packages by name.
+
+For single-file programs the `lyric name { }` wrapper is optional — bare top-level declarations belong to an implicit package derived from the filename. For multi-file projects, it's how you organize code.
 
 ### 13.2 How It Actually Works
 
 The module system operates at the AST level, not through linkers or object files. When the compiler sees `import mylib`, it:
 
-1. Finds the `mylib/` directory
-2. Parses all `.ly` files in it
-3. Prefixes every declaration name with `mylib_` — so `Point` becomes `mylib_Point`, `new_point` becomes `mylib_new_point`
+1. Looks for a `mylib/` directory under the module root
+2. Parses every `.ly` file in it
+3. Prefixes every top-level declaration name with `mylib_` — so `Point` becomes `mylib_Point`, `new_point` becomes `mylib_new_point`
 4. Rewrites qualified access (`mylib.new_point`) to the prefixed name (`mylib_new_point`)
-5. Merges everything into one flat namespace
+5. Merges the prefixed declarations into the program's flat namespace
 
-That's it. No separate compilation, no linking, no symbol tables. The entire program — your code plus all imported packages — becomes one compilation unit. The C backend emits one `.c` file containing everything.
+That's it. No separate compilation, no linking, no symbol tables. The entire program — your code plus all imported packages plus the stdlib — becomes one compilation unit. The C backend emits one `.c` file containing everything.
 
-This is deliberately simple. The compiler itself is organized as packages — `ast`, `lexer`, `parser`, `checker`, `desugar`, `lowerer`, `monomorphizer`, `c_backend` — and they all merge into a single 105,457-line C file. Separate compilation is an optimization you add when build times matter. At 0.2 seconds for a 30,000-line compiler, we haven't needed it.
+This is deliberately simple. The Lyric compiler itself is 33,500 lines of Lyric across 14 files in 12 directories (`ast`, `lexer`, `parser`, `checker`, `desugar`, `lowerer`, `lir`, `optimizer`, `monomorphizer`, `c_backend`, `memory`, `main`). It all merges into a single 114,770-line C file. The whole pipeline — parse, check, lower, optimize, monomorphize, emit — runs in about 0.2 seconds. Separate compilation is an optimization you add when build times matter; at this scale, we haven't needed it.
 
 ### 13.3 The Module File
 
@@ -3997,49 +4015,51 @@ A `lyric.mod` file marks a project root:
 module calculator
 ```
 
-That's the entire file — one line declaring the module name. When you run `lyric compile -mod .`, the compiler finds `lyric.mod`, discovers all `.ly` files in the directory tree, resolves imports, and compiles everything together.
+That's the entire file — one line declaring the module name. When you run `lyric compile .` (passing a directory rather than a file list), the compiler looks for `lyric.mod` in that directory. If it finds one, it collects every top-level `.ly` file in the directory, resolves the imports those files make, and compiles everything together.
 
-The `lyric.mod` file serves the same purpose as Go's `go.mod` or Rust's `Cargo.toml`: it tells the toolchain where your project starts. Unlike those files, it has no dependency management, no version constraints, no build configuration. Lyric doesn't have a package registry yet. If you need external code, copy it into your source tree.
+The `lyric.mod` file serves the same purpose as Go's `go.mod` or Rust's `Cargo.toml`: it tells the toolchain where your project starts. Unlike those files, today it has no dependency management, no version constraints, no build configuration. Lyric doesn't have a package registry yet. If you need external code, copy it into your source tree.
+
+🚧 *Roadmap: today the compiler only checks for `lyric.mod`'s **existence** — its contents aren't parsed. The intent is for `lyric.mod` to declare the module's import-path prefix, its external dependencies, and the package containing `main()`. Until that parsing lands, drop a one-line `module name` (the name is for humans; the compiler ignores it) and rely on the directory layout.*
 
 ### 13.4 The Standard Library
 
 You've been using `println`, `append`, `assert_eq`, `Dict`, `ArrayList`, and dozens of other functions throughout this book without ever writing `import std`. The standard library is auto-imported — the compiler merges it into your program before type checking, without any explicit import.
 
-The stdlib is two files totaling 875 lines of Lyric:
+The stdlib is two files totaling 991 lines of Lyric:
 
-- **`std.ly`** (617 lines): ArrayList, OwningList, HashedList, Dict, Sym, StringBuilder, Error — all the interfaces, relations, and data structures from Chapters 8–10.
+- **`std.ly`** (733 lines): `ArrayList`, `OwningList`, `RefList`, `HashedList`, `Dict`, `Sym`, `StringBuilder`, `Error` — all the interfaces, relations, and data structures from Chapters 8–10.
 - **`string.ly`** (258 lines): string methods — `split`, `trim`, `contains`, `index_of`, `replace`, `has_prefix`, `has_suffix`, `to_upper`, `to_lower`, `join`, and the rest.
 
 Every line is Lyric. No C escape hatches, no compiler magic. When you call `dict.set(key, value)`, you're calling a Lyric method defined in `std.ly` using the same interfaces and relations this book taught you. The stdlib is the proof that Lyric's features compose into real libraries.
 
+The merge is not blind: a pass called `merge_stdlib` walks your code, sees which stdlib types and functions you actually reference, and pulls in just those (plus their transitive dependencies) to a fixed point. So `Dict` literals always pull in `Dict`, but a program that never touches `StringBuilder` doesn't pay for it in the emitted C.
+
 ### 13.5 Splitting the Calculator
 
-Our calculator has grown through twelve chapters. Here's how to split it into packages:
+The calculator we built in Chapters 4 and 5 has grown large enough that one file is starting to feel cramped. There are two ways to split it: across multiple files in the same package, or across packages with `import`. The first is unconditional and ergonomic; the second has sharp edges today. Let's do the first, and the next section will be honest about the second.
+
+Here's a three-file split, all in package `main`:
 
 ```
 calculator/
 ├── lyric.mod
-├── main.ly
-├── lexer/
-│   └── lexer.ly
-├── parser/
-│   └── parser.ly
-└── ast/
-    └── ast.ly
+├── lexer.ly        // tokenize() — package "main"
+├── parser.ly       // parse() — package "main"
+└── main.ly         // main() — package "main"
 ```
 
-`ast/ast.ly` exports the token and expression types:
+`lexer.ly` declares the tokenizer:
 
 ```lyric
-lyric ast {
+lyric main {
     pub enum TokenKind {
         Number
         Plus
         Minus
         Star
         Slash
-        LParen
-        RParen
+        LeftParen
+        RightParen
         End
     }
 
@@ -4048,71 +4068,31 @@ lyric ast {
         value: string
     }
 
-    pub enum ExprKind {
-        Num(value: f64)
-        BinOp(op: string)
-    }
-
-    pub class Expr {
-        kind: ExprKind
-        left: Expr?
-        right: Expr?
-    }
-}
-```
-
-`lexer/lexer.ly` imports `ast` and exports the tokenizer:
-
-```lyric
-lyric lexer {
-    import ast
-
-    pub func tokenize(input: string) -> [ast.Token] {
-        let mut tokens: [ast.Token] = []
-        let mut pos: i32 = 0
-        while pos < input.len() {
-            let ch = input[pos]
-            if ch == ' ' {
-                pos = pos + 1
-                continue
-            }
-            if ch >= '0' && ch <= '9' {
-                let start = pos
-                while pos < input.len() && input[pos] >= '0' && input[pos] <= '9' {
-                    pos = pos + 1
-                }
-                tokens = append(tokens, ast.Token { kind: ast.TokenKind.Number, value: input[start:pos] })
-            } else {
-                let kind = match ch {
-                    '+' => ast.TokenKind.Plus
-                    '-' => ast.TokenKind.Minus
-                    '*' => ast.TokenKind.Star
-                    '/' => ast.TokenKind.Slash
-                    '(' => ast.TokenKind.LParen
-                    ')' => ast.TokenKind.RParen
-                    _ => ast.TokenKind.End  // unknown chars become End — a bug we'd fix with error handling
-                }
-                tokens = append(tokens, ast.Token { kind: kind, value: char_to_string(ch) })  // stdlib: u8 → string
-                pos = pos + 1
-            }
-        }
-        tokens = append(tokens, ast.Token { kind: ast.TokenKind.End, value: "" })
+    pub func tokenize(input: string) -> [Token] {
+        // ... the Chapter 4 tokenizer, unchanged ...
+        let mut tokens: [Token] = []
+        // (body elided for space — same code as §4.7)
         return tokens
     }
 }
 ```
 
-`parser/parser.ly` imports both:
+`parser.ly` uses `Token` and `TokenKind` directly — no `import`, no `lexer.` prefix:
 
 ```lyric
-lyric parser {
-    import ast
-    import lexer
-
-    pub func parse(input: string) -> (ast.Expr?, error) {
-        let tokens = lexer.tokenize(input)
-        // ... parsing logic using ast.Token, ast.Expr, ast.ExprKind ...
+lyric main {
+    pub class Parser {
+        tokens: [Token]
+        pos: i32
     }
+
+    pub func parse(input: string) -> (f64, error) {
+        let toks = tokenize(input)
+        let p = Parser { tokens: toks, pos: 0 }
+        return p.parse_expr()
+    }
+
+    // ... parse_expr / parse_term / parse_primary, exactly as in §5.6 ...
 }
 ```
 
@@ -4120,52 +4100,107 @@ And `main.ly` ties them together:
 
 ```lyric
 lyric main {
-    import ast
-    import lexer
-    import parser
-
     func main() {
-        let expr = parser.parse("3 + 4 * 2")
-        // ... evaluate and print ...
+        let (val, err) = parse("(3 + 4) * 2")
+        if err != null {
+            println(f"error: {err}")
+        } else {
+            println(f"= {val}")
+        }
     }
 }
 ```
 
-Compile with `lyric compile -mod .` and the compiler finds `lyric.mod`, discovers all four packages, resolves the imports, prefixes names, and emits one C file. The `ast.Token` in `lexer.ly` becomes `ast_Token` in the generated C. The `lexer.tokenize` call in `parser.ly` becomes `lexer_tokenize`. No header files, no forward declarations, no link errors.
+The `lyric main { }` wrapper in each file is conventional — the compiler doesn't actually need it; the package name comes from the directory. Both files share one namespace, so `parser.ly` calling `tokenize(...)` resolves to the function declared in `lexer.ly` with zero ceremony. Compile and run with `lyric compile calculator`.
+
+What this split *doesn't* give you is enforcement. Anything you wanted to keep private to the lexer (a helper like `is_digit`) is visible from `parser.ly` and `main.ly` just the same. To get a hard boundary you'd need a separate package — and that's where the sharp edges live.
+
+**True cross-package today: function calls only.** Pull the lexer into its own package and the import system will resolve calls into it, but only the kind of call where the function returns a value you then use unqualified:
+
+```lyric
+// lexer/lexer.ly
+lyric lexer {
+    pub struct Token { kind: i32, value: string }
+
+    pub func make_number(value: string) -> Token {
+        return Token { kind: 1, value: value }
+    }
+
+    pub func tokenize(input: string) -> [Token] {
+        let seed = make_number("")
+        let mut tokens = [seed]
+        tokens.pop()
+        // ... fill in tokens, return ...
+        return tokens
+    }
+}
+
+// main.ly
+lyric main {
+    import lexer
+
+    func main() {
+        let toks = lexer.tokenize("(3 + 4)")
+        println(f"{toks.len()} tokens")
+    }
+}
+```
+
+`lexer.tokenize(...)` resolves; `toks[0].value` works (field access on a returned struct is fine). What does *not* work today:
+
+- Naming the imported type in an annotation: `let xs: [lexer.Token] = []` — 🚧 *checker rejects `lexer.Token` as an unknown type.*
+- Constructing it at the call site: `lexer.Token { kind: 1, value: "x" }` — 🚧 *same path, same rejection.*
+- Referring to an imported enum variant: `lexer.TokenKind.Plus` — 🚧 *same.*
+
+The compiler accepts qualified function calls (`lexer.tokenize`) and qualified function references generally, but not qualified *type* names or *variant* names. The working pattern for now is to expose constructor functions (`make_number`, `new_point`) and let callers stay typed structurally — `let p = mylib.new_point(1, 2)` works because the type `Point` is inferred from `new_point`'s return type, never spelled at the call site.
+
+🚧 *Roadmap: qualified type and enum-variant resolution — `let xs: [lexer.Token] = []`, `lexer.Token { ... }`, and `lexer.TokenKind.Plus` should all parse and check the same way `lexer.tokenize(...)` does. Until they do, package boundaries are best for **behaviour** (functions and methods) rather than **data** (types and variants). Keep types in the package that owns the algorithms over them.*
+
+🚧 *Roadmap: recursive import resolution — only the root file's `import` statements are processed today. If `parser/parser.ly` says `import ast`, that import is silently ignored. Every package your program touches must be visible from `main.ly`'s imports, which in practice limits how deep package hierarchies go. The compiler itself sidesteps this by **not using `import` at all** — see §13.9.*
 
 ### 13.6 Import Variants
 
 The parser accepts three forms of import:
 
 ```lyric
-import mylib               // directory import, alias = "mylib"
-import "path/to/lib"       // string path import
-import ml from "mylib"     // aliased import, access as ml.func()
+import mylib               // by-name: resolves to ./mylib/, access as mylib.X
+import ml from "mylib"     // aliased: resolves to ./mylib/, access as ml.X
+import "path/to/lib"       // 🚧 bare path — see below
 ```
 
-The first form is what you'll use most — it imports a sibling directory by name. The third form lets you rename a package at the import site, useful when directory names are long or would collide.
+The first form is what you'll use most. The second renames a package at the import site, useful when directory names are long or would collide with a local identifier. The path is interpreted relative to the module root (the directory holding `lyric.mod`).
 
-### 13.7 What Packages Can't Do
+🚧 *Roadmap: bare `import "path"` parses but currently crashes the resolver because the alias derivation isn't implemented. Use `import alias from "path"` instead until the unaliased form is fixed.*
 
-A few things to know about the current module system:
+### 13.7 What Packages Can't Do (Yet)
 
-**Imports are single-level today.** When you `import lexer`, the compiler resolves `lexer`'s declarations but does NOT recursively resolve `lexer`'s own `import` statements. 🚧 *Recursive import resolution is on the roadmap — until it lands, every package your program uses transitively must be listed explicitly in the root file, or the build will fail with unresolved names. The compiler's own build works around this by listing all twelve packages from `main.ly`.*
+§13.5 named the two big constraints — single-level imports and call-only cross-package resolution. A few smaller things round out the picture:
 
-**`pub` isn't filtered across imports yet.** 🚧 *Today, every declaration in an imported package is visible after prefixing — package-private declarations leak. The roadmap target is true `pub` filtering: non-`pub` declarations should be invisible to importers. Write `pub` on everything you intend to export now, so your code is correct once the filter lands.*
+**`pub` isn't filtered across imports yet.** 🚧 *Every declaration in an imported package is visible after prefixing — package-private declarations leak. The roadmap target is true `pub` filtering: non-`pub` declarations should be invisible to importers. Write `pub` on everything you intend to export now, so your code is correct once the filter lands.*
 
-**Cycle detection.** 🚧 *Today there's no cycle detector — circular imports either work by accident or blow up with a duplicate-declaration error from the merge pass. The single-level rule makes the question mostly moot in practice; cycle detection becomes load-bearing once recursive resolution lands. The roadmap fix is the standard topological-sort error: "cycle detected: a → b → c → a."*
+**No cycle detection.** 🚧 *Today there's no cycle detector — circular imports either work by accident or blow up with a duplicate-declaration error from the merge pass. The single-level rule makes the question mostly moot in practice; cycle detection becomes load-bearing once recursive resolution lands. The roadmap fix is the standard topological-sort error: "cycle detected: a → b → c → a."*
 
-**`lyric.mod` content isn't parsed.** Today the compiler only checks for the file's *existence* as a module-root marker. 🚧 *The intent is for `lyric.mod` to declare the module's import-path prefix, its external dependencies, and the package containing `main()`. Until that parsing lands, drop a one-line `module name` and rely on the directory layout.*
-
-**No re-exports.** If `parser` imports `ast`, the types from `ast` don't become part of `parser`'s public API. Callers who need `ast.Token` must import `ast` themselves.
+**No re-exports.** If `parser` imports `ast`, the types and functions from `ast` don't become part of `parser`'s public API. Callers who need `ast.something` must import `ast` themselves.
 
 **No package registry.** There's no `lyric get` or `lyric add`. If you want third-party code, copy it into your project. This is intentional for now — dependency management is a solved problem with unsolved social problems (supply chain attacks, version conflicts, diamond dependencies). We'll add it when the language is mature enough to get it right.
 
-**One module, one compilation.** Every import is resolved and merged at compile time. There are no pre-compiled libraries, no `.o` files, no dynamic linking. The entire program is one C file. `append` uses amortized-doubling (like Go's `append`) — the backing array doubles when full, giving O(1) amortized appends. This scales to 30,000 lines in 0.2 seconds. When it stops scaling, we'll add incremental compilation.
+**One module, one compilation.** Every import is resolved and merged at compile time. There are no pre-compiled libraries, no `.o` files, no dynamic linking. The entire program is one C file. The amortized-doubling `append` (like Go's, with O(1) amortized push) scales to 30,000 lines of Lyric in about 0.2 seconds. When that stops scaling, we'll add incremental compilation.
 
-### 13.8 The Compiler as Example
+### 13.8 The `.lyric` Sibling
 
-The Lyric compiler is the largest Lyric program in existence: 30,796 lines across 12 packages. Its structure is a practical demonstration of everything in this chapter:
+Every `.ly` file in this chapter is *implementation* code — function bodies, struct fields, the works. Lyric also has a declaration-only dialect, `.lyric`, that contains the same `pub` signatures and type declarations but no function bodies. A `.lyric` file is what other tooling reads when it wants to know your module's public surface without compiling its implementation.
+
+The toolchain that reads `.lyric` files is called **lyre**. It's a separate program (written in Go, Python, TypeScript, and Lyric — one implementation per language ecosystem) that:
+
+- Extracts `.lyric` from `.ly` (so the declaration file stays in sync with the implementation).
+- Verifies that an implementation matches its declaration (signatures, fields, visibility).
+- Hosts the contract-driven development annotations — `why:`, `doc`, `invariant:`, `source:`, `fake:` — that some Lyric projects use for design-by-contract.
+
+Those CDD annotations live in `.lyric` files, not `.ly` files. The Lyric compiler doesn't see them, and the language reference doesn't mention them. They're a lyre feature; if you're not using lyre, you can ignore the `.lyric` mode entirely. The preface's "A sibling artifact: lyre" subsection has the full pitch.
+
+### 13.9 The Compiler as Example
+
+The Lyric compiler is the largest Lyric program in existence: 33,500 lines across 14 files in 12 directories. Its structure is a practical demonstration of how to scale a Lyric project today:
 
 ```
 src/
@@ -4174,18 +4209,41 @@ src/
 ├── parser/       parser.ly, expr_parser.ly
 ├── checker/      checker.ly
 ├── desugar/      desugar.ly
-├── lowerer/      lowerer.ly
 ├── lir/          lir.ly
+├── lowerer/      lowerer.ly
 ├── optimizer/    optimizer.ly
 ├── monomorphizer/ monomorphizer.ly
-├── c_backend/    c_backend.ly
 ├── memory/       memory.ly
+├── c_backend/    c_backend.ly
 └── main/         main.ly
 ```
 
-Each directory is a package. `parser` says `lyric parser { }` and imports `ast` for the AST types. `checker` imports `ast` and `lexer` for token kinds. `main` imports everything and wires the pipeline together. Two files in the same package — `parser.ly` and `expr_parser.ly` — both say `lyric parser { }` and share all declarations without imports.
+Each directory is a package. `parser.ly` and `expr_parser.ly` both say `lyric parser { }` and share all declarations without imports — that's the multi-file-in-one-package shape from §13.5. What might surprise you: there is **not a single `import` statement** in the entire compiler. `parser.ly` calls `tokenize(...)` and constructs `Token { ... }` directly, even though those are declared in `lexer.ly` over in `src/lexer/`. The 14 files are simply listed together on the build command line, the parser merges them, and every declaration ends up in one flat namespace.
 
-The whole thing compiles to one 105,457-line C file. `gcc` compiles that in a few seconds. The result is a binary that can compile itself — and the output matches byte-for-byte.
+The Makefile makes this explicit:
+
+```makefile
+BOOTSTRAP_FILES = \
+  src/ast/ast.ly src/ast/modules.ly \
+  src/lexer/lexer.ly \
+  src/parser/parser.ly src/parser/expr_parser.ly \
+  src/desugar/desugar.ly \
+  src/checker/checker.ly \
+  src/lir/lir.ly \
+  src/lowerer/lowerer.ly \
+  src/optimizer/optimizer.ly \
+  src/monomorphizer/monomorphizer.ly \
+  src/memory/memory.ly \
+  src/c_backend/c_backend.ly \
+  src/main/main.ly
+
+update: lyric
+	./lyric compile $(BOOTSTRAP_FILES) -o lyric.c
+```
+
+Why this shape rather than `import`? Because §13.5's qualified-type limitation bites hardest in a compiler — the AST module wants to export *types* (`Expr`, `TokenKind`, `TypeInfo`), and qualified type names don't resolve across packages today. So instead of fighting the limitation, the compiler treats `lyric ast { }`, `lyric parser { }`, `lyric checker { }`, and so on as **logical sections** of a single program — directories give human-readable structure, `lyric name { }` blocks give a visual hint, and the merge pass treats it all as one namespace. 🚧 *When qualified type resolution and recursive imports land, this code will be a candidate for a real `import` refactor.*
+
+The whole thing compiles to one 114,770-line C file. `gcc` compiles that in a few seconds. The result is a binary that can compile itself — and the output matches byte-for-byte.
 
 
 

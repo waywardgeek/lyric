@@ -393,3 +393,51 @@ Carry-forward already records "Calculator through-line is complete by Ch 8. Ch 1
 ### `pub permanent class SymTable` — `permanent` was missing from the §10.1 stdlib excerpt
 
 `stdlib/std.ly:503` declares `pub permanent class SymTable { }`, but the pre-edit §10.1 stdlib-excerpt code block showed it as `pub class SymTable { }` — dropping the `permanent` keyword that's load-bearing for sym interning (interned `Sym` instances must outlive every function that holds a handle). Fixed in §10.1; added a one-sentence prose mention that `permanent` opts the class out of slab reclamation. No compiler bug — the chapter's excerpt was simply incomplete.
+
+---
+
+## Ch 13 reviser, 2026-06-21
+
+### Qualified type names and enum-variant references don't resolve across `import`
+
+`import lexer` makes `lexer.tokenize(...)` (a qualified function call) resolve and run end-to-end. But every qualified *type* reference fails:
+
+- `let xs: [lexer.Token] = []` → `checker: unknown struct/class: lexer.Token` + `validateAllExprsResolved: TypeVar leak 'lexer.Token'`.
+- `lexer.Token { kind: 1, value: "x" }` (qualified struct constructor) → same `unknown struct/class` error at the literal opener.
+- `lexer.TokenKind.Plus` (qualified enum variant access) → same kind of failure.
+
+The prefix-then-merge resolver in `src/ast/modules.ly` rewrites qualified call sites (`ExFnCall` with a module-prefixed callee) but the same rewrite isn't applied to `TyHandle`, struct-literal `kind`, or enum-variant resolution against the imported namespace. Verified by extracting the `testdata/import_dir` example and replacing the function-call body with `let p: mylib.Point = mylib.Point { x: 7, y: 8 }`.
+
+This is the **single biggest gap** in the current module system. It means an imported package can only export *behaviour* (functions and methods) ergonomically; if it exports *data* (types, enum variants), the importing package can't name those types directly — it has to round-trip through a constructor function whose return type the checker can infer locally. The book's Ch 13 §13.5 teaches that exact workaround pattern (`pub func make_number(value: string) -> Token`) and adds a 🚧 callout.
+
+Knock-on effect on the Lyric compiler itself: `src/` has 14 `.ly` files in 12 directories — and **not a single `import` statement among them**. The compiler relies entirely on flat-namespace merging of `BOOTSTRAP_FILES` because its AST module exports types like `Expr` and `TokenKind` that the import system can't resolve qualified-type-name style. The Makefile lists all 14 files explicitly. Ch 13 §13.9 documents this honestly.
+
+Fix: the qualified-name resolver should produce the same prefixed identifier (`lexer_Token`, `lexer_TokenKind_Plus`) whether the use site is a function call, a type annotation, a struct-literal opener, or an enum-variant access. Today only the call site is rewritten.
+
+Logged in `~/projects/lyric/TODO`.
+
+### `lyric compile -mod .` does not exist as a CLI flag
+
+Pre-edit Ch 13 §13.3 said: "When you run `lyric compile -mod .`, the compiler finds `lyric.mod`, discovers all `.ly` files in the directory tree, resolves imports, and compiles everything together." Empirical: `./lyric compile -mod /path/to/proj main.ly` fails with `error: cannot read -mod`. There is no `-mod` flag.
+
+Reality (per `src/main/main.ly:735–765`): directory mode is **automatic** — `lyric compile <dir>` checks for `<dir>/lyric.mod`, and `lyric compile <single.ly>` checks for `<parent>/lyric.mod`. If either is present, the discovered directory is used as the module root; otherwise no module mode. Both shapes work end-to-end (verified against `testdata/import_dir`).
+
+Ch 13 now teaches the `lyric compile <dir>` form. Spec §Compilation Model already documents this correctly; only the book was out of sync. No compiler bug; doc fix only.
+
+### Import resolution is single-level, but the working level is only as deep as the root file imports
+
+Spec §Imports already calls out "🚧 Recursive imports are not resolved" — `resolve_module_imports` in `src/ast/modules.ly` walks the *root file's* import declarations only; an imported package's own `import` statements are silently ignored. This was already known.
+
+The consequence the pre-edit chapter under-stated: it's not just that nested imports don't resolve, it's that **anything an imported package references must already be in the root program's namespace**. If `parser/parser.ly` says `import ast` and uses `ast.Token`, both the `import` and the qualified references die — first because the import is dropped, second because (per the qualified-type bug above) the qualified type name doesn't resolve even when the import *is* processed. The two bugs compose.
+
+Ch 13 §13.5 names this honestly and points readers at the flat-file-list pattern (§13.9, the compiler) as the working workaround for projects that outgrow what one root file can `import`.
+
+### Multi-file single-package works perfectly
+
+This isn't a bug — it's the silver lining. When multiple `.ly` files in the same directory all declare `lyric <name> { }` (or even mix `lyric { }` wrappers with bare top-level declarations), the parser merges them into one namespace before the checker runs. Cross-file calls, type references, constructors, enum variants, methods, everything works unqualified. There's no `import` needed because every declaration is visible to every other declaration in the same package.
+
+This is the pattern the book now teaches in §13.5 as the default split (calculator across `lexer.ly` + `parser.ly` + `main.ly`, all in package `main`), and the pattern the compiler itself uses across all 14 files. It scales surprisingly well — the bootstrap compiler is 33,500 lines of Lyric across 14 files in 12 directories, all flat-merged.
+
+### Pre-edit §13.5 example would not compile even after `import` is sorted out
+
+The pre-edit §13.5 layout had `lexer/`, `parser/`, `ast/` as three subpackages with `main.ly` importing all three and the sub-packages importing each other (`parser/parser.ly` imports both `ast` and `lexer`). This fails three independent ways today: (a) recursive import — `parser`'s `import ast` is ignored; (b) qualified types — even if it weren't ignored, `ast.Token` as a type annotation wouldn't resolve; (c) the example uses `LParen`/`RParen` instead of `LeftParen`/`RightParen` (Ch 4 decision), and a `match` expression with bare-identifier arms which the parser also rejects. Rewritten to the working multi-file-single-package shape; the cross-package addendum uses constructor functions to sidestep (b).
