@@ -5174,10 +5174,10 @@ The Lyric toolchain is one binary: `lyric`. It compiles, tests, and formats. The
 ### C.1 lyric compile
 
 ```
-lyric compile <file.ly> [...] [-o output.c] [--soa] [--lir-dump file]
+lyric compile <file.ly | dir> [...] [-o output.c] [--soa] [--detect-uaf] [--rc-free | --no-rc] [--lir-dump file]
 ```
 
-Compile one or more `.ly` files to C:
+Compile one or more `.ly` files (or a single module directory) to C:
 
 ```
 $ lyric compile calculator.ly -o calculator.c
@@ -5198,7 +5198,15 @@ The `-std=gnu11` is required — the generated C uses GNU statement expressions 
 
 `--soa` — Switch all class allocation from Array-of-Structs to Struct-of-Arrays layout. Your code doesn't change. Chapter 11 explains the performance implications: 10% faster, 14% less memory on data-intensive workloads.
 
+`--detect-uaf` — Use-after-free debug mode. Freed class slots are poisoned with a sentinel refcount and every subsequent access checks for it. Slower, but turns "silent UAF" into a clear runtime abort. See Chapter 11 §11.4.
+
+`--rc-free` (default ON) — When a refcounted class's refcount reaches zero, run its destructor and release the slot. This is the normal refcounting regime described in Chapter 11 §11.5.
+
+`--no-rc` — Disable the RC=0-triggers-destroy step. Refcounts are still maintained, but slots are not reclaimed until the owning relation cascades or the program exits. Useful for isolating refcount bugs from destructor bugs.
+
 `--lir-dump file` — Dump the LIR (Low-level Intermediate Representation) to the named file before C emission. Useful for debugging the compiler itself.
+
+`--c` is accepted as a legacy no-op for backward compatibility.
 
 **Module mode:**
 
@@ -5206,12 +5214,14 @@ The `-std=gnu11` is required — the generated C uses GNU statement expressions 
 $ lyric compile . -o out.c
 ```
 
-If the argument is a directory containing a `lyric.mod` file, the compiler switches to module mode: it discovers all `.ly` files in the directory tree, resolves imports between packages, and compiles everything into one C file. This is how the compiler compiles itself — `lyric compile . -o lyric.c` from the `src/` directory.
+If the argument is a directory containing a `lyric.mod` file, the compiler switches to module mode: it walks the top-level `.ly` files in that directory and resolves the root file's `import` statements. Module mode is single-level today — `import` statements in imported packages are not recursively resolved (see Chapter 13 §13.7).
+
+For multi-directory projects whose imports outgrow single-level resolution, the working pattern is the **flat file list** — pass every `.ly` file on one command line, all merged into a single namespace. The Lyric compiler itself is built this way: `make update` runs `./lyric compile $(BOOTSTRAP_FILES) -o lyric.c`, where `BOOTSTRAP_FILES` enumerates all 14 source files across 12 directories with zero `import` statements between them. Chapters 13 §13.9 and 14 §14.5 cover the bootstrap in detail.
 
 ### C.2 lyric test
 
 ```
-lyric test <file.ly> [...]
+lyric test <file.ly> [...] [-o output.c] [--soa] [--detect-uaf] [--rc-free | --no-rc] [--lir-dump file]
 ```
 
 Compile, discover test functions, and run them:
@@ -5226,9 +5236,15 @@ PASS  test_tokenize_parens
 
 The test command compiles your files to C, links them with GCC (using `-O0 -g` for debuggability), then runs the resulting binary. It discovers test functions by scanning for any function whose name starts with `test_` — no framework, no registration, no annotations.
 
-Each test runs in isolation using `setjmp`/`longjmp` — a failed `assert` or `assert_eq` jumps back to the test harness rather than crashing the process. If a test fails, the suite continues with the remaining tests. The exit code is non-zero if any test failed.
+The generated runner calls each `test_*` function in source order and tracks pass/fail counts. The runtime `assert` and `assert_eq` macros call `exit(1)` on failure, so the first failed assertion ends the suite — there is no per-test isolation today. A segfault in one test will also abort the suite. The exit code is non-zero if any test failed.
+
+*🚧 Roadmap: per-test isolation (so a failure in one test doesn't end the suite), parallel execution, test filtering, and per-test timing are all planned. None of them are implemented today.*
+
+The same backend flags accepted by `compile` (`--soa`, `--detect-uaf`, `--rc-free` / `--no-rc`, `--lir-dump`, `-o`) are accepted here too — useful when you want to run a test suite under SoA or UAF-detection mode without changing your build script. The `-o` flag writes the generated C to disk and exits without running, for when you want to inspect what the runner looks like.
 
 The test command accepts the same file arguments as `compile`. You can pass multiple files, and all `test_*` functions across all files will be discovered and run.
+
+*🚧 Roadmap: the C-backend lowering for `assert` and `assert_eq` is still landing. While that work is in flight, calls to either builtin may be silently dropped — every test passes regardless of correctness. Re-run your suites once the lowering is in.*
 
 ### C.3 lyric fmt
 
@@ -5246,7 +5262,7 @@ formatted checker.lyric
 
 The formatter normalizes whitespace, sorts declarations by their original source order, and preserves comments. It's idempotent — running it twice produces the same output.
 
-Note that `fmt` operates on `.lyric` design files, not `.ly` source files. There is no source formatter yet. The `.lyric` files are the declaration-only design artifacts described in Chapter 14.
+Note that `fmt` operates on `.lyric` design files, not `.ly` source files. There is no source formatter yet. The `.lyric` files are the declaration-only Lyric artifacts described in Chapter 13 §13.8 — the same files consumed by the `lyre` toolchain documented in Appendix E.
 
 ### C.4 lyric help
 
@@ -5269,34 +5285,44 @@ Also available as `lyric -h` or `lyric --help`.
 
 The C output is self-contained. It includes:
 
-- A runtime header (`lyric_runtime.h`) with string operations, slab allocator macros, channel primitives, and the test harness
+- A runtime header (`lyric_runtime.h`) with string operations, slab allocator macros, channel primitives, and the test-runner assertion macros
 - All type definitions: forward declarations, then structs in topological order, then tagged unions for enums
 - All function bodies, monomorphized — generic functions are expanded into concrete copies per instantiation
 - Slab allocator globals for each class (one free-list and block array per type)
-- A `main()` that calls your `main()` (or, in test mode, the test harness)
+- A `main()` that calls your `main()` (or, in test mode, a generated runner that invokes each `test_*` function in source order)
 
 The output compiles cleanly with GCC and Clang. The `-w` flag suppresses warnings — the generated C is correct but not pretty, and compilers occasionally warn about unused variables from monomorphization.
 
-**Compilation performance:** The Lyric compiler itself — 30,796 lines of Lyric across 12 packages — compiles to 105,457 lines of C in 0.2 seconds on a MacBook Air. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
+**Compilation performance:** The Lyric compiler itself — 33,500 lines of Lyric (the compiler in `src/` plus the auto-imported `stdlib/`) across 14 files in 12 directories — compiles to 114,770 lines of C in a fraction of a second on a modern laptop. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
 
 ### C.6 The Bootstrap
 
-There is no pre-built `lyric` binary to download. The compiler bootstraps from C:
+There is no pre-built `lyric` binary to download. The compiler bootstraps from the checked-in `lyric.c`:
 
 ```
-$ gcc -std=gnu11 -O2 -w -o lyric lyric.c -lm -lpthread
+$ make
+gcc -std=gnu11 -O2 -w -I runtime -o lyric lyric.c -lm
 ```
 
-The checked-in `lyric.c` was generated by the Lyric compiler compiling itself. To verify the bootstrap:
+`lyric.c` is the canonical compiler output, produced by the Lyric compiler compiling itself. To regenerate it from `src/` after editing the compiler:
 
 ```
-$ ./lyric compile . -o bootstrap2.c    # stage 2: compile self with self
-$ gcc -std=gnu11 -O2 -w -o lyric2 bootstrap2.c -lm -lpthread
-$ ./lyric2 compile . -o bootstrap3.c   # stage 3: compile self with stage 2
-$ diff bootstrap2.c bootstrap3.c       # must be identical
+$ make update
+./lyric compile $(BOOTSTRAP_FILES) -o lyric.c
+lyric.c updated (114770 lines)
 ```
 
-If stage 2 and stage 3 produce identical C output, the compiler is a fixed point — it faithfully compiles its own source. This is verified in CI with every change.
+`BOOTSTRAP_FILES` is the explicit list of 14 `.ly` files that make up the compiler, passed as a flat file list (not module mode — see Chapter 13 §13.9).
+
+To verify the fixed-point property — that the compiler faithfully compiles its own source:
+
+```
+$ make self-test
+$ # or, equivalently:
+$ bash test_self_compile.sh
+```
+
+`test_self_compile.sh` builds Stage 0 from the checked-in `lyric.c`, has that binary self-compile to `stage2.c`, then builds a Stage 2 binary that compiles `src/` again to `stage3.c`, and finally `diff stage2.c stage3.c` — which must be empty. If the diff is empty, the compiler is at a fixed point. This is verified in CI on every change. See Chapter 14 §14.5 for the full bootstrap story.
 
 
 ## Appendix D: From Go/Rust/C++ to Lyric
