@@ -205,7 +205,7 @@ func main() {
 
 Nothing in the last two programs requires explanation — that's the point.
 
-One detail: Lyric formats `f64` values with `%g`, stripping trailing zeros. So `5.0` prints as `5`, and `3.14` stays `3.14`. Both `len(x)` and `x.len()` work — they compile to the same thing. This book uses whichever reads better in context.
+One detail: Lyric formats `f64` values with `%g`, stripping trailing zeros. So `5.0` prints as `5`, and `3.14` stays `3.14`. Both `len(x)` and `x.len()` compile to the same code; this book uses the method form (`x.len()`) consistently — it reads better when chained with other methods and matches the idiom for stdlib collections.
 
 ## 1.5 A First Real Program: The Calculator
 
@@ -1549,7 +1549,7 @@ func make_item(s: string) -> (Item, error) {
 func collect(names: [string]) -> ([Item], error) {
     let mut items: [Item] = []
     let mut i = 0
-    while i < len(names) {
+    while i < names.len() {
         let item = make_item(names[i])?
         items = append(items, item)
         i = i + 1
@@ -1811,7 +1811,7 @@ This extends to collection types:
 
 ```lyric
 func first<T>(xs: [T]) -> T? {
-    if len(xs) == 0 {
+    if xs.len() == 0 {
         return null
     }
     return xs[0]
