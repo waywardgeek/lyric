@@ -107,6 +107,8 @@ let y: i64 = x          // ok: implicit widening
 let z: i32 = y as i32   // explicit narrowing
 ```
 
+🚧 *Cross-sign integer assignment (`i32` ↔ `u8`) is also implicit today — a footgun the roadmap intends to tighten. Don't rely on it.*
+
 ## 1.3 Control Flow
 
 `if`/`else` has no parentheses around the condition. Braces are required:
@@ -207,9 +209,9 @@ One detail: Lyric formats `f64` values with `%g`, stripping trailing zeros. So `
 
 ## 1.5 A First Real Program: The Calculator
 
-Now let's build something. We'll write a calculator that evaluates arithmetic expressions. This program will grow through the next several chapters — we'll add types, error handling, and generics as we need them.
+Now let's build something. We'll write a calculator that evaluates arithmetic expressions. This program will grow through the next several chapters — each chapter adds the next layer (types, error handling, classes, generics) as we need it.
 
-Start with the simplest thing that works: a function that takes two numbers and an operator.
+Start with the simplest thing that works: a function that takes two numbers and an operator. Save this as `calc.ly`:
 
 ```lyric
 func eval_simple(a: f64, op: string, b: f64) -> f64 {
@@ -229,27 +231,27 @@ func eval_simple(a: f64, op: string, b: f64) -> f64 {
 }
 
 func main() {
-    let plus = "+"
-    let minus = "-"
-    let star = "*"
-    let slash = "/"
-    println(f"2 + 3 = {eval_simple(2.0, plus, 3.0)}")
-    println(f"10 - 4 = {eval_simple(10.0, minus, 4.0)}")
-    println(f"6 * 7 = {eval_simple(6.0, star, 7.0)}")
-    println(f"15 / 3 = {eval_simple(15.0, slash, 3.0)}")
+    println(f"2 + 3 = {eval_simple(2.0, "+", 3.0)}")
+    println(f"10 - 4 = {eval_simple(10.0, "-", 4.0)}")
+    println(f"6 * 7 = {eval_simple(6.0, "*", 7.0)}")
+    println(f"15 / 3 = {eval_simple(15.0, "/", 3.0)}")
 }
 ```
 
-Output:
+Compile and run:
 
 ```
+$ lyric compile calc.ly
+$ ./calc
 2 + 3 = 5
 10 - 4 = 6
 6 * 7 = 42
 15 / 3 = 5
 ```
 
-This works, but it has gaps. Division by zero will crash — we'll fix that in Chapter 5. It can't handle expressions like `3 + 4 * 2` where operator precedence matters. For that we need a data structure to hold intermediate values — a stack. We need types that can represent tokens, distinguish between operators and numbers, and match on them exhaustively. That's Chapter 2.
+(Remember from §1.4: Lyric formats `f64` with `%g`, so `5.0` prints as `5`.)
+
+This works, but it has obvious gaps. `op` is a `string`, so the compiler can't tell `"+"` apart from `"plus"` or `"mod"` — typos slip through silently and `eval_simple` returns `0.0`. Division by zero will crash — we'll fix that in Chapter 5. And it can't handle expressions like `3 + 4 * 2` where operator precedence matters: for that we need types that can represent tokens, distinguish operators from numbers, and match on them exhaustively. That's Chapter 2.
 
 
 ## Chapter 2: Types That Fit the Problem
