@@ -4571,11 +4571,13 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 **Type construction:**
 
 ```
-struct Point { x: f64; y: f64 }          // value type, stack-allocated
+struct Point { x: f64, y: f64 }           // value type, stack-allocated
 class Node { value: i32 }                 // reference type, heap-allocated
-enum Color { Red; Green; Blue }           // fieldless enum
-enum Shape { Circle(radius: f64)          // enum with payloads
-             Rect(w: f64, h: f64) }
+enum Color { Red Green Blue }             // fieldless enum (variants separated by whitespace)
+enum Shape {                              // enum with payloads
+    Circle(radius: f64)
+    Rect(w: f64, h: f64)
+}
 type StringList = [string]                // type alias
 ```
 
@@ -4691,7 +4693,7 @@ match expr {
     VariantA(x, y) => { ... }        // destructure enum payload
     VariantB | VariantC => { ... }    // multi-pattern
     val if val > 0 => { ... }         // guard
-    Some(Inner(x)) => { ... }         // nested destructuring
+    Outer(Inner(x)) => { ... }        // nested destructuring
     _ => { ... }                      // wildcard (must be last)
 }
 ```
@@ -4701,8 +4703,9 @@ match expr {
 **Conditional extraction:**
 
 ```
-if let Some(x) = optional_val { ... }
-let Some(x) = optional_val else { return }
+if let x = optional_val { ... }          // bind non-null optional payload
+if let Circle(r) = shape { ... }         // destructure enum variant
+let x = optional_val else { return }     // early-exit if null
 ```
 
 ### Declarations
@@ -4737,13 +4740,17 @@ relation HashedList Dict<K,V>:d owns [DictEntry<K,V>:d]
 interface MyList<P, C> {
     field P.children: [C]
     func P.add(self, child: C)
-    destructor P { cascade P.children { C.destroy(self) } }
+    destructor P {
+        for child in self.children {
+            child.destroy()
+        }
+    }
 }
 
 // Impl blocks
-impl MyList for Team, Player {
+impl MyList<Team, Player> {
     P.children <-> Team.roster_children
-    func P.add(self, child: C) { append(self.roster_children, child) }
+    func P.add(self, child: C) { self.children.push(child) }
 }
 
 // Tests
