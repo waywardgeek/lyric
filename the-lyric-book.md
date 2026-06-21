@@ -5388,6 +5388,7 @@ Lyric's error model is Go's tuples plus Rust's `?` operator. You get explicit er
 | Multi-type interface | — | — (workaround: associated types) | — | `interface Graph<G, N, E> { func G.nodes(self) -> [N] }` |
 | Default methods | — | `fn default() { ... }` | virtual with body | `func count(parent: P) -> i32 { ... }` in interface body |
 | Field injection | — | — | — | `field P.children: [C]` in interface body |
+| Method on type defined outside class body | `func (c *Counter) Reset()` (any file in same package) | `impl Counter { fn reset(&self) { ... } }` | `void Counter::reset() { ... }` (declared in header) | `func Counter.reset(self) { ... }` (external method — Ch 3.5) |
 
 **This is the big one.** No other language has multi-class interfaces. In Go, Rust, and C++, an interface describes one type. Lyric interfaces can span multiple type parameters — `Graph<G, N, E>` defines methods on `G`, `N`, and `E` simultaneously. One `impl` block binds all three to concrete types. Monomorphization means zero runtime cost. (Chapters 8-9)
 
