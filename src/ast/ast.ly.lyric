@@ -207,6 +207,8 @@ module ast
   class DestructorBlock
     source: ast.ly:153
     field body: Block?
+    field kind: RelationKind
+      doc: "discriminator selecting Owns or Refs — copied onto the concrete class only when matching the relation's kind"
     field span: Span
     field type_param: Sym?
 

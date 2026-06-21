@@ -71,6 +71,7 @@ lyric desugar {
             }
             let new_db = DestructorBlock {
               type_param: substitute_sym(db.type_param, type_map),
+              kind: db.kind,
               body: body_copy,
               span: db.span,
             }
@@ -508,6 +509,13 @@ lyric desugar {
 
         for db in destructors {
           if isnull(db.type_param) { continue }
+          // Skip destructors not matching the relation's owns/refs kind.
+          // Default (legacy) destructors carry kind=Owns and so still apply to owns relations.
+          if db.kind is Owns {
+            if !(rel.kind is Owns) { continue }
+          } else {
+            if !(rel.kind is Refs) { continue }
+          }
           let mut class_name: string = ""
           let entry = type_map.get(sym(db.type_param!.name))
           if isnull(entry) { continue }

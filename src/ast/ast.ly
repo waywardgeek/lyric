@@ -152,6 +152,7 @@ lyric ast {
 
   class DestructorBlock {
     type_param: Sym?
+    kind: RelationKind
     body: Block?
     span: Span
   }

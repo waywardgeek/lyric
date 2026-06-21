@@ -659,10 +659,20 @@ lyric parser {
   func Parser.parse_destructor_block(self) -> (DestructorBlock?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'destructor'
+    // Optional kind keyword: `destructor owns P { ... }` or `destructor refs P { ... }`.
+    // Absent kind keeps legacy behavior (Owns), so existing stdlib still parses.
+    let mut kind = Owns
+    if self.peek().kind == KOwns {
+      self.next()
+    } else if self.peek().kind == KRefs {
+      self.next()
+      kind = Refs
+    }
     let type_name = self.expect(LIdent)?
     let body = self.parse_block()?
     return (DestructorBlock {
       sym(type_name!.text),
+      kind: kind,
       body: body,
       span: self.make_span(start)
     }, null)
