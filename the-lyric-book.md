@@ -5468,20 +5468,32 @@ interface Graph<G, N, E> {
 
 ## Appendix E: The CDD Layer (`lyre`)
 
-Earlier drafts of this book described **Context-Driven Development** — the practice of keeping a `.lyric` design artifact alongside every `.ly` source file, annotated with `why:` purpose statements, `doc "..."` narrative blocks, `invariant:` claims, and `source:`/`fake:` links to implementation — as if it were part of the Lyric language. It isn't, and it never was: those annotations don't parse with the Lyric grammar. They are a layer on top, owned by a separate tool called **`lyre`**.
+Earlier drafts of this book described **Context-Driven Development** — the practice of keeping a `.lyric` design artifact alongside every source file, annotated with `why:` purpose statements, `doc "..."` narrative blocks, `invariant:` claims, and `source:`/`fake:` links to implementation — as if it were part of the Lyric language. It isn't, and it never was: those annotations don't parse with the Lyric grammar. They are a layer on top, owned by a separate tool called **lyre**.
 
 The split is clean:
 
 - **Lyric** (this book) is the language and compiler. A `.lyric` file, from Lyric's perspective, is a valid Lyric source file with no function bodies — declarations only.
-- **`lyre`** is the design-artifact tool. It reads `.lyric` files, recognizes the CDD annotation layer, generates the function-index and dependency zones, and provides `lyre verify` / `lyre update` / `lyre gen` to keep the artifact in sync with the implementation.
+- **lyre** is the design-artifact tool. It reads `.lyric` files, recognizes the CDD annotation layer, and keeps each artifact in sync with the implementation it describes.
 
-If you want the full CDD methodology — the three-zone file layout, the `why:`/`doc`/`invariant:`/`verified_at:`/`source:`/`fake:` vocabulary, the verify/update/gen workflow — see the `lyre` repository at `~/projects/lyre/`. The methodology stands on its own and applies whether the implementation language is Lyric, Go, Python, or anything else `lyre` has an extractor for.
+lyre's reach is broader than Lyric. The same `.lyric` format that describes a Lyric module can describe a Go package, a Python package, or a TypeScript module — lyre ships extractors for all four ecosystems (`pkg/extract/golang`, `pkg/extract/python`, `pkg/extract/typescript`, `pkg/extract/lyric`). The CDD methodology stands on its own and applies whether the implementation is Lyric, Go, Python, or TypeScript. Lyric is one of lyre's targets, not its only one.
+
+lyre's command surface, for orientation:
+
+| Command | Purpose |
+|---------|---------|
+| `lyre gen <package-dir>` | Scaffold a fresh `.lyric` file by extracting declarations from source. |
+| `lyre update <file.lyric>` | Re-extract the auto-generated zones (function index, dependency table) without touching hand-written CDD prose. |
+| `lyre verify <file.lyric>` | Check that the declarations and CDD claims still match the implementation. |
+| `lyre lint <file.lyric>` | Report recoverable quality issues (missing `why:`, broken `source:` links, stale `verified_at:`). |
+| `lyre fmt <file.lyric>` | Format `.lyric` files using Lyric grammar rules. |
+
+That's the entire interface. There's no `lyre compile`, no `lyre run` — lyre doesn't produce executable code, it produces and verifies design artifacts. The build still goes through `lyric compile`, `go build`, `pytest`, `tsc`, or whatever the implementation language already uses.
 
 What stays in Lyric proper:
 
-- The `.lyric` file *format* (declaration-only Lyric source) is a Lyric concept.
+- The `.lyric` file *format* (declaration-only Lyric source) is a Lyric concept — lyre piggybacks on the Lyric grammar to keep `.lyric` files trivially parseable for the Lyric-implementation case.
 - The one annotation Lyric's own grammar parses today is `guarded_by(lock_name)` on fields (Chapter 12).
-- A roadmap table of function-level annotations (`requires:`, `ensures:`, `concurrent:`, `requires_lock`, `excludes_lock`, etc.) is described in the language spec, but does not parse today.
+- A roadmap table of function-level annotations (`requires:`, `ensures:`, `concurrent:`, `requires_lock`, `excludes_lock`, etc.) is described in the language spec but does not parse today.
 
-The Lyric toolchain ships four subcommands — `compile`, `test`, `fmt`, `help` — and nothing else. The verify/update/gen commands you may have seen in earlier drafts live in `lyre`.
+For the full CDD methodology — the three-zone file layout, the `why:`/`doc`/`invariant:`/`verified_at:`/`source:`/`fake:` vocabulary, the extractor/verifier workflow per supported language — see the lyre repository and its own documentation. The Lyric toolchain itself ships exactly the four subcommands documented in Appendix C (`compile`, `test`, `fmt`, `help`); everything in this appendix belongs to lyre.
 
