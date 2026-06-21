@@ -4186,7 +4186,7 @@ The first form is what you'll use most. The second renames a package at the impo
 
 **No package registry.** There's no `lyric get` or `lyric add`. If you want third-party code, copy it into your project. This is intentional for now — dependency management is a solved problem with unsolved social problems (supply chain attacks, version conflicts, diamond dependencies). We'll add it when the language is mature enough to get it right.
 
-**One module, one compilation.** Every import is resolved and merged at compile time. There are no pre-compiled libraries, no `.o` files, no dynamic linking. The entire program is one C file. The amortized-doubling `append` (like Go's, with O(1) amortized push) scales to 30,000 lines of Lyric in about 0.2 seconds. When that stops scaling, we'll add incremental compilation.
+**One module, one compilation.** Every import is resolved and merged at compile time. There are no pre-compiled libraries, no `.o` files, no dynamic linking. The entire program is one C file. The amortized-doubling `append` (like Go's, with O(1) amortized push) scales to 33,500 lines of Lyric in about 0.2 seconds. When that stops scaling, we'll add incremental compilation.
 
 ### 13.8 The `.lyric` Sibling
 
@@ -5296,7 +5296,7 @@ The C output is self-contained. It includes:
 
 The output compiles cleanly with GCC and Clang. The `-w` flag suppresses warnings — the generated C is correct but not pretty, and compilers occasionally warn about unused variables from monomorphization.
 
-**Compilation performance:** The Lyric compiler itself — 33,500 lines of Lyric (the compiler in `src/` plus the auto-imported `stdlib/`) across 14 files in 12 directories — compiles to 114,770 lines of C in a fraction of a second on a modern laptop. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
+**Compilation performance:** The Lyric compiler itself — 33,500 lines of Lyric (the compiler in `src/` plus the auto-imported `stdlib/`) across 14 files in 12 directories — compiles to 114,770 lines of C in about 0.2 seconds on a modern laptop. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
 
 ### C.6 The Bootstrap
 
