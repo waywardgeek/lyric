@@ -3484,8 +3484,8 @@ func main() {
     let b = TeamB { name: "Betas" }
     let p = Player { name: "Alice" }
 
-    dll_append<TeamA, Player>(a, p)
-    dll_append<TeamB, Player>(b, p)
+    a.team_a_append(p)
+    b.team_b_append(p)
 
     println(f"a has player: {!isnull(a.team_a_first)}")
     println(f"b has player: {!isnull(b.team_b_first)}")
@@ -3516,13 +3516,26 @@ When `a.destroy()` fires, it cascade-destroys Alice (because `TeamA` *owns* her)
 
 **After `a.destroy()`, `p` is a dangling pointer.** Accessing `p.name` is undefined behavior, even though the zeroed memory makes it look safe. The slab allocator's `memset` is a debugging aid, not a safety guarantee. Don't rely on it.
 
-🚧 *This is the one place Lyric's safety story has a real gap today: a stale reference to a destroyed object is a use-after-free. The roadmap fix is **bidirectional pointers** — a back-pointer annotation that the compiler tracks across destroys, automatically nulling it when the owner dies. Combined with a planned `destroys` annotation (declares "this function may destroy `self`") and `mut resize` (declares "this function may reallocate the backing array"), the checker will be able to reject UAF at compile time. Until then: when you have references that outlive an `owns` relation, keep them inside `if !isnull(parent)` guards, or hold them through the parent (`team.roster_children[i]`) rather than as standalone pointers.*
+🚧 *This is the one place Lyric's safety story has a real gap today: a stale reference to a destroyed object is a use-after-free. The roadmap fix is **bidirectional pointers** — a back-pointer annotation that the compiler tracks across destroys, automatically nulling it when the owner dies. Combined with a planned `destroys` annotation (declares "this function may destroy `self`") and `mut resize` (declares "this function may reallocate the backing array"), the checker will be able to reject UAF at compile time. Until then: when you have references that outlive an `owns` relation, keep them inside `if !isnull(parent)` guards, or hold them through the parent (`team.roster_children[i]`) rather than as standalone pointers. While debugging, compile with `--detect-uaf` — freed slab slots are marked with a sentinel and every class access checks for it, turning silent UAF into a loud crash at the point of the bad read.*
 
 A class can participate in multiple `owns` relations simultaneously — Alice was owned by both TeamA and TeamB. Whichever owner's `destroy` fires first cascade-destroys the child. The child's destructor automatically unlinks it from all other relations before the slab slot is freed.
 
-This is deterministic. No GC pause, no finalization queue, no reference cycle detection. The ownership graph declared by relations is the destruction order. The compiler generates the cascade code — you never write a destructor. Every non-`permanent` class gets a `destroy(self)` method synthesized for it automatically, with a body assembled from all the relation destructors and any `final func` cleanup you declared. The default body for a class with no relations and no `final` just frees the slab slot.
+This is deterministic. No GC pause, no finalization queue, no reference cycle detection. The ownership graph declared by relations is the destruction order. The compiler generates the cascade code — you never write a destructor. Every non-`permanent` class gets a `destroy(self)` method synthesized for it automatically, with a body assembled from all the relation destructors and any `final func` cleanup you declared (Chapter 8 §8.7 introduced `final`). The default body for a class with no relations and no `final` just frees the slab slot.
 
-### 11.5 Scope-Exit Analysis
+### 11.5 The Three Lifetime Regimes
+
+The previous section showed `owns` driving destruction, but `owns` is one of three regimes the compiler picks per class. The spec spells them out; here's the working version:
+
+1. **Owned.** The class is the child of an `owns` relation. Its lifetime is the parent's lifetime. No reference count is maintained — the parent's cascade is the only way it dies. This is the regime every example so far has used: `Player` owned by `Team`, `DictEntry` owned by `Dict`, `Stmt` owned by `Program`.
+2. **Permanent.** The class is declared `permanent class Foo`. Instances are never freed and never reference-counted. The slab grows; nothing ever returns to the free list. Chapter 10's `SymTable` is the canonical example — interned `Sym` values must outlive every function that holds a handle, so the entire intern table opts out of reclamation. Use `permanent` for compiler singletons and for AST or symbol trees that have whole-program lifetimes. 🚧 *Roadmap: a `permanent` class that is also a relation target will produce a compile-time warning, since the two policies contradict.*
+3. **Refcounted.** Every other class — anything that's neither owned by a relation nor declared `permanent`. The compiler inserts `ref` increments at assignment and `ref` decrements at scope exit, and destroys the instance when the count hits zero. This is what gives local class values their "Go-like" feel: you create one, pass it around, and it goes away when the last variable referring to it disappears. The `--rc-free` flag (on by default) is what wires "RC = 0" to `destroy()`; `--no-rc` disables auto-destruction for benchmarks that want to measure the cost separately.
+
+Two compiler details worth knowing because they show up in the generated C:
+
+- **Move inference, not move syntax.** If you assign a local class variable into a struct field or pass it to a function, and you never touch that local again afterward, the lowerer treats the assignment as a *move* — no retain/release pair is emitted around it. You never write `move x` or anything like Rust's `&T` vs `T`; dataflow analysis figures it out. The effect is invisible at the Lyric level, but it's why you'll see fewer RC operations in the generated C than you might expect.
+- **`ref` and `unref` are escape hatches.** The stdlib's `ArrayList`, `OwningList`, and `RefList` implementations call `ref child` and `unref child` directly — bare RC primitives that are only legal inside a `trusted` function. You won't write these unless you're building your own ownership container.
+
+### 11.6 Scope-Exit Analysis
 
 Not every class participates in a relation. The compiler also runs escape analysis to free locally-created values at scope exit:
 
@@ -3535,7 +3548,7 @@ func test_local_no_escape() {
     temps.push(2)
     let mut sum = 0
     let mut i = 0
-    while i < len(temps) {
+    while i < temps.len() {
         sum = sum + temps[i]
         i = i + 1
     }
@@ -3567,7 +3580,7 @@ The analysis is conservative. If a slice is assigned to another variable (`let b
 
 If a lambda captures a local slice, the slice is marked as escaping — the lambda might outlive the current scope. The same applies to `spawn` blocks, which capture variables by pointer (see Chapter 12).
 
-### 11.6 Copy-on-Assign: The Recurring Lesson
+### 11.7 Copy-on-Assign: The Recurring Lesson
 
 The value-type model has one consistent gotcha. When you modify a struct and forget it's a copy, the modification is lost:
 
@@ -3587,22 +3600,21 @@ Without `mut`, the function receives a copy. The fix is always `mut` — pass by
 
 The same principle doesn't apply to classes. Classes are pointers. When you pass a class to a function, the function sees the same object. Mutations are visible to the caller. No `mut` needed — and in fact, using `mut` on a class parameter creates a double-pointer, which is almost never what you want.
 
-One more thing the compiler does behind your back: **move semantics are inferred, not declared.** If you assign a local class variable into a struct field or pass it to a function, and you never touch that local again afterward, the lowerer treats the assignment as a *move* — no retain/release pair is emitted around it. You don't write `move x` or anything like Rust's `T` vs `&T`; the dataflow analysis figures it out. The effect is invisible at the Lyric level, but it's why you'll see fewer reference-count operations in the generated C than you might expect.
+### 11.8 What the Calculator Costs
 
-### 11.7 What the Calculator Costs
+The calculator from Chapters 4–5 is the largest program the book has built. Let's count what it allocates:
 
-Let's count the allocations in our calculator from the previous chapters:
+- **`Token` and `TokenKind`** — both stack values. A `Token` is a struct holding a `TokenKind` enum and a `string` field. The `string` is a fat-pointer view into the original source — no copy. Zero heap cost for the tokens themselves; one shared backing buffer for the source text.
+- **`[Token]` token list** — one slice allocation, freed at scope exit by the escape analysis described in §11.6. The slice doesn't survive past `parse`.
+- **`Parser`** — one slab allocation. It holds the token slice and a cursor. Refcounted (no `owns` relation, not `permanent`); freed when the last reference drops, which in the current `parse` shape is the end of the function.
+- **No `malloc`, no `free`.** Everything class-shaped lands in a typed slab; everything slice-shaped is reclaimed by scope-exit analysis.
 
-- **Calculator** — one slab allocation, freed on destroy
-- **Dict** — one slab allocation, freed when Calculator is destroyed (cascade via `owns`)
-- **DictEntry** — one per variable, freed when Dict is destroyed (cascade)
-- **Sym** — one per unique string, interned globally, never freed
-- **Token** — a struct, stack-allocated, zero heap cost
-- **Slices** — the token list, temporary expression lists — freed at scope exit by escape analysis
+If you bolt the §10.5 variable-bindings example onto the calculator, the inventory grows by exactly two more line items:
 
-The entire calculator uses zero `malloc`/`free` calls. Slab allocators handle classes. Escape analysis handles slices. Relations handle destruction order. The only persistent heap objects are the interned `Sym` values in the global `SymTable`, which live for the lifetime of the program.
+- **`Dict<Sym, f64>`** and its **`DictEntry<Sym, f64>`** children — one `Dict` slab slot plus one `DictEntry` slab slot per defined variable. The `Dict` `owns` its entries via a `HashedList` relation; destroying the `Dict` cascade-destroys every entry. No leak path exists.
+- **`Sym`** instances — interned in the global `permanent` `SymTable` (Chapter 10 §10.1, §11.5). Created once per unique variable name and never freed. This is exactly what `permanent` is for.
 
-Compile with `--soa` and the memory footprint shrinks further. The `Dict` entries, the `Calculator`, the `Sym` instances — all stored as parallel field arrays instead of individual objects. The program runs the same. The memory layout changes underneath.
+Compile with `--soa` and the memory footprint shrinks again: each `DictEntry` field becomes a column in a parallel array instead of a row in an AoS struct, and class handles become 32-bit indices instead of 64-bit pointers. The program runs the same — same source code, same output. Only the layout changes underneath.
 
 This is what Lyric's memory model delivers: you write ownership declarations, and the compiler generates an allocation strategy that would take hundreds of lines of C to implement manually. No garbage collector. No borrow checker. No unsafe blocks. Just declarations and generated code.
 
