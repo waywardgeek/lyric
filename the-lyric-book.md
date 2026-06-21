@@ -4527,6 +4527,9 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `owns` | Cascade-destroy relation |
 | `refs` | Unlink-only relation |
 | `implements` | Declare interface conformance on a class |
+| `permanent` | Class modifier — opts the class out of slab reclamation and ref-counting (Ch 10, Ch 11.5) |
+| `trusted` | Function modifier — allows raw `ref` / `unref` ops inside the body (Ch 8.2, Ch 11.5) |
+| `final` | Function modifier — pre-destruction hook that runs before the auto-generated destructor (Ch 8.7) |
 
 **Literals:**
 
@@ -4635,7 +4638,7 @@ From lowest to highest:
 | `.len()` | `i32` | Length |
 | `.push(elem)` | `unit` | Append in place |
 | `.pop()` | `T` | Remove and return last element |
-| `.extend(other)` | `unit` | Append all elements from another slice |
+| `.extend(other)` | `unit` | 🚧 *Silent no-op today — the lowerer never wired it up. Use `append(xs, elem)` in a loop, or `xs = xs + other` for a new slice.* |
 | `.contains(elem)` | `bool` | Linear search |
 | `.index_of(elem)` | `i32` | First index, or -1 |
 | `.sort()` | `unit` | In-place sort |
