@@ -13,11 +13,11 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
   }
 
   // Collect all imports from root package
-  let blocks = root_file!.fb_children()
+  let blocks = root_file!.fb.children()
   let mut imports: [ImportDecl] = []
   for i in range(0, len(blocks)) {
     let block = blocks[i]
-    let imps = block.imp_children()
+    let imps = block.imp.children()
     for j in range(0, len(imps)) {
       imports = append(imports, imps[j])
     }
@@ -77,7 +77,7 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
     let mut cur_orig: [string] = []
     let mut cur_prefixed: [string] = []
 
-    let pkg_blocks = merged_pkg!.fb_children()
+    let pkg_blocks = merged_pkg!.fb.children()
     for j in range(0, len(pkg_blocks)) {
       let block = pkg_blocks[j]
       prefix_block_declarations(block, prefix, mut cur_orig, mut cur_prefixed)
@@ -100,7 +100,7 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
   }
 
   // Rewrite qualified references in root package and strip imports
-  let root_blocks = root_file!.fb_children()
+  let root_blocks = root_file!.fb.children()
   for i in range(0, len(root_blocks)) {
     let block = root_blocks[i]
     rewrite_qualified_access(block, alias_names, orig_names, prefixed_names)
@@ -113,7 +113,7 @@ func resolve_module_imports(module_root: string, root_file: File?) -> (File?, st
 
 // strip_imports removes all ImportDecl children from a LyricBlock.
 func strip_imports(block: LyricBlock) {
-  let imps = block.imp_children()
+  let imps = block.imp.children()
   // Remove from last to first to avoid index shifting
   let mut i = len(imps) - 1
   while i >= 0 {
@@ -145,7 +145,7 @@ func prefix_sym(s: Sym?, prefix: string) -> Sym? {
 func prefix_block_declarations(block: LyricBlock, prefix: string,
     mut orig: [string], mut prefixed: [string]) {
   // Functions
-  let funcs = block.fd_children()
+  let funcs = block.fd.children()
   for i in range(0, len(funcs)) {
     let f = funcs[i]
     let name = f.name!.get_name()
@@ -154,7 +154,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     f.name = sym(prefix + name)
   }
   // Structs
-  let structs = block.sd_children()
+  let structs = block.sd.children()
   for i in range(0, len(structs)) {
     let s = structs[i]
     let name = s.name!.get_name()
@@ -163,7 +163,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     s.name = sym(prefix + name)
   }
   // Classes
-  let classes = block.cd_children()
+  let classes = block.cd.children()
   for i in range(0, len(classes)) {
     let c = classes[i]
     let name = c.name!.get_name()
@@ -172,7 +172,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     c.name = sym(prefix + name)
   }
   // Enums
-  let enums = block.ed_children()
+  let enums = block.ed.children()
   for i in range(0, len(enums)) {
     let e = enums[i]
     let name = e.name!.get_name()
@@ -181,7 +181,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     e.name = sym(prefix + name)
   }
   // Interfaces
-  let ifaces = block.id_children()
+  let ifaces = block.id.children()
   for i in range(0, len(ifaces)) {
     let iface = ifaces[i]
     let name = iface.name!.get_name()
@@ -190,7 +190,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     iface.name = sym(prefix + name)
   }
   // Constants
-  let consts = block.con_children()
+  let consts = block.con.children()
   for i in range(0, len(consts)) {
     let con = consts[i]
     let name = con.name!.get_name()
@@ -199,7 +199,7 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
     con.name = sym(prefix + name)
   }
   // Type aliases
-  let aliases = block.ta_children()
+  let aliases = block.ta.children()
   for i in range(0, len(aliases)) {
     let ta = aliases[i]
     let name = ta.name!.get_name()
@@ -214,46 +214,46 @@ func prefix_block_declarations(block: LyricBlock, prefix: string,
 // ---------------------------------------------------------------------------
 
 func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [string]) {
-  let funcs = block.fd_children()
+  let funcs = block.fd.children()
   for i in range(0, len(funcs)) {
     rewrite_func_references(funcs[i], orig, prefixed)
   }
-  let structs = block.sd_children()
+  let structs = block.sd.children()
   for i in range(0, len(structs)) {
-    let fields = structs[i].sf_children()
+    let fields = structs[i].sf.children()
     for j in range(0, len(fields)) {
       rewrite_type_expr(fields[j].type_expr, orig, prefixed)
     }
   }
-  let classes = block.cd_children()
+  let classes = block.cd.children()
   for i in range(0, len(classes)) {
-    let fields = classes[i].cf_children()
+    let fields = classes[i].cf.children()
     for j in range(0, len(fields)) {
       rewrite_type_expr(fields[j].type_expr, orig, prefixed)
     }
-    let methods = classes[i].cm_children()
+    let methods = classes[i].cm.children()
     for j in range(0, len(methods)) {
       rewrite_func_references(methods[j], orig, prefixed)
     }
   }
-  let enums = block.ed_children()
+  let enums = block.ed.children()
   for i in range(0, len(enums)) {
-    let variants = enums[i].ev_children()
+    let variants = enums[i].ev.children()
     for j in range(0, len(variants)) {
-      let tfields = variants[j].evf_children()
+      let tfields = variants[j].evf.children()
       for k in range(0, len(tfields)) {
         rewrite_type_expr(tfields[k].type_expr, orig, prefixed)
       }
     }
   }
-  let ifaces = block.id_children()
+  let ifaces = block.id.children()
   for i in range(0, len(ifaces)) {
-    let methods = ifaces[i].im_children()
+    let methods = ifaces[i].im.children()
     for j in range(0, len(methods)) {
       rewrite_func_references(methods[j], orig, prefixed)
     }
   }
-  let impls = block.ib_children()
+  let impls = block.ib.children()
   for i in range(0, len(impls)) {
     let iname = impls[i].interface_name
     if !isnull(iname) {
@@ -270,7 +270,7 @@ func rewrite_block_references(block: LyricBlock, orig: [string], prefixed: [stri
 
 func rewrite_func_references(f: FuncDecl, orig: [string], prefixed: [string]) {
   // Parameters
-  let params = f.param_children()
+  let params = f.param.children()
   for i in range(0, len(params)) {
     rewrite_type_expr(params[i].type_expr, orig, prefixed)
   }
@@ -328,7 +328,7 @@ func rewrite_type_expr(te: TypeExpr?, orig: [string], prefixed: [string]) {
 }
 
 func rewrite_block_stmts(block: Block, orig: [string], prefixed: [string]) {
-  let stmts = block.bs_children()
+  let stmts = block.bs.children()
   for i in range(0, len(stmts)) {
     rewrite_stmt(stmts[i], orig, prefixed)
   }
@@ -566,24 +566,24 @@ func rewrite_pattern(pat: Pattern?, orig: [string], prefixed: [string]) {
 
 func rewrite_qualified_access(block: LyricBlock,
     alias_names: [string], orig_names: [[string]], prefixed_names: [[string]]) {
-  let funcs = block.fd_children()
+  let funcs = block.fd.children()
   for i in range(0, len(funcs)) {
     rewrite_qualified_in_func(funcs[i], alias_names, orig_names, prefixed_names)
   }
-  let structs = block.sd_children()
+  let structs = block.sd.children()
   for i in range(0, len(structs)) {
-    let fields = structs[i].sf_children()
+    let fields = structs[i].sf.children()
     for j in range(0, len(fields)) {
       rewrite_qualified_type_expr(fields[j].type_expr, alias_names, orig_names, prefixed_names)
     }
   }
-  let classes = block.cd_children()
+  let classes = block.cd.children()
   for i in range(0, len(classes)) {
-    let fields = classes[i].cf_children()
+    let fields = classes[i].cf.children()
     for j in range(0, len(fields)) {
       rewrite_qualified_type_expr(fields[j].type_expr, alias_names, orig_names, prefixed_names)
     }
-    let methods = classes[i].cm_children()
+    let methods = classes[i].cm.children()
     for j in range(0, len(methods)) {
       rewrite_qualified_in_func(methods[j], alias_names, orig_names, prefixed_names)
     }
@@ -592,7 +592,7 @@ func rewrite_qualified_access(block: LyricBlock,
 
 func rewrite_qualified_in_func(f: FuncDecl,
     alias_names: [string], orig_names: [[string]], prefixed_names: [[string]]) {
-  let params = f.param_children()
+  let params = f.param.children()
   for i in range(0, len(params)) {
     rewrite_qualified_type_expr(params[i].type_expr, alias_names, orig_names, prefixed_names)
   }
@@ -654,7 +654,7 @@ func rewrite_qualified_type_expr(te: TypeExpr?,
 
 func rewrite_qualified_block(block: Block,
     alias_names: [string], orig_names: [[string]], prefixed_names: [[string]]) {
-  let stmts = block.bs_children()
+  let stmts = block.bs.children()
   for i in range(0, len(stmts)) {
     rewrite_qualified_stmt(stmts[i], alias_names, orig_names, prefixed_names)
   }

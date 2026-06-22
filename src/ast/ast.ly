@@ -425,12 +425,12 @@ func merge_files(files: [File?]) -> File? {
     for i in range(0, len(files)) {
         let f = files[i]
         if f != null {
-            let blocks = f!.fb_children()
+            let blocks = f!.fb.children()
             for j in range(0, len(blocks)) {
                 let b = blocks[j]
                 array_append<File, LyricBlock>(merged, b)
             }
-            let comments = f!.fc_children()
+            let comments = f!.fc.children()
             for j in range(0, len(comments)) {
                 array_append<File, Comment>(merged, comments[j])
             }
@@ -470,7 +470,7 @@ func load_stdlib(dir: string) -> File? {
             if combined == null {
                 combined = file
             } else {
-                let blocks = file!.fb_children()
+                let blocks = file!.fb.children()
                 for j in range(0, len(blocks)) {
                     array_append<File, LyricBlock>(combined!, blocks[j])
                 }
@@ -555,21 +555,21 @@ func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool> {
     if file == null {
         return names
     }
-    let blocks = file!.fb_children()
+    let blocks = file!.fb.children()
     for bi in range(0, len(blocks)) {
         let block = blocks[bi]
         // Classes
-        let classes = block.cd_children()
+        let classes = block.cd.children()
         for ci in range(0, len(classes)) {
             let cls = classes[ci]
-            let fields = cls.cf_children()
+            let fields = cls.cf.children()
             for fi in range(0, len(fields)) {
                 ast_collect_type_names(fields[fi].type_expr, names)
             }
-            let methods = cls.cm_children()
+            let methods = cls.cm.children()
             for mi in range(0, len(methods)) {
                 let m = methods[mi]
-                let params = m.param_children()
+                let params = m.param.children()
                 for pi in range(0, len(params)) {
                     ast_collect_type_names(params[pi].type_expr, names)
                 }
@@ -577,20 +577,20 @@ func ast_collect_used_type_names(file: File?) -> Dict<Sym, bool> {
             }
         }
         // Functions
-        let fns = block.fd_children()
+        let fns = block.fd.children()
         for fi in range(0, len(fns)) {
             let fn_ = fns[fi]
-            let params = fn_.param_children()
+            let params = fn_.param.children()
             for pi in range(0, len(params)) {
                 ast_collect_type_names(params[pi].type_expr, names)
             }
             ast_collect_type_names(fn_.return_type, names)
         }
         // Structs
-        let structs = block.sd_children()
+        let structs = block.sd.children()
         for si in range(0, len(structs)) {
             let s = structs[si]
-            let fields = s.sf_children()
+            let fields = s.sf.children()
             for fi in range(0, len(fields)) {
                 ast_collect_type_names(fields[fi].type_expr, names)
             }
@@ -793,7 +793,7 @@ func ast_collect_call_names_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
 }
 
 func ast_collect_call_names_block(block: Block, names: Dict<Sym, bool>) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for i in range(0, len(stmts)) {
         ast_collect_call_names_stmt(stmts[i], names)
     }
@@ -991,7 +991,7 @@ func ast_collect_var_refs_in_stmt(stmt: Stmt, names: Dict<Sym, bool>) {
 }
 
 func ast_collect_var_refs_in_block(block: Block, names: Dict<Sym, bool>) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for i in range(0, len(stmts)) {
         ast_collect_var_refs_in_stmt(stmts[i], names)
     }
@@ -1004,18 +1004,18 @@ func ast_collect_used_func_names(file: File?) -> Dict<Sym, bool> {
     if file == null {
         return names
     }
-    let blocks = file!.fb_children()
+    let blocks = file!.fb.children()
     for bi in range(0, len(blocks)) {
         let block = blocks[bi]
-        let fns = block.fd_children()
+        let fns = block.fd.children()
         for fi in range(0, len(fns)) {
             if fns[fi].body != null {
                 ast_collect_call_names_block(fns[fi].body!, names)
             }
         }
-        let classes = block.cd_children()
+        let classes = block.cd.children()
         for ci in range(0, len(classes)) {
-            let methods = classes[ci].cm_children()
+            let methods = classes[ci].cm.children()
             for mi in range(0, len(methods)) {
                 if methods[mi].body != null {
                     ast_collect_call_names_block(methods[mi].body!, names)
@@ -1051,9 +1051,9 @@ func merge_stdlib(file: File?, std_file: File?) {
 
     // Collect relation hints (interface names used in relations)
     let used_ifaces = Dict<Sym, bool>()
-    let blocks = file!.fb_children()
+    let blocks = file!.fb.children()
     for bi in range(0, len(blocks)) {
-        let rels = blocks[bi].rd_children()
+        let rels = blocks[bi].rd.children()
         for ri in range(0, len(rels)) {
             if rels[ri].hint != null {
                 used_ifaces.set(sym(rels[ri].hint!.name), true)
@@ -1070,22 +1070,22 @@ func merge_stdlib(file: File?, std_file: File?) {
     let std_class_map = Dict<Sym, ClassDecl>()
     let std_func_map = Dict<Sym, FuncDecl>()
 
-    let std_blocks = std_file!.fb_children()
+    let std_blocks = std_file!.fb.children()
     for bi in range(0, len(std_blocks)) {
         let sb = std_blocks[bi]
-        let ifaces = sb.id_children()
+        let ifaces = sb.id.children()
         for i in range(0, len(ifaces)) {
             if ifaces[i].name != null {
                 std_iface_map.set(sym(ifaces[i].name!.name), ifaces[i])
             }
         }
-        let classes = sb.cd_children()
+        let classes = sb.cd.children()
         for i in range(0, len(classes)) {
             if classes[i].name != null {
                 std_class_map.set(sym(classes[i].name!.name), classes[i])
             }
         }
-        let fns = sb.fd_children()
+        let fns = sb.fd.children()
         for i in range(0, len(fns)) {
             if fns[i].name != null {
                 std_func_map.set(sym(fns[i].name!.name), fns[i])
@@ -1101,7 +1101,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // Build set of user-defined interface names to avoid duplicates
     let user_iface_names = Dict<Sym, bool>()
     for bi in range(0, len(blocks)) {
-        let user_ifaces = blocks[bi].id_children()
+        let user_ifaces = blocks[bi].id.children()
         for i in range(0, len(user_ifaces)) {
             if user_ifaces[i].name != null {
                 user_iface_names.set(sym(user_ifaces[i].name!.name), true)
@@ -1148,7 +1148,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // Users can call shadowed stdlib functions via std.funcName().
     let user_defined_funcs = Dict<Sym, bool>()
     for bi in range(0, len(blocks)) {
-        let user_fns = blocks[bi].fd_children()
+        let user_fns = blocks[bi].fd.children()
         for i in range(0, len(user_fns)) {
             if user_fns[i].name != null {
                 user_defined_funcs.set(sym(user_fns[i].name!.name), true)
@@ -1198,7 +1198,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // bare name (get_hash) and only the last one survives in the map.
     for bi in range(0, len(std_blocks)) {
         let sb = std_blocks[bi]
-        let fns = sb.fd_children()
+        let fns = sb.fd.children()
         for i in range(0, len(fns)) {
             if fns[i].name == null { continue }
             if fns[i].receiver_type == null { continue }
@@ -1222,7 +1222,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // Build set of existing relations to avoid duplicates
     let existing_rels = Dict<Sym, bool>()
     for bi in range(0, len(blocks)) {
-        let rels = blocks[bi].rd_children()
+        let rels = blocks[bi].rd.children()
         for ri in range(0, len(rels)) {
             let r = rels[ri]
             let mut key = ""
@@ -1236,7 +1236,7 @@ func merge_stdlib(file: File?, std_file: File?) {
 
     let mut std_relations: [RelationDecl] = []
     for bi in range(0, len(std_blocks)) {
-        let rels = std_blocks[bi].rd_children()
+        let rels = std_blocks[bi].rd.children()
         for ri in range(0, len(rels)) {
             let r = rels[ri]
             let parent_name = r.parent.type_name!.name
@@ -1336,7 +1336,7 @@ func merge_stdlib(file: File?, std_file: File?) {
 
     // Also merge external methods (func T.method) whose receiver type is a merged class
     for bi in range(0, len(std_blocks)) {
-        let fns = std_blocks[bi].fd_children()
+        let fns = std_blocks[bi].fd.children()
         for i in range(0, len(fns)) {
             if fns[i].receiver_type != null {
                 let recv_name = fns[i].receiver_type!.name
@@ -1355,7 +1355,7 @@ func merge_stdlib(file: File?, std_file: File?) {
 
     // Merge interfaces referenced by where clauses on merged classes and functions
     for i in range(0, len(std_classes)) {
-        let wheres = std_classes[i].cwc_children()
+        let wheres = std_classes[i].cwc.children()
         for wi in range(0, len(wheres)) {
             if wheres[wi].constraint != null {
                 let cname = wheres[wi].constraint!.name
@@ -1390,7 +1390,7 @@ func merge_stdlib(file: File?, std_file: File?) {
     // Collect stdlib constants referenced by merged functions
     let std_const_map = Dict<Sym, ConstDecl>()
     for bi in range(0, len(std_blocks)) {
-        let consts = std_blocks[bi].con_children()
+        let consts = std_blocks[bi].con.children()
         for i in range(0, len(consts)) {
             if consts[i].name != null {
                 std_const_map.set(sym(consts[i].name!.name), consts[i])
