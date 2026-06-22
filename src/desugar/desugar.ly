@@ -15,9 +15,9 @@ lyric desugar {
   //   field P.first: C?  =>  func P.first(self) -> C?  +  func P.set_first(mut self, val: C?)
 
   func desugar_interface_fields(file: File) {
-    for block in file.fb_children() {
-      for iface in block.id_children() {
-        for fd in iface.ifd_children() {
+    for block in file.fb.children() {
+      for iface in block.id.children() {
+        for fd in iface.ifd.children() {
           // Getter: func T.name(self) -> Type
           let self_param = Param {
             name: `self`,
@@ -98,8 +98,8 @@ lyric desugar {
   func desugar_relations(file: File) {
     // Build GLOBAL interface lookup across ALL blocks
     let iface_map = Dict<Sym, InterfaceDecl>()
-    for block in file.fb_children() {
-      for iface in block.id_children() {
+    for block in file.fb.children() {
+      for iface in block.id.children() {
         if !isnull(iface.name) {
           iface_map.set(sym(iface.name!.name), iface)
         }
@@ -110,22 +110,22 @@ lyric desugar {
     // Relations may reference classes in other blocks (e.g., Lexer:lc owns [Comment:lc]
     // where Comment is in ast.ly but the relation is in lexer.ly)
     let class_map = Dict<Sym, ClassDecl>()
-    for block in file.fb_children() {
-      for cls in block.cd_children() {
+    for block in file.fb.children() {
+      for cls in block.cd.children() {
         if !isnull(cls.name) {
           class_map.set(sym(cls.name!.name), cls)
         }
       }
     }
 
-    for block in file.fb_children() {
+    for block in file.fb.children() {
 
       // ===== Phase A: relation → impl skeleton =====
       // Per-type-var labels (redesign §3.8) ride on ib_args[i].label.
       // Ownership annotation (redesign §3.9) rides on impl.kind. No
       // mapping generation here; Phase B handles that uniformly for
       // user-authored ownership impls as well.
-      for rel in block.rd_children() {
+      for rel in block.rd.children() {
         if isnull(rel.hint) { continue }
         let mut parent_name: string = ""
         if !isnull(rel.parent.type_name) {
@@ -139,9 +139,9 @@ lyric desugar {
 
         // Look for existing impl block matching (hint, parent, child).
         let mut existing: ImplBlock? = null
-        for ib in block.ib_children() {
+        for ib in block.ib.children() {
           if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
-            let ta = ib.ib_arg_children()
+            let ta = ib.ib_arg.children()
             if len(ta) >= 2 {
               let n0 = if !isnull(ta[0].type_expr) { type_expr_name(ta[0].type_expr!) } else { null }
               let n1 = if !isnull(ta[1].type_expr) { type_expr_name(ta[1].type_expr!) } else { null }
@@ -155,7 +155,7 @@ lyric desugar {
         if !isnull(existing) {
           // Drop labels and kind onto existing impl if slots are empty.
           // User-authored values win; relation-synthesized values fill gaps.
-          let ex_args = existing!.ib_arg_children()
+          let ex_args = existing!.ib_arg.children()
           if len(ex_args) >= 2 {
             if isnull(ex_args[0].label) && !isnull(rel.parent.label) {
               ex_args[0].label = rel.parent.label
@@ -195,20 +195,20 @@ lyric desugar {
       // Iterate impls (NOT relations) so user-authored
       // `impl Hint<A:l, B:l> owns { }` over user-defined hint interfaces
       // gets identical treatment to a relation-synthesized impl.
-      for impl_block in block.ib_children() {
+      for impl_block in block.ib.children() {
         if isnull(impl_block.kind) { continue }
         if isnull(impl_block.interface_name) { continue }
         let iface_entry = iface_map.get(sym(impl_block.interface_name!.name))
         if isnull(iface_entry) { continue }
         let iface = iface_entry!.value
 
-        let iface_fields = iface.ifd_children()
+        let iface_fields = iface.ifd.children()
         if len(iface_fields) == 0 { continue }
 
-        let iface_tps = iface.itp_children()
+        let iface_tps = iface.itp.children()
         if len(iface_tps) < 2 { continue }
 
-        let impl_args = impl_block.ib_arg_children()
+        let impl_args = impl_block.ib_arg.children()
         if len(impl_args) < 2 { continue }
 
         // Snapshot existing mappings for dedup. User-authored
@@ -217,7 +217,7 @@ lyric desugar {
         // `new_mappings` and appended AFTER the per-field loop, so
         // that mid-loop reallocation of impl_block's mapping backing
         // can't invalidate the slice we're iterating.
-        let existing_mappings = impl_block.ibm_children()
+        let existing_mappings = impl_block.ibm.children()
         let mut new_mappings: [ImplMapping] = []
 
         for fd in iface_fields {
@@ -344,8 +344,8 @@ lyric desugar {
   func desugar_destructors(file: File) {
     // Build GLOBAL interface lookup across ALL blocks
     let iface_map = Dict<Sym, InterfaceDecl>()
-    for block in file.fb_children() {
-      for iface in block.id_children() {
+    for block in file.fb.children() {
+      for iface in block.id.children() {
         if !isnull(iface.name) {
           iface_map.set(sym(iface.name!.name), iface)
         }
@@ -354,34 +354,34 @@ lyric desugar {
 
     // Build GLOBAL class lookup across ALL blocks
     let class_map = Dict<Sym, ClassDecl>()
-    for block in file.fb_children() {
-      for cls in block.cd_children() {
+    for block in file.fb.children() {
+      for cls in block.cd.children() {
         if !isnull(cls.name) {
           class_map.set(sym(cls.name!.name), cls)
         }
       }
     }
 
-    for block in file.fb_children() {
+    for block in file.fb.children() {
       // Collect destructor blocks per class name. One destroy method
       // per class; multiple ownership impls touching the same class
       // append wrapped block-stmts.
       let destroy_methods = Dict<Sym, FuncDecl>()
 
-      for impl_block in block.ib_children() {
+      for impl_block in block.ib.children() {
         if isnull(impl_block.kind) { continue }
         if isnull(impl_block.interface_name) { continue }
         let iface_entry = iface_map.get(sym(impl_block.interface_name!.name))
         if isnull(iface_entry) { continue }
         let iface = iface_entry!.value
 
-        let destructors = iface.idb_children()
+        let destructors = iface.idb.children()
         if len(destructors) == 0 { continue }
 
-        let iface_tps = iface.itp_children()
+        let iface_tps = iface.itp.children()
         if len(iface_tps) < 2 { continue }
 
-        let impl_args = impl_block.ib_arg_children()
+        let impl_args = impl_block.ib_arg.children()
         if len(impl_args) < 2 { continue }
 
         // Map type-param-name → concrete class name (simple string map).
@@ -416,7 +416,7 @@ lyric desugar {
         // generic getter/setter call inside a destructor body is
         // renamed to its label-prefixed concrete form.
         let method_renames = Dict<Sym, string>()
-        for ifield in iface.ifd_children() {
+        for ifield in iface.ifd.children() {
           if isnull(ifield.type_param) { continue }
           let label_entry = type_param_to_label.get(sym(ifield.type_param!.name))
           if !isnull(label_entry) && !isnull(ifield.name) {
@@ -490,7 +490,7 @@ lyric desugar {
 
       // Attach destroy methods to classes
       // Attach destroy methods to classes
-      for cls in block.cd_children() {
+      for cls in block.cd.children() {
         if isnull(cls.name) { continue }
         let entry = destroy_methods.get(sym(cls.name!.name))
         if !isnull(entry) {
@@ -504,9 +504,9 @@ lyric desugar {
   // with relational where clauses.
 
   func desugar_default_impls(file: File) {
-    for block in file.fb_children() {
-      for iface in block.id_children() {
-        let methods = iface.im_children()
+    for block in file.fb.children() {
+      for iface in block.id.children() {
+        let methods = iface.im.children()
         let mut kept: [FuncDecl] = []
         for m in methods {
           if !isnull(m.body) {
@@ -516,7 +516,7 @@ lyric desugar {
             // on concrete types that implement this interface via impl blocks.
 
             // Add interface type params
-            let iface_tps = iface.itp_children()
+            let iface_tps = iface.itp.children()
             for tp in iface_tps {
               let new_tp = TypeParam {
                 name: tp.name,
@@ -580,27 +580,27 @@ lyric desugar {
   // and `self.children = x` becomes `self.set_children(x)`.
 
   func desugar_field_access(file: File) {
-    for block in file.fb_children() {
-      for iface in block.id_children() {
+    for block in file.fb.children() {
+      for iface in block.id.children() {
         // Collect field names per type param
         let field_names = Dict<Sym, bool>()
-        for fd in iface.ifd_children() {
+        for fd in iface.ifd.children() {
           if !isnull(fd.name) {
             field_names.set(sym(fd.name!.name), true)
           }
         }
-        let has_fields = len(iface.ifd_children()) > 0
+        let has_fields = len(iface.ifd.children()) > 0
         if !has_fields { continue }
 
         // Rewrite field accesses in method bodies
-        for m in iface.im_children() {
+        for m in iface.im.children() {
           if !isnull(m.body) {
             rewrite_field_access_block(m.body!, field_names)
           }
         }
 
         // Also rewrite in destructor bodies
-        for db in iface.idb_children() {
+        for db in iface.idb.children() {
           if !isnull(db.body) {
             rewrite_field_access_block(db.body!, field_names)
           }
@@ -610,7 +610,7 @@ lyric desugar {
   }
 
   func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>) {
-    for s in block.bs_children() {
+    for s in block.bs.children() {
       rewrite_field_access_stmt(s, field_names)
     }
   }
@@ -861,7 +861,7 @@ lyric desugar {
   func deep_copy_block(b: Block?) -> Block? {
     if isnull(b) { return null }
     let new_block = Block { span: b!.span }
-    for stmt in b!.bs_children() {
+    for stmt in b!.bs.children() {
       let new_stmt = deep_copy_stmt(stmt)
       array_append<Block, Stmt>(new_block, new_stmt)
     }
@@ -975,7 +975,7 @@ lyric desugar {
   // Deep copy a non-optional Block (for use in enum fields that are Block not Block?)
   func deep_copy_block_val(b: Block) -> Block {
     let new_block = Block { span: b.span }
-    for stmt in b.bs_children() {
+    for stmt in b.bs.children() {
       let new_stmt = deep_copy_stmt(stmt)
       array_append<Block, Stmt>(new_block, new_stmt)
     }
@@ -1108,7 +1108,7 @@ lyric desugar {
   // ---- Type param substitution in blocks/stmts/exprs ----
 
   func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>) {
-    for stmt in block.bs_children() {
+    for stmt in block.bs.children() {
       substitute_type_params_in_stmt(stmt, type_map)
     }
   }
@@ -1214,7 +1214,7 @@ lyric desugar {
   // the replacement carries Args so generic instantiations are preserved.
 
   func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>) {
-    for stmt in block.bs_children() {
+    for stmt in block.bs.children() {
       substitute_type_params_rich_in_stmt(stmt, type_map)
     }
   }
@@ -1346,7 +1346,7 @@ lyric desugar {
   // (e.g. "children") to label-prefixed concrete names (e.g. "fb_children").
 
   func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>) {
-    for stmt in block.bs_children() {
+    for stmt in block.bs.children() {
       rename_method_calls_in_stmt(stmt, renames)
     }
   }
