@@ -1,0 +1,42 @@
+#!/bin/bash
+# runly — compile a Lyric program to C, link with the runtime, and run it.
+# Usage: ./runly file.ly [extra_file.ly ...] [-- prog_args...]
+# Output binary lives in /tmp/runly-$$ and is removed on exit.
+set -e
+
+cd "$(dirname "$0")"
+
+if [ ! -x ./lyric ]; then
+  echo "runly: ./lyric not found — run ./build.sh first" >&2
+  exit 1
+fi
+
+# Split ly sources from runtime args at "--"
+LY_FILES=()
+PROG_ARGS=()
+SEEN_DASHDASH=0
+for arg in "$@"; do
+  if [ "$SEEN_DASHDASH" = "1" ]; then
+    PROG_ARGS+=("$arg")
+  elif [ "$arg" = "--" ]; then
+    SEEN_DASHDASH=1
+  else
+    LY_FILES+=("$arg")
+  fi
+done
+
+if [ ${#LY_FILES[@]} -eq 0 ]; then
+  echo "usage: $0 file.ly [extra.ly ...] [-- prog_args ...]" >&2
+  exit 1
+fi
+
+TMP=$(mktemp -d -t runly_XXXXXX)
+trap "rm -rf $TMP" EXIT
+
+C_FILE="$TMP/prog.c"
+BIN_FILE="$TMP/prog"
+
+./lyric compile "${LY_FILES[@]}" -o "$C_FILE" >&2
+gcc -std=gnu11 -O0 -w -I runtime -o "$BIN_FILE" "$C_FILE" -lm
+
+"$BIN_FILE" "${PROG_ARGS[@]}"
