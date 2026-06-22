@@ -179,6 +179,18 @@ lyric ast {
   class ImplBlock {
     interface_name: Sym?
     for_type: Sym?
+    // Ownership annotation. Null means a plain impl (today's common
+    // case: alias / fieldbind / inline mappings). Non-null means an
+    // ownership-bearing impl whose hint interface declares hint shape
+    // (field T.name: Type + paired destructor owns/refs T blocks);
+    // the desugar synthesizes per-side field-binds and copies the
+    // matching destructor pair onto the concrete classes. See
+    // cr/docs/multi-class-interface-redesign.md §3.9.
+    //
+    // Populated either by the parser (user-authored
+    // `impl Hint<A:l1, B:l2> owns { }`) or by `desugar_relations`
+    // when synthesizing an impl from a `relation` declaration.
+    kind: RelationKind?
     span: Span
   }
   relation ArrayList ImplBlock:ib_arg owns [ImplTypeArg:ib_arg]

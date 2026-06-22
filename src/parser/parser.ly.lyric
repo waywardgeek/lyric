@@ -110,6 +110,24 @@ module parser
     now drops labels into the per-type-arg slots directly.
     """
 
+  invariant "Ownership Annotation on Impl Declarations":
+    procedural
+    """
+    parse_impl reads an optional `owns` or `refs` keyword between the
+    closing `>` of the type-argument list and the opening `{` of the
+    body, storing it in `impl_block.kind` (null when absent). This
+    marks the impl as an ownership-bearing impl over a hint-shape
+    interface (one or more `field T.name: Type` decls + paired
+    `destructor owns/refs T { ... }` blocks). See cr/docs/multi-class-
+    interface-redesign.md §3.9 for the design.
+
+    The annotation is grammatically position-stable with the `for`
+    keyword: both are optional, mutually compatible (`impl Iface<...>
+    owns for ConcreteType { ... }` parses), and both precede the body.
+    No today's user code uses the new form; downstream consumers
+    (desugar / checker) read the new field in follow-on commits.
+    """
+
   func binary_prec(kind: TokenKind) -> i32
     source: expr_parser.ly:22
 

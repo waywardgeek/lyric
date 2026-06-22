@@ -231,6 +231,8 @@ module ast
     source: ast.ly:184
     field for_type: Sym?
     field interface_name: Sym?
+    field kind: RelationKind?
+      doc: "ownership annotation; null = plain impl, non-null = owns/refs-annotated impl over a hint-shape interface; populated by parser for user-authored `impl Hint<A:l1, B:l2> owns { }` and by desugar_relations when synthesizing impls from relation declarations; see cr/docs/multi-class-interface-redesign.md §3.9"
     field span: Span
 
   // Per-class-type-variable label on an impl declaration's top-level

@@ -680,6 +680,20 @@ lyric parser {
       self.expect(PGt)?
     }
 
+    // Optional ownership annotation: `owns` or `refs` between the
+    // closing `>` of the type-args and the opening `{` of the body.
+    // Marks this impl as an owns/refs-annotated impl over a hint-shape
+    // interface (one or more `field T.name: Type` decls + paired
+    // `destructor owns/refs T { ... }` blocks). See
+    // cr/docs/multi-class-interface-redesign.md §3.9.
+    if self.peek().kind == KOwns {
+      self.next()
+      impl_block.kind = Owns
+    } else if self.peek().kind == KRefs {
+      self.next()
+      impl_block.kind = Refs
+    }
+
     // Optional: for ConcreteType
     if self.peek().kind == KFor {
       self.next()

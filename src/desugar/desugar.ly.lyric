@@ -155,6 +155,20 @@ module desugar
     redesign.md §3.8.
     """
 
+  invariant "Ownership Annotation on Synthesized Impls":
+    procedural
+    """
+    When desugar_relations synthesizes a new impl block from a relation,
+    it MUST drop rel.kind into the impl's `kind` slot, making the
+    synthesized impl fully equivalent to a user-authored
+    `impl Hint<P:l1, C:l2> owns/refs { }`. When merging into an existing
+    impl whose kind is null, drop rel.kind there as well. If the existing
+    impl already carries a non-null kind, keep it (two relations merging
+    into one impl with conflicting kinds is a contradiction; a checker
+    diagnostic catches this when the validator generalizes in a follow-on
+    commit). See cr/docs/multi-class-interface-redesign.md §3.9.
+    """
+
   func desugar_interface_fields(file: File)
     source: desugar.ly:145
 

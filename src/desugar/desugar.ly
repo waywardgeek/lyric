@@ -237,6 +237,14 @@ lyric desugar {
                 ex_args[1].label = rel.child.label
               }
             }
+            // Ownership annotation (redesign §3.9): drop rel.kind into
+            // existing.kind if unset. Two relations merging into one
+            // impl with conflicting kinds is a contradiction; in that
+            // case keep the first (a checker diagnostic will catch it
+            // when the validator generalizes in a follow-on commit).
+            if isnull(existing!.kind) {
+              existing!.kind = rel.kind
+            }
             // Merge: add mappings not already present
             // Collect to_add first to avoid invalidating existing_mappings pointer
             let existing_mappings = existing!.ibm_children()
@@ -259,8 +267,13 @@ lyric desugar {
             // Create new impl block — per-type-var labels (redesign §3.8):
             // parent label rides on the first ImplTypeArg, child label on
             // the second. No impl-block-wide label slot anymore.
+            // Ownership annotation (redesign §3.9): rel.kind drops into
+            // the impl block's `kind` slot, making this synthesized impl
+            // fully equivalent to a user-authored
+            // `impl Hint<P:l1, C:l2> owns/refs { }`.
             let new_ib = ImplBlock {
               interface_name: rel.hint,
+              kind: rel.kind,
               span: rel.span,
             }
             // Build TypeArgs with type parameters from the relation sides
