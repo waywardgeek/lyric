@@ -1225,7 +1225,7 @@ lyric checker {
   func Checker.func_decl_to_type(self, f: FuncDecl) -> Type {
     // Collect type param names first and temporarily bind to scope
     let mut tpnames: [string] = []
-    let tps = f.fp_children()
+    let tps = f.fp.children()
     for tp in tps {
       if tp.name != null {
         let tpname = sym_to_string(tp.name!)
@@ -1241,7 +1241,7 @@ lyric checker {
     }
 
     let mut param_types: [Type] = []
-    let params = f.param_children()
+    let params = f.param.children()
     for p in params {
       if !p.is_self {
         if p.type_expr != null {
@@ -1270,7 +1270,7 @@ lyric checker {
 
   func Checker.preregister_type_names(self, block: LyricBlock) {
     // Register imports as module types
-    let imports = block.imp_children()
+    let imports = block.imp.children()
     for imp in imports {
       if imp.alias != null {
         let alias = sym_to_string(imp.alias!)
@@ -1278,7 +1278,7 @@ lyric checker {
       }
     }
 
-    let ifaces = block.id_children()
+    let ifaces = block.id.children()
     for iface in ifaces {
       if iface.name != null {
         let iname = sym_to_string(iface.name!)
@@ -1295,7 +1295,7 @@ lyric checker {
         self.registry.register(iname, stub)
       }
     }
-    let structs = block.sd_children()
+    let structs = block.sd.children()
     for s in structs {
       if s.name != null {
         let sname = sym_to_string(s.name!)
@@ -1312,7 +1312,7 @@ lyric checker {
         self.registry.register(sname, stub)
       }
     }
-    let classes = block.cd_children()
+    let classes = block.cd.children()
     for c in classes {
       if c.name != null {
         let cname = sym_to_string(c.name!)
@@ -1329,7 +1329,7 @@ lyric checker {
         self.registry.register(cname, stub)
       }
     }
-    let enums = block.ed_children()
+    let enums = block.ed.children()
     for e in enums {
       if e.name != null {
         let ename = sym_to_string(e.name!)
@@ -1353,10 +1353,10 @@ lyric checker {
   // =====================================================================
 
   func Checker.register_lyric_block(self, block: LyricBlock) {
-    let ifaces = block.id_children()
-    let structs = block.sd_children()
-    let classes = block.cd_children()
-    let enums = block.ed_children()
+    let ifaces = block.id.children()
+    let structs = block.sd.children()
+    let classes = block.cd.children()
+    let enums = block.ed.children()
 
     // Register interfaces first (classes may implement them)
     for iface in ifaces {
@@ -1385,13 +1385,13 @@ lyric checker {
     }
 
     // Register impl block methods on concrete classes
-    let impls = block.ib_children()
+    let impls = block.ib.children()
     for ib in impls {
       self.register_impl_methods(ib)
     }
 
     // Register type aliases
-    let aliases = block.ta_children()
+    let aliases = block.ta.children()
     for a in aliases {
       if a.name != null && a.type_expr != null {
         let t = self.resolve_type_expr(a.type_expr!)
@@ -1412,7 +1412,7 @@ lyric checker {
     }
 
     // Register constants
-    let consts = block.con_children()
+    let consts = block.con.children()
     for c in consts {
       if c.name != null {
         let cname = sym_to_string(c.name!)
@@ -1430,7 +1430,7 @@ lyric checker {
     }
 
     // Register functions
-    let funcs = block.fd_children()
+    let funcs = block.fd.children()
     for f in funcs {
       self.register_func(f)
     }
@@ -1443,9 +1443,9 @@ lyric checker {
   func Checker.register_interface_methods(self, file: File) {
     // Collect ALL impl blocks from ALL blocks
     let mut all_impls: [ImplBlock] = []
-    let all_blocks = file.fb_children()
+    let all_blocks = file.fb.children()
     for blk in all_blocks {
-      let blk_impls = blk.ib_children()
+      let blk_impls = blk.ib.children()
       for ib in blk_impls {
         all_impls = append(all_impls, ib)
       }
@@ -1453,7 +1453,7 @@ lyric checker {
 
     // Find all functions with type-param receivers and match against all impl blocks
     for blk in all_blocks {
-      let funcs = blk.fd_children()
+      let funcs = blk.fd.children()
       for f in funcs {
         if f.name == null { continue }
         if f.receiver_type == null { continue }
@@ -1469,9 +1469,9 @@ lyric checker {
           let iface_entry = self.iface_decls.get(sym(iface_name))
           if iface_entry == null { continue }
           let iface_decl = iface_entry!.value
-          let itp = iface_decl.itp_children()
+          let itp = iface_decl.itp.children()
 
-          let wc_args = wc.wc_arg_children()
+          let wc_args = wc.wc_arg.children()
           let mut recv_param_idx: i32 = -1
           let mut j: i32 = 0
           while j < len(wc_args) {
@@ -1493,7 +1493,7 @@ lyric checker {
             let iface_matches = ib_iface_name == iface_name
             if !iface_matches { continue }
 
-            let impl_args = ib.ib_arg_children()
+            let impl_args = ib.ib_arg.children()
             if recv_param_idx >= len(impl_args) as i32 { continue }
 
             let subst = Dict<Sym, Type>()
@@ -1535,7 +1535,7 @@ lyric checker {
               _ => {}
             }
             let mut ta: [TypeExpr] = []
-            let orig_tps = f.fp_children()
+            let orig_tps = f.fp.children()
             for tp in orig_tps {
               if tp.name != null {
                 let tpname = sym_to_string(tp.name!)
@@ -1580,8 +1580,8 @@ lyric checker {
       if iface_decl.name == null { continue }
       let iface_name = sym_to_string(iface_decl.name!)
 
-      let itp = iface_decl.itp_children()
-      let imethods = iface_decl.im_children()
+      let itp = iface_decl.itp.children()
+      let imethods = iface_decl.im.children()
 
       // Only process interfaces that have body methods with receiver types
       let mut has_recv_methods = false
@@ -1597,7 +1597,7 @@ lyric checker {
         if ib.interface_name == null { continue }
         if sym_to_string(ib.interface_name!) != iface_name { continue }
 
-        let impl_args = ib.ib_arg_children()
+        let impl_args = ib.ib_arg.children()
 
         // Build substitution: interface type param → concrete type.
         // Also build param→label map (redesign §3.8: labels live on
@@ -1716,7 +1716,7 @@ lyric checker {
     let info = info_opt!
 
     // Register type params
-    let itparams = iface.itp_children()
+    let itparams = iface.itp.children()
     for tp in itparams {
       if tp.name != null {
         let tpname = sym_to_string(tp.name!)
@@ -1746,7 +1746,7 @@ lyric checker {
     }
 
     // Register interface methods
-    let imethods = iface.im_children()
+    let imethods = iface.im.children()
     for m in imethods {
       let ft = self.func_decl_to_type(m)
       if m.name != null {
@@ -1781,7 +1781,7 @@ lyric checker {
     }
     let info = info_opt!
 
-    let stparams = s.stp_children()
+    let stparams = s.stp.children()
     for tp in stparams {
       if tp.name != null {
         let tpname = sym_to_string(tp.name!)
@@ -1804,7 +1804,7 @@ lyric checker {
       }
     }
 
-    let sfields = s.sf_children()
+    let sfields = s.sf.children()
     for f in sfields {
       if f.name != null {
         let fname = sym_to_string(f.name!)
@@ -1847,7 +1847,7 @@ lyric checker {
     }
     let info = info_opt!
 
-    let ctparams = cls.ctp_children()
+    let ctparams = cls.ctp.children()
     let mut type_var_args: [Type] = []
     for tp in ctparams {
       if tp.name != null {
@@ -1872,7 +1872,7 @@ lyric checker {
       }
     }
 
-    let cfields = cls.cf_children()
+    let cfields = cls.cf.children()
     for f in cfields {
       if f.name != null {
         let fname = sym_to_string(f.name!)
@@ -1889,7 +1889,7 @@ lyric checker {
     }
 
     // Register methods
-    let cmethods = cls.cm_children()
+    let cmethods = cls.cm.children()
     for m in cmethods {
       if m.name != null {
         let ft = self.func_decl_to_type(m)
@@ -1924,7 +1924,7 @@ lyric checker {
     for m in cmethods {
       if m.name != null && sym_to_string(m.name!) == cname {
         has_explicit_ctor = true
-        let cparams = m.param_children()
+        let cparams = m.param.children()
         for p in cparams {
           if !p.is_self {
             if p.type_expr != null {
@@ -1981,7 +1981,7 @@ lyric checker {
     }
     let info = info_opt!
 
-    let etparams = e.etp_children()
+    let etparams = e.etp.children()
     for tp in etparams {
       if tp.name != null {
         let tpname = sym_to_string(tp.name!)
@@ -1995,13 +1995,13 @@ lyric checker {
       }
     }
 
-    let evs = e.ev_children()
+    let evs = e.ev.children()
     for v in evs {
       if v.name == null { continue }
       let vname = sym_to_string(v.name!)
       let vi = VariantInfo { enum_name: ename, fields: [] }
 
-      let evfs = v.evf_children()
+      let evfs = v.evf.children()
       let mut param_types: [Type] = []
       for f in evfs {
         let mut ft = make_any_type()
@@ -2052,8 +2052,8 @@ lyric checker {
     let subst = Dict<Sym, Type>()
     if iface_decl_entry != null {
       let iface_decl = iface_decl_entry!.value
-      let itp = iface_decl.itp_children()
-      let impl_args = ib.ib_arg_children()
+      let itp = iface_decl.itp.children()
+      let impl_args = ib.ib_arg.children()
       let mut limit = len(itp)
       if len(impl_args) < limit { limit = len(impl_args) }
       for i in range(0, limit) {
@@ -2064,7 +2064,7 @@ lyric checker {
     }
 
     // Process each mapping
-    let mappings = ib.ibm_children()
+    let mappings = ib.ibm.children()
     for m in mappings {
       if m.method_name == null { continue }
       let method_name = sym_to_string(m.method_name!)
@@ -2168,7 +2168,7 @@ lyric checker {
     let iface = iface_entry!.value
 
     // Build interface type param name → where clause type arg name mapping
-    let itp = iface.itp_children()
+    let itp = iface.itp.children()
     let param_map = Dict<Sym, string>()  // iface param name → func type var name
     let mut i = 0
     while i < len(itp) && i < len(type_args) {
@@ -2189,7 +2189,7 @@ lyric checker {
       self.type_var_methods = Dict<Sym, Dict<Sym, Type>>()
     }
 
-    let ifuncs = iface.im_children()   // actual FuncDecl methods
+    let ifuncs = iface.im.children()   // actual FuncDecl methods
     for m in ifuncs {
       let mname = if m.name != null { sym_to_string(m.name!) } else { "<no-name>" }
       let rtype = if m.receiver_type != null { sym_to_string(m.receiver_type!) } else { "<no-recv>" }
@@ -2218,7 +2218,7 @@ lyric checker {
 
   func Checker.func_decl_to_type_with_subst(self, f: FuncDecl, subst: Dict<Sym, string>) -> Type {
     let mut params: [Type] = []
-    let fp = f.param_children()
+    let fp = f.param.children()
     for p in fp {
       if p.is_self { continue }
       if p.type_expr != null {
@@ -2261,7 +2261,7 @@ lyric checker {
 
   func Checker.check_lyric_block_bodies(self, block: LyricBlock) {
     // Check free functions
-    let funcs = block.fd_children()
+    let funcs = block.fd.children()
     for f in funcs {
       if f.body == null { continue }
 
@@ -2289,7 +2289,7 @@ lyric checker {
           for wc in where_clauses {
             if wc.constraint != null {
               let iface_name = sym_to_string(wc.constraint!)
-              let wc_args = wc.wc_arg_children()
+              let wc_args = wc.wc_arg.children()
               self.grant_relational_methods(iface_name, wc_args)
             }
           }
@@ -2302,7 +2302,7 @@ lyric checker {
     }
 
     // Check class method bodies
-    let classes = block.cd_children()
+    let classes = block.cd.children()
     for c in classes {
       if c.name == null { continue }
       let cname = sym_to_string(c.name!)
@@ -2312,7 +2312,7 @@ lyric checker {
       // (e.g., class Dict<K, V> where K: Hashable grants K.get_hash())
       let prev_tvm = self.type_var_methods
       self.type_var_methods = null
-      let cwcs = c.cwc_children()
+      let cwcs = c.cwc.children()
       for wc in cwcs {
         if wc.variable != null && wc.constraint != null {
           let iface_name = sym_to_string(wc.constraint!)
@@ -2324,7 +2324,7 @@ lyric checker {
             let tv_name = sym_to_string(wc.variable!)
             let existing = self.type_var_methods!.get(sym(tv_name))
             let mut methods_dict = if existing != null { existing!.value } else { Dict<Sym, Type>() }
-            let iface_methods = iface_entry!.value.im_children()
+            let iface_methods = iface_entry!.value.im.children()
             for im in iface_methods {
               if im.name != null {
                 let mtype = self.func_decl_to_type(im)
@@ -2336,7 +2336,7 @@ lyric checker {
         }
       }
 
-      let cmethods = c.cm_children()
+      let cmethods = c.cm.children()
       for m in cmethods {
         if m.body == null { continue }
         self.push_scope()
@@ -2353,7 +2353,7 @@ lyric checker {
           self.scope.define("self", self_type)
         }
         // Register class type params
-        let ctparams = c.ctp_children()
+        let ctparams = c.ctp.children()
         for tp in ctparams {
           if tp.name != null {
             let tpname = sym_to_string(tp.name!)
@@ -2381,7 +2381,7 @@ lyric checker {
     }
 
     // Bind type params
-    let tparams = f.fp_children()
+    let tparams = f.fp.children()
     for tp in tparams {
       if tp.name != null {
         let tpname = sym_to_string(tp.name!)
@@ -2397,7 +2397,7 @@ lyric checker {
     for wc in wheres {
       if wc.variable == null && wc.constraint != null {
         // Bare relational constraint: where Graph<G, N, E>
-        let args = wc.wc_arg_children()
+        let args = wc.wc_arg.children()
         if len(args) > 0 {
           self.grant_relational_methods(sym_to_string(wc.constraint!), args)
         }
@@ -2412,7 +2412,7 @@ lyric checker {
           let tv_name = sym_to_string(wc.variable!)
           let existing = self.type_var_methods!.get(sym(tv_name))
           let mut methods_dict = if existing != null { existing!.value } else { Dict<Sym, Type>() }
-          let iface_methods = iface_entry!.value.im_children()
+          let iface_methods = iface_entry!.value.im.children()
           for im in iface_methods {
             if im.name != null {
               let mtype = self.func_decl_to_type(im)
@@ -2455,7 +2455,7 @@ lyric checker {
     }
 
     // Bind parameters
-    let params = f.param_children()
+    let params = f.param.children()
     for p in params {
       if p.is_self { continue }
       if p.name != null {
@@ -2488,7 +2488,7 @@ lyric checker {
   // =====================================================================
 
   func Checker.check_block(self, block: Block) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for s in stmts {
       self.check_stmt(s)
     }
@@ -3129,7 +3129,7 @@ lyric checker {
 
   func Checker.check_block_expr_type(self, block: Block) -> Type {
     // The type of a block-as-expression is the type of its last expression
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     if len(stmts) > 0 {
       let last = stmts[len(stmts) - 1]
       match last.kind {
@@ -4300,7 +4300,7 @@ lyric checker {
   }
 
   func Checker.walk_block(self, block: Block, callback: (Expr) -> ()) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for s in stmts { self.walk_stmt(s, callback) }
   }
 
@@ -4448,29 +4448,29 @@ lyric checker {
   func Checker.validate_all_exprs_resolved(self, file: File) {
     if len(self.errors) > 0 { return }
 
-    let blocks = file.fb_children()
+    let blocks = file.fb.children()
     for block in blocks {
-      let funcs = block.fd_children()
+      let funcs = block.fd.children()
       for f in funcs {
         if f.body == null { continue }
         // Skip generic functions — they aren't fully resolved
-        let tps = f.fp_children()
+        let tps = f.fp.children()
         if len(tps) > 0 { continue }
 
         let ctx = f.name!.name
         self.vwalk_block(f.body!, ctx)
       }
 
-      let classes = block.cd_children()
+      let classes = block.cd.children()
       for cls in classes {
         // Skip generic classes — their methods use unresolved type variables
-        let cls_tps = cls.ctp_children()
+        let cls_tps = cls.ctp.children()
         if len(cls_tps) > 0 { continue }
 
-        let cmethods = cls.cm_children()
+        let cmethods = cls.cm.children()
         for m in cmethods {
           if m.body == null { continue }
-          let tps = m.fp_children()
+          let tps = m.fp.children()
           if len(tps) > 0 { continue }
 
           let ctx = sym_to_string(cls.name!) + "." + m.name!.name
@@ -4481,7 +4481,7 @@ lyric checker {
   }
 
   func Checker.vwalk_block(self, block: Block, ctx: string) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for s in stmts {
       self.vwalk_stmt(s, ctx)
     }
@@ -4687,23 +4687,23 @@ lyric checker {
   func Checker.validate_field_and_method_access(self, file: File) {
     if len(self.errors) > 0 { return }
 
-    let blocks = file.fb_children()
+    let blocks = file.fb.children()
     for block in blocks {
-      let funcs = block.fd_children()
+      let funcs = block.fd.children()
       for f in funcs {
         if f.body == null { continue }
-        let tps = f.fp_children()
+        let tps = f.fp.children()
         if len(tps) > 0 { continue }
 
         self.validate_access_block(f.body!)
       }
 
-      let classes = block.cd_children()
+      let classes = block.cd.children()
       for cls in classes {
-        let cmethods = cls.cm_children()
+        let cmethods = cls.cm.children()
         for m in cmethods {
           if m.body == null { continue }
-          let tps = m.fp_children()
+          let tps = m.fp.children()
           if len(tps) > 0 { continue }
 
           self.validate_access_block(m.body!)
@@ -4713,7 +4713,7 @@ lyric checker {
   }
 
   func Checker.validate_access_block(self, block: Block) {
-    let stmts = block.bs_children()
+    let stmts = block.bs.children()
     for s in stmts {
       self.validate_access_stmt(s)
     }
@@ -4972,10 +4972,10 @@ lyric checker {
   // =====================================================================
 
   func Checker.validate_relation_hints(self, file: File) {
-    let blocks = file.fb_children()
+    let blocks = file.fb.children()
     let mut validated: Dict<Sym, bool> = Dict<Sym, bool>()
     for bi in range(0, len(blocks)) {
-      let impls = blocks[bi].ib_children()
+      let impls = blocks[bi].ib.children()
       for ii in range(0, len(impls)) {
         let ib = impls[ii]
         if isnull(ib.kind) { continue }
@@ -4994,7 +4994,7 @@ lyric checker {
   func Checker.validate_one_hint_interface(self, ib: ImplBlock, iface: InterfaceDecl) {
     if iface.name == null { return }
     let iface_name = sym_to_string(iface.name!)
-    let tps = iface.itp_children()
+    let tps = iface.itp.children()
 
     let prefix = "cannot use " + iface_name + " as an owns/refs hint; "
 
@@ -5009,7 +5009,7 @@ lyric checker {
     let sides = "(" + p_name + ", " + c_name + ")"
 
     // Rule 2a: every field declaration must name P or C.
-    let fields = iface.ifd_children()
+    let fields = iface.ifd.children()
     for fi in range(0, len(fields)) {
       let f = fields[fi]
       let fname = if f.name != null { sym_to_string(f.name!) } else { "?" }
@@ -5025,7 +5025,7 @@ lyric checker {
     }
 
     // Rule 2b: every destructor block must name P or C.
-    let destrs = iface.idb_children()
+    let destrs = iface.idb.children()
     for di in range(0, len(destrs)) {
       let d = destrs[di]
       if d.type_param == null { continue }
@@ -5038,7 +5038,7 @@ lyric checker {
 
     // Rule 2c: every method with a receiver must use a receiver naming P or C.
     // Methods with no receiver are free-function helpers and are exempt.
-    let methods = iface.im_children()
+    let methods = iface.im.children()
     for mi in range(0, len(methods)) {
       let m = methods[mi]
       if m.receiver_type == null { continue }
@@ -5070,7 +5070,7 @@ lyric checker {
   func check_file(file: File) -> Checker {
     let c = new_checker()
 
-    let blocks = file.fb_children()
+    let blocks = file.fb.children()
 
     // Phase 0: Pre-register all type names across ALL blocks
     for b in blocks {
