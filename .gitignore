@@ -44,3 +44,10 @@ lyric_asan*
 /lyric_debug
 *.dSYM/
 /testdata/hello_world
+
+# Per-chapter split files for the book overhaul workflow.
+# Regenerable from the-lyric-book.md via cr/book-chapters/split.sh.
+cr/book-chapters/preface.md
+cr/book-chapters/ch*.md
+cr/book-chapters/app*.md
+

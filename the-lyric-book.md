@@ -2388,9 +2388,9 @@ That one line — `relation ArrayList Team:roster owns [Player:team]` — tells 
 
 The compiler reads this and generates:
 
-- A field `roster_children: [Player]` on `Team`
-- Fields `team_parent: Team?` and `team_index: i32` on `Player`
-- Methods `Team.roster_append(p)` and `Team.roster_remove(p)` (label-prefixed from the parent label `roster`)
+- A `roster` scope on `Team` that contains a `children: [Player]` field (read as `t.roster.children`)
+- A `team` scope on `Player` that contains `parent: Team?` and `index: i32` fields (read as `p.team.parent`, `p.team.index`)
+- Methods `t.roster.append(p)` and `t.roster.remove(p)` injected into the same `roster` scope on `Team`
 - A destructor on `Team` that cascade-destroys all children
 - A destructor on `Player` that removes itself from its parent's array
 - An impl block that wires the `ArrayList` interface fields to these concrete fields
@@ -2409,26 +2409,26 @@ func main() {
     let p2 = Player { name: "Bob" }
     let p3 = Player { name: "Carol" }
 
-    t.roster_append(p1)
-    t.roster_append(p2)
-    t.roster_append(p3)
+    t.roster.append(p1)
+    t.roster.append(p2)
+    t.roster.append(p3)
 
-    println(t.roster_children.len())
-    println(p1.team_index)
-    println(p2.team_index)
-    println(p3.team_index)
+    println(t.roster.children.len())
+    println(p1.team.index)
+    println(p2.team.index)
+    println(p3.team.index)
 
     // Remove middle element (Bob) — Carol should swap into Bob's slot
-    t.roster_remove(p2)
-    println(t.roster_children.len())
-    println(p3.team_index)
+    t.roster.remove(p2)
+    println(t.roster.children.len())
+    println(p3.team.index)
 
     // Parent destroy — cascade
     let t2 = Team { name: "Bears" }
     let p4 = Player { name: "Dan" }
-    t2.roster_append(p4)
+    t2.roster.append(p4)
     t2.destroy()
-    println(isnull(p4.team_parent))
+    println(isnull(p4.team.parent))
 }
 ```
 
@@ -2444,9 +2444,9 @@ Output:
 true
 ```
 
-Three players appended — indices 0, 1, 2. Remove Bob (index 1) — Carol swaps down from index 2 to index 1, array shrinks to length 2. Destroy `t2` — Dan's parent becomes null because `owns` means cascade destroy. Accessing `p4` after this is technically a use-after-free; in practice, the slab allocator zeros freed memory so `isnull(p4.team_parent)` returns `true`. Don't rely on this — it's undefined behavior. We'll discuss this further in Chapter 11.
+Three players appended — indices 0, 1, 2. Remove Bob (index 1) — Carol swaps down from index 2 to index 1, array shrinks to length 2. Destroy `t2` — Dan's parent becomes null because `owns` means cascade destroy. Accessing `p4` after this is technically a use-after-free; in practice, the slab allocator zeros freed memory so `isnull(p4.team.parent)` returns `true`. Don't rely on this — it's undefined behavior. We'll discuss this further in Chapter 11.
 
-`t.roster_append(p1)` and `t.roster_remove(p2)` are the methods the `relation` declaration generated. The label `roster` on the parent side of the relation prefixes the method names — that's why it's `roster_append`, not just `append`. If you'd declared `relation ArrayList Team:squad owns [Player:team]` instead, the methods would be `t.squad_append(...)` and `t.squad_remove(...)`. The label keeps method names from colliding when one class participates in several relations (see §8.5).
+`t.roster.append(p1)` and `t.roster.remove(p2)` are the methods the `relation` declaration generated. The label `roster` on the parent side of the relation becomes a sub-scope on `Team` — that's why it's `t.roster.append`, not `t.append`. If you'd declared `relation ArrayList Team:squad owns [Player:team]` instead, the methods would be `t.squad.append(...)` and `t.squad.remove(...)`. The label keeps method names from colliding when one class participates in several relations (see §8.5).
 
 The methods aren't generated from thin air. They come from a stdlib interface called `ArrayList`. Here's the relevant part of `stdlib/std.ly`:
 
@@ -2517,13 +2517,13 @@ pub interface ArrayList<P, C> {
 
 A single interface, two paired destructors. The relation line's `owns`/`refs` keyword selects which pair the desugar pass copies onto the concrete classes. `relation ArrayList Team:roster owns [Player:team]` picks up the `destructor owns P/C` pair (cascade); change `owns` to `refs` and you get the unlink-only pair instead. We'll see the same shape on `DoublyLinked` and `HashedList` in §8.3 and §8.4.
 
-`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` with the parent label as prefix — so `Team.append` becomes `Team.roster_append`. That's where `t.roster_append(p1)` comes from. The `roster_remove` method is the same story. The `array_remove<P, C>` call inside `destructor owns C` is the *free-function* form of the same operation — both forms exist, and Lyric's UFCS rule means `t.roster_append(p)` and `array_append<Team, Player>(t, p)` lower to the same generated code. The book prefers the method form.
+`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` inside the `roster` sub-scope — so the call form becomes `t.roster.append(p1)`. The `t.roster.remove` method is the same story. The `array_remove<P, C>` call inside `destructor owns C` is the *free-function* form of the same operation — both forms exist, and Lyric's UFCS rule means `t.roster.append(p)` and `array_append<Team, Player>(t, p)` lower to the same generated code. The book prefers the method form.
 
 The `array_remove` body uses swap-remove for O(1) deletion — the last element swaps into the removed slot, then the slice shrinks by one. **Don't cache array indices across removals** — swap-remove changes the index of whatever element used to be at the end.
 
 The `trusted` keyword on the methods opens a small window where the interface can call the raw `ref child` / `unref child` ops to manage the child's reference count by hand — these are the back-pointer fix-ups that make the relation's lifetime contract work. You don't write `trusted` code yourself unless you're building your own container interface; the three stdlib relation types are the only ones most programs need.
 
-The interface is generic over `P` and `C`. It works for any parent-child pair. The `relation` declaration tells the compiler which concrete types to bind — `Team` as `P`, `Player` as `C` — and auto-generates the field bindings so that when `ArrayList` code accesses `self.children`, it reaches `Team.roster_children`.
+The interface is generic over `P` and `C`. It works for any parent-child pair. The `relation` declaration tells the compiler which concrete types to bind — `Team` as `P`, `Player` as `C` — and routes the per-side members into the right sub-scope so that when `ArrayList` code accesses `self.children`, it reaches the same scope's children field — `t.roster.children` when read from outside, the mangled storage `Team.__roster_children` underneath.
 
 ### 8.3 owns vs refs
 
@@ -2541,30 +2541,30 @@ func main() {
     let g2 = Guest { name: "Bob" }
     let g3 = Guest { name: "Carol" }
 
-    r.room_append(g1)
-    r.room_append(g2)
-    r.room_append(g3)
+    r.room.append(g1)
+    r.room.append(g2)
+    r.room.append(g3)
 
     // Walk the list
-    let mut cur = r.room_first
+    let mut cur = r.room.first
     while !isnull(cur) {
         println(cur!.name)
-        cur = cur!.guest_next
+        cur = cur!.guest.next
     }
 
     // Remove middle element — Bob is unlinked but still alive
-    r.room_remove(g2)
+    r.room.remove(g2)
     println("after remove:")
-    cur = r.room_first
+    cur = r.room.first
     while !isnull(cur) {
         println(cur!.name)
-        cur = cur!.guest_next
+        cur = cur!.guest.next
     }
 
     // Destroy parent — children should be unlinked but still alive
     r.destroy()
-    println(f"g1 parent null: {isnull(g1.guest_parent)}")
-    println(f"g3 parent null: {isnull(g3.guest_parent)}")
+    println(f"g1 parent null: {isnull(g1.guest.parent)}")
+    println(f"g3 parent null: {isnull(g3.guest.parent)}")
     // Children still accessible — refs means no cascade
     println(f"g1 name: {g1.name}")
     println(f"g2 name: {g2.name}")
@@ -2588,9 +2588,9 @@ g2 name: Bob
 g3 name: Carol
 ```
 
-`refs` instead of `owns`. Same hint (`DoublyLinked`) — only the keyword changes. When the room is destroyed, all three guests are unlinked — their parent pointers become null — but they survive. Bob is doubly interesting: we explicitly removed him from the room with `r.room_remove(g2)` before the destroy, and he's still alive at the end because nobody owns him.
+`refs` instead of `owns`. Same hint (`DoublyLinked`) — only the keyword changes. When the room is destroyed, all three guests are unlinked — their parent pointers become null — but they survive. Bob is doubly interesting: we explicitly removed him from the room with `r.room.remove(g2)` before the destroy, and he's still alive at the end because nobody owns him.
 
-The methods this time are `r.room_append(...)` and `r.room_remove(...)` — same label-prefix rule as `ArrayList`, just bound to a doubly-linked-list interface. Walking the list uses the injected fields directly: `r.room_first` (the list head) and `cur!.guest_next` (each child's forward pointer). The `room` and `guest` labels prefix the fields the same way they prefix the methods.
+The methods this time are `r.room.append(...)` and `r.room.remove(...)` — same label-as-scope rule as `ArrayList`, just bound to a doubly-linked-list interface. Walking the list uses the injected fields directly: `r.room.first` (the list head) and `cur!.guest.next` (each child's forward pointer). The `room` and `guest` labels open the sub-scopes the same way they did for the methods.
 
 `DoublyLinked` carries the same shape as `ArrayList`: one interface, two paired destructors, with the `owns`/`refs` keyword choosing which pair runs. Here are the two parent destructors side by side:
 
@@ -2655,19 +2655,19 @@ func main() {
     let p = Parent { name: "test" }
     let a = Child1 { val: 1 }
     let b = Child2 { val: 2 }
-    p.c1_append(a)
-    p.c2_append(b)
-    print(p.c1_children.len())
-    print(p.c2_children.len())
-    p.c1_remove(a)
-    print(p.c1_children.len())
-    print(p.c2_children.len())
+    p.c1.append(a)
+    p.c2.append(b)
+    print(p.c1.children.len())
+    print(p.c2.children.len())
+    p.c1.remove(a)
+    print(p.c1.children.len())
+    print(p.c2.children.len())
 }
 ```
 
 Output: `1101`
 
-The labels (`c1` and `c2`) keep both the method names and the field names from colliding: `p.c1_append` vs `p.c2_append`, `c1_children` vs `c2_children`, `c1_parent` vs `c2_parent`. Each relation is independent — removing a `Child1` doesn't affect the `Child2` collection. The output reads left to right (we used `print`, not `println`): after both appends, c1 has 1 child, c2 has 1 child. After removing the `Child1`, c1 has 0, c2 still has 1.
+The labels (`c1` and `c2`) keep both the method names and the field names from colliding by giving each relation its own sub-scope: `p.c1.append` vs `p.c2.append`, `p.c1.children` vs `p.c2.children`, `a.c1.parent` vs `b.c2.parent`. Each relation is independent — removing a `Child1` doesn't affect the `Child2` collection. The output reads left to right (we used `print`, not `println`): after both appends, c1 has 1 child, c2 has 1 child. After removing the `Child1`, c1 has 0, c2 still has 1.
 
 A child can also belong to multiple parents. In `destroy_shared.ly`, a `Player` belongs to both `TeamA` and `TeamB` via separate `DoublyLinked owns` relations. Destroying `TeamA` cascade-destroys the player, which automatically removes itself from `TeamB`:
 
@@ -2684,16 +2684,16 @@ func main() {
     let b = TeamB { name: "Betas" }
     let p = Player { name: "Alice" }
 
-    a.team_a_append(p)
-    b.team_b_append(p)
+    a.team_a.append(p)
+    b.team_b.append(p)
 
-    println(f"a has player: {!isnull(a.team_a_first)}")
-    println(f"b has player: {!isnull(b.team_b_first)}")
+    println(f"a has player: {!isnull(a.team_a.first)}")
+    println(f"b has player: {!isnull(b.team_b.first)}")
 
     // Destroy team A — cascade-destroys Alice,
     // which auto-removes her from team B
     a.destroy()
-    println(f"b has player after destroy: {!isnull(b.team_b_first)}")
+    println(f"b has player after destroy: {!isnull(b.team_b.first)}")
 }
 ```
 
@@ -2732,27 +2732,27 @@ func main() {
     let three = Expr { kind: "num", value: 3.0, op: "" }
     let four = Expr { kind: "num", value: 4.0, op: "" }
 
-    add.operands_append(three)
-    add.operands_append(four)
+    add.operands.append(three)
+    add.operands.append(four)
 
     let print_stmt = Stmt { kind: "print" }
-    print_stmt.args_append(add)
-    prog.stmts_append(print_stmt)
+    print_stmt.args.append(add)
+    prog.stmts.append(print_stmt)
 
     // Walk the tree
-    let stmt = prog.stmts_children[0]
-    let expr = stmt.args_children[0]
+    let stmt = prog.stmts.children[0]
+    let expr = stmt.args.children[0]
     println(f"stmt: {stmt.kind}")
     println(f"expr: {expr.kind} {expr.op}")
-    println(f"left: {expr.operands_children[0].value}")
-    println(f"right: {expr.operands_children[1].value}")
+    println(f"left: {expr.operands.children[0].value}")
+    println(f"right: {expr.operands.children[1].value}")
 
     // Destroy the whole tree in one call
     prog.destroy()
 }
 ```
 
-Notice that `Expr` is both a parent (of `operands`) and a child (of `Stmt` via `args`). A class can play either role in any number of relations; each relation's labels keep the injected fields and methods separate. `add.operands_append(three)` reaches the `operands` relation; `print_stmt.args_append(add)` reaches the `args` relation; both work on the same `Expr` instance without ambiguity.
+Notice that `Expr` is both a parent (of `operands`) and a child (of `Stmt` via `args`). A class can play either role in any number of relations; each relation's labels keep the injected fields and methods separate. `add.operands.append(three)` reaches the `operands` relation; `print_stmt.args.append(add)` reaches the `args` relation; both work on the same `Expr` instance without ambiguity.
 
 `prog.destroy()` destroys the program, which cascade-destroys all statements, which cascade-destroy all expressions, which cascade-destroy their operands. The entire tree is cleaned up deterministically, in reverse order, with no manual traversal and no GC.
 
@@ -2899,6 +2899,34 @@ This is documentation and a compiler check. Lyric uses structural interface sati
 
 🚧 *Today, `implements` is declarative only — the checker records the claim but doesn't yet verify that the required methods are actually present. Missing methods surface as errors later in lowering or codegen instead of at the declaration site. The roadmap item is to do the structural check up front so you get a clean "Task: method `display` required by Displayable is missing" error.*
 
+### 9.2.1 Labels on Impl Type-Vars
+
+The impl blocks above bind one class per type parameter and inject the interface's fields and methods flat into each class. That's fine when a class plays its role in the interface exactly once. The interesting case is when the same class wants to play the same role *twice*, with the two participations kept distinct. The mechanism is a `:label` after the class name in the impl's type-argument list:
+
+```lyric
+impl ArrayList<Team:roster, Player:team> {
+    P.children <-> Team.roster_field
+    C.parent   <-> Player.team_field
+}
+```
+
+The label sits with the type-variable, not with the impl block as a whole. Members the interface puts on `P` inject into the `roster` scope on `Team`; members on `C` inject into the `team` scope on `Player`. Call sites use the dotted-scope path: `team.roster.children`, `player.team.parent`. Omit the label and that side injects flat into the class namespace — only one *unlabeled* relation per `(P, C)` pair is allowed.
+
+The headline benefit is that same-letter labels on different type-vars are **non-colliding**, because each label lives in its own class's namespace:
+
+```lyric
+class Team { name: string }
+class Player { name: string }
+class Coach { name: string }
+
+relation ArrayList Team:roster owns [Player:team]
+relation ArrayList Team:staff  owns [Coach:team]
+```
+
+Both children carry the same label `:team` — and that's fine. `player.team.parent` and `coach.team.parent` are different fields on different classes, with no shared symbol table entry. The C++ trick of inheriting from a `LinkedListChild` mixin twice and silently colliding on `next`/`prev` simply doesn't apply: each label is scoped to its class, not to a shared inheritance chain. A `Node` participating in two intrusive linked lists works the same way — two `DoublyLinked` relations with labels distinct on at least one side, no inheritance involved.
+
+A `relation` declaration is sugar for a labeled impl: `relation ArrayList Team:roster owns [Player:team]` desugars to `impl ArrayList<Team:roster, Player:team> owns { }` with the field-binds synthesized from the hint's `field` declarations. §9.6 shows the impl form by hand for a user-defined hint.
+
 ### 9.3 Default Methods and Field Accessors
 
 The `Graph` example uses method aliases — the concrete class already has a method, and the impl block maps the interface name to it. The other style is to give the interface a body — a *default method* — that calls the abstract methods and field accessors it declares:
@@ -2944,24 +2972,24 @@ func main() {
 }
 ```
 
-The call site uses the free-function form `add<Panel, Widget>(panel, w1)`. The compiler monomorphizes `add` against `(Panel, Widget)`, rewrites `parent.items()` to read the relation-injected field `panel.w_items`, and emits a direct call — no vtables, no dispatch.
+The call site uses the free-function form `add<Panel, Widget>(panel, w1)`. The compiler monomorphizes `add` against `(Panel, Widget)`, rewrites `parent.items()` to read the relation-injected field `panel.w.items`, and emits a direct call — no vtables, no dispatch.
 
-🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w_add(w1)` and `panel.w_count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster_append(p)`, `dir.files_append(f)`) is wired up for the stdlib hints `ArrayList`, `DoublyLinked`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
+🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w.add(w1)` and `panel.w.count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster.append(p)`, `dir.files.append(f)`) is wired up for the stdlib hints `ArrayList`, `DoublyLinked`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
 
 ### 9.4 Field Injection
 
-Chapter 8 showed the *effect* of field injection — `relation ArrayList Team:roster owns [Player:team]` adds `roster_children` to `Team` and `team_parent` to `Player`. Now you can see the mechanism: the `ArrayList` interface declares `field P.children: [C]`, `field C.parent: P?`, and `field C.index: i32`. The desugar pass physically adds these fields to the concrete classes, prefixed with the label from the relation declaration.
+Chapter 8 showed the *effect* of field injection — `relation ArrayList Team:roster owns [Player:team]` adds `team.roster.children` to `Team` and `player.team.parent` to `Player`. Now you can see the mechanism: the `ArrayList` interface declares `field P.children: [C]`, `field C.parent: P?`, and `field C.index: i32`. The desugar pass physically adds these fields to the concrete classes, dropped into the scope named by each side's relation label.
 
 The impl block can also bind injected fields to existing fields using `<->`:
 
 ```lyric
-impl DoublyLinked<Folder, File> {
-    P.children <-> Folder.items
-    C.label <-> File.title
+impl DoublyLinked<Folder:items, File:folder> {
+    P.first <-> Folder.first_item
+    C.parent <-> File.owner
 }
 ```
 
-This tells the compiler: when the `DoublyLinked` interface accesses `P.children`, use `Folder.items` instead of injecting a new field. You'd use this when `Folder` already has an `items` field — perhaps from an earlier version of your code, or because the field name carries domain meaning that `children` doesn't.
+This tells the compiler: when the `DoublyLinked` interface accesses `P.first` on the `items` side of `Folder`, use the existing field `Folder.first_item` instead of injecting a new one. You'd use this when `Folder` already has a `first_item` field — perhaps from an earlier version of your code, or because the field name carries domain meaning that `first` doesn't. Field-binds the impl body doesn't mention are still synthesized from the hint's `field` declarations using each side's label, so you only spell out the overrides.
 
 ### 9.5 Destructors
 
@@ -2979,7 +3007,7 @@ pub interface ArrayList<P, C> {
     }
 
     destructor owns C {
-        array_remove(self)
+        array_remove<P, C>(self)
     }
 
     destructor refs P {
@@ -2992,12 +3020,14 @@ pub interface ArrayList<P, C> {
     }
 
     destructor refs C {
-        array_remove(self)
+        array_remove<P, C>(self)
     }
 }
 ```
 
 When you write `relation ArrayList Team:roster owns [Player:team]`, the desugar pass copies the `owns` pair onto `Team` and `Player`. Switch the keyword to `refs` and you get the `refs` pair instead — same hint, different lifetime contract. `destructor P` (no kind keyword) is a legacy shorthand that defaults to `owns`.
+
+Inside the destructor body, `self.children` is written against the *interface*'s field name. When the pair is copied onto a concrete class for a labeled relation, the desugar pass rewrites that access onto the matching scoped storage on the target class — so the same `self.children` body that reads naturally inside the interface lands on `Team` as the per-label `roster.children` slice. You write the algorithm once against the abstract field; the desugar puts it where it belongs.
 
 `destructor owns P` is injected into whatever concrete class plays `P` for an `owns` relation. When you call `team.destroy()`, this code runs — iterating the children array in reverse so that children added last are cleaned up first (matching C++ RAII conventions). `destructor owns C` calls `array_remove` to unlink the child before it's freed.
 
@@ -3007,33 +3037,64 @@ Destructors cascade. When `team.destroy()` runs, it calls `player.destroy()` for
 
 The three stdlib hints (`ArrayList`, `DoublyLinked`, `HashedList`) cover the storage shapes you'll reach for 99% of the time. When they don't fit, you can write your own. A hint is just an interface that declares the parent-side and child-side fields the relation needs, plus a pair of `owns`/`refs` destructors describing how to clean up.
 
-Say you want a stack-shaped relation — children are pushed and popped from one end, no iteration in the middle, no back-pointer needed on the child. You'd write:
+Say you want a stack-shaped relation — children are pushed onto one end, popped from the same end, no random access. You'd write:
 
 ```lyric
 pub interface Stack<P, C> {
     field P.top: C?
+    field C.next: C?
+
+    pub func push(parent: P, child: C) {
+        child.set_next(parent.top())
+        parent.set_top(child)
+    }
 
     destructor owns P {
-        let mut cur = self.top()
+        let mut cur = self.top
         while !isnull(cur) {
-            let next: C? = null   // children have no back-link in this hint
+            let nxt = cur!.next
             cur!.destroy()
-            cur = next
+            cur = nxt
         }
-        self.set_top(null)
+        self.top = null
     }
+    destructor owns C { }
 
     destructor refs P {
-        self.set_top(null)
+        self.top = null
     }
+    destructor refs C { }
 }
+```
 
+There are two surfaces for binding it to concrete classes. The convenient one is the `relation` sugar from Chapter 8 — it works for user-defined hints too, not just the stdlib three:
+
+```lyric
 relation Stack Editor:undo owns [Action:owner]
 ```
 
-The compiler treats `Stack` exactly like a stdlib hint: it injects `top` onto `Editor` under the `undo` label, runs the `owns` destructor when `editor.destroy()` fires, and ignores the `refs` block for this relation because the keyword was `owns`. Switch to `refs` and the other destructor runs instead.
+The underlying form is a labeled, ownership-annotated impl block:
+
+```lyric
+impl Stack<Editor:undo, Action:owner> owns { }
+```
+
+The two are equivalent — the `relation` line desugars to exactly this impl. The body is empty because the desugar pass synthesizes the per-side field-binds from the hint interface's `field` declarations (`Editor` gets a `top` field in its `undo` scope; `Action` gets `next` in its `owner` scope). The `owns` flag selects the matching destructor pair (cascade through the chain, calling `destroy` on each `Action`). Either way you write it, calls look the same:
+
+```lyric
+let e = Editor { name: "e1" }
+let a1 = Action { tag: "A1" }
+let a2 = Action { tag: "A2" }
+push<Editor, Action>(e, a1)
+push<Editor, Action>(e, a2)
+println(e.undo.top!.tag)               // A2
+println(e.undo.top!.owner.next!.tag)   // A1
+```
+
+The impl form is strictly more capable than the relation sugar in two cases. First, it accepts any binary interface whose shape satisfies the hint contract — the relation surface only recognizes the three stdlib hint names by ident. Second, the body need not stay empty: any additional Alias, FieldBind, or Inline mappings written between the braces stack on top of the synthesized ones, letting you override individual bindings without restating the rest.
 
 Earlier versions of Lyric had an `embed` keyword that let one interface inherit fields and destructors from another (so you could build `Stack` on top of `DoublyLinked` and only add what was different). It was removed once the stdlib hints stopped needing it — the three of them carry their own paired destructors directly. User-defined hints are uncommon enough that declaring fields and destructors inline (as `Stack` does above) reads more clearly than indirecting through a base interface.
+
 ### 9.7 Where Clauses on Functions
 
 You can write generic functions constrained by an interface using `where`:
@@ -3102,7 +3163,7 @@ Every collection type in Lyric's standard library is built with interfaces and r
 - `Dict<K, V>` — uses `HashedList` internally (Chapter 10)
 - `Hashable` — single-method constraint for hash table keys
 
-733 lines of Lyric in `std.ly` alone (991 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, and `destructor` that the standard library uses.
+740 lines of Lyric in `std.ly` alone (998 including `string.ly`). No compiler magic, no special-cased types. If you don't like how `ArrayList` works, you can write your own — using the same `interface`, `field`, and `destructor` that the standard library uses.
 
 This is what it means when we say the standard library *is* the language. The language provides the mechanism. The library provides the policy. You can change the policy.
 
@@ -3525,17 +3586,17 @@ func main() {
     let b = TeamB { name: "Betas" }
     let p = Player { name: "Alice" }
 
-    a.team_a_append(p)
-    b.team_b_append(p)
+    a.team_a.append(p)
+    b.team_b.append(p)
 
-    println(f"a has player: {!isnull(a.team_a_first)}")
-    println(f"b has player: {!isnull(b.team_b_first)}")
+    println(f"a has player: {!isnull(a.team_a.first)}")
+    println(f"b has player: {!isnull(b.team_b.first)}")
 
     let old_ptr = p
 
     a.destroy()
 
-    println(f"b has player after destroy: {!isnull(b.team_b_first)}")
+    println(f"b has player after destroy: {!isnull(b.team_b.first)}")
 
     let p2 = Player { name: "Bob" }
     println(f"slab reuse: {p2 == old_ptr}")
@@ -3555,9 +3616,11 @@ p2 name: Bob
 
 When `a.destroy()` fires, it cascade-destroys Alice (because `TeamA` *owns* her). Alice is removed from both `TeamA`'s list and `TeamB`'s list. Then her slab slot goes on the free list — `memset` zeros the slot, so any dangling reference sees zeroed fields rather than garbage. The next allocation (`Player { name: "Bob" }`) reuses that same slot.
 
+The reason the destructor *can* unlink Alice from both lists is sitting right inside her slab slot. The parent-side dotted-scope syntax (`a.team_a.first`, `a.team_a.last`) and the child-side back-pointer and link fields are all sugar for storage the compiler injected during relation lowering. At the C level those fields carry mangled names — `TeamA.__team_a_first` and `TeamA.__team_a_last` on the parent side; `Player.__pa_parent`, `Player.__pa_next`, `Player.__pa_prev` for the child's view of the first relation, and the matching `__pb_*` triple for the second. The mangling uses the label that lives on *that side* of the relation — parent label for parent-side fields, child label for child-side fields — so `Player`'s slab slot carries one independent back-pointer-plus-links triple per relation it participates in. User code never spells the mangled names; they're what you'll see if you crack a slab open in gdb.
+
 **After `a.destroy()`, `p` is a dangling pointer.** Accessing `p.name` is undefined behavior, even though the zeroed memory makes it look safe. The slab allocator's `memset` is a debugging aid, not a safety guarantee. Don't rely on it.
 
-🚧 *This is the one place Lyric's safety story has a real gap today: a stale reference to a destroyed object is a use-after-free. The roadmap fix is **bidirectional pointers** — a back-pointer annotation that the compiler tracks across destroys, automatically nulling it when the owner dies. Combined with a planned `destroys` annotation (declares "this function may destroy `self`") and `mut resize` (declares "this function may reallocate the backing array"), the checker will be able to reject UAF at compile time. Until then: when you have references that outlive an `owns` relation, keep them inside `if !isnull(parent)` guards, or hold them through the parent (`team.roster_children[i]`) rather than as standalone pointers. While debugging, compile with `--detect-uaf` — freed slab slots are marked with a sentinel and every class access checks for it, turning silent UAF into a loud crash at the point of the bad read.*
+🚧 *This is the one place Lyric's safety story has a real gap today: a stale reference to a destroyed object is a use-after-free. The roadmap fix is **bidirectional pointers** — a back-pointer annotation that the compiler tracks across destroys, automatically nulling it when the owner dies. Combined with a planned `destroys` annotation (declares "this function may destroy `self`") and `mut resize` (declares "this function may reallocate the backing array"), the checker will be able to reject UAF at compile time. Until then: when you have references that outlive an `owns` relation, keep them inside `if !isnull(parent)` guards, or hold them through the parent (`team.roster.children[i]`) rather than as standalone pointers. While debugging, compile with `--detect-uaf` — freed slab slots are marked with a sentinel and every class access checks for it, turning silent UAF into a loud crash at the point of the bad read.*
 
 A class can participate in multiple `owns` relations simultaneously — Alice was owned by both TeamA and TeamB. Whichever owner's `destroy` fires first cascade-destroys the child. The child's destructor automatically unlinks it from all other relations before the slab slot is freed.
 
@@ -4293,7 +4356,7 @@ The whole thing compiles to one 114,770-line C file. `gcc` compiles that in a fe
 ## Chapter 14: The Self-Hosting Compiler
 
 
-The Lyric compiler is written in Lyric. It parses Lyric source, type-checks it, lowers it to an intermediate representation, optimizes, monomorphizes generics, and emits C. Then GCC compiles the C. The whole process — 32,509 lines of Lyric across 14 files (plus 991 lines of stdlib) producing 114,770 lines of C — takes a few seconds end-to-end.
+The Lyric compiler is written in Lyric. It parses Lyric source, type-checks it, lowers it to an intermediate representation, optimizes, monomorphizes generics, and emits C. Then GCC compiles the C. The whole process — 32,533 lines of Lyric across 14 files (plus 998 lines of stdlib) producing 114,473 lines of C — takes a few seconds end-to-end.
 
 This chapter is a tour. Not a tutorial on how to write a compiler — that's a different book — but a walk through the pipeline that compiles every example in this one. By the end, you should understand how `./lyric compile` turns the `.ly` files you've been writing into a running binary, and why running it on its own source code reaches a fixed point.
 
@@ -4351,7 +4414,7 @@ func compile_pipeline(inputs: [string], output: string,
     validate_post_mono(prog)  // ensures no unresolved type params remain
 
     // 11. Rewrite impl renames to final names
-    rewrite_impl_renames(prog)  // resolves label-prefixed method names
+    rewrite_impl_renames(prog)  // resolves interface-dispatched method calls to concrete impls
 
     // 12. Slab allocation rewrite
     if soa { prog!.slab_mode_soa = true }
@@ -4370,7 +4433,7 @@ Let's walk through the interesting ones.
 
 ### 14.2 Parse
 
-The parser (`src/parser/parser.ly`, 1,383 lines; `src/parser/expr_parser.ly`, 1,496 lines) is a recursive descent parser that produces an AST defined in `src/ast/ast.ly` (1,476 lines).
+The parser (`src/parser/parser.ly`, 1,383 lines; `src/parser/expr_parser.ly`, 1,483 lines) is a recursive descent parser that produces an AST defined in `src/ast/ast.ly` (1,447 lines).
 
 Splitting the parser into two files was practical, not architectural. Expression parsing is complex enough to deserve its own file — operator precedence, prefix/postfix, function calls, match expressions, if-expressions, lambdas. Both files declare `lyric parser { }` and share all declarations without imports.
 
@@ -4380,15 +4443,15 @@ One design choice worth noting: the parser uses a `no_struct_lit` flag to resolv
 
 Between parsing and C emission, the source passes through three major transformations:
 
-**Desugar** (1,534 lines) runs five passes in fixed order: InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
+**Desugar** (1,454 lines) runs five passes in fixed order: InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
 
-**Check** (4,919 lines) is four-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
+**Check** (5,087 lines) is five-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 1.6 validates that every interface used as a relation hint has the right shape (paired destructors, well-typed field declarations); Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
 
-**Lower** (3,669 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
+**Lower** (3,657 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
 
 **Optimize** (1,556 lines) runs six LIR→LIR passes: fuse side-effect temps, destructure multi-returns, destructure extract-pairs from the `?` operator, fix nil-zero values on non-class returns, eliminate unused temps recursively while preserving side effects, and blank out unused multi-assign names. Each pass is small and local; together they undo the lowerer's verbose-but-correct first cut.
 
-**Monomorphize** (3,939 lines) eliminates generics by creating specialized copies: `identity<i32>` becomes `identity_i32`. This is iterative — specializing a function may reveal new generic calls in its body. In practice, it converges in two or three iterations. The tradeoff vs. vtables is code size for speed; for a compiler where types are known at compile time, monomorphization wins.
+**Monomorphize** (3,950 lines) eliminates generics by creating specialized copies: `identity<i32>` becomes `identity_i32`. This is iterative — specializing a function may reveal new generic calls in its body. In practice, it converges in two or three iterations. The tradeoff vs. vtables is code size for speed; for a compiler where types are known at compile time, monomorphization wins.
 
 
 ### 14.4 Emit C
@@ -4401,7 +4464,7 @@ Classes become heap-allocated structs. In AoS mode (the default), each class typ
 
 Lambdas are hoisted to top-level C functions. Captured variables are packed into a context struct that's passed as the first argument. Spawned blocks work the same way — the captured variables become fields of a context struct passed to a `pthread_create` wrapper.
 
-The output is one C file. The compiler's own output — `lyric.c` — is 114,770 lines. GCC compiles it with `-O2` in a few seconds. The resulting binary is the Lyric compiler.
+The output is one C file. The compiler's own output — `lyric.c` — is 114,473 lines. GCC compiles it with `-O2` in a few seconds. The resulting binary is the Lyric compiler.
 
 ### 14.5 The Bootstrap
 
@@ -4409,7 +4472,7 @@ A self-hosting compiler has a peculiar property: it compiles itself. Feed `./lyr
 
 That fixed point is the definition of self-hosting, and it's the thing that makes the whole edifice non-magical. Each new feature in the language has to keep compiling the compiler, because the compiler is the largest Lyric program in the world and any breakage shows up immediately.
 
-The build commits to this property in two places. First, `lyric.c` — all 114,770 lines of generated C — is checked into the repository. That's how anyone with GCC can build the compiler without already having a working Lyric toolchain:
+The build commits to this property in two places. First, `lyric.c` — all 114,473 lines of generated C — is checked into the repository. That's how anyone with GCC can build the compiler without already having a working Lyric toolchain:
 
 ```
 $ make
@@ -4468,26 +4531,26 @@ The compiler by the numbers:
 | Component | Lines |
 |-----------|-------|
 | `c_backend.ly` | 5,551 |
-| `checker.ly` | 4,919 |
-| `monomorphizer.ly` | 3,939 |
-| `lowerer.ly` | 3,669 |
+| `checker.ly` | 5,087 |
+| `monomorphizer.ly` | 3,950 |
+| `lowerer.ly` | 3,657 |
 | `memory.ly` | 2,855 |
-| `main.ly` | 1,602 |
+| `main.ly` | 1,584 |
 | `optimizer.ly` | 1,556 |
-| `desugar.ly` | 1,534 |
-| `expr_parser.ly` | 1,496 |
-| `ast.ly` | 1,476 |
+| `desugar.ly` | 1,454 |
+| `expr_parser.ly` | 1,483 |
+| `ast.ly` | 1,447 |
 | `parser.ly` | 1,383 |
-| `lir.ly` | 943 |
+| `lir.ly` | 942 |
 | `modules.ly` | 907 |
-| `lexer.ly` | 679 |
-| **Compiler total** | **32,509** |
-| `stdlib/std.ly` | 733 |
+| `lexer.ly` | 677 |
+| **Compiler total** | **32,533** |
+| `stdlib/std.ly` | 740 |
 | `stdlib/string.ly` | 258 |
-| **Stdlib total** | **991** |
-| **Grand total** | **33,500** |
+| **Stdlib total** | **998** |
+| **Grand total** | **33,531** |
 
-33,500 lines of Lyric (compiler + stdlib) produce 114,770 lines of C. The 3.4× expansion ratio comes from monomorphization (each generic function becomes multiple concrete copies), generated destructors, slab allocator boilerplate, and the verbose nature of C compared to Lyric.
+33,531 lines of Lyric (compiler + stdlib) produce 114,473 lines of C. The 3.4× expansion ratio comes from monomorphization (each generic function becomes multiple concrete copies), generated destructors, slab allocator boilerplate, and the verbose nature of C compared to Lyric.
 
 ### 14.6.1 First-Iteration Benchmarks
 
@@ -4505,7 +4568,7 @@ Compiling this same codebase with the `--soa` flag — switching all class alloc
 
 These are first-iteration numbers. The language was fourteen days old. The compiler had not yet been optimized for Lyric idioms — it was a transliteration of the Go original, carrying Go habits into a language that doesn't need them. Every subsequent round of loop engineering on the compiler — rewriting Go patterns into native Lyric — should widen these margins further.
 
-The test suite has 89 `.ly` files under `testdata/`, 83 of them paired with golden output files under `testdata/golden/`. Each test compiles a `.ly` file, runs the resulting binary, and diffs the output against the `.expected` file. The tests cover every feature in this book — enums, match, generics, relations, interfaces, Dict, concurrency, packages, error handling — plus a few that don't (the `--soa` slab layout switch, the `--detect-uaf` debug mode, the `--rc-free` reference-counting mode). The full self-compile fixed-point check in `test_self_compile.sh` is the integration test on top.
+The test suite has 91 `.ly` files under `testdata/`, 83 of them paired with golden output files under `testdata/golden/`. Each test compiles a `.ly` file, runs the resulting binary, and diffs the output against the `.expected` file. The tests cover every feature in this book — enums, match, generics, relations, interfaces, Dict, concurrency, packages, error handling — plus a few that don't (the `--soa` slab layout switch, the `--detect-uaf` debug mode, the `--rc-free` reference-counting mode). The full self-compile fixed-point check in `test_self_compile.sh` is the integration test on top.
 
 ### 14.7 Every Feature Used
 
@@ -4551,9 +4614,11 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `type` | Type alias |
 | `impl` | Interface implementation block |
 | `import` | Package import |
+| `from` | Aliased import path (`import alias from "path"`) |
 | `let` | Variable binding (immutable) |
 | `pub` | Public visibility modifier |
 | `destructor` | Destructor declaration in interfaces |
+| `lyric` | Reserved (currently unused at the parser level) |
 
 **Control flow keywords:**
 
@@ -4569,9 +4634,7 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `case` | Branch in `select` |
 | `select` | Channel multiplexing |
 | `spawn` | Launch concurrent block |
-| `lock` | Scoped mutex acquisition |
 | `yield` | Produce value from generator |
-| `cascade` | 🚧 Reserved — currently a no-op statement, slated for removal (use `owns`/`refs` on relations) |
 
 **Modifier and operator keywords:**
 
@@ -4584,10 +4647,6 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `where` | Generic constraint clause |
 | `owns` | Cascade-destroy relation |
 | `refs` | Unlink-only relation |
-| `implements` | Declare interface conformance on a class |
-| `permanent` | Class modifier — opts the class out of slab reclamation and ref-counting (Ch 10, Ch 11.5) |
-| `trusted` | Function modifier — allows raw `ref` / `unref` ops inside the body (Ch 8.2, Ch 11.5) |
-| `final` | Function modifier — pre-destruction hook that runs before the auto-generated destructor (Ch 8.7) |
 
 **Literals:**
 
@@ -4596,14 +4655,17 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 | `true` / `false` | Boolean literals |
 | `null` | Null literal |
 
-**Contextual keywords** — these are identifiers in most positions, keywords only in specific contexts:
+**Contextual keywords** — these lex as identifiers (so they may name variables, fields, methods) and only act as keywords in specific contexts:
 
 | Keyword | Context |
 |---------|---------|
-| `field` | Inside interface blocks: field injection |
-| `lock` | As statement: scoped mutex |
-| `implements` | After class name |
-| `guarded_by` | Annotation on fields |
+| `field` | Inside interface blocks: field-injection declaration |
+| `lock` | As statement: scoped mutex acquisition. As type: `lock` is the mutex type |
+| `implements` | After a class name: declare interface conformance |
+| `guarded_by` | Annotation on a field: names the lock that guards it |
+| `permanent` | Class modifier — opts the class out of slab reclamation and ref-counting (Ch 10, Ch 11.5) |
+| `trusted` | Function modifier — allows raw `ref` / `unref` ops inside the body (Ch 8.2, Ch 11.5) |
+| `final` | Function modifier — pre-destruction hook that runs before the auto-generated destructor (Ch 8.7) |
 
 ### Types
 
@@ -4659,11 +4721,11 @@ From lowest to highest:
 | 9 | `+` `-` | Left |
 | 10 | `*` `/` `%` | Left |
 | 11 | `-` `!` (unary) | Right (prefix) |
-| 12 | `.` `()` `[]` `!` | Left (postfix) |
+| 12 | `.` `()` `[]` `!` `?` `is` `as` | Left (postfix) |
 
-**Assignment operators:** `=`, `+=`, `-=`, `*=`, `/=`
+**Assignment operators:** `=`, `+=`, `-=`, `*=`, `/=` (bitwise compound assigns `%= &= |= ^= <<= >>=` and unary `~` are on the roadmap).
 
-**Other operators:** `?` (error propagation), `as` (type cast), `is` (variant test)
+**Postfix `!`** is the non-null assertion (`opt!` unwraps `T?` or panics); postfix `?` is error propagation on a `(T, error)` return.
 
 ### Built-in Functions
 
@@ -4675,17 +4737,32 @@ From lowest to highest:
 | `eprint(args...)` | variadic → `unit` | Print to stderr |
 | `len(s)` | `[T]` or `string` → `i32` | Length of slice or string |
 | `append(s, elem)` | `([T], T)` → `[T]` | Append element, return new slice |
-| `assert(cond)` | `bool` → `unit` | Assert with file:line; optional message |
-| `assert_eq(a, b)` | `(T, T)` → `unit` | Assert equality with file:line |
+| `push_bytes(dst, src)` | `(mut string, string)` → `unit` | In-place byte append |
+| `assert(cond, msg?)` | `(bool, string?)` → `unit` | Assert with injected file:line; message optional |
+| `assert_eq(a, b, msg?)` | `(T, T, string?)` → `unit` | Assert equality with injected file:line; message optional |
 | `isnull(x)` | `T?` → `bool` | Test for null |
 | `panic(msg)` | `string` → `unit` | Abort with message |
 | `exit(code)` | `i32` → `unit` | Exit process |
-| `atoi(s)` | `string` → `(i64, bool)` | Parse integer from string; `bool` is `false` on parse failure |
+| `to_string(x)` | `any` → `string` | Auto-generated for every type |
+| `format(fmt, args...)` | variadic → `string` | F-string-like formatter |
+| `atoi(s)` | `string` → `(i64, bool)` | Parse integer; `bool` is `false` on parse failure |
 | `itoa(n)` | `i32` → `string` | Integer to string |
+| `parse_float(s)` | `string` → `(f64, bool)` | Parse float; `bool` is `false` on failure |
 | `char_to_string(c)` | `u8` → `string` | Single byte to string |
-| `sym(s)` | `string` → `Sym` | Create interned symbol |
+| `string_to_bytes(s)` | `string` → `[u8]` | View string as byte slice |
+| `bytes_to_string(b)` | `[u8]` → `string` | View byte slice as string |
+| `hash_string(s)` | `string` → `u64` | FNV-1a hash |
+| `sym(s)` | `string` → `Sym` | Create interned symbol (also `` `name` ``) |
+| `new_string_builder()` | `()` → `StringBuilder` | Construct a `StringBuilder` |
+| `new_error(msg)` | `string` → `Error` | Shortcut for `Error { msg: msg }` |
 | `make_channel<T>()` | `()` → `channel<T>` | Unbuffered channel |
 | `make_channel<T>(n)` | `i32` → `channel<T>` | Buffered channel |
+
+**Character predicates** (all `u8 → bool`): `char_is_digit`, `char_is_alpha`, `char_is_space`, `char_is_upper`, `char_is_lower`, `char_is_alnum`.
+
+**Files & OS:** `read_file(path) -> (string, bool)`, `write_file(path, content) -> bool`, `file_exists(path)`, `list_dir(path) -> ([string], bool)`, `mkdtemp()`, `path_join`, `path_dir`, `path_base`, `path_ext`, `os_args()`, `os_getwd()`, `os_exit(code)`, `exec_command(name, args) -> (string, bool)`.
+
+**Relation functions** (callable manually inside `trusted` contexts): `array_append`, `array_remove`, `dll_append`, `dll_remove`, `hash_insert`, `hash_lookup`, `hash_remove`.
 
 ### Built-in Methods
 
@@ -4810,8 +4887,8 @@ interface MyList<P, C> {
 
 // Impl blocks
 impl MyList<Team, Player> {
-    P.children <-> Team.roster_children
-    func P.add(self, child: C) { self.children.push(child) }
+    P.children <-> Team.roster      // FieldBind: interface field ↔ class field
+    P.add = Team.add_player          // Alias: interface method ↔ class method
 }
 
 // Tests
@@ -4864,24 +4941,29 @@ These are multi-class interfaces (Chapter 9) that define ownership patterns. You
 
 Dynamic array of children with O(1) swap-remove. The most common relation type, and the default when you don't know which list shape you want.
 
-**Injected fields:**
+The `owns` and `refs` modifiers on the `relation` line are orthogonal: both are supported, and the choice selects which destructor pair the desugar pass copies onto the concrete classes (cascade-destroy children, or unlink-only).
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `P.children` | `[C]` | The parent's array of children |
-| `C.parent` | `P?` | Back-reference to owning parent |
-| `C.index` | `i32` | Position in parent's array |
+**Injected storage** (mangled, internal — never named in user code):
 
-The injected field names are prefixed with the relation label; for `relation ArrayList Team:roster owns [Player:team]` you get `t.roster_children`, `p.team_parent`, `p.team_index`.
+| Storage | Type | Description |
+|---------|------|-------------|
+| `P.__<label>_children` | `[C]` | The parent's array of children |
+| `C.__<label>_parent` | `P?` | Back-reference to owning parent |
+| `C.__<label>_index` | `i32` | Position in parent's array |
 
-**Generated methods** (label-prefixed using the parent relation label, e.g. `:roster` below):
+For `relation ArrayList Team:roster owns [Player:team]` the C-level fields are `Team.__roster_children`, `Player.__team_parent`, `Player.__team_index`. They exist so the runtime has stable C names regardless of the source-level label; users never type them.
 
-| Method | Description |
-|--------|-------------|
-| `parent.roster_append(child)` | Append child to parent's array |
-| `parent.roster_remove(child)` | Swap-remove child from parent's array (O(1)) |
+**User-visible access** (dotted-scope sugar, Phase 3e):
 
-The desugared free-function form is `array_append<Team, Player>(t, p)` / `array_remove<Team, Player>(p)`. The label-prefixed method form is the idiomatic call site.
+| Form | Description |
+|------|-------------|
+| `t.roster.children` | The parent's children slice (length via `len(...)`) |
+| `p.team.parent` | Back-reference to the owning team |
+| `p.team.index` | Position of `p` in `t.roster.children` |
+| `t.roster.append(p)` | Append child — method form |
+| `t.roster.remove(p)` | Swap-remove child (O(1)) — method form |
+
+The desugared free-function form `array_append<Team, Player>(t, p)` / `array_remove<Team, Player>(p)` is still available and is what the dotted method desugars to; the dotted method is the idiomatic call site.
 
 **Destructor:** When the parent is destroyed, all children in the array are cascade-destroyed (for `owns`) or unlinked (for `refs`); the `owns` vs `refs` choice on the `relation` line selects the variant.
 
@@ -4896,70 +4978,86 @@ func main() {
     let t = Team { name: "Sharks" }
     let p1 = Player { name: "Alice" }
     let p2 = Player { name: "Bob" }
-    t.roster_append(p1)
-    t.roster_append(p2)
-    println(f"{t.roster_children.len()}")  // 2
-    t.roster_remove(p1)                    // O(1) swap-remove
-    println(f"{t.roster_children.len()}")  // 1
-    t.destroy()                            // destroys remaining players
+    t.roster.append(p1)
+    t.roster.append(p2)
+    println(f"{len(t.roster.children)}")  // 2
+    t.roster.remove(p1)                   // O(1) swap-remove
+    println(f"{len(t.roster.children)}")  // 1
+    t.destroy()                           // destroys remaining players
 }
 ```
 
-`roster_remove` uses swap-remove: the last element takes the removed element's slot, and the array shrinks by one. Order is not preserved, but removal is O(1).
+`t.roster.remove(p)` uses swap-remove: the last element takes the removed element's slot, and the array shrinks by one. Order is not preserved, but removal is O(1).
 
 #### DoublyLinked\<P, C\>
 
 Intrusive doubly-linked list. Insertion preserves order; removal is O(1) without swap (siblings get relinked). Use when iteration order needs to be stable across removals, when you want to thread one child through several parents at once (each list lives on a separate label), or when you'd otherwise pay for swap-remove churn.
 
-**Injected fields:**
+As with `ArrayList`, the `owns` and `refs` modifiers on the `relation` line are orthogonal: `owns` cascades destruction through the list; `refs` walks the list nulling sibling links but leaves children alive.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `P.first` | `C?` | Head of the list |
-| `P.last` | `C?` | Tail of the list |
-| `C.parent` | `P?` | Back-reference to owner |
-| `C.next` | `C?` | Next sibling |
-| `C.prev` | `C?` | Previous sibling |
+**Injected storage** (mangled, internal):
 
-**Generated methods** (label-prefixed):
+| Storage | Type | Description |
+|---------|------|-------------|
+| `P.__<label>_first` | `C?` | Head of the list |
+| `P.__<label>_last`  | `C?` | Tail of the list |
+| `C.__<label>_parent` | `P?` | Back-reference to owner |
+| `C.__<label>_next` | `C?` | Next sibling |
+| `C.__<label>_prev` | `C?` | Previous sibling |
 
-| Method | Description |
-|--------|-------------|
-| `parent.label_append(child)` | Append child to end of list |
-| `parent.label_remove(child)` | Unlink child from list (O(1)) |
+**User-visible access** (dotted-scope sugar, Phase 3e):
 
-The desugared free-function form is `dll_append<P, C>(parent, child)` / `dll_remove<P, C>(child)`. As with `ArrayList`, the `owns` vs `refs` choice on the `relation` line selects whether parent destruction cascades.
+| Form | Description |
+|------|-------------|
+| `p.label.first`, `p.label.last` | Head and tail of the parent's list |
+| `c.label.next`, `c.label.prev` | Sibling links on a child |
+| `c.label.parent` | Back-reference to the owning parent |
+| `p.label.append(c)` | Append child to end of list — method form |
+| `p.label.remove(c)` | Unlink child from list (O(1)) — method form |
 
-**Example** (excerpted from `testdata/graph.ly`):
+The desugared free-function form `dll_append<P, C>(parent, child)` / `dll_remove<P, C>(child)` is also available and is what the dotted method desugars to.
+
+**Example.** A small scheduler where each `Node` participates in three independent doubly-linked lists at once — the runnable queue, the blocked queue, and a registry of every node ever created:
 
 ```lyric
-class Network { name: string }
-class Person   { handle: string }
-class Follow   { since: i64; weight: f64 = 1.0 }
+class Scheduler { tick: i64 }
+class Pool      { count: i32 }
+class Registry  { name: string }
+class Node      { id: i32 }
 
-relation DoublyLinked Network:nodes owns [Person:graph]
-relation DoublyLinked Person:out    refs [Follow:source]
-relation DoublyLinked Person:in     refs [Follow:target]
+relation DoublyLinked Scheduler:ready   refs [Node:rq]
+relation DoublyLinked Pool:blocked      refs [Node:bq]
+relation DoublyLinked Registry:all      owns [Node:reg]
 ```
 
-Each `Person` is in three different lists (the network's `nodes` list, plus their outgoing and incoming `Follow` lists) — the relation labels keep the injected fields and methods (`nodes_first`, `out_append`, `in_remove`, …) distinct.
+Each `Node` is in three different lists at once. The relation labels keep the injected storage and dotted-scope members distinct on both ends: `sched.ready.append(n)`, `pool.blocked.append(n)`, `reg.all.append(n)` on the parent side; `n.rq.next`, `n.bq.parent`, `n.reg.prev` on the child side. Same class threaded through three intrusive linked lists, no inheritance, no field collisions, and only the `Registry` cascades destruction (the `refs` queues unlink on parent death and leave the nodes alive for the registry to free). Labels must not be reserved words — `:in` and `:out` are illegal Lyric identifiers, which is why this example uses `:rq` / `:bq` rather than `:in` / `:out`.
+
+The current compiler injects at most one relation per ordered `(P, C)` class pair. The three relations above are fine because each pair is distinct (`Scheduler→Node`, `Pool→Node`, `Registry→Node`). Two relations on the *same* `(P, C)` pair — say `Person:outgoing` and `Person:incoming` both with `[Follow:...]` — would silently drop the second label. The spec permits any number of labeled relations per pair; that lift is on the roadmap.
 
 #### HashedList\<P, C\>
 
 Hash table with linear probing and 75% load factor. The backbone of `Dict` and `SymTable`.
 
-**Injected fields:**
+**Injected storage** (mangled, internal):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `P.children` | `[C]` | Dense array of entries |
-| `P.buckets` | `[i32]` | Bucket-to-index map (-1 = empty, -2 = tombstone) |
-| `P.hash_cap` | `i32` | Current bucket array capacity |
-| `P.hash_count` | `i32` | Number of live entries |
-| `C.parent` | `P?` | Back-reference to owner |
-| `C.index` | `i32` | Position in children array |
+| Storage | Type | Description |
+|---------|------|-------------|
+| `P.__<label>_children` | `[C]` | Dense array of entries |
+| `P.__<label>_buckets` | `[i32]` | Bucket-to-index map (-1 = empty, -2 = tombstone) |
+| `P.__<label>_hash_cap` | `i32` | Current bucket array capacity |
+| `P.__<label>_hash_count` | `i32` | Number of live entries |
+| `C.__<label>_parent` | `P?` | Back-reference to owner |
+| `C.__<label>_index` | `i32` | Position in children array |
 
-Children must implement a `hash_key(self) -> u64` method. The interface uses this for bucket placement.
+**User-visible access** (dotted-scope sugar, Phase 3e):
+
+| Form | Description |
+|------|-------------|
+| `p.label.children` | Dense entry array (read-mostly) |
+| `p.label.buckets`, `p.label.hash_cap`, `p.label.hash_count` | Bucket array and bookkeeping |
+| `c.label.parent`, `c.label.index` | Child back-reference and slot |
+
+Children must implement a `hash_key(self) -> u64` method. The interface uses this for bucket placement. As with the other two hints, `owns` and `refs` are both supported on the `relation` line and select the destructor pair.
 
 **Functions:**
 
@@ -5103,9 +5201,9 @@ The idiomatic way to construct an error value is the class literal `Error { msg:
 ```lyric
 func divide(a: i32, b: i32) -> (i32, error) {
     if b == 0 {
-        return 0, Error { msg: "division by zero" }
+        return (0, Error { msg: "division by zero" })
     }
-    return a / b, null
+    return (a / b, null)
 }
 ```
 
@@ -5517,6 +5615,21 @@ interface Graph<G, N, E> {
     func E.target(self) -> N
 }
 ```
+
+**Labels on impl type-vars — same class on two intrusive linked lists, no inheritance** — A class can carry the link slots for two (or more) intrusive doubly-linked lists at once. Each labeled relation injects its members under its own sub-scope on the participating class, so the names don't collide. (Chapter 9)
+
+```lyric
+class Node { id: i32 }
+
+// Node sits on either a ready queue or a blocked queue — same class,
+// two distinct intrusive lists, no base class and no wrapper struct:
+relation DoublyLinked ReadyQueue:ready     owns [Node:ready_q]
+relation DoublyLinked BlockedQueue:blocked owns [Node:blocked_q]
+
+// Disambiguated access: n.ready_q.parent vs n.blocked_q.parent.
+```
+
+In C++ you would reach for multiple inheritance from two `boost::intrusive::list_base_hook<tag<X>>` bases. In Rust you would write two wrapper structs (or unsafe link fields). In Go intrusive lists aren't idiomatic at all — you'd use slices of pointers and pay the indirection. Lyric handles it with two `relation` lines and zero base classes.
 
 **`--soa` flag** — Switch all class allocation to Struct-of-Arrays layout with no code changes. 10% faster, 14% less memory. (Chapter 11)
 
