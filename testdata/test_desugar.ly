@@ -12,11 +12,11 @@ lyric desugar_tests {
     let src = """lyric t { interface Named<T> { field T.name: string } }"""
     let file = td_parse(src)
     desugar_interface_fields(file)
-    let named = file.fb_children()[0].id_children()[0]
+    let named = file.fb.children()[0].id.children()[0]
     // Should have at least 2 methods: getter + setter
-    assert(len(named.im_children()) >= 2, "expected getter + setter")
-    let getter = named.im_children()[0]
-    let setter = named.im_children()[1]
+    assert(len(named.im.children()) >= 2, "expected getter + setter")
+    let getter = named.im.children()[0]
+    let setter = named.im.children()[1]
     assert(getter.name!.name == "name", "getter name")
     assert(setter.name!.name == "set_name", "setter name")
   }
@@ -30,9 +30,9 @@ lyric desugar_tests {
     }"""
     let file = td_parse(src)
     desugar_interface_fields(file)
-    let iface = file.fb_children()[0].id_children()[0]
+    let iface = file.fb.children()[0].id.children()[0]
     // 2 fields -> 4 methods (2 getters + 2 setters)
-    assert(len(iface.im_children()) >= 4, "expected 4 methods for 2 fields")
+    assert(len(iface.im.children()) >= 4, "expected 4 methods for 2 fields")
   }
 
   // (Pass 1 InterfaceEmbeds removed — embed keyword deleted.)
@@ -47,8 +47,8 @@ lyric desugar_tests {
     let file = td_parse(src)
     desugar_default_impls(file)
     // Default impl should be extracted to top-level function
-    let block = file.fb_children()[0]
-    assert(len(block.fd_children()) >= 1, "default impl extracted to top-level func")
+    let block = file.fb.children()[0]
+    assert(len(block.fd.children()) >= 1, "default impl extracted to top-level func")
   }
 
   func test_abstract_method_preserved() {
@@ -60,9 +60,9 @@ lyric desugar_tests {
     }"""
     let file = td_parse(src)
     desugar_default_impls(file)
-    let iface = file.fb_children()[0].id_children()[0]
+    let iface = file.fb.children()[0].id.children()[0]
     // Abstract method (describe) should remain on the interface
-    assert(len(iface.im_children()) >= 1, "abstract methods preserved")
+    assert(len(iface.im.children()) >= 1, "abstract methods preserved")
   }
 
   // ---- Pass ordering: desugar_all ----
@@ -75,9 +75,9 @@ lyric desugar_tests {
     }"""
     let file = td_parse(src)
     desugar_all(file)
-    let iface = file.fb_children()[0].id_children()[0]
+    let iface = file.fb.children()[0].id.children()[0]
     // After desugar_all, fields should be converted to getter/setter
-    assert(len(iface.im_children()) >= 2, "desugar_all should run interface_fields")
+    assert(len(iface.im.children()) >= 2, "desugar_all should run interface_fields")
   }
 
   // ---- Helper function tests ----

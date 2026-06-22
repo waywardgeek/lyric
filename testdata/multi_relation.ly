@@ -27,10 +27,10 @@ lyric multi_relation {
     let b = Child2 { val: 2 }
     array_append<Parent, Child1>(p, a)
     array_append<Parent, Child2>(p, b)
-    print(len(p.c1_children()))
-    print(len(p.c2_children()))
+    print(len(p.c1.children()))
+    print(len(p.c2.children()))
     array_remove<Parent, Child1>(a)
-    print(len(p.c1_children()))
-    print(len(p.c2_children()))
+    print(len(p.c1.children()))
+    print(len(p.c2.children()))
   }
 }
