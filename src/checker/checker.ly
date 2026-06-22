@@ -3737,6 +3737,43 @@ lyric checker {
       }
       _ => {}
     }
+    // Phase 3c-capability: labels-as-scopes resolution for method calls.
+    // `inner.label.method(args)` → `inner.<label>_<method>(args)` when
+    // `label` is a registered per-type-var label on inner's type
+    // (redesign §3.8) but isn't itself a real member, and the
+    // textual-prefix flat name `<label>_<method>` IS a registered
+    // member. Pure additive sugar — the desugar-emitted flat names
+    // remain canonical until Phase 3e flips them. See
+    // cr/docs/multi-class-interface-redesign.md §3.1.
+    match receiver.kind {
+      ExprKind.FieldAccess(inner, label_sym) => {
+        let label_str = sym_to_string(label_sym)
+        let member_str = sym_to_string(method)
+        let combined = label_str + "_" + member_str
+        let inner_type = self.check_expr(inner)
+        let tname0 = type_name(inner_type)
+        if tname0 != "" {
+          let info0 = self.registry.lookup(tname0)
+          if info0 != null {
+            let has_label = info0!.fields.has(sym(label_str)) || info0!.methods.has(sym(label_str))
+            let has_comb = info0!.fields.has(sym(combined)) || info0!.methods.has(sym(combined))
+            if !has_label && has_comb {
+              // Pull the existing mut_args off call_expr.kind to preserve
+              // its [bool] type — synthesizing `[]` in this position trips
+              // a Lyric codegen bug that emits LyricSlice_void.
+              let mut keep_mut: [bool] = []
+              match call_expr.kind {
+                ExprKind.MethodCall(_, _, _, _, ma) => { keep_mut = ma }
+                _ => {}
+              }
+              call_expr.kind = ExprKind.MethodCall(inner, sym(combined), type_args, args, keep_mut)
+              return self.check_method_call(call_expr, inner, sym(combined), type_args, args)
+            }
+          }
+        }
+      }
+      _ => {}
+    }
     let recv_type = self.check_expr(receiver)
     let mut arg_types: [Type] = []
     for a in args {
@@ -3980,6 +4017,36 @@ lyric checker {
           // Unit variant — rewrite AST to plain Ident
           parent_expr.kind = ExprKind.Ident(field_name)
           return enum_info!.type_val
+        }
+      }
+      _ => {}
+    }
+    // Phase 3c-capability: labels-as-scopes resolution.
+    // If the receiver looks like `inner.label` where `label` is a
+    // per-type-var label on inner's type (redesign §3.8) without a
+    // real field/method by that name, but `<label>_<field_name>` IS
+    // a registered member, rewrite the AST in place so the access
+    // dispatches via the existing textual-prefix flat name. Pure
+    // additive sugar — the desugar-emitted flat names remain
+    // canonical until Phase 3e flips them. See
+    // cr/docs/multi-class-interface-redesign.md §3.1.
+    match receiver.kind {
+      ExprKind.FieldAccess(inner, label_sym) => {
+        let label_str = sym_to_string(label_sym)
+        let member_str = sym_to_string(field_name)
+        let combined = label_str + "_" + member_str
+        let inner_type = self.check_expr(inner)
+        let tname0 = type_name(inner_type)
+        if tname0 != "" {
+          let info0 = self.registry.lookup(tname0)
+          if info0 != null {
+            let has_label = info0!.fields.has(sym(label_str)) || info0!.methods.has(sym(label_str))
+            let has_comb = info0!.fields.has(sym(combined)) || info0!.methods.has(sym(combined))
+            if !has_label && has_comb {
+              parent_expr.kind = ExprKind.FieldAccess(inner, sym(combined))
+              return self.check_field_access(parent_expr, inner, sym(combined))
+            }
+          }
         }
       }
       _ => {}

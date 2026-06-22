@@ -190,6 +190,37 @@ module checker
     site, once per offending hint interface per file.
     """
 
+  invariant "Phase 3c-capability — Labels-as-Scopes Resolution":
+    procedural
+    """
+    check_field_access and check_method_call peek at their receiver
+    before calling check_expr on it. When the receiver has the shape
+    `FieldAccess(inner, label)` AND inner's TypeInfo has NO real
+    field/method named `label` AND DOES have a field/method named
+    `<label>_<member>`, the parent AST node is rewritten in place to
+    `FieldAccess(inner, <label>_<member>)` (resp. MethodCall with
+    the combined method name), and the function recurses on the
+    rewritten form.
+
+    This is pure sugar: today's desugar still emits the flat textual-
+    prefix names as the canonical storage (Team.roster_children etc.).
+    Phase 3c-capability adds the dotted-scope call syntax described in
+    multi-class-interface-redesign §3.1 as a parallel call form so
+    Phase 3d can migrate bootstrap source to the new syntax without
+    breaking anything. Phase 3e will eventually flip canonical form
+    and delete the flat emission.
+
+    The "no field/method named `label`" guard prevents collision with
+    legitimate nested-object access — if Team had a real `roster`
+    field of type Roster, `team.roster.children` should resolve as
+    ordinary field access on the Roster object, not as a scope.
+
+    The MethodCall rewrite must reuse the existing mut_args slice
+    from call_expr.kind rather than synthesizing `[]`, because the
+    `[]` literal inside an enum-variant initializer at this nesting
+    level is currently miscompiled to LyricSlice_void.
+    """
+
   typedef TypeKind: enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
     source: checker.ly:19
 
@@ -398,11 +429,11 @@ module checker
     method check_map_method(self, key: Type, value: Type, method: string) -> Type?
       source: checker.ly:3919
     method check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type
-      source: checker.ly:3936
+      source: checker.ly:3970
     method resolve_field_type(self, recv_type: Type, field_str: string) -> Type
-      source: checker.ly:3976
+      source: checker.ly:4038
     method walk_expr(self, expr: Expr, callback: (Expr) -> ())
-      source: checker.ly:4060
+      source: checker.ly:4122
     method walk_stmt(self, stmt: Stmt, callback: (Expr) -> ())
       source: checker.ly:4145
     method walk_block(self, block: Block, callback: (Expr) -> ())
