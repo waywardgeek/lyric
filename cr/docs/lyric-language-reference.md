@@ -381,20 +381,20 @@ impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
 A `relation` declaration is sugar for a labeled impl of the
 matching hint interface plus an `owns`/`refs` flag.
 
+User-authored ownership impls of user-defined hint interfaces
+work directly: an interface whose shape satisfies §3.7 (two
+type parameters; every field, destructor, and abstract method-
+with-receiver names one of them) is a candidate for
+`impl Hint<A:l1, B:l2> owns { }` / `refs { }` — the compiler
+injects fields, generates field-binds, and synthesizes
+destructors exactly as it does for a relation-synthesized
+ownership impl.
+
 🚧 The dotted-scope call form (`team.roster.children`) for accessing
 label-prefixed members is design intent per redesign §3.1 but not yet
 shipped; today, label-prefixed members are accessed by their flat
 textual-prefix names (`team.roster_children`). Phase 3c-capability
 ships the dotted form as additive sugar.
-
-🚧 The user-facing ownership-annotated impl form
-(`impl ArrayList<Team:roster, Player:team> owns { }` — `owns`/`refs`
-keyword between the closing `>` and the opening `{`) is design intent
-per redesign §3.9 but not yet shipped. Today, the `owns`/`refs`
-ownership flag is only available via the `relation` surface, which
-internally desugars to the equivalent labeled impl; user-authored
-ownership-annotated impls of user-defined hint interfaces will land
-with the §3.9 work.
 
 ### `error` interface
 Built-in. Any class with a `message(self) -> string` method satisfies it.

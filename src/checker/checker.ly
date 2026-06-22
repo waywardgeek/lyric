@@ -4940,9 +4940,11 @@ lyric checker {
   }
 
   // =====================================================================
-  // Relation-hint shape validation (multi-class-interface-redesign §3.7)
+  // Ownership-impl hint-shape validation (multi-class-interface-redesign §3.7+§3.9)
   //
-  // An interface used as the hint in a `relation` declaration must:
+  // An interface used as the hint of an ownership-bearing impl —
+  // either an explicit `impl Hint<A:l, B:l> owns/refs { }` or one
+  // synthesized from a `relation` declaration — must:
   //   (1) have exactly two type parameters (parent, child);
   //   (2) annotate every field declaration and destructor block with a
   //       type parameter naming one of those two sides; abstract methods
@@ -4951,6 +4953,11 @@ lyric checker {
   //       no receiver are exempt;
   //   (3) NOT cross sides inside a method body (rule deferred to
   //       Phase 3c; see redesign doc).
+  //
+  // The pass iterates impl blocks whose `kind` is non-null (after
+  // desugar_relations has dropped rel.kind onto each relation-synthesized
+  // impl). Each distinct hint interface is validated once per file;
+  // diagnostics fire at the offending impl's span.
   //
   // Caveat on (2): methods with bodies are extracted to top-level
   // functions by desugar_default_impls BEFORE the checker runs, so the
@@ -4968,31 +4975,32 @@ lyric checker {
     let blocks = file.fb_children()
     let mut validated: Dict<Sym, bool> = Dict<Sym, bool>()
     for bi in range(0, len(blocks)) {
-      let rels = blocks[bi].rd_children()
-      for ri in range(0, len(rels)) {
-        let rel = rels[ri]
-        if rel.hint == null { continue }
-        let hint_name = rel.hint!
+      let impls = blocks[bi].ib_children()
+      for ii in range(0, len(impls)) {
+        let ib = impls[ii]
+        if isnull(ib.kind) { continue }
+        if ib.interface_name == null { continue }
+        let hint_name = ib.interface_name!
         if validated.has(hint_name) { continue }
         validated.set(hint_name, true)
         if !self.iface_decls.has(hint_name) { continue }
         let entry = self.iface_decls.get(hint_name)
         if isnull(entry) { continue }
-        self.validate_one_hint_interface(rel, entry!.value)
+        self.validate_one_hint_interface(ib, entry!.value)
       }
     }
   }
 
-  func Checker.validate_one_hint_interface(self, rel: RelationDecl, iface: InterfaceDecl) {
+  func Checker.validate_one_hint_interface(self, ib: ImplBlock, iface: InterfaceDecl) {
     if iface.name == null { return }
     let iface_name = sym_to_string(iface.name!)
     let tps = iface.itp_children()
 
-    let prefix = "cannot use " + iface_name + " as a relation hint; "
+    let prefix = "cannot use " + iface_name + " as an owns/refs hint; "
 
     // Rule 1: exactly two type parameters.
     if len(tps) != 2 {
-      self.error_at(rel.span, prefix + "an interface used as a relation hint must have exactly 2 type parameters (parent, child); " + iface_name + " has " + itoa(len(tps)) + " type parameters.")
+      self.error_at(ib.span, prefix + "an interface used as an owns/refs hint must have exactly 2 type parameters (parent, child); " + iface_name + " has " + itoa(len(tps)) + " type parameters.")
       return
     }
     if tps[0].name == null || tps[1].name == null { return }
@@ -5006,12 +5014,12 @@ lyric checker {
       let f = fields[fi]
       let fname = if f.name != null { sym_to_string(f.name!) } else { "?" }
       if f.type_param == null {
-        self.error_at(rel.span, prefix + "field `" + fname + "` of " + iface_name + " has no side annotation. An interface used as a relation hint must annotate every member with `P.` or `C.`.")
+        self.error_at(ib.span, prefix + "field `" + fname + "` of " + iface_name + " has no side annotation. An interface used as an owns/refs hint must annotate every member with `P.` or `C.`.")
         return
       }
       let tp = sym_to_string(f.type_param!)
       if tp != p_name && tp != c_name {
-        self.error_at(rel.span, prefix + "field `" + tp + "." + fname + "` of " + iface_name + " does not name either type parameter " + sides + ".")
+        self.error_at(ib.span, prefix + "field `" + tp + "." + fname + "` of " + iface_name + " does not name either type parameter " + sides + ".")
         return
       }
     }
@@ -5023,7 +5031,7 @@ lyric checker {
       if d.type_param == null { continue }
       let tp = sym_to_string(d.type_param!)
       if tp != p_name && tp != c_name {
-        self.error_at(rel.span, prefix + "destructor on `" + tp + "` of " + iface_name + " does not name either type parameter " + sides + ".")
+        self.error_at(ib.span, prefix + "destructor on `" + tp + "` of " + iface_name + " does not name either type parameter " + sides + ".")
         return
       }
     }
@@ -5037,7 +5045,7 @@ lyric checker {
       let rt = sym_to_string(m.receiver_type!)
       if rt != p_name && rt != c_name {
         let mname = if m.name != null { sym_to_string(m.name!) } else { "?" }
-        self.error_at(rel.span, prefix + "method `" + rt + "." + mname + "` of " + iface_name + " has a receiver that names neither type parameter " + sides + ".")
+        self.error_at(ib.span, prefix + "method `" + rt + "." + mname + "` of " + iface_name + " has a receiver that names neither type parameter " + sides + ".")
         return
       }
     }

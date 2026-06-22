@@ -170,13 +170,15 @@ module checker
     side-channel asymmetry of the previous design.
     """
 
-  invariant "Phase 1.6 — Relation-Hint Shape Validation":
+  invariant "Phase 1.6 — Ownership-Impl Hint-Shape Validation":
     procedural
     """
     validate_relation_hints runs after register_interface_methods and
     before bodies are checked. It enforces that every interface used
-    as the hint in a `relation` declaration fits the relation-hint
-    shape laid out in multi-class-interface-redesign §3.7:
+    as the hint of an ownership-bearing impl (impl.kind != null —
+    either authored as `impl Hint<A:l, B:l> owns/refs { }` directly
+    or synthesized from a `relation` decl by desugar pass 3A) fits
+    the hint shape laid out in multi-class-interface-redesign §3.7:
       (1) exactly two type parameters (parent, child);
       (2) every field, destructor, and abstract method-with-receiver
           names one of the two type parameters; free-function helpers
@@ -186,8 +188,8 @@ module checker
       (3) [DEFERRED to Phase 3c] no cross-side body references.
     Today's stdlib hints (ArrayList, DoublyLinked, HashedList) satisfy
     these conditions by construction, so the pass is silent on the
-    bootstrap source. Diagnostics fire at the `relation` declaration
-    site, once per offending hint interface per file.
+    bootstrap source. Diagnostics fire at the offending impl's span,
+    once per offending hint interface per file.
     """
 
   invariant "Phase 3c-capability — Labels-as-Scopes Resolution":
@@ -330,148 +332,148 @@ module checker
     method register_interface_methods(self, file: File)
       source: checker.ly:1443
     method register_interface(self, iface: InterfaceDecl)
-      source: checker.ly:1687
+      source: checker.ly:1693
     method register_struct(self, s: StructDecl)
-      source: checker.ly:1756
+      source: checker.ly:1762
     method register_class(self, cls: ClassDecl)
-      source: checker.ly:1822
+      source: checker.ly:1828
     method register_enum(self, e: EnumDecl)
-      source: checker.ly:1939
+      source: checker.ly:1961
     method check_implements(self, cls: ClassDecl)
-      source: checker.ly:2008
+      source: checker.ly:2030
     method register_impl_methods(self, ib: ImplBlock)
-      source: checker.ly:2021
+      source: checker.ly:2043
     method register_func(self, f: FuncDecl)
-      source: checker.ly:2113
+      source: checker.ly:2135
     method grant_relational_methods(self, iface_name: string, type_args: [TypeExpr])
-      source: checker.ly:2144
+      source: checker.ly:2166
     method func_decl_to_type_with_subst(self, f: FuncDecl, subst: Dict<Sym, string>) -> Type
-      source: checker.ly:2197
+      source: checker.ly:2219
     method check_lyric_block_bodies(self, block: LyricBlock)
-      source: checker.ly:2240
+      source: checker.ly:2262
     method check_func_body(self, f: FuncDecl)
-      source: checker.ly:2348
+      source: checker.ly:2370
     method check_block(self, block: Block)
-      source: checker.ly:2468
+      source: checker.ly:2490
     method check_stmt(self, stmt: Stmt)
-      source: checker.ly:2475
+      source: checker.ly:2497
     method check_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, value: Expr?)
-      source: checker.ly:2609
+      source: checker.ly:2626
     method check_assign(self, target: Expr, value: Expr)
-      source: checker.ly:2678
+      source: checker.ly:2695
     method check_return(self, value: Expr?)
-      source: checker.ly:2706
+      source: checker.ly:2723
     method check_if(self, condition: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block?)
-      source: checker.ly:2726
+      source: checker.ly:2743
     method check_for(self, var_name: Sym, index_var: Sym?, collection: Expr, body: Block)
-      source: checker.ly:2748
+      source: checker.ly:2765
     method check_while(self, condition: Expr, body: Block)
-      source: checker.ly:2794
+      source: checker.ly:2811
     method check_match(self, value: Expr, arms: [MatchArm])
-      source: checker.ly:2801
+      source: checker.ly:2818
     method bind_pattern(self, pat: Pattern, val_type: Type)
-      source: checker.ly:2825
+      source: checker.ly:2842
     method check_expr(self, expr: Expr) -> Type
-      source: checker.ly:2885
+      source: checker.ly:2902
       why: "Primary expression-checking entry point. Calls check_expr_inner for type inference, then annotate(expr, type) which sets expr.resolved_type — the checker→lowerer contract."
     method check_expr_inner(self, expr: Expr) -> Type
-      source: checker.ly:2890
+      source: checker.ly:2907
     method check_unary(self, op: UnaryOp, operand: Expr) -> Type
-      source: checker.ly:2981
+      source: checker.ly:2998
     method check_binary(self, left: Expr, op: BinaryOp, right: Expr) -> Type
-      source: checker.ly:2990
+      source: checker.ly:3007
     method check_index(self, receiver: Expr, index: Expr) -> Type
-      source: checker.ly:3029
+      source: checker.ly:3046
     method check_slice(self, receiver: Expr, low: Expr?, high: Expr?) -> Type
-      source: checker.ly:3043
+      source: checker.ly:3060
     method check_cast(self, target_type: TypeExpr, operand: Expr) -> Type
-      source: checker.ly:3050
+      source: checker.ly:3067
     method check_unwrap(self, operand: Expr) -> Type
-      source: checker.ly:3055
+      source: checker.ly:3072
     method check_try(self, operand: Expr) -> Type
-      source: checker.ly:3063
+      source: checker.ly:3080
     method check_is(self, operand: Expr, variant: Sym) -> Type
-      source: checker.ly:3083
+      source: checker.ly:3100
     method check_if_else_expr(self, cond: Expr, then_block: Block, else_ifs: [ElseIf], else_block: Block) -> Type
-      source: checker.ly:3088
+      source: checker.ly:3105
     method check_block_expr_type(self, block: Block) -> Type
-      source: checker.ly:3113
-    method check_tuple_lit(self, elems: [Expr]) -> Type
       source: checker.ly:3130
+    method check_tuple_lit(self, elems: [Expr]) -> Type
+      source: checker.ly:3147
     method check_list_lit(self, elems: [Expr]) -> Type
-      source: checker.ly:3139
+      source: checker.ly:3156
     method check_map_lit(self, keys: [Expr], values: [Expr]) -> Type
-      source: checker.ly:3150
+      source: checker.ly:3167
     method check_struct_lit(self, type_name_sym: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> Type
-      source: checker.ly:3172
+      source: checker.ly:3189
     method check_lambda(self, params: [Param], return_type: TypeExpr?, body: Block) -> Type
-      source: checker.ly:3295
+      source: checker.ly:3312
     method check_match_expr(self, value: Expr, arms: [MatchArm]) -> Type
-      source: checker.ly:3317
+      source: checker.ly:3334
     method check_call(self, call_expr: Expr, func_expr: Expr, type_args: [TypeExpr], args: [Expr]) -> Type
-      source: checker.ly:3374
+      source: checker.ly:3391
     method resolve_module_func(self, mod_name: string, func_name: string) -> Type
-      source: checker.ly:3489
+      source: checker.ly:3506
     method check_builtin_call(self, name: string, type_args: [TypeExpr], arg_types: [Type]) -> Type?
-      source: checker.ly:3531
+      source: checker.ly:3548
     method build_type_arg_subst(self, recv_type: Type) -> Dict<Sym, Type>?
-      source: checker.ly:3649
+      source: checker.ly:3666
     method check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type
-      source: checker.ly:3668
+      source: checker.ly:3685
     method check_builtin_method(self, recv_type: Type, method: string, arg_types: [Type]) -> Type?
-      source: checker.ly:3865
-    method check_list_method(self, elem: Type, method: string) -> Type?
-      source: checker.ly:3884
-    method check_string_method(self, method: string) -> Type?
-      source: checker.ly:3899
-    method check_channel_method(self, elem: Type, method: string) -> Type?
-      source: checker.ly:3912
-    method check_map_method(self, key: Type, value: Type, method: string) -> Type?
       source: checker.ly:3919
+    method check_list_method(self, elem: Type, method: string) -> Type?
+      source: checker.ly:3938
+    method check_string_method(self, method: string) -> Type?
+      source: checker.ly:3953
+    method check_channel_method(self, elem: Type, method: string) -> Type?
+      source: checker.ly:3966
+    method check_map_method(self, key: Type, value: Type, method: string) -> Type?
+      source: checker.ly:3973
     method check_field_access(self, parent_expr: Expr, receiver: Expr, field_name: Sym) -> Type
-      source: checker.ly:3970
+      source: checker.ly:3990
     method resolve_field_type(self, recv_type: Type, field_str: string) -> Type
-      source: checker.ly:4038
+      source: checker.ly:4060
     method walk_expr(self, expr: Expr, callback: (Expr) -> ())
-      source: checker.ly:4122
+      source: checker.ly:4144
     method walk_stmt(self, stmt: Stmt, callback: (Expr) -> ())
-      source: checker.ly:4145
+      source: checker.ly:4229
     method walk_block(self, block: Block, callback: (Expr) -> ())
-      source: checker.ly:4218
+      source: checker.ly:4302
     method walk_pattern(self, pat: Pattern, callback: (Expr) -> ())
-      source: checker.ly:4223
+      source: checker.ly:4307
     method type_expr_has_typevar(self, te: TypeExpr) -> bool
-      source: checker.ly:4263
+      source: checker.ly:4347
     method find_typevar_name(self, te: TypeExpr) -> string
-      source: checker.ly:4318
+      source: checker.ly:4402
     method validate_all_exprs_resolved(self, file: File)
-      source: checker.ly:4364
+      source: checker.ly:4448
     method vwalk_block(self, block: Block, ctx: string)
-      source: checker.ly:4399
+      source: checker.ly:4483
     method vwalk_stmt(self, stmt: Stmt, ctx: string)
-      source: checker.ly:4406
+      source: checker.ly:4490
     method vwalk_pattern(self, pat: Pattern, ctx: string)
-      source: checker.ly:4485
+      source: checker.ly:4566
     method vwalk_expr(self, expr: Expr, ctx: string)
-      source: checker.ly:4500
+      source: checker.ly:4581
     method validate_field_and_method_access(self, file: File)
-      source: checker.ly:4606
+      source: checker.ly:4687
     method validate_access_block(self, block: Block)
-      source: checker.ly:4634
+      source: checker.ly:4715
     method validate_access_stmt(self, stmt: Stmt)
-      source: checker.ly:4641
+      source: checker.ly:4722
     method validate_access_expr(self, expr: Expr)
-      source: checker.ly:4709
+      source: checker.ly:4790
     method validate_field_access(self, receiver: Expr, field_name: Sym)
-      source: checker.ly:4784
+      source: checker.ly:4865
     method validate_method_access(self, receiver: Expr, method: Sym)
-      source: checker.ly:4816
+      source: checker.ly:4897
     method validate_all_types_resolved(self, file: File)
-      source: checker.ly:4856
+      source: checker.ly:4937
     method validate_relation_hints(self, file: File)
-      source: checker.ly:4877
-    method validate_one_hint_interface(self, rel: RelationDecl, iface: InterfaceDecl)
-      source: checker.ly:4896
+      source: checker.ly:4974
+    method validate_one_hint_interface(self, ib: ImplBlock, iface: InterfaceDecl)
+      source: checker.ly:4994
 
   func new_checker() -> Checker
     source: checker.ly:178
@@ -588,19 +590,19 @@ module checker
     source: checker.ly:1080
 
   func subst_type_var_names(t: Type, subst: Dict<Sym, string>) -> Type
-    source: checker.ly:2216
+    source: checker.ly:2238
 
   func propagate_arg_types(args: [Expr], param_types: [Type])
-    source: checker.ly:3351
+    source: checker.ly:3368
 
   func coerce_numeric(a: Type, b: Type) -> Type
-    source: checker.ly:4041
+    source: checker.ly:4125
 
   func is_primitive_name(n: string) -> bool
-    source: checker.ly:4240
+    source: checker.ly:4324
 
   func sym_to_string(s: Sym) -> string
-    source: checker.ly:4865
+    source: checker.ly:5062
 
   func check_file(file: File) -> Checker
-    source: checker.ly:4873
+    source: checker.ly:5070
