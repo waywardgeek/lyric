@@ -345,12 +345,12 @@ lyric lowerer {
   func Lowerer.register_block(self, block: LyricBlock) {
 
     // Register structs
-    for sd in block.sd_children() {
+    for sd in block.sd.children() {
       if !isnull(sd.name) {
         self.structs!.set(sym(sd.name!.name), sd)
         // Register class fields for struct
         let fmap = Dict<Sym, LType> {}
-        for f in sd.sf_children() {
+        for f in sd.sf.children() {
           if !isnull(f.name) {
             fmap.set(f.name!, self.lower_type(f.type_expr)!)
           }
@@ -360,12 +360,12 @@ lyric lowerer {
     }
 
     // Register classes
-    for cd in block.cd_children() {
+    for cd in block.cd.children() {
       if !isnull(cd.name) {
         let cname = cd.name!.name
         self.classes!.set(sym(cname), cd)
         let fmap = Dict<Sym, LType> {}
-        for f in cd.cf_children() {
+        for f in cd.cf.children() {
           if !isnull(f.name) {
             fmap.set(f.name!, self.lower_type(f.type_expr)!)
             if !isnull(f.default_value) {
@@ -378,18 +378,18 @@ lyric lowerer {
     }
 
     // Register enums — use flattened keys "EnumName.VariantName"
-    for ed in block.ed_children() {
+    for ed in block.ed.children() {
       if !isnull(ed.name) {
         let ename = ed.name!.name
         self.enums!.set(sym(ename), ed)
         let mut tag: i32 = 0
-        for v in ed.ev_children() {
+        for v in ed.ev.children() {
           if !isnull(v.name) {
             let vname = v.name!.name
             let key = ename + "." + vname
             self.enum_variant_tags!.set(sym(key), tag)
             self.variant_to_enum!.set(sym(vname), ename)
-            let vfields = v.evf_children()
+            let vfields = v.evf.children()
             let mut tfs: [TupleField] = []
             for tf in vfields {
               append(tfs, tf)
@@ -405,21 +405,21 @@ lyric lowerer {
     }
 
     // Register interfaces
-    for id in block.id_children() {
+    for id in block.id.children() {
       if !isnull(id.name) {
         self.interfaces!.set(sym(id.name!.name), id)
       }
     }
 
     // Register type aliases
-    for ta in block.ta_children() {
+    for ta in block.ta.children() {
       if !isnull(ta.name) {
         self.type_aliases!.set(sym(ta.name!.name), ta.type_expr!)
       }
     }
 
     // Register function signatures
-    for fd in block.fd_children() {
+    for fd in block.fd.children() {
       if !isnull(fd.name) {
         let key = if !isnull(fd.receiver_type) {
           fd.receiver_type!.name + "." + fd.name!.name
@@ -431,9 +431,9 @@ lyric lowerer {
     }
 
     // Register class methods
-    for cd in block.cd_children() {
+    for cd in block.cd.children() {
       if !isnull(cd.name) {
-        for m in cd.cm_children() {
+        for m in cd.cm.children() {
           if !isnull(m.name) {
             let key = cd.name!.name + "." + m.name!.name
             self.func_sigs!.set(sym(key), m)
@@ -451,7 +451,7 @@ lyric lowerer {
     }
 
     // Phase 1: register all blocks
-    for block in file!.fb_children() {
+    for block in file!.fb.children() {
       self.register_block(block)
     }
 
@@ -466,10 +466,10 @@ lyric lowerer {
     let mut type_defs: [LTypeDef] = []
     let mut owned_classes = Dict<Sym, bool>()
 
-    for block in file!.fb_children() {
+    for block in file!.fb.children() {
 
       // Imports
-      for imp in block.imp_children() {
+      for imp in block.imp.children() {
         let alias = if !isnull(imp.alias) { imp.alias!.name } else { "" }
         append(imports, LImport { alias: alias, path: imp.path })
         if alias != "" {
@@ -478,29 +478,29 @@ lyric lowerer {
       }
 
       // Structs
-      for sd in block.sd_children() {
+      for sd in block.sd.children() {
         append(structs, self.lower_struct_decl(sd))
       }
 
       // Classes
-      for cd in block.cd_children() {
+      for cd in block.cd.children() {
         append(classes, self.lower_class_decl(cd))
       }
 
       // Enums
-      for ed in block.ed_children() {
+      for ed in block.ed.children() {
         append(enums, self.lower_enum_decl(ed))
       }
 
       // Interfaces
-      for id in block.id_children() {
+      for id in block.id.children() {
         let li = self.lower_interface_decl(id)
         self.lowered_ifaces!.set(sym(li.name), li)
         append(ifaces, li)
       }
 
       // Functions
-      for fd in block.fd_children() {
+      for fd in block.fd.children() {
         let lf = self.lower_func(fd)
         if !isnull(lf) {
           append(functions, lf!)
@@ -508,9 +508,9 @@ lyric lowerer {
       }
 
       // Class methods
-      for cd in block.cd_children() {
+      for cd in block.cd.children() {
         if isnull(cd.name) { continue }
-        for m in cd.cm_children() {
+        for m in cd.cm.children() {
           let lf = self.lower_func_with_receiver(m, cd.name!.name)
           if !isnull(lf) {
             append(functions, lf!)
@@ -519,7 +519,7 @@ lyric lowerer {
       }
 
       // Impl blocks
-      for ib in block.ib_children() {
+      for ib in block.ib.children() {
         let impl_funcs = self.lower_impl_block(ib)
         for f in impl_funcs {
           append(functions, f)
@@ -527,7 +527,7 @@ lyric lowerer {
       }
 
       // Type aliases
-      for ta in block.ta_children() {
+      for ta in block.ta.children() {
         if !isnull(ta.name) {
           append(type_defs, LTypeDef {
             name: ta.name!.name,
@@ -538,7 +538,7 @@ lyric lowerer {
       }
 
       // Collect owned class names from relations
-      for rel in block.rd_children() {
+      for rel in block.rd.children() {
         if rel.kind is Owns {
           if !isnull(rel.child.type_name) {
             owned_classes.set(sym(rel.child.type_name!.name), true)
@@ -547,7 +547,7 @@ lyric lowerer {
       }
 
       // Constants as globals
-      for c in block.con_children() {
+      for c in block.con.children() {
         if !isnull(c.name) {
           let ct = if !isnull(c.type_expr) { self.lower_type(c.type_expr) } else { self.expr_type(c.value) }
           let init = if !isnull(c.value) {
@@ -563,8 +563,8 @@ lyric lowerer {
       }
     }
 
-    let pname = if len(file!.fb_children()) > 0 && !isnull(file!.fb_children()[0].name) {
-      file!.fb_children()[0].name!.name
+    let pname = if len(file!.fb.children()) > 0 && !isnull(file!.fb.children()[0].name) {
+      file!.fb.children()[0].name!.name
     } else {
       "main"
     }
@@ -600,12 +600,12 @@ lyric lowerer {
     let mut fields: [LField] = []
     let mut tps: [LTypeParam] = []
     if !isnull(sd) {
-      for f in sd!.sf_children() {
+      for f in sd!.sf.children() {
         if !isnull(f.name) {
           append(fields, LField { name: f.name!.name, typ: self.lower_type(f.type_expr) })
         }
       }
-      for tp in sd!.stp_children() {
+      for tp in sd!.stp.children() {
         if !isnull(tp.name) {
           let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
           append(tps, LTypeParam { name: tp.name!.name, constraint: c })
@@ -622,12 +622,12 @@ lyric lowerer {
     let mut tps: [LTypeParam] = []
     let mut impls: [string] = []
     if !isnull(cd) {
-      for f in cd!.cf_children() {
+      for f in cd!.cf.children() {
         if !isnull(f.name) {
           append(fields, LField { name: f.name!.name, typ: self.lower_type(f.type_expr) })
         }
       }
-      for tp in cd!.ctp_children() {
+      for tp in cd!.ctp.children() {
         if !isnull(tp.name) {
           let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
           append(tps, LTypeParam { name: tp.name!.name, constraint: c })
@@ -647,11 +647,11 @@ lyric lowerer {
     let mut variants: [LVariant] = []
     if !isnull(ed) {
       let mut tag: i32 = 0
-      for v in ed!.ev_children() {
+      for v in ed!.ev.children() {
         if !isnull(v.name) {
           let mut vfields: [LField] = []
           let mut fi = 0
-          for tf in v.evf_children() {
+          for tf in v.evf.children() {
             let fname = if !isnull(tf.name) { tf.name!.name } else { f"_{fi}" }
 
             append(vfields, LField { name: fname, typ: self.lower_type(tf.type_expr) })
@@ -671,10 +671,10 @@ lyric lowerer {
     let mut methods: [LInterfaceMethod] = []
     let mut tps: [LTypeParam] = []
     if !isnull(id) {
-      for m in id!.im_children() {
+      for m in id!.im.children() {
         if !isnull(m.name) {
           let mut params: [LParam] = []
-          for p in m.param_children() {
+          for p in m.param.children() {
             if !isnull(p.name) && !p.is_self {
               append(params, LParam { name: p.name!.name, typ: self.lower_type(p.type_expr), mutable: p.is_mut })
             }
@@ -684,7 +684,7 @@ lyric lowerer {
           append(methods, LInterfaceMethod { name: m.name!.name, receiver_type: recv, params: params, return_type: rt })
         }
       }
-      for tp in id!.itp_children() {
+      for tp in id!.itp.children() {
         if !isnull(tp.name) {
           let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
           append(tps, LTypeParam { name: tp.name!.name, constraint: c })
@@ -715,7 +715,7 @@ lyric lowerer {
     // Build type param -> concrete type mappings (matches Go's typeArgMap + typeArgLTypeMap)
     let mut type_arg_map: Dict<Sym, string> = Dict<Sym, string>()
     let mut type_arg_ltype_map: Dict<Sym, LType> = Dict<Sym, LType>()
-    let ib_args = ib!.ib_arg_children()
+    let ib_args = ib!.ib_arg.children()
     let mut i = 0
     for tp in iface.type_params {
       if i < len(ib_args) {
@@ -761,7 +761,7 @@ lyric lowerer {
     }
 
     // Lower each mapping
-    for mapping in ib!.ibm_children() {
+    for mapping in ib!.ibm.children() {
       if isnull(mapping.type_param) || isnull(mapping.method_name) { continue }
 
       let type_param = mapping.type_param!.name
@@ -990,7 +990,7 @@ lyric lowerer {
 
     // Type params
     let mut tps: [LTypeParam] = []
-    for tp in fd!.fp_children() {
+    for tp in fd!.fp.children() {
       if !isnull(tp.name) {
         let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
         append(tps, LTypeParam { name: tp.name!.name, constraint: c })
@@ -1013,7 +1013,7 @@ lyric lowerer {
         let mut self_type_args: [LType?] = []
         let cls_entry = self.classes!.get(sym(receiver))
         if !isnull(cls_entry) {
-          for tp in cls_entry!.value.ctp_children() {
+          for tp in cls_entry!.value.ctp.children() {
             if !isnull(tp.name) {
               append(self_type_args, LType { kind: TyTypeVar, name: tp.name!.name, bits: 0, is_exported: false })
             }
@@ -1025,7 +1025,7 @@ lyric lowerer {
       self.define_var("self", self_type)
     }
 
-    for p in fd!.param_children() {
+    for p in fd!.param.children() {
       if !isnull(p.name) && !p.is_self {
         let pt = self.lower_type(p.type_expr)
         append(params, LParam { name: p.name!.name, typ: pt, mutable: p.is_mut })
@@ -1055,7 +1055,7 @@ lyric lowerer {
     for wc in fd!.where_children() {
       if !isnull(wc.constraint) {
         let mut wc_args: [string] = []
-        for a in wc.wc_arg_children() {
+        for a in wc.wc_arg.children() {
           match a.kind {
             Named(n, _) => { append(wc_args, n.name) }
             _ => {}
@@ -1074,7 +1074,7 @@ lyric lowerer {
       let cd_entry = self.classes!.get(sym(receiver))
       let cd = if !isnull(cd_entry) { cd_entry!.value } else { null }
       if !isnull(cd) {
-        for tp in cd!.ctp_children() {
+        for tp in cd!.ctp.children() {
           if !isnull(tp.name) {
             let c = if !isnull(tp.constraint) { tp.constraint!.name } else { "" }
             append(recv_tps, LTypeParam { name: tp.name!.name, constraint: c })
@@ -1102,7 +1102,7 @@ lyric lowerer {
 
   func Lowerer.lower_block(self, block: Block?) {
     if isnull(block) { return }
-    for s in block!.bs_children() {
+    for s in block!.bs.children() {
       self.lower_stmt(s)
     }
   }
@@ -2475,7 +2475,7 @@ lyric lowerer {
       if isnull(cd_entry2) { return null }
       let cd = cd_entry2!.value
       let mut finits: [LFieldInit] = []
-      let cf = cd.cf_children()
+      let cf = cd.cf.children()
       let mut i = 0
       for a in args {
         let av = self.lower_expr(a)
@@ -2793,7 +2793,7 @@ lyric lowerer {
     let sig_key = if !isnull(recv_type) { recv_type!.name + "." + method_name } else { method_name }
     let sig = self.func_sigs!.get(sym(sig_key))
     if !isnull(sig) {
-      for p in sig!.value.param_children() {
+      for p in sig!.value.param.children() {
         if !isnull(p.name) && !p.is_self {
           append(ptypes, self.lower_type(p.type_expr))
         }
@@ -3191,7 +3191,7 @@ lyric lowerer {
     if self.classes!.has(sym(tname)) {
       let cd = self.classes!.get(sym(tname))
       if !isnull(cd) {
-        for f in cd!.value.cf_children() {
+        for f in cd!.value.cf.children() {
           if !isnull(f.name) {
             append(field_order, f.name!.name)
           }
@@ -3201,7 +3201,7 @@ lyric lowerer {
     if self.structs!.has(sym(tname)) {
       let sd = self.structs!.get(sym(tname))
       if !isnull(sd) {
-        for f in sd!.value.sf_children() {
+        for f in sd!.value.sf.children() {
           if !isnull(f.name) {
             append(field_order, f.name!.name)
           }
@@ -3232,7 +3232,7 @@ lyric lowerer {
     if self.classes!.has(sym(tname)) {
       let cd = self.classes!.get(sym(tname))
       if !isnull(cd) {
-        for f in cd!.value.cf_children() {
+        for f in cd!.value.cf.children() {
           if !isnull(f.name) && !provided.has(sym(f.name!.name)) && !isnull(f.default_value) {
             let dv = self.lower_expr(f.default_value)
             append(finits, LFieldInit { name: f.name!.name, value: dv })
@@ -3286,7 +3286,7 @@ lyric lowerer {
     // Lower lambda body with implicit return for last expression
     let saved_stmts = self.save_stmts()
     if !isnull(body) {
-      let stmts = body!.bs_children()
+      let stmts = body!.bs.children()
       let mut i = 0
       while i < len(stmts) {
         if !isnull(rt) && i == len(stmts) - 1 && stmts[i].kind is ExprStmt {
@@ -3334,7 +3334,7 @@ lyric lowerer {
   // statement is assigned to it (match-as-expression pattern).
   func Lowerer.lower_arm_body(self, body: Block?, result_name: string, rt: LType?) {
     if isnull(body) { return }
-    let stmts = body!.bs_children()
+    let stmts = body!.bs.children()
     if result_name == "" || len(stmts) == 0 {
       self.lower_block(body)
       return

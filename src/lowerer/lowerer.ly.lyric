@@ -132,7 +132,6 @@ module lowerer
     on every control-flow path.
     """
 
-
   class Lowerer
     source: lowerer.ly:13
     field class_defaults: Dict<Sym, Expr>?
@@ -190,119 +189,119 @@ module lowerer
     method lower_interface_decl(self, id: InterfaceDecl?) -> LInterfaceDecl
       source: lowerer.ly:670
     method lower_impl_block(self, ib: ImplBlock?) -> [LFuncDecl]
-      source: lowerer.ly:707
+      source: lowerer.ly:701
     method subst_impl_type(self, t: LType?, argmap: Dict<Sym, LType>) -> LType?
-      source: lowerer.ly:953
+      source: lowerer.ly:945
     method lower_func(self, fd: FuncDecl?) -> LFuncDecl?
-      source: lowerer.ly:989
+      source: lowerer.ly:981
     method lower_func_with_receiver(self, fd: FuncDecl?, receiver: string) -> LFuncDecl?
-      source: lowerer.ly:994
+      source: lowerer.ly:986
     method lower_block(self, block: Block?)
-      source: lowerer.ly:1111
+      source: lowerer.ly:1103
     method lower_block_as_stmts(self, block: Block?) -> [LStmt?]
-      source: lowerer.ly:1118
+      source: lowerer.ly:1110
     method lower_stmt(self, s: Stmt?)
-      source: lowerer.ly:1126
+      source: lowerer.ly:1118
     method lower_var_decl(self, name: Sym, names: [Sym], type_expr: TypeExpr?, is_mut: bool, is_ref: bool, value: Expr?)
-      source: lowerer.ly:1213
+      source: lowerer.ly:1201
     method lower_assign(self, target: Expr?, value: Expr?)
-      source: lowerer.ly:1291
+      source: lowerer.ly:1279
     method lower_return(self, value: Expr?)
-      source: lowerer.ly:1353
+      source: lowerer.ly:1341
     method lower_if(self, condition: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?)
-      source: lowerer.ly:1381
+      source: lowerer.ly:1369
     method lower_else_ifs(self, else_ifs: [ElseIf], final_else: Block?) -> [LStmt?]
-      source: lowerer.ly:1391
+      source: lowerer.ly:1379
     method lower_else_ifs_with_result(self, else_ifs: [ElseIf], final_else: Block?, result_name: string, result_type: LType?)
-      source: lowerer.ly:1427
+      source: lowerer.ly:1415
     method lower_while(self, condition: Expr?, body: Block?)
-      source: lowerer.ly:1468
+      source: lowerer.ly:1456
     method lower_for(self, var_name: Sym, index_var: Sym?, collection: Expr?, body: Block?)
-      source: lowerer.ly:1485
+      source: lowerer.ly:1473
     method lower_select(self, cases: [SelectCase])
-      source: lowerer.ly:1524
+      source: lowerer.ly:1512
     method lower_if_let(self, pattern: Pattern?, value: Expr?, then_block: Block?, else_block: Block?)
-      source: lowerer.ly:1578
+      source: lowerer.ly:1566
     method lower_let_else(self, pattern: Pattern?, value: Expr?, else_block: Block?)
-      source: lowerer.ly:1674
+      source: lowerer.ly:1662
     method emit_variant_bindings(self, val: LValue?, enum_name: string, variant: string, bindings: [Pattern])
-      source: lowerer.ly:1739
+      source: lowerer.ly:1727
     method lower_match(self, value: Expr?, arms: [MatchArm])
-      source: lowerer.ly:1764
+      source: lowerer.ly:1752
     method is_union_match(self, val_type: LType?, arms: [MatchArm]) -> bool
-      source: lowerer.ly:1780
+      source: lowerer.ly:1768
     method emit_union_type_switch(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
-      source: lowerer.ly:1796
+      source: lowerer.ly:1784
     method lyric_name_to_ltype(self, name: string) -> LType?
-      source: lowerer.ly:1835
+      source: lowerer.ly:1823
     method lower_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm])
-      source: lowerer.ly:1849
+      source: lowerer.ly:1837
     method has_nested_variant_patterns(self, arms: [MatchArm]) -> bool
-      source: lowerer.ly:1958
+      source: lowerer.ly:1946
     method arm_has_nested_variant(self, arm: MatchArm) -> bool
-      source: lowerer.ly:1973
+      source: lowerer.ly:1961
     method emit_nested_enum_match(self, val: LValue?, enum_name: string, arms: [MatchArm], result_name: string, result_type: LType?)
-      source: lowerer.ly:1986
+      source: lowerer.ly:1974
     method lower_match_as_if_else(self, val: LValue?, val_type: LType?, arms: [MatchArm], result_name: string, result_type: LType?)
-      source: lowerer.ly:2162
+      source: lowerer.ly:2150
     method lower_expr(self, e: Expr?) -> LValue?
-      source: lowerer.ly:2299
+      source: lowerer.ly:2287
     method lower_ident(self, orig: Expr?, name: Sym) -> LValue?
-      source: lowerer.ly:2333
+      source: lowerer.ly:2321
     method lower_int_lit(self, value: string, type_hint: Sym?) -> LValue?
-      source: lowerer.ly:2383
+      source: lowerer.ly:2371
     method lower_float_lit(self, value: string) -> LValue?
-      source: lowerer.ly:2409
+      source: lowerer.ly:2397
     method lower_string_interp(self, orig: Expr?, parts: [Expr]) -> LValue?
-      source: lowerer.ly:2418
+      source: lowerer.ly:2406
     method lower_call(self, orig: Expr?, func_expr: Expr?, type_args: [TypeExpr], args: [Expr], call_mut_args: [bool]) -> LValue?
-      source: lowerer.ly:2441
+      source: lowerer.ly:2429
     method lower_method_call(self, orig: Expr?, receiver: Expr?, method: Sym, type_args: [TypeExpr], args: [Expr], mc_mut_args: [bool]) -> LValue?
-      source: lowerer.ly:2650
+      source: lowerer.ly:2638
     method lower_field_access(self, orig: Expr?, receiver: Expr?, field_name: Sym) -> LValue?
-      source: lowerer.ly:2834
+      source: lowerer.ly:2822
     method lower_mut_arg(self, e: Expr?) -> LValue?
-      source: lowerer.ly:2862
+      source: lowerer.ly:2850
     method lower_index(self, orig: Expr?, receiver: Expr?, index: Expr?) -> LValue?
-      source: lowerer.ly:2882
+      source: lowerer.ly:2870
     method lower_slice(self, orig: Expr?, receiver: Expr?, low: Expr?, high: Expr?) -> LValue?
-      source: lowerer.ly:2896
+      source: lowerer.ly:2884
     method lower_unary(self, orig: Expr?, op: UnaryOp, operand: Expr?) -> LValue?
-      source: lowerer.ly:2911
+      source: lowerer.ly:2899
     method lower_binary(self, orig: Expr?, left: Expr?, op: BinaryOp, right: Expr?) -> LValue?
-      source: lowerer.ly:2928
+      source: lowerer.ly:2916
     method lower_tuple_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
-      source: lowerer.ly:3106
+      source: lowerer.ly:3094
     method lower_list_lit(self, orig: Expr?, elems: [Expr]) -> LValue?
-      source: lowerer.ly:3129
+      source: lowerer.ly:3117
     method lower_map_lit(self, orig: Expr?, keys: [Expr], values: [Expr]) -> LValue?
-      source: lowerer.ly:3145
+      source: lowerer.ly:3133
     method lower_struct_lit(self, orig: Expr?, type_name: Sym, type_args: [TypeExpr], fields: [StructLitField]) -> LValue?
-      source: lowerer.ly:3195
+      source: lowerer.ly:3183
     method lower_lambda(self, orig: Expr?, params: [Param], return_type: TypeExpr?, body: Block?) -> LValue?
-      source: lowerer.ly:3279
+      source: lowerer.ly:3267
     method lower_arm_body(self, body: Block?, result_name: string, rt: LType?)
-      source: lowerer.ly:3347
+      source: lowerer.ly:3335
     method lower_match_expr(self, orig: Expr?, value: Expr?, arms: [MatchArm]) -> LValue?
-      source: lowerer.ly:3376
+      source: lowerer.ly:3364
     method lower_cast(self, orig: Expr?, target_type: TypeExpr?, operand: Expr?) -> LValue?
-      source: lowerer.ly:3461
+      source: lowerer.ly:3449
     method lower_unwrap(self, orig: Expr?, operand: Expr?) -> LValue?
-      source: lowerer.ly:3474
+      source: lowerer.ly:3462
     method lower_try(self, orig: Expr?, operand: Expr?) -> LValue?
-      source: lowerer.ly:3491
+      source: lowerer.ly:3479
     method lower_is(self, orig: Expr?, operand: Expr?, variant: Sym) -> LValue?
-      source: lowerer.ly:3542
+      source: lowerer.ly:3530
     method lower_if_else_expr(self, orig: Expr?, cond: Expr?, then_block: Block?, else_ifs: [ElseIf], else_block: Block?) -> LValue?
-      source: lowerer.ly:3588
+      source: lowerer.ly:3576
     method find_variant_tag(self, enum_name: string, variant_name: string) -> i32
-      source: lowerer.ly:3625
+      source: lowerer.ly:3613
     method find_variant_field_name(self, enum_name: string, variant_name: string, field_idx: i32) -> string
-      source: lowerer.ly:3634
+      source: lowerer.ly:3622
     method get_variant_field_type(self, enum_name: string, variant_name: string, field_idx: i32) -> LType?
-      source: lowerer.ly:3650
+      source: lowerer.ly:3638
     method find_variant_enum(self, variant_name: string) -> string
-      source: lowerer.ly:3663
+      source: lowerer.ly:3651
 
   func new_lowerer() -> Lowerer
     source: lowerer.ly:35
@@ -329,13 +328,13 @@ module lowerer
     source: lowerer.ly:162
 
   func is_map_method(name: string) -> bool
-    source: lowerer.ly:3018
+    source: lowerer.ly:3006
 
   func is_builtin_func(name: string) -> bool
-    source: lowerer.ly:3029
+    source: lowerer.ly:3017
 
   func is_numeric_type(t: LType) -> bool
-    source: lowerer.ly:3079
+    source: lowerer.ly:3067
 
   func wider_numeric_type(a: LType, b: LType) -> LType?
-    source: lowerer.ly:3095
+    source: lowerer.ly:3083
