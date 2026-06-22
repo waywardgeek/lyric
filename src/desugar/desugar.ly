@@ -333,8 +333,13 @@ lyric desugar {
     }
   }
   // ---- 4. DesugarDestructors ----
-  // Generates destroy methods on classes involved in relations by copying
-  // interface destructor blocks to concrete classes.
+  // Generates destroy methods on classes named by ownership-bearing
+  // impl blocks (impl.kind != null) by deep-copying the hint interface's
+  // matching destructor blocks onto each concrete class. Iterates impls
+  // (not relations) so a user-authored
+  // `impl Hint<A:l, B:l> owns { }` over a user-defined hint interface
+  // gets identical treatment to a relation-synthesized impl. See
+  // cr/docs/multi-class-interface-redesign.md §3.9.
 
   func desugar_destructors(file: File) {
     // Build GLOBAL interface lookup across ALL blocks
@@ -358,14 +363,15 @@ lyric desugar {
     }
 
     for block in file.fb_children() {
-      // Collect destructor blocks per class name
-      // Since Dict can only store single values, we use a Dict<Sym, Block> where
-      // each Block wraps all destructor stmts for that class as sub-blocks.
+      // Collect destructor blocks per class name. One destroy method
+      // per class; multiple ownership impls touching the same class
+      // append wrapped block-stmts.
       let destroy_methods = Dict<Sym, FuncDecl>()
 
-      for rel in block.rd_children() {
-        if isnull(rel.hint) { continue }
-        let iface_entry = iface_map.get(sym(rel.hint!.name))
+      for impl_block in block.ib_children() {
+        if isnull(impl_block.kind) { continue }
+        if isnull(impl_block.interface_name) { continue }
+        let iface_entry = iface_map.get(sym(impl_block.interface_name!.name))
         if isnull(iface_entry) { continue }
         let iface = iface_entry!.value
 
@@ -375,43 +381,41 @@ lyric desugar {
         let iface_tps = iface.itp_children()
         if len(iface_tps) < 2 { continue }
 
-        // Map type params to concrete class names (simple string map)
+        let impl_args = impl_block.ib_arg_children()
+        if len(impl_args) < 2 { continue }
+
+        // Map type-param-name → concrete class name (simple string map).
         let type_map = Dict<Sym, string>()
-        if !isnull(iface_tps[0].name) && !isnull(rel.parent.type_name) {
-          type_map.set(sym(iface_tps[0].name!.name), rel.parent.type_name!.name)
-        }
-        if !isnull(iface_tps[1].name) && !isnull(rel.child.type_name) {
-          type_map.set(sym(iface_tps[1].name!.name), rel.child.type_name!.name)
-        }
-
-        // Rich type map (preserves TypeArgs for generic instantiation)
+        // Rich type map (preserves TypeArgs for generic instantiation).
         let rich_type_map = Dict<Sym, TypeExpr>()
-        if !isnull(iface_tps[0].name) && !isnull(rel.parent.type_name) {
-          let mut parent_args: [TypeExpr] = []
-          for ta in rel.parent.type_args {
-            append(parent_args, TypeExpr { kind: Named(ta, []), span: rel.span })
+        // Map type-param-name → label (for method renaming).
+        let type_param_to_label = Dict<Sym, string>()
+
+        let mut slot: i32 = 0
+        while slot < 2 {
+          if !isnull(iface_tps[slot].name) && !isnull(impl_args[slot].type_expr) {
+            let tp_name = iface_tps[slot].name!
+            let te = impl_args[slot].type_expr!
+            let name_sym = type_expr_name(te)
+            if !isnull(name_sym) {
+              type_map.set(sym(tp_name.name), name_sym!.name)
+            }
+            // Rich map: bind type-param to a fresh TypeExpr cloned from
+            // the impl's per-side type-arg, preserving its generic args.
+            let te_copy = TypeExpr { kind: te.kind, span: te.span }
+            rich_type_map.set(sym(tp_name.name), te_copy)
+            if !isnull(impl_args[slot].label) {
+              type_param_to_label.set(sym(tp_name.name), impl_args[slot].label!.name)
+            }
           }
-          let te = TypeExpr { kind: Named(rel.parent.type_name!, parent_args), span: rel.span }
-          rich_type_map.set(sym(iface_tps[0].name!.name), te)
-        }
-        if !isnull(iface_tps[1].name) && !isnull(rel.child.type_name) {
-          let mut child_args: [TypeExpr] = []
-          for ta in rel.child.type_args {
-            append(child_args, TypeExpr { kind: Named(ta, []), span: rel.span })
-          }
-          let te = TypeExpr { kind: Named(rel.child.type_name!, child_args), span: rel.span }
-          rich_type_map.set(sym(iface_tps[1].name!.name), te)
+          slot = slot + 1
         }
 
-        // Build method rename map for label-prefixed fields
+        // Build method rename map for label-prefixed fields. For each
+        // interface field whose type-param-side carries a label, the
+        // generic getter/setter call inside a destructor body is
+        // renamed to its label-prefixed concrete form.
         let method_renames = Dict<Sym, string>()
-        let type_param_to_label = Dict<Sym, string>()
-        if !isnull(iface_tps[0].name) && !isnull(rel.parent.label) {
-          type_param_to_label.set(sym(iface_tps[0].name!.name), rel.parent.label!.name)
-        }
-        if !isnull(iface_tps[1].name) && !isnull(rel.child.label) {
-          type_param_to_label.set(sym(iface_tps[1].name!.name), rel.child.label!.name)
-        }
         for ifield in iface.ifd_children() {
           if isnull(ifield.type_param) { continue }
           let label_entry = type_param_to_label.get(sym(ifield.type_param!.name))
@@ -425,12 +429,13 @@ lyric desugar {
 
         for db in destructors {
           if isnull(db.type_param) { continue }
-          // Skip destructors not matching the relation's owns/refs kind.
-          // Default (legacy) destructors carry kind=Owns and so still apply to owns relations.
+          // Skip destructors not matching the impl's owns/refs kind.
+          // Default (legacy) destructors carry kind=Owns and so still
+          // apply to owns impls.
           if db.kind is Owns {
-            if !(rel.kind is Owns) { continue }
+            if !(impl_block.kind! is Owns) { continue }
           } else {
-            if !(rel.kind is Refs) { continue }
+            if !(impl_block.kind! is Refs) { continue }
           }
           let mut class_name: string = ""
           let entry = type_map.get(sym(db.type_param!.name))
@@ -484,6 +489,7 @@ lyric desugar {
       }
 
       // Attach destroy methods to classes
+      // Attach destroy methods to classes
       for cls in block.cd_children() {
         if isnull(cls.name) { continue }
         let entry = destroy_methods.get(sym(cls.name!.name))
@@ -493,7 +499,6 @@ lyric desugar {
       }
     }
   }
-
   // ---- 5. DesugarDefaultImpls ----
   // Extracts interface methods with bodies into top-level functions
   // with relational where clauses.

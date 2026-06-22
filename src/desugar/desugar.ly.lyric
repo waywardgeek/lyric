@@ -29,11 +29,14 @@ module desugar
             interface gets identical treatment to a relation-
             synthesized impl. Cross-block GLOBAL class lookup, see
             below.
-    4. desugar_destructors — for each owns relation, deep-copies the
-       interface's destructor body onto the concrete class's destroy
-       method. Multiple relations append. Each body is wrapped in a
-       StmtBlock for variable-name isolation. Method calls inside the
-       copy are renamed to their label-prefixed forms.
+    4. desugar_destructors — for each impl block with non-null kind
+       (whether synthesized from a relation in pass 3A or written by
+       the user as `impl Hint<A:l, B:l> owns { }`), deep-copies the
+       interface's destructor blocks whose kind matches impl.kind
+       onto each concrete class named by ib_args[i].type_expr.
+       Multiple impls touching the same class append wrapped block-
+       stmts. Method calls inside the copy are renamed to their
+       label-prefixed forms using ib_args[i].label.
     5. desugar_default_impls — extracts interface methods that carry a
        body into top-level generic functions guarded by relational
        `where` clauses, so any conforming class picks them up.
@@ -107,7 +110,16 @@ module desugar
     deep_copy_expr and deep_copy_stmt MUST also clone the TypeArgs slice
     on CallExpr and MethodCallExpr, because rich type-parameter
     substitution mutates TypeArgs in place. Without the clone, the LAST
-    relation processed wins for ALL destructors.
+    impl processed wins for ALL destructors.
+
+    The pass iterates impl blocks with non-null kind — NOT relations.
+    This makes user-authored
+    `impl Hint<A:l, B:l> owns { }` over a user-defined hint interface
+    get identical destructor synthesis as a relation-synthesized
+    ownership impl. Concrete classes come from ib_args[i].type_expr;
+    labels for method renaming come from ib_args[i].label; the
+    owns/refs gating compares db.kind against impl_block.kind. See
+    cr/docs/multi-class-interface-redesign.md §3.9.
     """
 
   invariant "Type Parameter Substitution Strategy":
@@ -196,98 +208,97 @@ module desugar
     """
 
   func desugar_interface_fields(file: File)
-  func desugar_interface_fields(file: File)
     source: desugar.ly:17
 
   func desugar_relations(file: File)
     source: desugar.ly:98
 
   func desugar_destructors(file: File)
-    source: desugar.ly:339
+    source: desugar.ly:344
 
   func desugar_default_impls(file: File)
-    source: desugar.ly:501
+    source: desugar.ly:506
 
   func desugar_field_access(file: File)
-    source: desugar.ly:577
+    source: desugar.ly:582
 
   func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>)
-    source: desugar.ly:607
+    source: desugar.ly:612
 
   func rewrite_field_access_stmt(s: Stmt, field_names: Dict<Sym, bool>)
-    source: desugar.ly:613
+    source: desugar.ly:618
 
   func rewrite_field_access_expr(e: Expr, field_names: Dict<Sym, bool>)
-    source: desugar.ly:687
+    source: desugar.ly:692
 
   func desugar_all(file: File)
-    source: desugar.ly:746
+    source: desugar.ly:751
 
   func type_expr_name(te: TypeExpr) -> Sym?
-    source: desugar.ly:757
+    source: desugar.ly:762
 
   func sym_eq(a: Sym?, b: Sym?) -> bool
-    source: desugar.ly:765
+    source: desugar.ly:770
 
   func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
-    source: desugar.ly:772
+    source: desugar.ly:777
 
   func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr?
-    source: desugar.ly:780
+    source: desugar.ly:785
 
   func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<Sym, string>)
-    source: desugar.ly:791
+    source: desugar.ly:796
 
   func rewrite_field_type_impl(te: TypeExpr?, iface_tps: [TypeParam], impl_args: [ImplTypeArg]) -> TypeExpr?
-    source: desugar.ly:819
+    source: desugar.ly:824
 
   func deep_copy_block(b: Block?) -> Block?
-    source: desugar.ly:856
+    source: desugar.ly:861
 
   func deep_copy_stmt(s: Stmt) -> Stmt
-    source: desugar.ly:866
+    source: desugar.ly:871
 
   func deep_copy_block_val(b: Block) -> Block
-    source: desugar.ly:971
+    source: desugar.ly:976
 
   func deep_copy_expr(e: Expr) -> Expr
-    source: desugar.ly:980
+    source: desugar.ly:985
 
   func deep_copy_type_expr(te: TypeExpr) -> TypeExpr
-    source: desugar.ly:1076
+    source: desugar.ly:1081
 
   func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
-    source: desugar.ly:1083
+    source: desugar.ly:1088
 
   func deep_copy_expr_list(exprs: [Expr]) -> [Expr]
-    source: desugar.ly:1093
+    source: desugar.ly:1098
 
   func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>)
-    source: desugar.ly:1105
+    source: desugar.ly:1110
 
   func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<Sym, string>)
-    source: desugar.ly:1111
+    source: desugar.ly:1116
 
   func substitute_type_params_in_expr(expr: Expr, type_map: Dict<Sym, string>)
-    source: desugar.ly:1159
+    source: desugar.ly:1164
 
   func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1211
+    source: desugar.ly:1216
 
   func substitute_type_params_rich_in_stmt(stmt: Stmt, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1217
+    source: desugar.ly:1222
 
   func substitute_type_params_rich_in_expr(expr: Expr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1266
+    source: desugar.ly:1271
 
   func substitute_type_params_rich_in_type_expr(te: TypeExpr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1312
+    source: desugar.ly:1317
 
   func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>)
-    source: desugar.ly:1343
+    source: desugar.ly:1348
 
   func rename_method_calls_in_stmt(stmt: Stmt, renames: Dict<Sym, string>)
-    source: desugar.ly:1349
+    source: desugar.ly:1354
 
   func rename_method_calls_in_expr(expr: Expr, renames: Dict<Sym, string>)
-    source: desugar.ly:1398
+    source: desugar.ly:1403
