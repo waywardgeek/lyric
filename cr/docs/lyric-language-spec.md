@@ -1279,26 +1279,39 @@ interface MyList<P, C> {
 relation MyList Panel:w owns [Widget:p]
 ```
 
-…the desugar pass injects methods callable as `panel.w_add(widget)` and
-`panel.w_count()`. The dual free-function form
-(`w_add<Panel, Widget>(panel, widget)`) also works for the canonical stdlib
-hints (`array_append`, `dll_append`, `hash_insert`, etc.); user-defined
-hints get only the method form unless they declare standalone functions.
+…the desugar pass injects methods callable via the parent's label
+scope: `panel.w.add(widget)` and `panel.w.count()` (Phase 3e dotted
+form; see §Labeled impl declarations). The dual free-function form
+(`w_add<Panel, Widget>(panel, widget)`) also works for the canonical
+stdlib hints (`array_append`, `dll_append`, `hash_insert`, etc.);
+user-defined hints get only the method form unless they declare
+standalone functions.
 
 ### Field vs Method Access for Relation Accessors
 
-The injected field `parent_label_field` (e.g., `roster_children`) is
-accessible both as a **field** and as a **zero-argument method** (`()`
-optional). Both forms work:
+A labeled relation's injected members are reachable from user code only
+via the dotted-scope sugar `parent.<label>.<member>` /
+`child.<label>.<member>` (Phase 3e). The underlying storage name is
+mangled (`Team.__roster_children`, `Player.__team_parent`) so the bare
+textual-prefix form is no longer reachable — gcc reports
+"did you mean `__roster_children`?" if a stale call survives. The
+dotted form works for both the field read and the auto-generated
+zero-argument getter:
 
 ```lyric
-let n = len(team.roster_children)     // field form
-let n = team.roster_children()        // method form (zero-arg call)
+let n = len(team.roster.children)     // field form
+let n = team.roster.children()        // method form (zero-arg call)
 ```
 
-The field form is idiomatic for direct collection access; the method form
-matches the interface contract and is required inside default-method
-bodies where the receiver type is a type variable.
+The field form is idiomatic for direct collection access; the method
+form matches the interface contract and is required inside default-
+method bodies where the receiver type is a type variable.
+
+An unlabeled side of a relation (or an impl whose type-arg has no
+`:label`) injects flat into the class namespace
+(`team.children`, `player.parent`). At most one unlabeled relation per
+`(P, C)` pair is allowed; subsequent relations on the same pair must
+carry labels to keep the namespaces disjoint.
 
 🚧 If the hint interface is undefined or has the wrong arity, the
 desugar pass silently skips the relation. Error-on-bad-hint is a roadmap
@@ -1310,25 +1323,36 @@ item.
 relation ArrayList Team:roster owns [Player:team]
 ```
 
-**Injected fields:** `Team.roster_children: [Player]`,
-`Player.team_parent: Team?`, `Player.team_index: i32`.
+**Injected storage** (mangled, internal):
+`Team.__roster_children: [Player]`,
+`Player.__team_parent: Team?`, `Player.__team_index: i32`.
+
+**User-visible access** (Phase 3e dotted-scope sugar):
+`team.roster.children`, `player.team.parent`, `player.team.index`.
 
 **Functions:** `array_append<Team, Player>(t, p)`,
-`array_remove<Team, Player>(p)`.
+`array_remove<Team, Player>(p)`. Method form:
+`team.roster.append(p)`, `team.roster.remove(p)`.
 
 ### DoublyLinked — Intrusive Doubly-Linked List
 
 ```lyric
-relation DoublyLinked Team:team owns [Player:player]   // cascade-destroys children
-relation DoublyLinked Room:room refs [Guest:guest]     // unlinks children, does not destroy them
+relation DoublyLinked Team:roster owns [Player:team]    // cascade-destroys children
+relation DoublyLinked Room:guests refs [Guest:room]     // unlinks children, does not destroy them
 ```
 
-**Injected fields:** `Team.team_first: Player?`, `Team.team_last: Player?`,
-`Player.player_next: Player?`, `Player.player_prev: Player?`,
-`Player.player_parent: Team?`.
+**Injected storage** (mangled, internal):
+`Team.__roster_first: Player?`, `Team.__roster_last: Player?`,
+`Player.__team_next: Player?`, `Player.__team_prev: Player?`,
+`Player.__team_parent: Team?`.
+
+**User-visible access** (Phase 3e dotted-scope sugar):
+`team.roster.first`, `team.roster.last`, `player.team.next`,
+`player.team.prev`, `player.team.parent`.
 
 **Functions:** `dll_append<Team, Player>(t, p)`,
-`dll_remove<Team, Player>(p)`.
+`dll_remove<Team, Player>(p)`. Method form: `team.roster.append(p)`,
+`team.roster.remove(p)`.
 
 The `owns`/`refs` modifier on the relation line selects the destructor the
 desugar pass synthesizes: `owns` cascades through the list calling
@@ -1344,6 +1368,15 @@ relation HashedList Registry:reg owns [Entry:entry]
 Child must implement `hash_key(self) -> u64`. Open-addressing hash table
 with 75% load factor rehash and linear probing.
 
+**Injected storage** (mangled, internal):
+`Registry.__reg_children: [Entry]`, `Registry.__reg_buckets: [i32]`,
+`Registry.__reg_hash_cap: i32`, `Registry.__reg_hash_count: i32`,
+`Entry.__entry_parent: Registry?`, `Entry.__entry_index: i32`.
+
+**User-visible access** (Phase 3e dotted-scope sugar):
+`registry.reg.children`, `registry.reg.buckets`, `registry.reg.hash_cap`,
+`registry.reg.hash_count`, `entry.entry.parent`, `entry.entry.index`.
+
 **Functions:** `hash_insert`, `hash_lookup`, `hash_remove`, `hash_init`.
 
 ### Generic Type Parameters in Relations
@@ -1354,9 +1387,11 @@ Relations support generic participants:
 relation HashedList Dict<K, V>:d owns [DictEntry<K, V>:d]
 ```
 
-The label `:d` on both sides produces field names like `d_children`,
-`d_buckets`, `d_hash_cap`, `d_hash_count` on `Dict`, and `d_parent`,
-`d_index` on `DictEntry`.
+The label `:d` on both sides produces mangled storage `Dict.__d_children`,
+`Dict.__d_buckets`, `Dict.__d_hash_cap`, `Dict.__d_hash_count` on `Dict`
+and `DictEntry.__d_parent`, `DictEntry.__d_index` on `DictEntry`. User
+code accesses them through the dotted-scope sugar: `dict.d.children`,
+`dict.d.buckets`, `entry.d.parent`, `entry.d.index`.
 
 ---
 
