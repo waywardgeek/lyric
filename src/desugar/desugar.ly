@@ -74,7 +74,26 @@ lyric desugar {
 
   // ---- 3. DesugarRelations ----
   // Processes relation declarations: injects fields into concrete classes
-  // and generates impl blocks with field bindings.
+  // ---- 3. DesugarRelations ----
+  // Two phases:
+  //
+  //   Phase A: synthesize an impl skeleton from each relation declaration.
+  //     For each `relation Hint Parent:l1 owns/refs [Child:l2]`, find or
+  //     create a matching `impl Hint<Parent, Child>` block, drop the
+  //     per-side labels into ib_args[i].label, and drop rel.kind into
+  //     impl.kind. No mapping/field injection yet.
+  //
+  //   Phase B: materialize every ownership-bearing impl block.
+  //     For each impl block with non-null kind whose interface declares
+  //     hint shape (field T.name: Type decls), inject label-prefixed
+  //     fields onto the concrete classes named by ib_args[i].type_expr
+  //     and emit FieldBind mappings (deduped against any user-authored
+  //     mappings already on the impl).
+  //
+  // Phase B reads everything off the impl, so a user-authored
+  // `impl Hint<A:l1, B:l2> owns { }` over a user-defined hint interface
+  // gets identical treatment to a desugared relation. See
+  // cr/docs/multi-class-interface-redesign.md §3.9.
 
   func desugar_relations(file: File) {
     // Build GLOBAL interface lookup across ALL blocks
@@ -101,9 +120,85 @@ lyric desugar {
 
     for block in file.fb_children() {
 
+      // ===== Phase A: relation → impl skeleton =====
+      // Per-type-var labels (redesign §3.8) ride on ib_args[i].label.
+      // Ownership annotation (redesign §3.9) rides on impl.kind. No
+      // mapping generation here; Phase B handles that uniformly for
+      // user-authored ownership impls as well.
       for rel in block.rd_children() {
         if isnull(rel.hint) { continue }
-        let iface_entry = iface_map.get(sym(rel.hint!.name))
+        let mut parent_name: string = ""
+        if !isnull(rel.parent.type_name) {
+          parent_name = rel.parent.type_name!.name
+        }
+        let mut child_name: string = ""
+        if !isnull(rel.child.type_name) {
+          child_name = rel.child.type_name!.name
+        }
+        if parent_name == "" || child_name == "" { continue }
+
+        // Look for existing impl block matching (hint, parent, child).
+        let mut existing: ImplBlock? = null
+        for ib in block.ib_children() {
+          if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
+            let ta = ib.ib_arg_children()
+            if len(ta) >= 2 {
+              let n0 = if !isnull(ta[0].type_expr) { type_expr_name(ta[0].type_expr!) } else { null }
+              let n1 = if !isnull(ta[1].type_expr) { type_expr_name(ta[1].type_expr!) } else { null }
+              if !isnull(n0) && !isnull(n1) && n0!.name == parent_name && n1!.name == child_name {
+                existing = ib
+              }
+            }
+          }
+        }
+
+        if !isnull(existing) {
+          // Drop labels and kind onto existing impl if slots are empty.
+          // User-authored values win; relation-synthesized values fill gaps.
+          let ex_args = existing!.ib_arg_children()
+          if len(ex_args) >= 2 {
+            if isnull(ex_args[0].label) && !isnull(rel.parent.label) {
+              ex_args[0].label = rel.parent.label
+            }
+            if isnull(ex_args[1].label) && !isnull(rel.child.label) {
+              ex_args[1].label = rel.child.label
+            }
+          }
+          if isnull(existing!.kind) {
+            existing!.kind = rel.kind
+          }
+        } else {
+          let new_ib = ImplBlock {
+            interface_name: rel.hint,
+            kind: rel.kind,
+            span: rel.span,
+          }
+          let mut parent_args: [TypeExpr] = []
+          for ta in rel.parent.type_args {
+            append(parent_args, TypeExpr { kind: Named(ta, []), span: rel.span })
+          }
+          let ta0 = TypeExpr { kind: Named(sym(parent_name), parent_args), span: rel.span }
+          let mut child_args_te: [TypeExpr] = []
+          for ta in rel.child.type_args {
+            append(child_args_te, TypeExpr { kind: Named(ta, []), span: rel.span })
+          }
+          let ta1 = TypeExpr { kind: Named(sym(child_name), child_args_te), span: rel.span }
+          let ita0 = ImplTypeArg { type_expr: ta0, label: rel.parent.label, span: rel.span }
+          let ita1 = ImplTypeArg { type_expr: ta1, label: rel.child.label, span: rel.span }
+          array_append<ImplBlock, ImplTypeArg>(new_ib, ita0)
+          array_append<ImplBlock, ImplTypeArg>(new_ib, ita1)
+          array_append<LyricBlock, ImplBlock>(block, new_ib)
+        }
+      }
+
+      // ===== Phase B: materialize ownership impls =====
+      // Iterate impls (NOT relations) so user-authored
+      // `impl Hint<A:l, B:l> owns { }` over user-defined hint interfaces
+      // gets identical treatment to a relation-synthesized impl.
+      for impl_block in block.ib_children() {
+        if isnull(impl_block.kind) { continue }
+        if isnull(impl_block.interface_name) { continue }
+        let iface_entry = iface_map.get(sym(impl_block.interface_name!.name))
         if isnull(iface_entry) { continue }
         let iface = iface_entry!.value
 
@@ -113,39 +208,44 @@ lyric desugar {
         let iface_tps = iface.itp_children()
         if len(iface_tps) < 2 { continue }
 
-        // For each interface field, inject into the appropriate concrete class
-        let mut mappings: [ImplMapping] = []
+        let impl_args = impl_block.ib_arg_children()
+        if len(impl_args) < 2 { continue }
+
+        // Snapshot existing mappings for dedup. User-authored
+        // FieldBind mappings win over auto-synthesized ones. The
+        // snapshot is read-only; new mappings are buffered into
+        // `new_mappings` and appended AFTER the per-field loop, so
+        // that mid-loop reallocation of impl_block's mapping backing
+        // can't invalidate the slice we're iterating.
+        let existing_mappings = impl_block.ibm_children()
+        let mut new_mappings: [ImplMapping] = []
+
         for fd in iface_fields {
           if isnull(fd.type_param) { continue }
           let tp_name = fd.type_param!.name
 
-          // Determine which side this field belongs to
-          let mut side_name: string = ""
-          let mut side_label: string = ""
+          // Find which iface type-param slot this field references.
+          let mut slot: i32 = -1
           if !isnull(iface_tps[0].name) && tp_name == iface_tps[0].name!.name {
-            if !isnull(rel.parent.type_name) {
-              side_name = rel.parent.type_name!.name
-            }
-            if !isnull(rel.parent.label) {
-              side_label = rel.parent.label!.name
-            }
+            slot = 0
           } else if !isnull(iface_tps[1].name) && tp_name == iface_tps[1].name!.name {
-            if !isnull(rel.child.type_name) {
-              side_name = rel.child.type_name!.name
-            }
-            if !isnull(rel.child.label) {
-              side_label = rel.child.label!.name
-            }
-          } else {
-            continue
+            slot = 1
           }
+          if slot < 0 { continue }
 
-          if side_name == "" { continue }
+          let ta = impl_args[slot]
+          if isnull(ta.type_expr) { continue }
+          let side_name_sym = type_expr_name(ta.type_expr!)
+          if isnull(side_name_sym) { continue }
+          let side_name = side_name_sym!.name
+          let mut side_label: string = ""
+          if !isnull(ta.label) { side_label = ta.label!.name }
+
           let cls_entry = class_map.get(sym(side_name))
           if isnull(cls_entry) { continue }
           let cls = cls_entry!.value
 
-          // Build field name with label prefix
+          // Build field name with optional label prefix.
           let mut field_name: string = ""
           if !isnull(fd.name) {
             field_name = fd.name!.name
@@ -154,10 +254,15 @@ lyric desugar {
             field_name = side_label + "_" + field_name
           }
 
-          // Rewrite type: replace type param references with concrete types
-          let field_type = rewrite_field_type(fd.type_expr, iface_tps, rel)
+          // Rewrite the field's type, substituting iface type-params
+          // with the impl's per-side concrete TypeExpr.
+          let field_type = rewrite_field_type_impl(fd.type_expr, iface_tps, impl_args)
 
-          // Inject field into concrete class
+          // Inject the field into the concrete class. Always: a user-
+          // authored impl mapping like `P.children <-> Team.roster_children`
+          // names a class field that this pass is responsible for
+          // injecting; deduping field injection on the mapping presence
+          // would leave the binding dangling.
           let new_field = Field {
             name: sym(field_name),
             is_public: false,
@@ -168,145 +273,65 @@ lyric desugar {
           }
           array_append<ClassDecl, Field>(cls, new_field)
 
-          // Generate field binding for getter
-          let getter_mapping = ImplMapping {
-            type_param: fd.type_param,
-            method_name: fd.name,
-            kind: FieldBind,
-            target_class: sym(side_name),
-            target_member: sym(field_name),
-            inline_func: null,
-            span: fd.span,
+          // Generate getter mapping unless user already provided one for
+          // (type_param, fd.name). User-authored mappings win.
+          let mut getter_user_bound = false
+          for em in existing_mappings {
+            if (!isnull(em.type_param) && !isnull(fd.type_param) &&
+                em.type_param!.name == fd.type_param!.name &&
+                !isnull(em.method_name) && !isnull(fd.name) &&
+                em.method_name!.name == fd.name!.name) {
+              getter_user_bound = true
+            }
           }
-          mappings = append(mappings, getter_mapping)
+          if !getter_user_bound {
+            let getter_mapping = ImplMapping {
+              type_param: fd.type_param,
+              method_name: fd.name,
+              kind: FieldBind,
+              target_class: sym(side_name),
+              target_member: sym(field_name),
+              inline_func: null,
+              span: fd.span,
+            }
+            new_mappings = append(new_mappings, getter_mapping)
+          }
 
-          // Generate field binding for setter
+          // Generate setter mapping unless user already provided one for
+          // (type_param, set_<fd.name>).
           let mut setter_name: Sym? = null
           if !isnull(fd.name) {
             setter_name = sym("set_" + fd.name!.name)
           }
-          let setter_mapping = ImplMapping {
-            type_param: fd.type_param,
-            method_name: setter_name,
-            kind: FieldBind,
-            target_class: sym(side_name),
-            target_member: sym(field_name),
-            inline_func: null,
-            span: fd.span,
+          let mut setter_user_bound = false
+          for em in existing_mappings {
+            if (!isnull(em.type_param) && !isnull(fd.type_param) &&
+                em.type_param!.name == fd.type_param!.name &&
+                !isnull(em.method_name) && !isnull(setter_name) &&
+                em.method_name!.name == setter_name!.name) {
+              setter_user_bound = true
+            }
           }
-          mappings = append(mappings, setter_mapping)
+          if !setter_user_bound {
+            let setter_mapping = ImplMapping {
+              type_param: fd.type_param,
+              method_name: setter_name,
+              kind: FieldBind,
+              target_class: sym(side_name),
+              target_member: sym(field_name),
+              inline_func: null,
+              span: fd.span,
+            }
+            new_mappings = append(new_mappings, setter_mapping)
+          }
         }
-
-
-        // Create or merge impl block
-        if len(mappings) > 0 {
-          let mut parent_name: string = ""
-          if !isnull(rel.parent.type_name) {
-            parent_name = rel.parent.type_name!.name
-          }
-          let mut child_name: string = ""
-          if !isnull(rel.child.type_name) {
-            child_name = rel.child.type_name!.name
-          }
-
-          // Look for existing impl block
-          let mut existing: ImplBlock? = null
-          for ib in block.ib_children() {
-            if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
-              let ta = ib.ib_arg_children()
-              if len(ta) >= 2 {
-                let n0 = if !isnull(ta[0].type_expr) { type_expr_name(ta[0].type_expr!) } else { null }
-                let n1 = if !isnull(ta[1].type_expr) { type_expr_name(ta[1].type_expr!) } else { null }
-                if !isnull(n0) && !isnull(n1) && n0!.name == parent_name && n1!.name == child_name {
-                  existing = ib
-                }
-              }
-            }
-          }
-
-          if !isnull(existing) {
-            // Per-type-var labels (redesign §3.8): drop relation labels
-            // into the existing impl block's type-arg slots if those
-            // slots are unlabeled. Both sides treated independently.
-            let ex_args = existing!.ib_arg_children()
-            if len(ex_args) >= 2 {
-              if isnull(ex_args[0].label) && !isnull(rel.parent.label) {
-                ex_args[0].label = rel.parent.label
-              }
-              if isnull(ex_args[1].label) && !isnull(rel.child.label) {
-                ex_args[1].label = rel.child.label
-              }
-            }
-            // Ownership annotation (redesign §3.9): drop rel.kind into
-            // existing.kind if unset. Two relations merging into one
-            // impl with conflicting kinds is a contradiction; in that
-            // case keep the first (a checker diagnostic will catch it
-            // when the validator generalizes in a follow-on commit).
-            if isnull(existing!.kind) {
-              existing!.kind = rel.kind
-            }
-            // Merge: add mappings not already present
-            // Collect to_add first to avoid invalidating existing_mappings pointer
-            let existing_mappings = existing!.ibm_children()
-            let mut to_add: [ImplMapping] = []
-            for m in mappings {
-              let mut found = false
-              for em in existing_mappings {
-                if sym_eq(em.type_param!, m.type_param!) && sym_eq(em.method_name!, m.method_name!) {
-                  found = true
-                }
-              }
-              if !found {
-                to_add = append(to_add, m)
-              }
-            }
-            for m in to_add {
-              array_append<ImplBlock, ImplMapping>(existing!, m)
-            }
-          } else {
-            // Create new impl block — per-type-var labels (redesign §3.8):
-            // parent label rides on the first ImplTypeArg, child label on
-            // the second. No impl-block-wide label slot anymore.
-            // Ownership annotation (redesign §3.9): rel.kind drops into
-            // the impl block's `kind` slot, making this synthesized impl
-            // fully equivalent to a user-authored
-            // `impl Hint<P:l1, C:l2> owns/refs { }`.
-            let new_ib = ImplBlock {
-              interface_name: rel.hint,
-              kind: rel.kind,
-              span: rel.span,
-            }
-            // Build TypeArgs with type parameters from the relation sides
-            let mut parent_args: [TypeExpr] = []
-            for ta in rel.parent.type_args {
-              append(parent_args, TypeExpr { kind: Named(ta, []), span: rel.span })
-            }
-            let ta0 = TypeExpr {
-              kind: Named(sym(parent_name), parent_args),
-              span: rel.span,
-            }
-            let mut child_args_te: [TypeExpr] = []
-            for ta in rel.child.type_args {
-              append(child_args_te, TypeExpr { kind: Named(ta, []), span: rel.span })
-            }
-            let ta1 = TypeExpr {
-              kind: Named(sym(child_name), child_args_te),
-              span: rel.span,
-            }
-            let ita0 = ImplTypeArg { type_expr: ta0, label: rel.parent.label, span: rel.span }
-            let ita1 = ImplTypeArg { type_expr: ta1, label: rel.child.label, span: rel.span }
-            array_append<ImplBlock, ImplTypeArg>(new_ib, ita0)
-            array_append<ImplBlock, ImplTypeArg>(new_ib, ita1)
-            for m in mappings {
-              array_append<ImplBlock, ImplMapping>(new_ib, m)
-            }
-            array_append<LyricBlock, ImplBlock>(block, new_ib)
-          }
+        // Flush buffered mappings onto the impl in a single pass.
+        for m in new_mappings {
+          array_append<ImplBlock, ImplMapping>(impl_block, m)
         }
       }
     }
   }
-
   // ---- 4. DesugarDestructors ----
   // Generates destroy methods on classes involved in relations by copying
   // interface destructor blocks to concrete classes.
@@ -788,38 +813,27 @@ lyric desugar {
   }
 
   // Rewrite a field's type, replacing interface type params with concrete types from the relation
-  func rewrite_field_type(te: TypeExpr?, iface_tps: [TypeParam], rel: RelationDecl) -> TypeExpr? {
+  // Rewrite a field's type, replacing iface type-param references with
+  // the impl's per-side concrete TypeExpr (preserving generic args).
+  // Indexes impl_args by name match against iface_tps. See redesign §3.9.
+  func rewrite_field_type_impl(te: TypeExpr?, iface_tps: [TypeParam], impl_args: [ImplTypeArg]) -> TypeExpr? {
     if isnull(te) { return null }
     match te!.kind {
       Named(name, args) => {
+        let mut slot: i32 = -1
         if len(iface_tps) >= 1 && !isnull(iface_tps[0].name) && name.name == iface_tps[0].name!.name {
-          if !isnull(rel.parent.type_name) {
-            let mut new_args: [TypeExpr] = []
-            for arg in rel.parent.type_args {
-              append(new_args, TypeExpr { kind: Named(arg, []), span: te!.span })
-            }
-            return TypeExpr {
-              kind: Named(rel.parent.type_name!, new_args),
-              span: te!.span,
-            }
-          }
+          slot = 0
+        } else if len(iface_tps) >= 2 && !isnull(iface_tps[1].name) && name.name == iface_tps[1].name!.name {
+          slot = 1
         }
-        if len(iface_tps) >= 2 && !isnull(iface_tps[1].name) && name.name == iface_tps[1].name!.name {
-          if !isnull(rel.child.type_name) {
-            let mut new_args: [TypeExpr] = []
-            for arg in rel.child.type_args {
-              append(new_args, TypeExpr { kind: Named(arg, []), span: te!.span })
-            }
-            return TypeExpr {
-              kind: Named(rel.child.type_name!, new_args),
-              span: te!.span,
-            }
-          }
+        if slot >= 0 && slot < len(impl_args) && !isnull(impl_args[slot].type_expr) {
+          let src = impl_args[slot].type_expr!
+          return TypeExpr { kind: src.kind, span: te!.span }
         }
         return te
       }
       Optional(inner) => {
-        let new_inner = rewrite_field_type(inner, iface_tps, rel)
+        let new_inner = rewrite_field_type_impl(inner, iface_tps, impl_args)
         if isnull(new_inner) { return te }
         return TypeExpr {
           kind: TypeExprKind.Optional(new_inner!),
@@ -827,7 +841,7 @@ lyric desugar {
         }
       }
       Sequence(elem) => {
-        let new_elem = rewrite_field_type(elem, iface_tps, rel)
+        let new_elem = rewrite_field_type_impl(elem, iface_tps, impl_args)
         if isnull(new_elem) { return te }
         return TypeExpr {
           kind: TypeExprKind.Sequence(new_elem!),
@@ -837,7 +851,6 @@ lyric desugar {
       _ => { return te }
     }
   }
-
   // ---- Deep copy ----
 
   func deep_copy_block(b: Block?) -> Block? {

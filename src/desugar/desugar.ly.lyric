@@ -14,12 +14,21 @@ module desugar
     2. desugar_field_access — rewrites `obj.field` shorthand inside
        interface bodies into getter/setter method calls for fields lifted
        by pass 1.
-    3. desugar_relations — expands relation decls into label-prefixed
-       fields on the parent class plus impl blocks on the child. Uses a
-       GLOBAL class lookup across all blocks (relations frequently target
-       a class declared in a different block, e.g. lexer.ly referencing
-       ast.ly's Comment). rewrite_field_type remaps interface type
-       parameters to the concrete types from the relation decl.
+    3. desugar_relations — runs in two phases:
+         A. Skeleton synthesis: every relation decl finds-or-creates an
+            impl block matching its (hint, parent, child) and drops
+            per-side labels onto ib_args[i].label and the owns/refs
+            flag onto impl.kind. No mapping/field generation.
+         B. Ownership-impl materialization: every impl block with
+            non-null kind whose interface declares hint shape gets its
+            per-side fields injected onto the concrete classes named
+            by ib_args[i].type_expr (label-prefixed) and FieldBind
+            mappings appended (deduped against any user-authored
+            mappings on the impl). A user-authored
+            `impl Hint<A:l, B:l> owns { }` over a user-defined hint
+            interface gets identical treatment to a relation-
+            synthesized impl. Cross-block GLOBAL class lookup, see
+            below.
     4. desugar_destructors — for each owns relation, deep-copies the
        interface's destructor body onto the concrete class's destroy
        method. Multiple relations append. Each body is wrapped in a
@@ -158,109 +167,127 @@ module desugar
   invariant "Ownership Annotation on Synthesized Impls":
     procedural
     """
-    When desugar_relations synthesizes a new impl block from a relation,
-    it MUST drop rel.kind into the impl's `kind` slot, making the
-    synthesized impl fully equivalent to a user-authored
-    `impl Hint<P:l1, C:l2> owns/refs { }`. When merging into an existing
-    impl whose kind is null, drop rel.kind there as well. If the existing
-    impl already carries a non-null kind, keep it (two relations merging
-    into one impl with conflicting kinds is a contradiction; a checker
-    diagnostic catches this when the validator generalizes in a follow-on
-    commit). See cr/docs/multi-class-interface-redesign.md §3.9.
+    desugar_relations runs in two phases. Phase A (per-relation) finds
+    or creates the impl block matching (hint, parent, child) and drops
+    rel.kind into impl.kind plus per-side labels onto ib_args[i].label.
+    User-authored values win: if the existing impl already carries a
+    non-null kind, keep it (two relations merging into one impl with
+    conflicting kinds is a contradiction; a checker diagnostic catches
+    this when the validator generalizes in a follow-on commit).
+
+    Phase B (per-impl) iterates impl blocks with non-null kind whose
+    interface declares hint shape (one or more `field T.name: Type`
+    decls). For each iface field, the slot whose name matches the
+    field's type_param selects an ImplTypeArg; its type_expr names the
+    concrete class to inject into and its label optionally prefixes the
+    injected field name. Phase B reads everything off the impl, so a
+    user-authored `impl Hint<A:l, B:l> owns { }` over a user-defined
+    hint interface gets identical treatment to a relation-synthesized
+    impl. New FieldBind mappings are buffered into a local slice and
+    appended after the per-field loop completes, so that mid-loop
+    reallocation of the impl's mapping backing cannot invalidate the
+    `existing_mappings` snapshot used for user-binding dedup. Field
+    injection is unconditional (the class field is what user-authored
+    FieldBind mappings POINT AT — deduping it on mapping presence
+    would leave the mapping dangling); mapping injection dedupes
+    per-mapping against user-authored bindings.
+
+    See cr/docs/multi-class-interface-redesign.md §3.9.
     """
 
   func desugar_interface_fields(file: File)
-    source: desugar.ly:145
+  func desugar_interface_fields(file: File)
+    source: desugar.ly:17
 
   func desugar_relations(file: File)
-    source: desugar.ly:207
+    source: desugar.ly:98
 
   func desugar_destructors(file: File)
-    source: desugar.ly:422
+    source: desugar.ly:339
 
   func desugar_default_impls(file: File)
-    source: desugar.ly:577
+    source: desugar.ly:501
 
   func desugar_field_access(file: File)
-    source: desugar.ly:653
+    source: desugar.ly:577
 
   func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>)
-    source: desugar.ly:683
+    source: desugar.ly:607
 
   func rewrite_field_access_stmt(s: Stmt, field_names: Dict<Sym, bool>)
-    source: desugar.ly:689
+    source: desugar.ly:613
 
   func rewrite_field_access_expr(e: Expr, field_names: Dict<Sym, bool>)
-    source: desugar.ly:763
+    source: desugar.ly:687
 
   func desugar_all(file: File)
-    source: desugar.ly:822
+    source: desugar.ly:746
 
   func type_expr_name(te: TypeExpr) -> Sym?
-    source: desugar.ly:834
+    source: desugar.ly:757
 
   func sym_eq(a: Sym?, b: Sym?) -> bool
-    source: desugar.ly:842
+    source: desugar.ly:765
 
   func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
-    source: desugar.ly:849
+    source: desugar.ly:772
 
   func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr?
-    source: desugar.ly:857
+    source: desugar.ly:780
 
   func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<Sym, string>)
-    source: desugar.ly:868
+    source: desugar.ly:791
 
-  func rewrite_field_type(te: TypeExpr?, iface_tps: [TypeParam], rel: RelationDecl) -> TypeExpr?
-    source: desugar.ly:893
+  func rewrite_field_type_impl(te: TypeExpr?, iface_tps: [TypeParam], impl_args: [ImplTypeArg]) -> TypeExpr?
+    source: desugar.ly:819
 
   func deep_copy_block(b: Block?) -> Block?
-    source: desugar.ly:945
+    source: desugar.ly:856
 
   func deep_copy_stmt(s: Stmt) -> Stmt
-    source: desugar.ly:955
+    source: desugar.ly:866
 
   func deep_copy_block_val(b: Block) -> Block
-    source: desugar.ly:1063
+    source: desugar.ly:971
 
   func deep_copy_expr(e: Expr) -> Expr
-    source: desugar.ly:1072
+    source: desugar.ly:980
 
   func deep_copy_type_expr(te: TypeExpr) -> TypeExpr
-    source: desugar.ly:1168
+    source: desugar.ly:1076
 
   func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
-    source: desugar.ly:1175
+    source: desugar.ly:1083
 
   func deep_copy_expr_list(exprs: [Expr]) -> [Expr]
-    source: desugar.ly:1185
+    source: desugar.ly:1093
 
   func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>)
-    source: desugar.ly:1197
+    source: desugar.ly:1105
 
   func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<Sym, string>)
-    source: desugar.ly:1203
+    source: desugar.ly:1111
 
   func substitute_type_params_in_expr(expr: Expr, type_map: Dict<Sym, string>)
-    source: desugar.ly:1251
+    source: desugar.ly:1159
 
   func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1303
+    source: desugar.ly:1211
 
   func substitute_type_params_rich_in_stmt(stmt: Stmt, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1309
+    source: desugar.ly:1217
 
   func substitute_type_params_rich_in_expr(expr: Expr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1358
+    source: desugar.ly:1266
 
   func substitute_type_params_rich_in_type_expr(te: TypeExpr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1404
+    source: desugar.ly:1312
 
   func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>)
-    source: desugar.ly:1435
+    source: desugar.ly:1343
 
   func rename_method_calls_in_stmt(stmt: Stmt, renames: Dict<Sym, string>)
-    source: desugar.ly:1441
+    source: desugar.ly:1349
 
   func rename_method_calls_in_expr(expr: Expr, renames: Dict<Sym, string>)
-    source: desugar.ly:1490
+    source: desugar.ly:1398
