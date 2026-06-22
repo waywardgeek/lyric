@@ -599,7 +599,7 @@ lyric std {
     return !isnull(self.get(key))
   }
 
-  pub func Dict.length<K, V>(self) -> i32 where K: Hashable {
+  pub func Dict.len<K, V>(self) -> i32 where K: Hashable {
     return self.d.hash_count
   }
 

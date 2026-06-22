@@ -657,7 +657,7 @@ There is no GC, no borrow checker, and no lifetime annotations.
 | Class | Notes |
 |---|---|
 | `Sym` | Interned symbol with pre-computed FNV-1a hash. `sym("name")` or `` `name` ``. `get_name() -> string`, `get_hash() -> u64`. Implements `Hashable`. |
-| `Dict<K, V>` | Hash table where `K: Hashable`. Constructor `Dict<K,V>()`. Methods: `set(k, v)`, `get(k) -> DictEntry<K,V>?`, `has(k) -> bool`, `remove(k) -> bool`, `keys() -> [K]`, `len()` / `length()`. |
+| `Dict<K, V>` | Hash table where `K: Hashable`. Constructor `Dict<K,V>()`. Methods: `set(k, v)`, `get(k) -> DictEntry<K,V>?`, `has(k) -> bool`, `remove(k) -> bool`, `keys() -> [K]`, `len() -> i32`. |
 | `DictEntry<K, V>` | Fields `key: K`, `value: V`. |
 | `Hashable` | Interface with `get_hash(self) -> u64`. (Note: `equals(self, other) -> bool` is on the roadmap.) |
 | `Comparable`, `Equatable` | Built-in constraints — see §11. |
@@ -773,7 +773,7 @@ Three syntactic forms parse: `import name`, `import alias from "path"`, `import 
 - **`fn` vs `func`** — both work; `fn` is preferred for type syntax.
 - **Tuple field access** — `t._0`, `t._1` (underscore-prefixed).
 - **`recv`** is a synonym for channel `receive()`.
-- **`length()`** is a synonym for `len()` on Dict and slices.
+- **`length()`** is a synonym for `len()` on slices and strings. (Dict has only `len()`.)
 - **C identifier collisions** — the C backend appends `_` to identifiers colliding with C keywords. Mostly invisible at the Lyric level.
 - **`map[K]V`** parses but compiles to a stub today. Use `Dict<K,V>`.
 

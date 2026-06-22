@@ -43,14 +43,14 @@ func test_global_dict_survives_churn() {
   phase1()
 
   // Verify immediately after phase1 — should be fine
-  let count_before = get_aliases().length()
+  let count_before = get_aliases().len()
   assert(count_before == 2)
 
   churn_dicts()
 
   // After churn, the global Dict may have been freed and its slab reused
   let aliases = get_aliases()
-  let count = aliases.length()
+  let count = aliases.len()
   assert(count == 2)
   let a = aliases.get(`alpha`)
   assert(!isnull(a))
