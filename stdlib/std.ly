@@ -614,7 +614,7 @@ lyric std {
 
   pub func Dict.keys<K, V>(self) -> [K] where K: Hashable {
     let mut result: [K] = []
-    for entry in self.d_children() {
+    for entry in self.d.children() {
       append(result, entry.key)
     }
     return result
