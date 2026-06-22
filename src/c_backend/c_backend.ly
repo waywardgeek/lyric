@@ -1795,6 +1795,41 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
     }
   }
 
+  // Character predicates (spec §Built-in Functions, char_is_* family).
+  // All accept u8 and return bool. lyric_runtime.h already pulls in <ctype.h>.
+  // Cast to (unsigned char) defensively: the macros are UB on negative int
+  // arguments, and Lyric u8 can flow through a signed-char temporary.
+  if name == "char_is_digit" {
+    if len(args) > 0 {
+      return f"(isdigit((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+  if name == "char_is_alpha" {
+    if len(args) > 0 {
+      return f"(isalpha((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+  if name == "char_is_alnum" {
+    if len(args) > 0 {
+      return f"(isalnum((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+  if name == "char_is_space" {
+    if len(args) > 0 {
+      return f"(isspace((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+  if name == "char_is_upper" {
+    if len(args) > 0 {
+      return f"(isupper((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+  if name == "char_is_lower" {
+    if len(args) > 0 {
+      return f"(islower((unsigned char)({self.emit_value(args[0])})) != 0)"
+    }
+  }
+
   // No fallback — unhandled builtins must be added explicitly above
   eprintln(f"c_backend: unhandled builtin: {name}")
   os_exit(1)

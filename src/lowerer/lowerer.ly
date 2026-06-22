@@ -3038,6 +3038,8 @@ lyric lowerer {
     if name == "char_is_digit" { return true }
     if name == "char_is_alnum" { return true }
     if name == "char_is_space" { return true }
+    if name == "char_is_upper" { return true }
+    if name == "char_is_lower" { return true }
     if name == "assert" { return true }
     if name == "assert_eq" { return true }
     if name == "exit" { return true }
