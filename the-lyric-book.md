@@ -920,7 +920,7 @@ Lyric's default is private because most fields are implementation details. You e
 | Enum variants | PascalCase | `Red`, `Circle`, `LeftParen` |
 | Type variables | Short PascalCase | `T`, `U`, `P`, `C` |
 | Functions and methods | snake_case | `array_append`, `get_hash` |
-| Fields | snake_case | `roster_children`, `is_empty` |
+| Fields | snake_case | `total_count`, `is_empty` |
 | Locals and parameters | snake_case | `let total_count = 0` |
 | Module-level constants | UPPER_SNAKE | `let PREC_NONE: i32 = 0` |
 | Packages | snake_case | `ast`, `parser`, `expr_parser` |
@@ -2267,10 +2267,10 @@ func test_field_generates_getter_and_setter() {
     let src = """lyric t { interface Named<T> { field T.name: string } }"""
     let file = td_parse(src)
     desugar_interface_fields(file)
-    let named = file.fb_children()[0].id_children()[0]
-    assert(len(named.im_children()) >= 2, "expected getter + setter")
-    let getter = named.im_children()[0]
-    let setter = named.im_children()[1]
+    let named = file.fb.children()[0].id.children()[0]
+    assert(len(named.im.children()) >= 2, "expected getter + setter")
+    let getter = named.im.children()[0]
+    let setter = named.im.children()[1]
     assert(getter.name!.name == "name", "getter name")
     assert(setter.name!.name == "set_name", "setter name")
 }
