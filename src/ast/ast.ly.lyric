@@ -228,9 +228,18 @@ module ast
     field type_param: Sym?
 
   class ImplBlock
-    source: ast.ly:185
+    source: ast.ly:184
     field for_type: Sym?
     field interface_name: Sym?
+    field span: Span
+
+  // Per-class-type-variable label on an impl declaration's top-level
+  // type argument; selects the sub-scope on the bound class into
+  // which the interface's per-side injected members go. See
+  // cr/docs/multi-class-interface-redesign.md §3.8.
+  class ImplTypeArg
+    source: ast.ly:194
+    field type_expr: TypeExpr?
     field label: Sym?
     field span: Span
 

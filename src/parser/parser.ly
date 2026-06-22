@@ -663,7 +663,16 @@ lyric parser {
       self.next()
       while self.peek().kind != PGt && self.peek().kind != SEOF {
         let te = self.parse_type_expr()?
-        array_append<ImplBlock, TypeExpr>(impl_block, te!)
+        // Optional per-class-type-variable label: `: <ident>`. See
+        // cr/docs/multi-class-interface-redesign.md §3.8.
+        let mut arg_label: Sym? = null
+        if self.peek().kind == PColon {
+          self.next()
+          let lbl = self.expect(LIdent)?
+          arg_label = sym(lbl!.text)
+        }
+        let arg = ImplTypeArg { type_expr: te, label: arg_label, span: te!.span }
+        array_append<ImplBlock, ImplTypeArg>(impl_block, arg)
         if self.peek().kind == PComma {
           self.next()
         }
@@ -676,13 +685,6 @@ lyric parser {
       self.next()
       let for_type = self.expect(LIdent)?
       impl_block.for_type = sym(for_type!.text)
-    }
-
-    // Optional: as label
-    if self.peek().kind == KAs {
-      self.next()
-      let label = self.expect(LIdent)?
-      impl_block.label = sym(label!.text)
     }
 
     self.expect(PLBrace)?

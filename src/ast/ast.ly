@@ -179,11 +179,20 @@ lyric ast {
   class ImplBlock {
     interface_name: Sym?
     for_type: Sym?
+    span: Span
+  }
+  relation ArrayList ImplBlock:ib_arg owns [ImplTypeArg:ib_arg]
+  relation ArrayList ImplBlock:ibm owns [ImplMapping:ibm]
+
+  // Per-class-type-variable label on an impl declaration's top-level
+  // type argument. The label selects the sub-scope on the bound class
+  // into which the interface's per-side injected members go. See
+  // cr/docs/multi-class-interface-redesign.md §3.8.
+  class ImplTypeArg {
+    type_expr: TypeExpr?
     label: Sym?
     span: Span
   }
-  relation ArrayList ImplBlock:ib_arg owns [TypeExpr:ib_arg]
-  relation ArrayList ImplBlock:ibm owns [ImplMapping:ibm]
 
   // ---- Relations ----
 

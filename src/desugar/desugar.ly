@@ -215,8 +215,8 @@ lyric desugar {
             if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
               let ta = ib.ib_arg_children()
               if len(ta) >= 2 {
-                let n0 = type_expr_name(ta[0])
-                let n1 = type_expr_name(ta[1])
+                let n0 = if !isnull(ta[0].type_expr) { type_expr_name(ta[0].type_expr!) } else { null }
+                let n1 = if !isnull(ta[1].type_expr) { type_expr_name(ta[1].type_expr!) } else { null }
                 if !isnull(n0) && !isnull(n1) && n0!.name == parent_name && n1!.name == child_name {
                   existing = ib
                 }
@@ -225,9 +225,17 @@ lyric desugar {
           }
 
           if !isnull(existing) {
-            // Set label from relation if not already set
-            if isnull(existing!.label) && !isnull(rel.parent.label) {
-              existing!.label = rel.parent.label
+            // Per-type-var labels (redesign §3.8): drop relation labels
+            // into the existing impl block's type-arg slots if those
+            // slots are unlabeled. Both sides treated independently.
+            let ex_args = existing!.ib_arg_children()
+            if len(ex_args) >= 2 {
+              if isnull(ex_args[0].label) && !isnull(rel.parent.label) {
+                ex_args[0].label = rel.parent.label
+              }
+              if isnull(ex_args[1].label) && !isnull(rel.child.label) {
+                ex_args[1].label = rel.child.label
+              }
             }
             // Merge: add mappings not already present
             // Collect to_add first to avoid invalidating existing_mappings pointer
@@ -248,14 +256,11 @@ lyric desugar {
               array_append<ImplBlock, ImplMapping>(existing!, m)
             }
           } else {
-            // Create new impl block — set label from parent side of relation
-            let mut rel_label: Sym? = null
-            if !isnull(rel.parent.label) {
-              rel_label = rel.parent.label
-            }
+            // Create new impl block — per-type-var labels (redesign §3.8):
+            // parent label rides on the first ImplTypeArg, child label on
+            // the second. No impl-block-wide label slot anymore.
             let new_ib = ImplBlock {
               interface_name: rel.hint,
-              label: rel_label,
               span: rel.span,
             }
             // Build TypeArgs with type parameters from the relation sides
@@ -275,8 +280,10 @@ lyric desugar {
               kind: Named(sym(child_name), child_args_te),
               span: rel.span,
             }
-            array_append<ImplBlock, TypeExpr>(new_ib, ta0)
-            array_append<ImplBlock, TypeExpr>(new_ib, ta1)
+            let ita0 = ImplTypeArg { type_expr: ta0, label: rel.parent.label, span: rel.span }
+            let ita1 = ImplTypeArg { type_expr: ta1, label: rel.child.label, span: rel.span }
+            array_append<ImplBlock, ImplTypeArg>(new_ib, ita0)
+            array_append<ImplBlock, ImplTypeArg>(new_ib, ita1)
             for m in mappings {
               array_append<ImplBlock, ImplMapping>(new_ib, m)
             }

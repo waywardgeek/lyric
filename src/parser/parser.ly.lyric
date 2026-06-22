@@ -95,6 +95,21 @@ module parser
     handles this in do_parse_file.
     """
 
+  invariant "Per-Type-Var Labels on Impl Declarations":
+    procedural
+    """
+    parse_impl reads an optional `:<ident>` label after each top-level
+    type-arg inside the `<...>` of an `impl` declaration. The label is
+    stored on the corresponding ImplTypeArg slot. See cr/docs/multi-
+    class-interface-redesign.md §3.8 for the design.
+
+    The obsolete `impl X<...> as <label> { }` parser path is removed —
+    a single impl-block-wide label is no longer expressible; labels
+    belong per-class-type-variable. No user code used `as label`; only
+    the relation→impl desugar internally populated it, and the desugar
+    now drops labels into the per-type-arg slots directly.
+    """
+
   func binary_prec(kind: TokenKind) -> i32
     source: expr_parser.ly:22
 
@@ -242,7 +257,7 @@ module parser
     method parse_destructor_block(self) -> (DestructorBlock?, error)
       source: parser.ly:659
     method parse_impl(self) -> (ImplBlock?, error)
-      source: parser.ly:673
+      source: parser.ly:656
     method parse_impl_mapping_short(self, for_type: Sym) -> (ImplMapping?, error)
       source: parser.ly:725
     method parse_impl_mapping(self) -> (ImplMapping?, error)

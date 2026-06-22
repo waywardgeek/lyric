@@ -364,17 +364,14 @@ impl Printable<Widget> {
 }
 ```
 
-🚧 **Labeled impl declarations** — design intent per
-`cr/docs/multi-class-interface-redesign.md` §3.8; not yet accepted
-by the parser (the relation→impl desugar carries the equivalent
-information through a single `ImplBlock.label` slot today). When
-shipped, each top-level class type-arg may carry an optional
-`:label` that puts the interface's per-side injected members under
-a `<label>` sub-scope on that class:
+**Labeled impl declarations.** Each top-level class type-arg may
+carry an optional `:label` that puts the interface's per-side
+injected members under a `<label>` sub-scope on that class (see
+`cr/docs/multi-class-interface-redesign.md` §3.8):
 
 ```lyric
 impl ArrayList<Team:roster, Player:team> { ... }
-// → team.roster.children, player.team.parent
+// label-prefixed members: team.roster_children, player.team_parent
 
 // Same interface, same class, distinct labels — non-colliding:
 impl DoublyLinked<Node:ready_q,   Node:ready_q_child>   { ... }
@@ -383,6 +380,12 @@ impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
 
 A `relation` declaration is sugar for a labeled impl of the
 matching hint interface plus an `owns`/`refs` flag.
+
+🚧 The dotted-scope call form (`team.roster.children`) for accessing
+label-prefixed members is design intent per redesign §3.1 but not yet
+shipped; today, label-prefixed members are accessed by their flat
+textual-prefix names (`team.roster_children`). Phase 3c-capability
+ships the dotted form as additive sugar.
 
 ### `error` interface
 Built-in. Any class with a `message(self) -> string` method satisfies it.

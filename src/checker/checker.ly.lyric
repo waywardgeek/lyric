@@ -152,6 +152,24 @@ module checker
     from another (e.g. impl Hashable for concrete types in stdlib).
     """
 
+  invariant "Phase 1.5 — Per-Type-Var Label Registration":
+    procedural
+    """
+    When register_impl_methods (Phase 1.5) registers an interface
+    method on a concrete class, the label that prefixes the registered
+    method name MUST come from the impl-type-arg slot at the same
+    index as the method's receiver type-parameter — NOT from a single
+    impl-block-wide label slot (which no longer exists; see
+    cr/docs/multi-class-interface-redesign.md §3.8). Phase 1.5b
+    (interface body methods with P.method receiver syntax) builds a
+    param→label dict alongside the existing param→concrete substitution
+    dict so the per-method receiver can index into the right label.
+    Same registration shape as before — single label per side, flat
+    textual-prefix names — but sourced per-type-arg rather than per-
+    impl-block, removing the parent-label-on-impl + child-label-in-
+    side-channel asymmetry of the previous design.
+    """
+
   invariant "Phase 1.6 — Relation-Hint Shape Validation":
     procedural
     """

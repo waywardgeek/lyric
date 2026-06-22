@@ -1501,13 +1501,14 @@ lyric checker {
             let mut limit = len(itp)
             if len(impl_args) < limit { limit = len(impl_args) }
             while k < limit as i32 {
-              if itp[k].name != null {
-                subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k]))
+              if itp[k].name != null && !isnull(impl_args[k].type_expr) {
+                subst.set(sym(sym_to_string(itp[k].name!)), self.resolve_type_expr(impl_args[k].type_expr!))
               }
               k = k + 1
             }
 
-            let concrete_type = self.resolve_type_expr(impl_args[recv_param_idx])
+            if isnull(impl_args[recv_param_idx].type_expr) { continue }
+            let concrete_type = self.resolve_type_expr(impl_args[recv_param_idx].type_expr!)
             let concrete_name = type_name(concrete_type)
             if concrete_name == "" { continue }
 
@@ -1544,10 +1545,14 @@ lyric checker {
                 }
               }
             }
-            // If impl block has a label, register with label-prefixed name
+            // Per-type-var label (redesign §3.8): the label that
+            // prefixes the registered method name comes from the
+            // impl-type-arg at the same index as the method's receiver
+            // type-param, not from a single impl-block-wide slot.
             let mut reg_name = fname
-            if ib.label != null {
-              let label_str = sym_to_string(ib.label!)
+            let recv_arg_label = impl_args[recv_param_idx].label
+            if recv_arg_label != null {
+              let label_str = sym_to_string(recv_arg_label!)
               // Use let ref to prevent scope-exit free — sym() stores pointer to string data
               let ref label_name = label_str + "_" + fname
               reg_name = label_name
@@ -1594,18 +1599,24 @@ lyric checker {
 
         let impl_args = ib.ib_arg_children()
 
-        // Build substitution: interface type param → concrete type
+        // Build substitution: interface type param → concrete type.
+        // Also build param→label map (redesign §3.8: labels live on
+        // per-type-arg slots, not on the impl block).
         let subst = Dict<Sym, Type>()
         let mut param_to_concrete = Dict<Sym, string>()
+        let mut param_to_label = Dict<Sym, string>()
         let mut si = 0
         let mut slimit = len(itp)
         if len(impl_args) < slimit { slimit = len(impl_args) }
         while si < slimit as i32 {
-          if itp[si].name != null {
+          if itp[si].name != null && !isnull(impl_args[si].type_expr) {
             let param_name = sym_to_string(itp[si].name!)
-            let concrete = self.resolve_type_expr(impl_args[si])
+            let concrete = self.resolve_type_expr(impl_args[si].type_expr!)
             subst.set(sym(param_name), concrete)
             param_to_concrete.set(sym(param_name), type_name(concrete))
+            if !isnull(impl_args[si].label) {
+              param_to_label.set(sym(param_name), sym_to_string(impl_args[si].label!))
+            }
           }
           si = si + 1
         }
@@ -1624,10 +1635,14 @@ lyric checker {
           if cinfo == null { continue }
 
           let mname = sym_to_string(m.name!)
-          // If impl block has a label, register with label-prefixed name
+          // Per-type-var label (redesign §3.8): look up the label on
+          // the impl-type-arg whose type-param matches this method's
+          // receiver. param_to_label was built alongside the type-
+          // substitution loop above.
           let mut reg_name = mname
-          if ib.label != null {
-            let label_str = sym_to_string(ib.label!)
+          let label_entry = param_to_label.get(sym(recv_param))
+          if !isnull(label_entry) {
+            let label_str = label_entry!.value
             // Use let ref to prevent scope-exit free — sym() stores pointer to string data
             let ref label_name = label_str + "_" + mname
             reg_name = label_name
@@ -1662,7 +1677,9 @@ lyric checker {
           let mut ta_limit = len(itp)
           if len(impl_args) < ta_limit { ta_limit = len(impl_args) }
           while ta_i < ta_limit as i32 {
-            append(ta, impl_args[ta_i])
+            if !isnull(impl_args[ta_i].type_expr) {
+              append(ta, impl_args[ta_i].type_expr!)
+            }
             ta_i = ta_i + 1
           }
           self.method_type_args.set(sym(method_key), ta)
@@ -2040,8 +2057,8 @@ lyric checker {
       let mut limit = len(itp)
       if len(impl_args) < limit { limit = len(impl_args) }
       for i in range(0, limit) {
-        if itp[i].name != null {
-          subst.set(sym(sym_to_string(itp[i].name!)), self.resolve_type_expr(impl_args[i]))
+        if itp[i].name != null && !isnull(impl_args[i].type_expr) {
+          subst.set(sym(sym_to_string(itp[i].name!)), self.resolve_type_expr(impl_args[i].type_expr!))
         }
       }
     }

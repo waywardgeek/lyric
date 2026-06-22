@@ -719,20 +719,28 @@ lyric lowerer {
     let mut i = 0
     for tp in iface.type_params {
       if i < len(ib_args) {
-        let lt = self.lower_type(ib_args[i])
-        if !isnull(lt) {
-          type_arg_ltype_map.set(sym(tp.name), lt!)
-          type_arg_map.set(sym(tp.name), lt!.name)
+        if !isnull(ib_args[i].type_expr) {
+          let lt = self.lower_type(ib_args[i].type_expr!)
+          if !isnull(lt) {
+            type_arg_ltype_map.set(sym(tp.name), lt!)
+            type_arg_map.set(sym(tp.name), lt!.name)
+          }
         }
       }
       i = i + 1
     }
 
     // Build rename key prefix: iface_name + @ + label? + @ + type_arg_names...
+    // Per-type-var labels (redesign §3.8): today's relation→impl desugar
+    // always puts the parent-side label on the FIRST type-arg, and the
+    // existing rename machinery only consulted that single label, so
+    // reading ib_args[0].label preserves today's behavior. A future
+    // change can fold in the child-side label too if user-authored
+    // impls need fully-distinct renames per side.
     let mut rename_prefix = iface_name
     let mut label_segment = ""
-    if !isnull(ib!.label) {
-      label_segment = "@" + ib!.label!.name
+    if len(ib_args) > 0 && !isnull(ib_args[0].label) {
+      label_segment = "@" + ib_args[0].label!.name
     }
     let mut type_arg_suffix = ""
     for tp in iface.type_params {

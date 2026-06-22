@@ -142,6 +142,19 @@ module desugar
     on one class is a bug, not a feature.
     """
 
+  invariant "Per-Type-Var Labels on Synthesized Impls":
+    procedural
+    """
+    When desugar_relations synthesizes a new impl block from a relation,
+    or merges into an existing one, it MUST drop labels into per-type-
+    arg ImplTypeArg slots (parent label → ib_args[0].label, child label
+    → ib_args[1].label) NOT into a single impl-block-wide label slot
+    (which no longer exists). Existing labels on the impl-type-args take
+    precedence over the relation's labels — user-authored impls win over
+    relation-synthesized labels. See cr/docs/multi-class-interface-
+    redesign.md §3.8.
+    """
+
   func desugar_interface_fields(file: File)
     source: desugar.ly:145
 
