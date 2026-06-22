@@ -131,25 +131,25 @@ module main
     source: main.ly:1284
 
   func fmt_class(sb: StringBuilder, c: ClassDecl)
-    source: main.ly:1352
+    source: main.ly:1334
 
   func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string)
-    source: main.ly:1383
+    source: main.ly:1365
 
   func fmt_relation(sb: StringBuilder, r: RelationDecl)
-    source: main.ly:1424
+    source: main.ly:1406
 
   func fmt_type_alias(sb: StringBuilder, t: TypeAliasDecl)
-    source: main.ly:1448
+    source: main.ly:1430
 
   func fmt_field(sb: StringBuilder, f: Field)
-    source: main.ly:1459
+    source: main.ly:1441
 
   func fmt_type_params(sb: StringBuilder, tps: [TypeParam])
-    source: main.ly:1469
+    source: main.ly:1451
 
   func fmt_type_expr(sb: StringBuilder, te: TypeExpr?)
-    source: main.ly:1485
+    source: main.ly:1467
 
   func main()
-    source: main.ly:1570
+    source: main.ly:1552

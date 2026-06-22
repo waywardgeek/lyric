@@ -1022,9 +1022,9 @@ func fmt_file(path: string) -> bool {
   if isnull(file) { return false }
 
   let sb = new_string_builder()
-  let comments = file!.fc_children()
+  let comments = file!.fc.children()
   let mut comment_idx = 0
-  let blocks = file!.fb_children()
+  let blocks = file!.fb.children()
 
   let mut bi = 0
   while bi < len(blocks) {
@@ -1095,14 +1095,14 @@ func fmt_block(sb: StringBuilder, block: LyricBlock, comments: [Comment], commen
   sb.write(f"lyric {name} {{\n")
 
   // Collect all declarations with source line for ordered emission
-  let imports = block.imp_children()
-  let structs = block.sd_children()
-  let enums = block.ed_children()
-  let interfaces = block.id_children()
-  let classes = block.cd_children()
-  let funcs = block.fd_children()
-  let relations = block.rd_children()
-  let type_aliases = block.ta_children()
+  let imports = block.imp.children()
+  let structs = block.sd.children()
+  let enums = block.ed.children()
+  let interfaces = block.id.children()
+  let classes = block.cd.children()
+  let funcs = block.fd.children()
+  let relations = block.rd.children()
+  let type_aliases = block.ta.children()
 
   let mut items: [DeclItem] = []
 
@@ -1213,9 +1213,9 @@ func fmt_struct(sb: StringBuilder, s: StructDecl) {
   if s.is_public { sb.write("pub ") }
   let name = if !isnull(s.name) { s.name!.get_name() } else { "?" }
   sb.write(f"struct {name}")
-  fmt_type_params(sb, s.stp_children())
+  fmt_type_params(sb, s.stp.children())
   sb.write(" {\n")
-  let fields = s.sf_children()
+  let fields = s.sf.children()
   let mut i = 0
   while i < len(fields) {
     fmt_field(sb, fields[i])
@@ -1229,16 +1229,16 @@ func fmt_enum(sb: StringBuilder, e: EnumDecl) {
   if e.is_public { sb.write("pub ") }
   let name = if !isnull(e.name) { e.name!.get_name() } else { "?" }
   sb.write(f"enum {name}")
-  fmt_type_params(sb, e.etp_children())
+  fmt_type_params(sb, e.etp.children())
   sb.write(" {")
 
-  let variants = e.ev_children()
+  let variants = e.ev.children()
 
   // Check if all simple (no fields)
   let mut all_simple = true
   let mut i = 0
   while i < len(variants) {
-    if len(variants[i].evf_children()) > 0 {
+    if len(variants[i].evf.children()) > 0 {
       all_simple = false
     }
     i = i + 1
@@ -1260,7 +1260,7 @@ func fmt_enum(sb: StringBuilder, e: EnumDecl) {
     while i < len(variants) {
       let vname = if !isnull(variants[i].name) { variants[i].name!.get_name() } else { "?" }
       sb.write(f"    {vname}")
-      let vfields = variants[i].evf_children()
+      let vfields = variants[i].evf.children()
       if len(vfields) > 0 {
         sb.write("(")
         let mut j = 0
@@ -1286,7 +1286,7 @@ func fmt_interface(sb: StringBuilder, iface: InterfaceDecl) {
   if iface.is_public { sb.write("pub ") }
   let name = if !isnull(iface.name) { iface.name!.get_name() } else { "?" }
   sb.write(f"interface {name}")
-  fmt_type_params(sb, iface.itp_children())
+  fmt_type_params(sb, iface.itp.children())
   sb.write(" {\n")
 
   // Implements
@@ -1300,7 +1300,7 @@ func fmt_interface(sb: StringBuilder, iface: InterfaceDecl) {
 
 
   // Fields
-  let ifields = iface.ifd_children()
+  let ifields = iface.ifd.children()
   i = 0
   while i < len(ifields) {
     let tp = if !isnull(ifields[i].type_param) { ifields[i].type_param!.get_name() } else { "?" }
@@ -1312,7 +1312,7 @@ func fmt_interface(sb: StringBuilder, iface: InterfaceDecl) {
   }
 
   // Destructors
-  let dblocks = iface.idb_children()
+  let dblocks = iface.idb.children()
   i = 0
   while i < len(dblocks) {
     let dtp = if !isnull(dblocks[i].type_param) { dblocks[i].type_param!.get_name() } else { "?" }
@@ -1321,7 +1321,7 @@ func fmt_interface(sb: StringBuilder, iface: InterfaceDecl) {
   }
 
   // Methods
-  let methods = iface.im_children()
+  let methods = iface.im.children()
   i = 0
   while i < len(methods) {
     fmt_func(sb, methods[i], "    ")
@@ -1336,7 +1336,7 @@ func fmt_class(sb: StringBuilder, c: ClassDecl) {
   if c.is_public { sb.write("pub ") }
   let name = if !isnull(c.name) { c.name!.get_name() } else { "?" }
   sb.write(f"class {name}")
-  fmt_type_params(sb, c.ctp_children())
+  fmt_type_params(sb, c.ctp.children())
   if len(c.implements) > 0 {
     sb.write(" implements ")
     let mut i = 0
@@ -1347,13 +1347,13 @@ func fmt_class(sb: StringBuilder, c: ClassDecl) {
     }
   }
   sb.write(" {\n")
-  let fields = c.cf_children()
+  let fields = c.cf.children()
   let mut i = 0
   while i < len(fields) {
     fmt_field(sb, fields[i])
     i = i + 1
   }
-  let methods = c.cm_children()
+  let methods = c.cm.children()
   i = 0
   while i < len(methods) {
     fmt_func(sb, methods[i], "    ")
@@ -1367,9 +1367,9 @@ func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string) {
   if fn.is_public { sb.write("pub ") }
   let name = if !isnull(fn.name) { fn.name!.get_name() } else { "?" }
   sb.write(f"func {name}")
-  fmt_type_params(sb, fn.fp_children())
+  fmt_type_params(sb, fn.fp.children())
   sb.write("(")
-  let params = fn.param_children()
+  let params = fn.param.children()
   let mut i = 0
   while i < len(params) {
     if i > 0 { sb.write(", ") }
