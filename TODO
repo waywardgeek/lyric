@@ -74,3 +74,42 @@
   with the Lyric-level suggestion "use team.roster.children" would give
   a cleaner error one stage earlier. Low priority — gcc's hint is good
   enough for now.
+
+* `self.field` shorthand inside an interface default-method body fails for
+  slice-typed `field T.name: [C]` declarations, though it works for class-
+  typed and optional-typed fields (`field T.name: C?`). Repro (found
+  2026-06-22 while updating the book's Ch 9.3 MyList example to method-form
+  defaults):
+  ```
+  pub interface MyList<P, C> {
+      field P.items: [C]
+      pub func P.add(self, child: C) {
+          let kids = self.items                    // fails:
+                                                   //   checker: field items not found on type
+          self.items = append(self.items, child)   // same failure
+      }
+  }
+  ```
+  Same body using the explicit getter/setter form compiles cleanly:
+  ```
+  let kids = self.items()
+  self.set_items(append(kids, child))
+  ```
+  Comparison: stdlib `ArrayList<P, C>` (`stdlib/std.ly:50-70`) uses the
+  shorthand against its own `field P.children: [C]` declaration and
+  compiles fine — `child.index = len(self.children)`, `self.children = kids`
+  all work. So either (a) the field-access desugar pass (`desugar.ly`
+  Phase 2 FieldAccess, the `self.field → self.field()` rewrite) treats
+  stdlib's `field P.children: [C]` specially, or (b) there's an ordering
+  bug where the rewrite only fires for fields it has already seen the
+  receiver-type binding for, and the stdlib's earlier-merged position
+  in the AST happens to satisfy that ordering while user interfaces
+  declared later don't. The Stack interface in /tmp/user_hint_method.ly
+  works with shorthand against `field P.top: C?` (optional-typed), so
+  the failure is specific to slice-typed fields in user-authored hint
+  interfaces. Workaround in book Ch 9.3: write the example with explicit
+  `self.items()` / `self.set_items(...)`. Real fix: make the FieldAccess
+  pass treat user-interface slice fields the same as stdlib slice fields,
+  or document that the shorthand is only available on optional/class
+  fields in interface bodies and update stdlib accordingly. (Found by
+  Hewitt while verifying the Ch 9.3 MyList rewrite, 2026-06-22.)
