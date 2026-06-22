@@ -23,7 +23,7 @@ An LLM can hold all of these design traditions in working memory simultaneously.
 
 ### First-iteration results
 
-The compiler bootstrapped to self-hosting in fourteen days — a 33,500-line Lyric compiler producing 114,770 lines of C, generation-stable. On the day the bootstrap reached its fixed point, we measured:
+The compiler bootstrapped to self-hosting in fourteen days — a 33,500-line Lyric compiler producing 114,473 lines of C, generation-stable. On the day the bootstrap reached its fixed point, we measured:
 
 - **20% fewer lines** than the Go compiler it replaced (33,739 → 26,813), while Lyric lines are 13% *longer* on average (31.2 vs 27.6 bytes per line). The savings are real expressiveness — relations, match, `?` — not denser formatting.
 - **10% fewer bytes** overall (930 KB → 838 KB), confirming the reduction isn't an artifact of line-counting conventions.
@@ -4109,7 +4109,7 @@ The module system operates at the AST level, not through linkers or object files
 
 That's it. No separate compilation, no linking, no symbol tables. The entire program — your code plus all imported packages plus the stdlib — becomes one compilation unit. The C backend emits one `.c` file containing everything.
 
-This is deliberately simple. The Lyric compiler itself is 33,500 lines of Lyric across 14 files in 12 directories (`ast`, `lexer`, `parser`, `checker`, `desugar`, `lowerer`, `lir`, `optimizer`, `monomorphizer`, `c_backend`, `memory`, `main`). It all merges into a single 114,770-line C file. The whole pipeline — parse, check, lower, optimize, monomorphize, emit — runs in about 0.2 seconds. Separate compilation is an optimization you add when build times matter; at this scale, we haven't needed it.
+This is deliberately simple. The Lyric compiler itself is 33,500 lines of Lyric across 14 files in 12 directories (`ast`, `lexer`, `parser`, `checker`, `desugar`, `lowerer`, `lir`, `optimizer`, `monomorphizer`, `c_backend`, `memory`, `main`). It all merges into a single 114,473-line C file. The whole pipeline — parse, check, lower, optimize, monomorphize, emit — runs in about 0.2 seconds. Separate compilation is an optimization you add when build times matter; at this scale, we haven't needed it.
 
 ### 13.3 The Module File
 
@@ -4129,7 +4129,7 @@ The `lyric.mod` file serves the same purpose as Go's `go.mod` or Rust's `Cargo.t
 
 You've been using `println`, `append`, `assert_eq`, `Dict`, `ArrayList`, and dozens of other functions throughout this book without ever writing `import std`. The standard library is auto-imported — the compiler merges it into your program before type checking, without any explicit import.
 
-The stdlib is two files totaling 991 lines of Lyric:
+The stdlib is two files totaling 998 lines of Lyric:
 
 - **`std.ly`** (740 lines): `ArrayList`, `DoublyLinked`, `HashedList`, `Dict`, `Sym`, `StringBuilder`, `Error` — all the interfaces, relations, and data structures from Chapters 8–10.
 - **`string.ly`** (258 lines): string methods — `split`, `trim`, `contains`, `index_of`, `replace`, `has_prefix`, `has_suffix`, `to_upper`, `to_lower`, `join`, and the rest.
@@ -4349,7 +4349,7 @@ update: lyric
 
 Why this shape rather than `import`? Because §13.5's qualified-type limitation bites hardest in a compiler — the AST module wants to export *types* (`Expr`, `TokenKind`, `TypeInfo`), and qualified type names don't resolve across packages today. So instead of fighting the limitation, the compiler treats `lyric ast { }`, `lyric parser { }`, `lyric checker { }`, and so on as **logical sections** of a single program — directories give human-readable structure, `lyric name { }` blocks give a visual hint, and the merge pass treats it all as one namespace. 🚧 *When qualified type resolution and recursive imports land, this code will be a candidate for a real `import` refactor.*
 
-The whole thing compiles to one 114,770-line C file. `gcc` compiles that in a few seconds. The result is a binary that can compile itself — and the output matches byte-for-byte.
+The whole thing compiles to one 114,473-line C file. `gcc` compiles that in a few seconds. The result is a binary that can compile itself — and the output matches byte-for-byte.
 
 
 
@@ -4931,7 +4931,7 @@ The CDD-layer commands `lyric verify`, `lyric update`, and `lyric gen` live in t
 
 ## Appendix B: Standard Library Reference
 
-The standard library is two files: `stdlib/std.ly` (733 lines) and `stdlib/string.ly` (258 lines) — 991 lines total. Both are auto-imported into every program — no `import` needed. Everything here is written in Lyric itself, using the same interfaces and relations covered in Chapters 8 and 9.
+The standard library is two files: `stdlib/std.ly` (740 lines) and `stdlib/string.ly` (258 lines) — 998 lines total. Both are auto-imported into every program — no `import` needed. Everything here is written in Lyric itself, using the same interfaces and relations covered in Chapters 8 and 9.
 
 ### Relation Interfaces
 
@@ -5450,7 +5450,7 @@ The C output is self-contained. It includes:
 
 The output compiles cleanly with GCC and Clang. The `-w` flag suppresses warnings — the generated C is correct but not pretty, and compilers occasionally warn about unused variables from monomorphization.
 
-**Compilation performance:** The Lyric compiler itself — 33,500 lines of Lyric (the compiler in `src/` plus the auto-imported `stdlib/`) across 14 files in 12 directories — compiles to 114,770 lines of C in about 0.2 seconds on a modern laptop. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
+**Compilation performance:** The Lyric compiler itself — 33,500 lines of Lyric (the compiler in `src/` plus the auto-imported `stdlib/`) across 14 files in 12 directories — compiles to 114,473 lines of C in about 0.2 seconds on a modern laptop. GCC compiles that C file in a few seconds. The total from-source-to-binary time is under 5 seconds.
 
 ### C.6 The Bootstrap
 
