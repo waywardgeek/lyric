@@ -1786,6 +1786,12 @@ func CGen.emit_builtin(self, d: LBuiltinData?) -> string {
   if name == "new_string_builder" {
     return "new_string_builder()"
   }
+  if name == "new_error" {
+    if len(args) > 0 {
+      return f"lyric_new_error({self.emit_value(args[0])})"
+    }
+    return "lyric_new_error(LYRIC_STR_EMPTY)"
+  }
   if name == "new_dict" {
     return "/* new_dict */"
   }
@@ -2158,6 +2164,12 @@ func CGen.emit_call_expr(self, e: LExpr?) -> string {
   }
   if name == "new_string_builder" {
     return "lyric_new_string_builder()"
+  }
+  if name == "new_error" {
+    if len(d.args) > 0 {
+      return f"lyric_new_error({self.emit_value(d.args[0])})"
+    }
+    return "lyric_new_error(LYRIC_STR_EMPTY)"
   }
   let args_str = self.emit_args_boxed_mut(d.func_name, d.args, d.mut_args)
   return f"{name}({args_str})"

@@ -184,6 +184,18 @@ static inline lyric_string lyric_str_from_bytes(const void* data, int32_t len) {
     return (lyric_string){.data = buf, .len = len, .cap = len};
 }
 
+/* new_error(msg): lower a lyric string to a NUL-terminated const char* for
+ * the error C ABI. Heap-allocates a fresh NUL-terminated copy so callers can
+ * pass dynamic / non-literal strings safely. */
+static inline const char* lyric_new_error(lyric_string msg) {
+    if (msg.len == 0) return "";
+    char* buf = (char*)malloc((size_t)msg.len + 1);
+    if (!buf) return "";
+    memcpy(buf, msg.data, (size_t)msg.len);
+    buf[msg.len] = '\0';
+    return buf;
+}
+
 /* Equality (length-aware, handles embedded \0) */
 static inline bool lyric_str_eq(lyric_string a, lyric_string b) {
     if (a.len != b.len) return false;
