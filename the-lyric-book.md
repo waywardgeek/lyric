@@ -2517,7 +2517,7 @@ pub interface ArrayList<P, C> {
 
 A single interface, two paired destructors. The relation line's `owns`/`refs` keyword selects which pair the desugar pass copies onto the concrete classes. `relation ArrayList Team:roster owns [Player:team]` picks up the `destructor owns P/C` pair (cascade); change `owns` to `refs` and you get the unlink-only pair instead. We'll see the same shape on `DoublyLinked` and `HashedList` in §8.3 and §8.4.
 
-`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` inside the `roster` sub-scope — so the call form becomes `t.roster.append(p1)`. The `t.roster.remove` method is the same story. The `array_remove<P, C>` call inside `destructor owns C` is the *free-function* form of the same operation — both forms exist, and Lyric's UFCS rule means `t.roster.append(p)` and `array_append<Team, Player>(t, p)` lower to the same generated code. The book prefers the method form.
+`pub func P.append(self, child: C)` is a method bound to whatever class plays `P`. When `relation ArrayList Team:roster owns [Player:team]` binds `Team` as `P` and `Player` as `C`, the desugar pass copies this method onto `Team` inside the `roster` sub-scope — so the call form becomes `t.roster.append(p1)`. The `t.roster.remove` method is the same story. The `array_remove<P, C>` call inside `destructor owns C` is a separately-declared *free-function* with the same body — the stdlib historically exposed both shapes side by side, and the destructor still leans on the free-function form during the in-progress migration to a method-only stdlib surface. User code should always reach for the method form (`t.roster.append(p)`); the free functions are stdlib-internal and will not survive the revamp.
 
 The `array_remove` body uses swap-remove for O(1) deletion — the last element swaps into the removed slot, then the slice shrinks by one. **Don't cache array indices across removals** — swap-remove changes the index of whatever element used to be at the end.
 
@@ -2621,7 +2621,7 @@ destructor refs P {
 }
 ```
 
-The same interface provides the fields (`first`, `last`, `next`, `prev`, `parent`) and both forms of append/remove — the free-function form (`dll_append`, `dll_remove`) and the method form (`P.append`, `P.remove`) we used above. The destructor pair the desugar pass picks depends entirely on the relation line's `owns`/`refs` keyword.
+The same interface provides the fields (`first`, `last`, `next`, `prev`, `parent`) and both shapes of append/remove — the method form (`P.append`, `P.remove`) we used above, and a transitional free-function form (`dll_append`, `dll_remove`) that stdlib still publishes for its own destructor bodies. The destructor pair the desugar pass picks depends entirely on the relation line's `owns`/`refs` keyword.
 
 ### 8.4 The Three Relation Hints
 
@@ -2884,7 +2884,7 @@ println(count)  // 1
 
 The three type parameters are explicit because the compiler can't always infer them — a class could participate in multiple `Graph` implementations. Monomorphization generates a `count_edges` specialized for these three concrete types. No vtables, no dynamic dispatch. The generated C code is a direct function call.
 
-🚧 *Roadmap: the spec promises method-call syntax on default methods too — `g.count_edges()` once the interface is wired up on `G`. Today the checker only resolves the free-function form `count_edges<G, N, E>(g)`, so that's what the examples use.*
+A note on the call form: `count_edges` above is declared as a free-function default method (`pub func count_edges(graph: G) -> i32`), not as a method on `G`, so the call site uses the explicit-args form `count_edges<G, N, E>(g)`. Declare it as `pub func G.count_edges(self) -> i32` instead and you'd call it as `g.count_edges()` once an `impl Graph<...>` is in scope — see §9.3 for that pattern. The free-function shape is the older idiom; the method-form is what the stdlib is migrating toward.
 
 Classes can also declare which interfaces they satisfy with `implements`:
 
@@ -2929,7 +2929,7 @@ A `relation` declaration is sugar for a labeled impl: `relation ArrayList Team:r
 
 ### 9.3 Default Methods and Field Accessors
 
-The `Graph` example uses method aliases — the concrete class already has a method, and the impl block maps the interface name to it. The other style is to give the interface a body — a *default method* — that calls the abstract methods and field accessors it declares:
+The `Graph` example uses method aliases — the concrete class already has a method, and the impl block maps the interface name to it. The other style is to give the interface a body — a *default method* — that calls the abstract methods and field accessors it declares. Write the method on the parent type-variable so call sites can use the dotted-scope form:
 
 ```lyric
 pub interface MyList<P, C> {
@@ -2937,21 +2937,21 @@ pub interface MyList<P, C> {
     field C.owner: P?
     field C.pos: i32
 
-    pub func add(parent: P, child: C) {
-        let kids = parent.items()
-        let num: i32 = kids.len() as i32
+    pub func P.add(self, child: C) {
+        let kids = self.items()
+        let num: i32 = len(kids)
         child.set_pos(num)
-        child.set_owner(parent)
-        parent.set_items(append(kids, child))
+        child.set_owner(self)
+        self.set_items(append(kids, child))
     }
 
-    pub func count(parent: P) -> i32 {
-        return parent.items().len() as i32
+    pub func P.count(self) -> i32 {
+        return len(self.items())
     }
 }
 ```
 
-Two things are happening here. Each `field` declaration auto-generates a getter (`parent.items()`) and a setter (`parent.set_items(...)`) on the type parameter — that's what the default method calls, because inside the interface body the compiler doesn't know `P` will be `Panel` yet. And `add` and `count` are *default methods*: top-level generic functions with a `where MyList<P, C>` clause, written once and specialized per binding.
+Two things are happening here. Each `field` declaration auto-generates a getter and setter on the type parameter, so the body calls `self.items()` to read and `self.set_items(...)` to write — inside the interface body the compiler doesn't yet know `P` will be `Panel`, so the abstract accessor form is what the desugar pass needs. And `P.add` and `P.count` are *default methods*: top-level generic functions with a `where MyList<P, C>` clause, written once and specialized per binding, callable through the parent's relation label.
 
 Bind it to concrete classes with a relation:
 
@@ -2966,15 +2966,15 @@ func main() {
     let w1 = Widget { label: "button" }
     let w2 = Widget { label: "text" }
 
-    add<Panel, Widget>(panel, w1)
-    add<Panel, Widget>(panel, w2)
-    println(count<Panel, Widget>(panel))  // 2
+    panel.w.add(w1)
+    panel.w.add(w2)
+    println(panel.w.count())   // 2
 }
 ```
 
-The call site uses the free-function form `add<Panel, Widget>(panel, w1)`. The compiler monomorphizes `add` against `(Panel, Widget)`, rewrites `parent.items()` to read the relation-injected field `panel.w.items`, and emits a direct call — no vtables, no dispatch.
+The call site uses the dotted-scope method form `panel.w.add(w1)` — the `w` label opens the relation's sub-scope on `Panel`, and `add` resolves to the default method declared on `P` in the hint interface. The compiler monomorphizes `P.add` against `(Panel, Widget)`, rewrites `self.items()` to read the relation-injected storage at `Panel.__w_items`, and emits a direct call — no vtables, no dispatch.
 
-🚧 *Roadmap: the spec says default methods should also be callable in method-syntax form prefixed by the relation's parent label — `panel.w.add(w1)` and `panel.w.count()` for the relation above. Today only the free-function form resolves for user-defined hints; the relation-method machinery you saw in Chapter 8 (`team.roster.append(p)`, `dir.files.append(f)`) is wired up for the stdlib hints `ArrayList`, `DoublyLinked`, `HashedList`. So if you want method-call ergonomics today, lean on the stdlib hints; default-method method-call on your own interfaces is on the way.*
+There is no stdlib privilege here. The same machinery that gives you `team.roster.append(p)` on the stdlib's `ArrayList` is what gives you `panel.w.add(w1)` on your own `MyList`. Method-form default methods (`pub func P.method(self, ...)`) get dotted-scope method calls; free-function-form defaults (`pub func name(parent: P, ...)`) get only the explicit `name<P, C>(parent, ...)` call form. Pick the shape that matches the call ergonomics you want, in your own hint or in the stdlib — both sides of the line behave identically.
 
 ### 9.4 Field Injection
 
@@ -3044,24 +3044,24 @@ pub interface Stack<P, C> {
     field P.top: C?
     field C.next: C?
 
-    pub func push(parent: P, child: C) {
-        child.set_next(parent.top())
-        parent.set_top(child)
+    pub func P.push(self, child: C) {
+        child.set_next(self.top())
+        self.set_top(child)
     }
 
     destructor owns P {
-        let mut cur = self.top
+        let mut cur = self.top()
         while !isnull(cur) {
-            let nxt = cur!.next
+            let nxt = cur!.next()
             cur!.destroy()
             cur = nxt
         }
-        self.top = null
+        self.set_top(null)
     }
     destructor owns C { }
 
     destructor refs P {
-        self.top = null
+        self.set_top(null)
     }
     destructor refs C { }
 }
@@ -3085,8 +3085,8 @@ The two are equivalent — the `relation` line desugars to exactly this impl. Th
 let e = Editor { name: "e1" }
 let a1 = Action { tag: "A1" }
 let a2 = Action { tag: "A2" }
-push<Editor, Action>(e, a1)
-push<Editor, Action>(e, a2)
+e.undo.push(a1)
+e.undo.push(a2)
 println(e.undo.top!.tag)               // A2
 println(e.undo.top!.owner.next!.tag)   // A1
 ```
