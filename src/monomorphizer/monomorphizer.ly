@@ -502,19 +502,28 @@ func MonoPass.collect_from_expr(self, e: LExpr) {
                   self.record_func_instance(direct_key, mc.type_args)
                 } else {
                   // Search for generic functions with relational constraints.
-                  // Handle label-prefixed method names like "roster_append" -> "append"
+                  // Handle label-prefixed method names like "__roster_append" -> "append"
                   // by finding the last underscore and splitting.
+                  // Phase 3e: registered method names carry a leading `__`
+                  // mangling prefix (e.g. `__roster_append`); strip it before
+                  // splitting so the label comes out as `roster`, not `__roster`.
+                  // The label-prefix is reapplied at the specialization site
+                  // (line ~3530) — leaving it in here would double-mangle.
                   // NOTE: We don't use global _method_aliases because it gets corrupted
                   // by the lowerer phase (Dict freed by RC, memory reused — see TODO).
                   let mut search_name = mc.method
                   let mut label = ""
+                  let mut start_idx: i32 = 0
+                  if len(mc.method) >= 2 && mc.method[0] == 95 && mc.method[1] == 95 {
+                    start_idx = 2
+                  }
                   // Find last underscore to split label from method name
                   let mut ui = len(mc.method) - 1
-                  while ui > 0 {
+                  while ui > start_idx {
                     if mc.method[ui] == 95 { // '_'
                       // Build label and search_name from slices
                       let mut lbl_sb = new_string_builder()
-                      let mut mi = 0
+                      let mut mi = start_idx
                       while mi < ui {
                         lbl_sb.write_byte(mc.method[mi])
                         mi = mi + 1
@@ -3523,10 +3532,12 @@ func monomorphize(prog: LProgram?) {
           new_receiver = recv_type!.value!.name
         }
       }
-      // Use label-prefixed name when label is present
+      // Use label-prefixed name when label is present.
+      // Phase 3e: mangled with `__` prefix so the name is unreachable
+      // by bare-flat access; only the dotted-scope sugar resolves it.
       let mut mangled = if new_receiver != "" { orig.name } else { mangle_name(orig.name, types) }
       if label != "" {
-        mangled = label + "_" + orig.name
+        mangled = "__" + label + "_" + orig.name
       }
       let spec = m.specialize_func(orig, subst, mangled, new_receiver, label)
       m.collect_from_stmts(spec.body)

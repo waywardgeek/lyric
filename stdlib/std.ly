@@ -600,7 +600,7 @@ lyric std {
   }
 
   pub func Dict.length<K, V>(self) -> i32 where K: Hashable {
-    return self.d_hash_count
+    return self.d.hash_count
   }
 
   pub trusted func Dict.remove<K, V>(self, key: K) -> bool where K: Hashable {

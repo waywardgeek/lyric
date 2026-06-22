@@ -1554,7 +1554,7 @@ lyric checker {
             if recv_arg_label != null {
               let label_str = sym_to_string(recv_arg_label!)
               // Use let ref to prevent scope-exit free — sym() stores pointer to string data
-              let ref label_name = label_str + "_" + fname
+              let ref label_name = "__" + label_str + "_" + fname
               reg_name = label_name
               get_method_aliases().set(sym(reg_name), fname)
               get_method_labels().set(sym(reg_name), label_str)
@@ -1644,7 +1644,7 @@ lyric checker {
           if !isnull(label_entry) {
             let label_str = label_entry!.value
             // Use let ref to prevent scope-exit free — sym() stores pointer to string data
-            let ref label_name = label_str + "_" + mname
+            let ref label_name = "__" + label_str + "_" + mname
             reg_name = label_name
             get_method_aliases().set(sym(reg_name), mname)
             get_method_labels().set(sym(reg_name), label_str)
@@ -3749,7 +3749,7 @@ lyric checker {
       ExprKind.FieldAccess(inner, label_sym) => {
         let label_str = sym_to_string(label_sym)
         let member_str = sym_to_string(method)
-        let combined = label_str + "_" + member_str
+        let combined = "__" + label_str + "_" + member_str
         let inner_type = self.check_expr(inner)
         let tname0 = type_name(inner_type)
         if tname0 != "" {
@@ -4034,7 +4034,7 @@ lyric checker {
       ExprKind.FieldAccess(inner, label_sym) => {
         let label_str = sym_to_string(label_sym)
         let member_str = sym_to_string(field_name)
-        let combined = label_str + "_" + member_str
+        let combined = "__" + label_str + "_" + member_str
         let inner_type = self.check_expr(inner)
         let tname0 = type_name(inner_type)
         if tname0 != "" {

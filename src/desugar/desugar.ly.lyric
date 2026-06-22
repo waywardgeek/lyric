@@ -214,91 +214,91 @@ module desugar
     source: desugar.ly:98
 
   func desugar_destructors(file: File)
-    source: desugar.ly:344
+    source: desugar.ly:351
 
   func desugar_default_impls(file: File)
-    source: desugar.ly:506
+    source: desugar.ly:513
 
   func desugar_field_access(file: File)
-    source: desugar.ly:582
+    source: desugar.ly:589
 
   func rewrite_field_access_block(block: Block, field_names: Dict<Sym, bool>)
-    source: desugar.ly:612
+    source: desugar.ly:619
 
   func rewrite_field_access_stmt(s: Stmt, field_names: Dict<Sym, bool>)
-    source: desugar.ly:618
+    source: desugar.ly:625
 
   func rewrite_field_access_expr(e: Expr, field_names: Dict<Sym, bool>)
-    source: desugar.ly:692
+    source: desugar.ly:699
 
   func desugar_all(file: File)
-    source: desugar.ly:751
+    source: desugar.ly:758
 
   func type_expr_name(te: TypeExpr) -> Sym?
-    source: desugar.ly:762
+    source: desugar.ly:769
 
   func sym_eq(a: Sym?, b: Sym?) -> bool
-    source: desugar.ly:770
-
-  func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
     source: desugar.ly:777
 
+  func substitute_sym(s: Sym?, type_map: Dict<Sym, string>) -> Sym?
+    source: desugar.ly:784
+
   func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr?
-    source: desugar.ly:785
+    source: desugar.ly:792
 
   func substitute_type_params_in_type_expr(te: TypeExpr, type_map: Dict<Sym, string>)
-    source: desugar.ly:796
+    source: desugar.ly:803
 
   func rewrite_field_type_impl(te: TypeExpr?, iface_tps: [TypeParam], impl_args: [ImplTypeArg]) -> TypeExpr?
-    source: desugar.ly:824
+    source: desugar.ly:831
 
   func deep_copy_block(b: Block?) -> Block?
-    source: desugar.ly:861
+    source: desugar.ly:868
 
   func deep_copy_stmt(s: Stmt) -> Stmt
-    source: desugar.ly:871
+    source: desugar.ly:878
 
   func deep_copy_block_val(b: Block) -> Block
-    source: desugar.ly:976
+    source: desugar.ly:983
 
   func deep_copy_expr(e: Expr) -> Expr
-    source: desugar.ly:985
+    source: desugar.ly:992
 
   func deep_copy_type_expr(te: TypeExpr) -> TypeExpr
-    source: desugar.ly:1081
-
-  func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
     source: desugar.ly:1088
 
+  func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr]
+    source: desugar.ly:1095
+
   func deep_copy_expr_list(exprs: [Expr]) -> [Expr]
-    source: desugar.ly:1098
+    source: desugar.ly:1105
 
   func substitute_type_params_in_block(block: Block, type_map: Dict<Sym, string>)
-    source: desugar.ly:1110
+    source: desugar.ly:1117
 
   func substitute_type_params_in_stmt(stmt: Stmt, type_map: Dict<Sym, string>)
-    source: desugar.ly:1116
+    source: desugar.ly:1123
 
   func substitute_type_params_in_expr(expr: Expr, type_map: Dict<Sym, string>)
-    source: desugar.ly:1164
+    source: desugar.ly:1171
 
   func substitute_type_params_rich_in_block(block: Block, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1216
+    source: desugar.ly:1223
 
   func substitute_type_params_rich_in_stmt(stmt: Stmt, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1222
+    source: desugar.ly:1229
 
   func substitute_type_params_rich_in_expr(expr: Expr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1271
+    source: desugar.ly:1278
 
   func substitute_type_params_rich_in_type_expr(te: TypeExpr, type_map: Dict<Sym, TypeExpr>)
-    source: desugar.ly:1317
+    source: desugar.ly:1324
 
   func rename_method_calls_in_block(block: Block, renames: Dict<Sym, string>)
-    source: desugar.ly:1348
+    source: desugar.ly:1355
 
   func rename_method_calls_in_stmt(stmt: Stmt, renames: Dict<Sym, string>)
-    source: desugar.ly:1354
+    source: desugar.ly:1361
 
   func rename_method_calls_in_expr(expr: Expr, renames: Dict<Sym, string>)
-    source: desugar.ly:1403
+    source: desugar.ly:1410

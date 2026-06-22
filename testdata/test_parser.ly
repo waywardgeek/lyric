@@ -9,17 +9,17 @@ lyric parser_tests {
     let (file, err) = parse_file(src, "test.ly")
     assert(err == null, "parse error")
     assert(file != null, "file is null")
-    assert(len(file!.fb_children) > 0, "no lyric blocks")
-    return file!.fb_children[0]
+    assert(len(file!.fb.children) > 0, "no lyric blocks")
+    return file!.fb.children[0]
   }
 
   // Helper: get first statement from first function in block
   func tp_first_stmt(block: LyricBlock) -> Stmt {
-    assert(len(block.fd_children) > 0, "no functions")
-    let f = block.fd_children[0]
+    assert(len(block.fd.children) > 0, "no functions")
+    let f = block.fd.children[0]
     assert(f.body != null, "no body")
-    assert(len(f.body!.bs_children) > 0, "empty body")
-    return f.body!.bs_children[0]
+    assert(len(f.body!.bs.children) > 0, "empty body")
+    return f.body!.bs.children[0]
   }
 
   // ---- Variable declarations ----
@@ -62,33 +62,33 @@ lyric parser_tests {
 
   func test_func_no_params() {
     let b = tp_parse("lyric t { func foo() { } }")
-    assert_eq(len(b.fd_children), 1, "one func")
-    let f = b.fd_children[0]
+    assert_eq(len(b.fd.children), 1, "one func")
+    let f = b.fd.children[0]
     assert_eq(f.name!.name, "foo", "func name")
-    assert_eq(len(f.param_children), 0, "no params")
+    assert_eq(len(f.param.children), 0, "no params")
   }
 
   func test_func_with_params() {
     let b = tp_parse("lyric t { func add(a: i32, b: i32) -> i32 { return a } }")
-    let f = b.fd_children[0]
+    let f = b.fd.children[0]
     assert_eq(f.name!.name, "add", "func name")
-    assert_eq(len(f.param_children), 2, "two params")
-    assert_eq(f.param_children[0].name!.name, "a", "param a")
-    assert_eq(f.param_children[1].name!.name, "b", "param b")
+    assert_eq(len(f.param.children), 2, "two params")
+    assert_eq(f.param.children[0].name!.name, "a", "param a")
+    assert_eq(f.param.children[1].name!.name, "b", "param b")
     assert(f.return_type != null, "has return type")
   }
 
   func test_func_generic() {
     let b = tp_parse("lyric t { func identity<T>(x: T) -> T { return x } }")
-    let f = b.fd_children[0]
-    assert_eq(len(f.fp_children), 1, "one type param")
-    assert_eq(f.fp_children[0].name!.name, "T", "type param T")
+    let f = b.fd.children[0]
+    assert_eq(len(f.fp.children), 1, "one type param")
+    assert_eq(f.fp.children[0].name!.name, "T", "type param T")
   }
 
   func test_func_receiver() {
     let b = tp_parse("lyric t { class Foo { } func Foo.bar(self) { } }")
-    assert_eq(len(b.fd_children), 1, "one func")
-    let f = b.fd_children[0]
+    assert_eq(len(b.fd.children), 1, "one func")
+    let f = b.fd.children[0]
     assert_eq(f.name!.name, "bar", "method name")
     assert(f.receiver_type != null, "has receiver")
     assert_eq(f.receiver_type!.name, "Foo", "receiver is Foo")
@@ -96,62 +96,62 @@ lyric parser_tests {
 
   func test_func_pub() {
     let b = tp_parse("lyric t { pub func foo() { } }")
-    assert(b.fd_children[0].is_public, "is_public")
+    assert(b.fd.children[0].is_public, "is_public")
   }
 
   // ---- Struct declarations ----
 
   func test_struct_simple() {
     let b = tp_parse("lyric t { struct Point { x: i32\n y: i32 } }")
-    assert_eq(len(b.sd_children), 1, "one struct")
-    let s = b.sd_children[0]
+    assert_eq(len(b.sd.children), 1, "one struct")
+    let s = b.sd.children[0]
     assert_eq(s.name!.name, "Point", "struct name")
-    assert_eq(len(s.sf_children), 2, "two fields")
-    assert_eq(s.sf_children[0].name!.name, "x", "field x")
-    assert_eq(s.sf_children[1].name!.name, "y", "field y")
+    assert_eq(len(s.sf.children), 2, "two fields")
+    assert_eq(s.sf.children[0].name!.name, "x", "field x")
+    assert_eq(s.sf.children[1].name!.name, "y", "field y")
   }
 
   func test_struct_generic() {
     let b = tp_parse("lyric t { struct Pair<A, B> { first: A\n second: B } }")
-    let s = b.sd_children[0]
-    assert_eq(len(s.stp_children), 2, "two type params")
-    assert_eq(s.stp_children[0].name!.name, "A", "type param A")
+    let s = b.sd.children[0]
+    assert_eq(len(s.stp.children), 2, "two type params")
+    assert_eq(s.stp.children[0].name!.name, "A", "type param A")
   }
 
   // ---- Class declarations ----
 
   func test_class_simple() {
     let b = tp_parse("lyric t { class Dog { name: string\n age: i32 } }")
-    assert_eq(len(b.cd_children), 1, "one class")
-    let c = b.cd_children[0]
+    assert_eq(len(b.cd.children), 1, "one class")
+    let c = b.cd.children[0]
     assert_eq(c.name!.name, "Dog", "class name")
-    assert_eq(len(c.cf_children), 2, "two fields")
+    assert_eq(len(c.cf.children), 2, "two fields")
   }
 
   func test_class_with_method() {
     let b = tp_parse("lyric t { class Cat { name: string } func Cat.speak(self) -> string { return self.name } }")
-    assert_eq(len(b.cd_children), 1, "one class")
-    assert_eq(len(b.fd_children), 1, "one func")
-    assert(b.fd_children[0].receiver_type != null, "has receiver")
+    assert_eq(len(b.cd.children), 1, "one class")
+    assert_eq(len(b.fd.children), 1, "one func")
+    assert(b.fd.children[0].receiver_type != null, "has receiver")
   }
 
   // ---- Enum declarations ----
 
   func test_enum_simple() {
     let b = tp_parse("lyric t { enum Color { Red\n Green\n Blue } }")
-    assert_eq(len(b.ed_children), 1, "one enum")
-    let e = b.ed_children[0]
+    assert_eq(len(b.ed.children), 1, "one enum")
+    let e = b.ed.children[0]
     assert_eq(e.name!.name, "Color", "enum name")
-    assert_eq(len(e.ev_children), 3, "three variants")
-    assert_eq(e.ev_children[0].name!.name, "Red", "variant Red")
+    assert_eq(len(e.ev.children), 3, "three variants")
+    assert_eq(e.ev.children[0].name!.name, "Red", "variant Red")
   }
 
   func test_enum_with_data() {
     let b = tp_parse("lyric t { enum Shape { Circle(radius: f64)\n Rect(w: f64, h: f64) } }")
-    let e = b.ed_children[0]
-    assert_eq(len(e.ev_children), 2, "two variants")
-    assert_eq(len(e.ev_children[0].evf_children), 1, "Circle has 1 field")
-    assert_eq(len(e.ev_children[1].evf_children), 2, "Rect has 2 fields")
+    let e = b.ed.children[0]
+    assert_eq(len(e.ev.children), 2, "two variants")
+    assert_eq(len(e.ev.children[0].evf.children), 1, "Circle has 1 field")
+    assert_eq(len(e.ev.children[1].evf.children), 2, "Rect has 2 fields")
   }
 
   // ---- Control flow ----
@@ -184,7 +184,7 @@ lyric parser_tests {
     let s = tp_first_stmt(b)
     match s.kind {
       While(_, body) => {
-        assert_eq(len(body.bs_children), 1, "one stmt in body")
+        assert_eq(len(body.bs.children), 1, "one stmt in body")
       }
       _ => { assert(false, "expected While") }
     }
@@ -192,7 +192,7 @@ lyric parser_tests {
 
   func test_for_loop() {
     let b = tp_parse("lyric t { func f() { let a = [1, 2, 3]\n for x in a { } } }")
-    let s = b.fd_children[0].body!.bs_children[1]
+    let s = b.fd.children[0].body!.bs.children[1]
     match s.kind {
       For(var_name, _, _, _) => {
         assert_eq(var_name.name, "x", "loop var")
@@ -203,7 +203,7 @@ lyric parser_tests {
 
   func test_match_stmt() {
     let b = tp_parse("lyric t { func f() { let x = 1\n match x { 1 => { } _ => { } } } }")
-    let s = b.fd_children[0].body!.bs_children[1]
+    let s = b.fd.children[0].body!.bs.children[1]
     match s.kind {
       Match(_, arms) => {
         assert_eq(len(arms), 2, "two arms")
@@ -437,7 +437,7 @@ lyric parser_tests {
 
   func test_assign() {
     let b = tp_parse("lyric t { func f() { let mut x = 0\n x = 1 } }")
-    let s = b.fd_children[0].body!.bs_children[1]
+    let s = b.fd.children[0].body!.bs.children[1]
     match s.kind {
       Assign(target, _) => {
         match target.kind {
@@ -455,25 +455,25 @@ lyric parser_tests {
 
   func test_interface_simple() {
     let b = tp_parse("lyric t { interface Printable { func to_string(self) -> string } }")
-    assert_eq(len(b.id_children), 1, "one interface")
-    let iface = b.id_children[0]
+    assert_eq(len(b.id.children), 1, "one interface")
+    let iface = b.id.children[0]
     assert_eq(iface.name!.name, "Printable", "interface name")
-    assert_eq(len(iface.im_children), 1, "one method")
+    assert_eq(len(iface.im.children), 1, "one method")
   }
 
   func test_interface_with_field() {
     let b = tp_parse("lyric t { interface HasName<T> { field T.name: string } }")
-    let iface = b.id_children[0]
-    assert_eq(len(iface.itp_children), 1, "one type param")
-    assert_eq(len(iface.ifd_children), 1, "one field decl")
+    let iface = b.id.children[0]
+    assert_eq(len(iface.itp.children), 1, "one type param")
+    assert_eq(len(iface.ifd.children), 1, "one field decl")
   }
 
   // ---- Relation declarations ----
 
   func test_relation_owns() {
     let b = tp_parse("lyric t { relation ArrayList Parent:pc owns [Child:pc] }")
-    assert_eq(len(b.rd_children), 1, "one relation")
-    let r = b.rd_children[0]
+    assert_eq(len(b.rd.children), 1, "one relation")
+    let r = b.rd.children[0]
     assert_eq(r.parent.type_name!.name, "Parent", "parent type")
     assert(r.is_many, "is_many for []")
     match r.kind {
@@ -484,7 +484,7 @@ lyric parser_tests {
 
   func test_relation_refs() {
     let b = tp_parse("lyric t { relation ArrayList Child:p refs Parent:p }")
-    let r = b.rd_children[0]
+    let r = b.rd.children[0]
     match r.kind {
       Refs => { }
       _ => { assert(false, "expected Refs") }
@@ -496,8 +496,8 @@ lyric parser_tests {
 
   func test_impl_block() {
     let b = tp_parse("lyric t { impl Printable for Dog { to_string = name } }")
-    assert_eq(len(b.ib_children), 1, "one impl block")
-    let imp = b.ib_children[0]
+    assert_eq(len(b.ib.children), 1, "one impl block")
+    let imp = b.ib.children[0]
     assert_eq(imp.interface_name!.name, "Printable", "interface")
   }
 
@@ -515,26 +515,26 @@ lyric parser_tests {
 
   func test_import() {
     let b = tp_parse("lyric t { import \"fmt\" }")
-    assert_eq(len(b.imp_children), 1, "one import")
-    assert_eq(b.imp_children[0].path, "fmt", "import path")
+    assert_eq(len(b.imp.children), 1, "one import")
+    assert_eq(b.imp.children[0].path, "fmt", "import path")
   }
 
   // ---- Multiple items in one block ----
 
   func test_multiple_funcs() {
     let b = tp_parse("lyric t { func a() { } func b() { } func c() { } }")
-    assert_eq(len(b.fd_children), 3, "three funcs")
-    assert_eq(b.fd_children[0].name!.name, "a", "first func")
-    assert_eq(b.fd_children[1].name!.name, "b", "second func")
-    assert_eq(b.fd_children[2].name!.name, "c", "third func")
+    assert_eq(len(b.fd.children), 3, "three funcs")
+    assert_eq(b.fd.children[0].name!.name, "a", "first func")
+    assert_eq(b.fd.children[1].name!.name, "b", "second func")
+    assert_eq(b.fd.children[2].name!.name, "c", "third func")
   }
 
   func test_mixed_decls() {
     let b = tp_parse("lyric t { struct S { x: i32 } class C { y: string } enum E { A\n B } func f() { } }")
-    assert_eq(len(b.sd_children), 1, "one struct")
-    assert_eq(len(b.cd_children), 1, "one class")
-    assert_eq(len(b.ed_children), 1, "one enum")
-    assert_eq(len(b.fd_children), 1, "one func")
+    assert_eq(len(b.sd.children), 1, "one struct")
+    assert_eq(len(b.cd.children), 1, "one class")
+    assert_eq(len(b.ed.children), 1, "one enum")
+    assert_eq(len(b.fd.children), 1, "one func")
   }
 
   // ---- Try operator ----
@@ -575,7 +575,7 @@ lyric parser_tests {
 
   func test_struct_literal() {
     let b = tp_parse("lyric t { struct Point { x: i32\n y: i32 } func f() { let p = Point { x: 1, y: 2 } } }")
-    let s = b.fd_children[0].body!.bs_children[0]
+    let s = b.fd.children[0].body!.bs.children[0]
     match s.kind {
       VarDecl(_, _, _, _, _, value) => {
         match value!.kind {
@@ -594,7 +594,7 @@ lyric parser_tests {
 
   func test_where_clause() {
     let b = tp_parse("lyric t { func process<T>(x: T) where T: Printable { } }")
-    let f = b.fd_children[0]
+    let f = b.fd.children[0]
     assert_eq(len(f.wc.children), 1, "one where clause")
     assert_eq(f.wc.children[0].variable!.name, "T", "where var")
     assert_eq(f.wc.children[0].constraint!.name, "Printable", "where constraint")
@@ -618,12 +618,12 @@ lyric parser_tests {
     let s = tp_first_stmt(b)
     match s.kind {
       While(_, body) => {
-        assert_eq(len(body.bs_children), 2, "two stmts")
-        match body.bs_children[0].kind {
+        assert_eq(len(body.bs.children), 2, "two stmts")
+        match body.bs.children[0].kind {
           Break => { }
           _ => { assert(false, "expected Break") }
         }
-        match body.bs_children[1].kind {
+        match body.bs.children[1].kind {
           Continue => { }
           _ => { assert(false, "expected Continue") }
         }
@@ -636,8 +636,8 @@ lyric parser_tests {
 
   func test_optional_type() {
     let b = tp_parse("lyric t { struct S { x: i32? } }")
-    let s = b.sd_children[0]
-    let field = s.sf_children[0]
+    let s = b.sd.children[0]
+    let field = s.sf.children[0]
     assert(field.type_expr != null, "has type")
     match field.type_expr!.kind {
       Optional(_) => { }
@@ -649,8 +649,8 @@ lyric parser_tests {
 
   func test_slice_type() {
     let b = tp_parse("lyric t { struct S { items: [i32] } }")
-    let s = b.sd_children[0]
-    let field = s.sf_children[0]
+    let s = b.sd.children[0]
+    let field = s.sf.children[0]
     match field.type_expr!.kind {
       Sequence(_) => { }
       _ => { assert(false, "expected Sequence type") }
@@ -661,7 +661,7 @@ lyric parser_tests {
 
   func test_tuple_type() {
     let b = tp_parse("lyric t { func f() -> (i32, string) { return (1, \"a\") } }")
-    let f = b.fd_children[0]
+    let f = b.fd.children[0]
     assert(f.return_type != null, "has return type")
     match f.return_type!.kind {
       Tuple(fields) => {

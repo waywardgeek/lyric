@@ -251,7 +251,14 @@ lyric desugar {
             field_name = fd.name!.name
           }
           if side_label != "" {
-            field_name = side_label + "_" + field_name
+            // Phase 3e (redesign §3.1): scope-injected names are mangled
+            // with a double-underscore prefix so they're unreachable by
+            // bare-flat access (`team.roster_children` errors as "no such
+            // field"). The dotted-scope sugar (`team.roster.children`)
+            // is the only user-visible path. Mangling also frees the
+            // user namespace — `class Team { roster_children: ... }`
+            // can coexist with `relation ArrayList Team:roster owns [...]`.
+            field_name = "__" + side_label + "_" + field_name
           }
 
           // Rewrite the field's type, substituting iface type-params
@@ -422,8 +429,8 @@ lyric desugar {
           if !isnull(label_entry) && !isnull(ifield.name) {
             let label = label_entry!.value
             let fname = ifield.name!.name
-            method_renames.set(sym(fname), label + "_" + fname)
-            method_renames.set(sym("set_" + fname), "set_" + label + "_" + fname)
+            method_renames.set(sym(fname), "__" + label + "_" + fname)
+            method_renames.set(sym("set_" + fname), "set___" + label + "_" + fname)
           }
         }
 

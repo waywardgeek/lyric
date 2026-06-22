@@ -223,6 +223,35 @@ module checker
     level is currently miscompiled to LyricSlice_void.
     """
 
+  invariant "Phase 3e — Mangled Scope-Injected Storage Names":
+    procedural
+    """
+    When the labeled method-name registration sites in Phase 1.5/1.5b
+    build `reg_name` for a labeled-impl-type-arg, the constructed name
+    is `"__" + label_str + "_" + member_name` (NOT `label_str + "_" +
+    member_name` as in pre-Phase-3e). The same `__` prefix is applied
+    by desugar's Phase B field injection, desugar's destructor-body
+    method-rename pass, and the monomorphizer's labeled-method
+    specialization. The dotted-scope rewrite (Phase 3c-capability above)
+    computes `combined = "__" + label_str + "_" + member_str` to match
+    the registered name, so `obj.label.member` still resolves correctly.
+
+    The user-facing effect: the bare-flat name (e.g. `roster_children`)
+    is no longer registered as a member on the concrete class. The
+    dotted-scope sugar `obj.label.member` is the only user-visible
+    path to relation-injected storage. Bare-flat access is rejected at
+    the C-compile stage with gcc's "did you mean `__roster_children`?"
+    helpful suggestion (the Lyric checker doesn't currently enforce
+    field existence for class-typed receivers — orthogonal laxity).
+
+    Critically: a user-declared field named `roster_children` on Team
+    is now free to coexist with `relation ArrayList Team:roster owns
+    [...]` — the two names live in disjoint namespaces. See
+    testdata/test_phase3e_user_namespace.ly for the acceptance test.
+
+    See cr/docs/multi-class-interface-redesign.md §3.1.
+    """
+
   typedef TypeKind: enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
     source: checker.ly:19
 

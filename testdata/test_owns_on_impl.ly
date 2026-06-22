@@ -111,10 +111,10 @@ lyric OwnsOnImpl {
   func test_relation_surface_regression() {
     let t = Team { name: "T" }
     let p = Player { name: "P" }
-    t.roster_append(p)
-    assert_eq(len(t.roster_children), 1, "relation-surface field still injected")
-    assert_eq(p.team_parent!.name, "T", "relation-surface back-pointer still injected")
+    t.roster.append(p)
+    assert_eq(len(t.roster.children), 1, "relation-surface field still injected")
+    assert_eq(p.team.parent!.name, "T", "relation-surface back-pointer still injected")
     t.destroy()
-    assert_eq(isnull(p.team_parent), true, "relation-surface destructor still fires")
+    assert_eq(isnull(p.team.parent), true, "relation-surface destructor still fires")
   }
 }

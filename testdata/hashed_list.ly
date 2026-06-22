@@ -14,15 +14,6 @@ lyric hashed_list {
 
   relation HashedList Registry:reg owns [Entry:entry]
 
-  impl HashedList<Registry, Entry> {
-    P.children <-> Registry.reg_children
-    P.buckets <-> Registry.reg_buckets
-    P.hash_cap <-> Registry.reg_hash_cap
-    P.hash_count <-> Registry.reg_hash_count
-    C.parent <-> Entry.entry_parent
-    C.index <-> Entry.entry_index
-  }
-
   func main() {
     let reg = Registry {}
 
@@ -46,12 +37,12 @@ lyric hashed_list {
     }
 
     // Count
-    println(f"count: {reg.reg_hash_count}")
+    println(f"count: {reg.reg.hash_count}")
 
     // Remove
     let removed = hash_remove<Registry, Entry>(reg, 100 as u64)
     println(f"removed 100: {removed}")
-    println(f"count after remove: {reg.reg_hash_count}")
+    println(f"count after remove: {reg.reg.hash_count}")
 
     // Verify 200 still there
     let e200 = hash_lookup<Registry, Entry>(reg, 200 as u64)
@@ -72,7 +63,7 @@ lyric hashed_list {
     if !isnull(e200b) {
       println(f"200 replaced: {e200b!.value}")
     }
-    println(f"count after replace: {reg.reg_hash_count}")
+    println(f"count after replace: {reg.reg.hash_count}")
 
     println("done")
   }

@@ -21,8 +21,8 @@ lyric destroy_shared {
     dll_append<TeamA, Player>(a, p)
     dll_append<TeamB, Player>(b, p)
 
-    println(f"a has player: {!isnull(a.team_a_first)}")
-    println(f"b has player: {!isnull(b.team_b_first)}")
+    println(f"a has player: {!isnull(a.team_a.first)}")
+    println(f"b has player: {!isnull(b.team_b.first)}")
 
     // Remember Alice's pointer for slab reuse check
     // TODO: This is a use-after-free — p is dangling after a.destroy().
@@ -34,7 +34,7 @@ lyric destroy_shared {
     // which should auto-remove her from team B
     a.destroy()
 
-    println(f"b has player after destroy: {!isnull(b.team_b_first)}")
+    println(f"b has player after destroy: {!isnull(b.team_b.first)}")
 
     // Allocate a new player — slab should reuse Alice's slot
     let p2 = Player { name: "Bob" }

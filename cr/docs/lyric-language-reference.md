@@ -391,10 +391,14 @@ destructors exactly as it does for a relation-synthesized
 ownership impl.
 
 🚧 The dotted-scope call form (`team.roster.children`) for accessing
-label-prefixed members is design intent per redesign §3.1 but not yet
-shipped; today, label-prefixed members are accessed by their flat
-textual-prefix names (`team.roster_children`). Phase 3c-capability
-ships the dotted form as additive sugar.
+label-prefixed members shipped in Phase 3c-capability and became
+canonical in Phase 3e. The underlying storage name is mangled
+(`Team.__roster_children`) so the bare textual-prefix form
+(`team.roster_children`) is no longer reachable — gcc reports the
+helpful "did you mean `__roster_children`?" if a stale call survives.
+Coexistence with user-declared fields sharing the same prefix is now
+allowed: `class Team { roster_children: i32 }` plus
+`relation ArrayList Team:roster owns [...]` is well-formed.
 
 ### `error` interface
 Built-in. Any class with a `message(self) -> string` method satisfies it.
@@ -436,9 +440,9 @@ class Player { name: string }
 relation ArrayList Team:roster owns [Player:team]
 ```
 
-Injected: `Team.roster_children: [Player]`, `Player.team_parent: Team?`, `Player.team_index: i32`.
+Injected: `Team.__roster_children: [Player]`, `Player.__team_parent: Team?`, `Player.__team_index: i32` — the `__` mangling prefix on labeled relation-injected storage (Phase 3e, redesign §3.1) means these names are reachable ONLY via the dotted-scope sugar (`team.roster.children`, `player.team.parent`, `player.team.index`), never via the bare textual-prefix form.
 Functions: `array_append<Team, Player>(t, p)`, `array_remove<Team, Player>(p)`.
-Methods: `team.roster_append(p)`, `team.roster_remove(p)`.
+Methods: `team.roster.append(p)`, `team.roster.remove(p)`.
 
 | Hint | Functions | Notes |
 |---|---|---|

@@ -156,25 +156,25 @@ module monomorphizer
     method collect_from_expr(self, e: LExpr)
       source: monomorphizer.ly:469
     method specialize_func(self, orig: LFuncDecl, subst: Dict<Sym, LType?>?, new_name: string, new_receiver: string, label: string) -> LFuncDecl
-      source: monomorphizer.ly:575
+      source: monomorphizer.ly:584
     method rewrite_impl_method_calls(self, fn: LFuncDecl, constraints: [LRelationalConstraint], subst: Dict<Sym, LType?>?, label: string)
-      source: monomorphizer.ly:630
+      source: monomorphizer.ly:639
     method specialize_class(self, orig: LClassDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LClassDecl
-      source: monomorphizer.ly:791
+      source: monomorphizer.ly:800
     method specialize_struct(self, orig: LStructDecl, subst: Dict<Sym, LType?>?, new_name: string) -> LStructDecl
-      source: monomorphizer.ly:809
+      source: monomorphizer.ly:818
     method build_class_rename_map(self, subst: Dict<Sym, LType?>?) -> Dict<Sym, string>?
-      source: monomorphizer.ly:824
+      source: monomorphizer.ly:833
     method rewrite_value(self, v: LValue?)
-      source: monomorphizer.ly:896
+      source: monomorphizer.ly:905
     method rewrite_stmts(self, stmts: [LStmt?])
-      source: monomorphizer.ly:907
+      source: monomorphizer.ly:916
     method rewrite_stmt(self, s: LStmt)
-      source: monomorphizer.ly:917
+      source: monomorphizer.ly:926
     method rewrite_expr(self, e: LExpr)
-      source: monomorphizer.ly:1134
+      source: monomorphizer.ly:1143
     method subst_type_remove_vars(self, t: LType?) -> LType?
-      source: monomorphizer.ly:1511
+      source: monomorphizer.ly:1520
       why: "Phase-5 workhorse: substitutes any remaining LTyTypeVar in a type with its concrete binding AND mangles generic class/struct names (Dict<string> → Dict_string). This is what makes validate_post_mono pass on rewritten signatures and field types — without it, monomorphized funcs would still expose unbound type vars in their public surface."
 
   func new_mono_pass(prog: LProgram?) -> MonoPass?
@@ -199,91 +199,91 @@ module monomorphizer
     source: monomorphizer.ly:292
 
   struct ImplRenameEntry
-    source: monomorphizer.ly:624
+    source: monomorphizer.ly:633
     field class_name: string
     field new_method: string
     field old_method: string
 
   func rewrite_method_calls_in_stmts(stmts: [LStmt?], renames: [ImplRenameEntry])
-    source: monomorphizer.ly:694
+    source: monomorphizer.ly:703
 
   func rewrite_method_calls_in_stmt(s: LStmt, renames: [ImplRenameEntry])
-    source: monomorphizer.ly:704
+    source: monomorphizer.ly:713
 
   func rewrite_method_calls_in_expr(e: LExpr?, renames: [ImplRenameEntry])
-    source: monomorphizer.ly:747
+    source: monomorphizer.ly:756
 
   func subst_type(t: LType?, subst: Dict<Sym, LType?>?) -> LType?
-    source: monomorphizer.ly:1444
+    source: monomorphizer.ly:1453
 
   func clone_stmts(stmts: [LStmt?], subst: Dict<Sym, LType?>?) -> [LStmt?]
-    source: monomorphizer.ly:1576
+    source: monomorphizer.ly:1585
 
   func clone_stmt(s: LStmt, subst: Dict<Sym, LType?>?) -> LStmt?
-    source: monomorphizer.ly:1590
+    source: monomorphizer.ly:1599
 
   func clone_value(v: LValue, subst: Dict<Sym, LType?>?) -> LValue?
-    source: monomorphizer.ly:2064
+    source: monomorphizer.ly:2073
 
   func clone_expr(e: LExpr?, subst: Dict<Sym, LType?>?) -> LExpr?
-    source: monomorphizer.ly:2078
+    source: monomorphizer.ly:2087
 
   func mangle_name(base: string, type_args: [LType?]) -> string
-    source: monomorphizer.ly:2729
+    source: monomorphizer.ly:2738
 
   func type_to_mangle(t: LType?) -> string
-    source: monomorphizer.ly:2743
+    source: monomorphizer.ly:2752
 
   func type_key(types: [LType?]) -> string
-    source: monomorphizer.ly:2805
+    source: monomorphizer.ly:2814
 
   func has_type_vars(types: [LType?]) -> bool
-    source: monomorphizer.ly:2819
+    source: monomorphizer.ly:2828
 
   func type_has_var(t: LType?) -> bool
-    source: monomorphizer.ly:2830
+    source: monomorphizer.ly:2839
 
   func filter_funcs(funcs: [LFuncDecl], class_instances: Dict<Sym, string>?, class_by_name: Dict<Sym, LClassDecl>?) -> [LFuncDecl]
-    source: monomorphizer.ly:2874
+    source: monomorphizer.ly:2883
 
   func filter_classes(classes: [LClassDecl], class_instances: Dict<Sym, string>?) -> [LClassDecl]
-    source: monomorphizer.ly:2900
+    source: monomorphizer.ly:2909
 
   func filter_structs(structs: [LStructDecl], struct_instances: Dict<Sym, string>?) -> [LStructDecl]
-    source: monomorphizer.ly:2914
+    source: monomorphizer.ly:2923
 
   func resolve_class_names(prog: LProgram?)
-    source: monomorphizer.ly:2932
+    source: monomorphizer.ly:2941
 
   func resolve_class_stmts(stmts: [LStmt?], renames: Dict<Sym, string>)
-    source: monomorphizer.ly:2958
+    source: monomorphizer.ly:2967
 
   func resolve_class_stmt(s: LStmt, renames: Dict<Sym, string>)
-    source: monomorphizer.ly:2968
+    source: monomorphizer.ly:2977
 
   func resolve_class_expr(e: LExpr, renames: Dict<Sym, string>)
-    source: monomorphizer.ly:3130
+    source: monomorphizer.ly:3139
 
   func resolve_class_value(v: LValue, renames: Dict<Sym, string>)
-    source: monomorphizer.ly:3359
+    source: monomorphizer.ly:3368
 
   func resolve_class_type(t: LType?, renames: Dict<Sym, string>)
-    source: monomorphizer.ly:3363
+    source: monomorphizer.ly:3372
 
   func monomorphize(prog: LProgram?)
-    source: monomorphizer.ly:3397
+    source: monomorphizer.ly:3406
 
   func mono_starts_with(s: string, prefix: string) -> bool
-    source: monomorphizer.ly:3744
+    source: monomorphizer.ly:3767
 
   func rewrite_impl_renames(prog: LProgram?)
-    source: monomorphizer.ly:3749
+    source: monomorphizer.ly:3772
 
   func rewrite_impl_stmts(stmts: [LStmt?], renames: Dict<Sym, string>?)
-    source: monomorphizer.ly:3862
+    source: monomorphizer.ly:3885
 
   func rewrite_impl_stmt(s: LStmt, renames: Dict<Sym, string>?)
-    source: monomorphizer.ly:3872
+    source: monomorphizer.ly:3895
 
   func rewrite_impl_expr(e: LExpr?, renames: Dict<Sym, string>?)
-    source: monomorphizer.ly:3910
+    source: monomorphizer.ly:3933

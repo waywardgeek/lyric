@@ -145,7 +145,7 @@ lyric Interfaces {
     let f4 = File { title: "old.txt" }
     dll_append<Folder, File>(dir2, f3)
     dll_append<Folder, File>(dir2, f4)
-    if !isnull(dir2.files_first) {
+    if !isnull(dir2.files.first) {
       println("append works")
     }
     if !isnull(f3.src.parent) {
@@ -157,8 +157,8 @@ lyric Interfaces {
     if isnull(f3.src.parent) {
       println("child unlinked")
     }
-    if !isnull(dir2.files_first) {
-      println(dir2.files_first!.title)
+    if !isnull(dir2.files.first) {
+      println(dir2.files.first!.title)
     }
 
     // Test parent destroy (cascade destroys remaining children)

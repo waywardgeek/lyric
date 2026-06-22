@@ -14,30 +14,30 @@ lyric ref_list {
     let g2 = Guest { name: "Bob" }
     let g3 = Guest { name: "Carol" }
 
-    r.room_append(g1)
-    r.room_append(g2)
-    r.room_append(g3)
+    r.room.append(g1)
+    r.room.append(g2)
+    r.room.append(g3)
 
     // Walk the list
-    let mut cur = r.room_first
+    let mut cur = r.room.first
     while !isnull(cur) {
       println(cur!.name)
-      cur = cur!.guest_next
+      cur = cur!.guest.next
     }
 
     // Remove middle element
-    r.room_remove(g2)
+    r.room.remove(g2)
     println("after remove:")
-    cur = r.room_first
+    cur = r.room.first
     while !isnull(cur) {
       println(cur!.name)
-      cur = cur!.guest_next
+      cur = cur!.guest.next
     }
 
     // Destroy parent — children should be unlinked but still alive
     r.destroy()
-    println(f"g1 parent null: {isnull(g1.guest_parent)}")
-    println(f"g3 parent null: {isnull(g3.guest_parent)}")
+    println(f"g1 parent null: {isnull(g1.guest.parent)}")
+    println(f"g3 parent null: {isnull(g3.guest.parent)}")
     // Children still accessible
     println(f"g1 name: {g1.name}")
     println(f"g2 name: {g2.name}")

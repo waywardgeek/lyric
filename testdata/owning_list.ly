@@ -13,29 +13,29 @@ lyric owning_list {
     let p2 = Player { name: "Bob" }
     let p3 = Player { name: "Carol" }
 
-    t.team_append(p1)
-    t.team_append(p2)
-    t.team_append(p3)
+    t.team.append(p1)
+    t.team.append(p2)
+    t.team.append(p3)
 
     // Walk the list
-    let mut cur = t.team_first
+    let mut cur = t.team.first
     while !isnull(cur) {
       println(cur!.name)
-      cur = cur!.player_next
+      cur = cur!.player.next
     }
 
     // Remove middle element
-    t.team_remove(p2)
+    t.team.remove(p2)
     println("after remove:")
-    cur = t.team_first
+    cur = t.team.first
     while !isnull(cur) {
       println(cur!.name)
-      cur = cur!.player_next
+      cur = cur!.player.next
     }
 
     // Cascade destroy — should destroy all remaining children
     t.destroy()
-    println(f"p1 parent null: {isnull(p1.player_parent)}")
-    println(f"p3 parent null: {isnull(p3.player_parent)}")
+    println(f"p1 parent null: {isnull(p1.player.parent)}")
+    println(f"p3 parent null: {isnull(p3.player.parent)}")
   }
 }

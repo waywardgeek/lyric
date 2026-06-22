@@ -63,3 +63,14 @@
   `:where` → `:wc` lose semantic information in user-visible AST
   access paths. Low priority — the bootstrap source is the only
   significant codebase, and it has 0 other keyword-collision sites.
+
+* ~~Phase 3e — drop the textual-prefix emission~~ **DONE 2026-06-22 (Bill + Hewitt).** Shipped option (ii): labeled relation-injected storage names are mangled with a `__` prefix (`Team.__roster_children`, methods `team.__roster_append`, etc.) so the bare-flat textual-prefix form is unreachable. The dotted-scope sugar from Phase 3c-capability (`team.roster.children`, `team.roster.append(p)`) is now the only user-visible access path. Bill flipped the recommendation from option (i) — checker rejection with a marker field — to option (ii) by asking what happens when a user declares a field that collides with the textual-prefix name; with mangling, the two live in disjoint namespaces by construction and coexist freely. Eight generation sites updated consistently (desugar field injection, desugar destructor-body method rename × 2, checker labeled method registration × 2, checker dotted-rewrite target × 2, monomorphizer late specialization). The monomorphizer's last-underscore split logic that recovers the label from a registered name was patched to skip the leading `__` so it doesn't absorb the mangling into the label and double-prefix. Pre-existing Phase 3d sweep stragglers fixed: `stdlib/std.ly` had one bare-flat `self.d_hash_count`; ten testdata files (arraylist, destroy_shared, hashed_list, interfaces, method_iface, owning_list, ref_list, test_impl_type_arg_labels, test_owns_on_impl, test_parser) needed migration. Two test files had user-authored `impl X { P.field <-> Class.<label>_<field> }` bindings that named the now-mangled storage; those bindings were redundant with Phase B's auto-generated mappings and were deleted. Acceptance test `testdata/test_phase3e_user_namespace.ly` verifies that `class Team { roster_children: i32 }` (user-declared) coexists with `relation ArrayList Team:roster owns [...]` (scope-injected `__roster_children`) — both reachable, both mutable, no collision. Bootstrap fixed point at 114,513 lines (was 114,573). Suite 85 PASS / 6 FAIL / 91 TOTAL (added the acceptance test). The 6 baseline fails are unchanged.
+
+* Checker-level rejection of bare-flat access to mangled scope-injected
+  names. Today (post-Phase-3e) bare-flat access like `team.roster_children`
+  is rejected at the gcc layer with "did you mean `__roster_children`?".
+  This is serviceable but happens late. A checker rule that recognizes a
+  mangled storage name in the receiver type and rejects bare-flat access
+  with the Lyric-level suggestion "use team.roster.children" would give
+  a cleaner error one stage earlier. Low priority — gcc's hint is good
+  enough for now.
