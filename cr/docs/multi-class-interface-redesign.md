@@ -1406,6 +1406,33 @@ Phase 1 on its completion.
 **Why first**: smallest, most self-contained, no dependencies on the
 other phases. Pays for itself immediately in code readability.
 
+**Status (audit 2026-06-22, Hewitt):** half-shipped. Working:
+zero-arg-method-as-property (`w.greeting` resolves to a zero-arg
+`func Widget.greeting(self)` call), assignment-as-setter sugar
+(`desugar.ly:628`), field/method collision check (`checker.ly:1883`),
+and field auto-getter/setter on **interface** fields via
+`DesugarInterfaceFields`. Broken / missing:
+
+- **Class field auto-getter is NOT auto-generated.** Today `w.name`
+  works (direct field access, pre-Phase-1 behavior) but `w.name()`
+  fails with `checker: unknown method: name`. The DesugarInterfaceFields
+  pass runs only over `InterfaceDecl`, not `ClassDecl`. Universal
+  field-method interchangeability (§4.2 promise) is not yet realized
+  for class fields.
+- **UFCS function-syntax form is NOT implemented.** Today
+  `Widget.greeting(w)` parses but fails at the checker / lowerer
+  (`Widget_greeting` not declared in C). Only the method-syntax
+  forms (`w.greeting()`, `w.greeting`) resolve. §4.3's third
+  equivalent form is unreachable.
+
+Both are real Phase 1 finishing work — bounded checker/desugar tweaks,
+not architectural. They were quietly skipped because Phase 3 needed
+neither (Phase 3 generates per-class scoped methods directly into the
+class scope, so the class-field-auto-getter gap didn't block any
+relation work). Both should land before Phase 4, since the auto-derive
+rules (§5.4) match against the class scope and assume field-derived
+getters are present in it.
+
 ### Phase 2: `DoublyLinked` rename + `owns`/`refs` modifier orthogonal
 
 - Add `DoublyLinked` as a hint name accepting both `owns` and `refs`.
@@ -1465,16 +1492,184 @@ bootstrap source is ~30K lines; manual migration is not viable.
 
 ### Phase 4: Capability interfaces and constraint aliases
 
-- Implement `constraint Name<...> = A + B` declarations.
-- Implement labels-in-where-clauses syntax (`Collection<N:out, E:source>`).
-- Implement aggressive auto-derive (three priority rules from §5.4).
-- Implement the grouped-impl-on-constraint-alias sugar (§5.5).
-- Implement the three error-message shapes from §5.9.
-- Add `Collection` to the stdlib (auto-satisfied by all three hints).
+**Overview**: ship the `constraint` alias keyword, labels-in-where-
+clauses, aggressive auto-derive, the `Collection` capability interface,
+and the impl-alias / grouped-impl sugar. This is the load-bearing
+spec deliverable that unblocks `testdata/graph.ly` and
+`testdata/tree.ly` (both currently parse-fail on `constraint Foo<...>
+= ...`) and lays the foundation for any algorithm library that
+quantifies over multiple relation shapes.
 
-**Why fourth**: depends on labels-as-scopes (Phase 3) for the
-constraint instantiations to work. Lays the groundwork for algorithm
-libraries.
+**Dependencies**: Phase 3 (labels-as-scopes) is shipped. Phase 1
+finishing work (class field auto-getter + UFCS function-syntax) should
+land first so the auto-derive name+signature matcher in §5.4 can rely
+on field-derived getters being present in the class scope.
+
+**Substep plan** (mirrors the 3a–3e cadence of Phase 3):
+
+#### Phase 4a — Lexer + parser for `constraint` declarations
+
+- Add `KConstraint` to the lexer keyword table; add `"constraint"` to
+  the hard-keyword list in the language reference.
+- Parser: top-level declaration `constraint Name<T1, T2, ...> = A<...>
+  + B<...> + C<...>`. AST node `ConstraintAliasDecl { name: Sym,
+  type_params: [Sym], body: [ConstraintRef] }` where `ConstraintRef`
+  is the existing constraint AST node (whatever desugar passes use
+  for where-clause entries today).
+- `+` is the existing constraint composition operator; reuse the
+  parser path for `where Foo<...> + Bar<...>`.
+- Single-element bodies (`constraint Single<T> = Other<T>`) parse;
+  empty bodies are an error.
+- Pretty-printer (`main.ly`) round-trips constraint aliases.
+- Acceptance: `testdata/test_constraint_alias_parse.ly` declares an
+  alias and references it in a `where` clause; checker can be a
+  stub for this substep (the alias resolves to nothing until 4d).
+
+#### Phase 4b — Lexer + parser for labels-in-where-clauses
+
+- Extend the type-argument parser inside constraint references to
+  accept `TypeName:label` per argument, with the label as a plain
+  identifier (matches the impl-block label syntax shipped in §3.8).
+- AST: `TypeArg { type: TypeExpr, label: Sym? }` (or a slot added
+  to whatever the constraint-arg AST currently uses; check the §3.8
+  ImplBlock changes for the existing pattern).
+- Allow labels on a subset of args, not all (`Collection<G, N:graph>`
+  parses; the labelled arg binds to the named scope on N, the
+  unlabeled arg binds to the flat scope on G).
+- Acceptance: `testdata/test_where_labels_parse.ly` shows mixed
+  labeled/unlabeled args.
+
+#### Phase 4c — `Collection<P, C>` interface in stdlib
+
+- Declare `Collection<P, C>` in `stdlib/std.ly` as a two-class
+  capability interface. Methods (initial set):
+  - `pub func P.iter(self) -> gen C` — iteration
+  - `pub func P.count(self) -> i32` — cardinality
+  - `pub func C.parent(self) -> P?` — back-edge, optional null for
+    refs-shape relations where the back-edge is set externally
+- Auto-impl `Collection<P:label, C:label>` for every owns/refs impl
+  produced by Phase 3's desugar. That is: any class-pair that has
+  `impl ArrayList<P:l, C:l> owns { }` (or DoublyLinked, HashedList)
+  generates an `impl Collection<P:l, C:l>` whose bodies delegate to
+  the relation's scope-iteration and `len(scope)`.
+- This is the "any hint that emits a scope satisfies Collection on
+  that scope" rule — labels carry through cleanly because the scope
+  name and the Collection label are the same identifier.
+- Acceptance: `testdata/test_collection_autoimpl.ly` checks that
+  `for c in p.label.iter()` works for one `ArrayList`, one
+  `DoublyLinked owns`, and one `HashedList`.
+
+#### Phase 4d — Constraint-alias expansion at where-clause sites
+
+- Add a desugar pass `DesugarConstraintAliases` that runs before the
+  checker's constraint-resolution phase. For every `where` clause,
+  expand any `ConstraintAliasRef` into the alias's body, substituting
+  the call-site type arguments for the alias's type parameters.
+- Aliases-of-aliases expand transitively. Detect and reject cyclic
+  references with a clean diagnostic.
+- After this pass, no `ConstraintAliasRef` survives in any `where`
+  clause; the checker sees only concrete constraint instantiations.
+- Keep `ConstraintAliasDecl` in the AST for tooling and error
+  messages (so diagnostics can name the alias the user wrote, not
+  just the expanded form).
+- Acceptance: `testdata/test_constraint_alias_expansion.ly` declares
+  `constraint Foo<T> = Bar<T> + Baz<T>` and a function `where Foo<X>`;
+  verify the checker resolves both Bar and Baz against X.
+
+#### Phase 4e — Aggressive auto-derive (§5.4)
+
+- For each constraint instantiation a user code site requires
+  (post-4d, so all aliases are already expanded), the checker walks
+  the constraint's methods and, for each one, looks in the receiver
+  type's class scope (including labeled scopes from §3.8 and field-
+  derived getters from Phase 1's class-field follow-up) for a
+  unique name+signature match.
+- Priority: explicit `impl` always wins; otherwise the unique class-
+  scope match satisfies; otherwise (zero or ≥2 matches) compile error
+  with the §5.9 ambiguity diagnostic.
+- Signature match is by name + arity + parameter types + return type;
+  no auto-coercion, no fuzzy match.
+- For labeled-constraint instantiations like
+  `Collection<N:out, E:source>`, the matcher restricts its search to
+  the `:out` scope on N (and the `:source` scope on E). If those
+  scopes don't exist on the receiver type, that's a "constraint not
+  satisfied" error (§5.9 second shape).
+- Acceptance: extend the test in 4c with one auto-derive success case
+  and one ambiguity case; assert error text matches §5.9.
+
+#### Phase 4f — Explicit `impl` and impl-alias form (§5.5)
+
+- Long form: `impl Iface<...labels...> { method bodies }` already
+  parses via §3.8/3.9 work. Wire the checker to recognize this as the
+  "always wins" priority-1 satisfier from §5.4.
+- Alias form: `impl Collection<Route:out, Via:source> =
+  Collection<Route:a, Via:a>`. Parser: top-level `impl X = Y` where
+  X and Y are both labeled-instantiation forms of the same interface.
+  Desugar: synthesize one delegating method per interface method,
+  body `return self.<a-label>.<method>()` (and similar shape for
+  each method).
+- Acceptance: `testdata/test_impl_alias.ly` covers the FPGA Route
+  example from §5.4 (a/b → out/in renaming).
+
+#### Phase 4g — Grouped-impl-on-constraint-alias body sugar (§5.5)
+
+- Parser: `impl AliasName<T1, T2, ...> { Foo<...> = Foo<...>; Bar<...>
+  = Bar<...> }` — each body entry is itself a 4f-style impl-alias
+  (or a long-form block with methods).
+- Desugar: expand to a top-level `impl Foo<...> = Foo<...>` (and so
+  on) per body entry. The grouping is purely visual.
+- Detect mismatches: each body entry must match one of the
+  constraints in the alias's expansion; missing or extra entries
+  are an error with the §5.9 third shape (a clean list of what
+  was expected vs. what was provided).
+- Acceptance: `testdata/test_grouped_impl.ly` covers the
+  `DirectedGraph` triple-binding example from §5.5.
+
+#### Phase 4h — Error message shapes (§5.9)
+
+- Implement the three diagnostic shapes from §5.9 verbatim (the spec's
+  examples are the acceptance bar): auto-derive ambiguity, constraint
+  not satisfied, field/method collision. The field/method collision
+  message already partially exists at `checker.ly:1892` from Phase 1;
+  upgrade it to the §5.9 format (with both declaration sites + the
+  one-line "rename one" suggestion).
+- Source positions on every error: the alias declaration site, the
+  use site (where the constraint is required), and the matching /
+  non-matching candidate sites all need to be cited.
+- Acceptance: golden-test the diagnostic text for each shape.
+
+#### Phase 4i — Reactivate `graph.ly` and `tree.ly`; sweep stdlib
+
+- With Phase 4a–4h shipped, both currently parse-failing tests should
+  flip to PASS. If they don't, the failures are the second wave of
+  Phase 4 work (e.g., constraint usage inside generic algorithm
+  bodies — `bfs`, `topo_sort`, etc., which probably need
+  Phase 5 static methods on numeric weights too — defer the genuinely
+  Phase-5-blocked tests behind a `🚧` callout).
+- Sweep `stdlib/std.ly` for places that should be expressed as
+  constraint aliases now that they're available (the ArrayList /
+  DoublyLinked / HashedList hint family is a likely candidate for
+  having a `Linear<P, C>` alias that bundles their shared shape).
+- Update `cr/docs/lyric-language-reference.md` §Capability Interfaces
+  / §Constraint Aliases sections with examples.
+- Update the book (`cr/docs/the-lyric-book.md`) Ch 9 (interfaces) and
+  Ch 12 (generics) to show the new mechanisms.
+
+**Estimated scope**: each substep is ≤200 LOC of compiler change
+(parser/desugar/checker), with proportional stdlib/test additions.
+Total Phase 4 budget: ~2,000 LOC compiler + ~500 LOC stdlib +
+~1,000 LOC testdata. Comparable in magnitude to Phase 3, which
+shipped in two days of focused work.
+
+**Parallelizability**: 4a, 4b, and 4h are independent and fleet-safe
+once the AST types are agreed (so write a tiny pre-flight commit that
+adds `ConstraintAliasDecl` and `TypeArg.label` empty stubs, then
+spawn three agents). 4c–4g are sequential because each builds on
+the previous one. 4i is single-agent verification + book sweep.
+
+**Why fourth in the overall ordering**: depends on labels-as-scopes
+(Phase 3) for the constraint instantiations to work. Lays the
+groundwork for algorithm libraries.
 
 ### Phase 5: Static methods + Numeric constraint
 
