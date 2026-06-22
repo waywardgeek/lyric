@@ -141,6 +141,7 @@ func is_side_effect_expr(e: LExpr) -> bool {
           b!.name == "panic" ||
           b!.name == "append" ||
           b!.name == "slice_push" ||
+          b!.name == "slice_extend" ||
           b!.name == "push_bytes" ||
           b!.name == "slice_pop" ||
           b!.name == "slice_clear" ||
