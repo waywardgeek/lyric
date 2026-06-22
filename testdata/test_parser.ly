@@ -595,9 +595,9 @@ lyric parser_tests {
   func test_where_clause() {
     let b = tp_parse("lyric t { func process<T>(x: T) where T: Printable { } }")
     let f = b.fd_children[0]
-    assert_eq(len(f.where_children), 1, "one where clause")
-    assert_eq(f.where_children[0].variable!.name, "T", "where var")
-    assert_eq(f.where_children[0].constraint!.name, "Printable", "where constraint")
+    assert_eq(len(f.wc.children), 1, "one where clause")
+    assert_eq(f.wc.children[0].variable!.name, "T", "where var")
+    assert_eq(f.wc.children[0].constraint!.name, "Printable", "where constraint")
   }
 
   // ---- Spawn statement ----

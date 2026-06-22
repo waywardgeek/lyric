@@ -1392,7 +1392,7 @@ func fmt_func(sb: StringBuilder, fn: FuncDecl, indent: string) {
     fmt_type_expr(sb, fn.return_type)
   }
   // Where clauses
-  let wheres = fn.where_children()
+  let wheres = fn.wc.children()
   i = 0
   while i < len(wheres) {
     let wvar = if !isnull(wheres[i].variable) { wheres[i].variable!.get_name() } else { "?" }

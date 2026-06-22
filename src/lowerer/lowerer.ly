@@ -1052,7 +1052,7 @@ lyric lowerer {
 
     // Where clauses → relational constraints
     let mut constraints: [LRelationalConstraint] = []
-    for wc in fd!.where_children() {
+    for wc in fd!.wc.children() {
       if !isnull(wc.constraint) {
         let mut wc_args: [string] = []
         for a in wc.wc_arg.children() {

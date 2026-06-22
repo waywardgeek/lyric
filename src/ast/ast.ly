@@ -86,7 +86,7 @@ lyric ast {
   }
   relation ArrayList FuncDecl:fp owns [TypeParam:fp]
   relation ArrayList FuncDecl:param owns [Param:param]
-  relation ArrayList FuncDecl:where owns [WhereClause:where]
+  relation ArrayList FuncDecl:wc owns [WhereClause:wc]
 
   // ---- Fields ----
 
@@ -1371,7 +1371,7 @@ func merge_stdlib(file: File?, std_file: File?) {
         }
     }
     for i in range(0, len(std_funcs)) {
-        let wheres = std_funcs[i].where_children()
+        let wheres = std_funcs[i].wc.children()
         for wi in range(0, len(wheres)) {
             if wheres[wi].constraint != null {
                 let cname = wheres[wi].constraint!.name

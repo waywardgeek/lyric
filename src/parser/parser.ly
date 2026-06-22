@@ -1158,12 +1158,13 @@ lyric parser {
         self.next()  // consume '>'
       }
     }
-    // Check for :label — label can be an ident or a contextual keyword used as name
+    // Check for :label — label must be an identifier (no hard keywords).
+    // This matches parse_impl's per-type-arg label parsing and the rest of
+    // the language's "hard keywords are reserved everywhere" rule.
     let mut label: Sym? = null
     if self.peek().kind == PColon {
       self.next()
-      let tok = self.peek()
-      if tok.kind != PLBrace && tok.kind != PRBrace && tok.kind != PLBracket && tok.kind != PRBracket && tok.kind != SEOF && tok.kind != SNewline && tok.text != "" {
+      if self.peek().kind == LIdent {
         label = sym(self.next().text)
       }
     }

@@ -113,7 +113,7 @@ lyric Interfaces {
   class File { title: string }
 
   // This relation injects DoublyLinked default fields into Folder and File
-  relation DoublyLinked Folder:files owns [File:from]
+  relation DoublyLinked Folder:files owns [File:src]
 
   impl DoublyLinked<Folder, File> {
     P.children <-> Folder.items
@@ -148,13 +148,13 @@ lyric Interfaces {
     if !isnull(dir2.files_first) {
       println("append works")
     }
-    if !isnull(f3.from_parent) {
+    if !isnull(f3.src.parent) {
       println("parent set")
     }
 
     // Test child destroy (unlink f3 from list, f4 should become first)
     f3.destroy()
-    if isnull(f3.from_parent) {
+    if isnull(f3.src.parent) {
       println("child unlinked")
     }
     if !isnull(dir2.files_first) {
@@ -168,7 +168,7 @@ lyric Interfaces {
     dll_append<Folder, File>(dir3, f5)
     dll_append<Folder, File>(dir3, f6)
     dir3.destroy()
-    if isnull(f5.from_parent) {
+    if isnull(f5.src.parent) {
       println("cascade works")
     }
   }

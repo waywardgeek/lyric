@@ -46,3 +46,20 @@
   one-line ast.ly edit. Tracked because Phase 3d's checker.ly migration
   was forced to keep `.where_children()` flat for 3 sites while migrating
   77 other sites successfully.
+
+* ~~Phase 3c-capability dotted-scope sugar doesn't accept hard keywords~~
+  **RESOLVED 2026-06-22**: chose KISS — hard keywords are reserved
+  everywhere, no carve-outs. Renamed `:where` label to `:wc` in ast.ly
+  (6 call sites swept across checker/lowerer/ast/main) and renamed
+  `:from` to `:src` in testdata/interfaces.ly (3 call sites). Tightened
+  `parse_relation_side` to require `LIdent` for labels, matching
+  `parse_impl`. Suite stays at 84/6/0/90.
+
+* Future: raw-identifier escape syntax (e.g. `\where` or `` `where` ``)
+  to let users actually use hard keywords as identifiers in any name
+  position — field names, label names, scope-access, variable names.
+  Today the language reserves all 36 hard keywords absolutely. The
+  empirical pain point this would address: forced renames like
+  `:where` → `:wc` lose semantic information in user-visible AST
+  access paths. Low priority — the bootstrap source is the only
+  significant codebase, and it has 0 other keyword-collision sites.

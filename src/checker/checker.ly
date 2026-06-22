@@ -1462,7 +1462,7 @@ lyric checker {
         let type_info = self.registry.lookup(rname)
         if type_info != null { continue }
 
-        let where_clauses = f.where_children()
+        let where_clauses = f.wc.children()
         for wc in where_clauses {
           if wc.constraint == null { continue }
           let iface_name = sym_to_string(wc.constraint!)
@@ -2285,7 +2285,7 @@ lyric checker {
           // Receiver is a type param (e.g., "P" from an interface method).
           // Define self as TypeVar and grant relational methods from where-clauses.
           self.scope.define("self", make_typevar_type(rname))
-          let where_clauses = f.where_children()
+          let where_clauses = f.wc.children()
           for wc in where_clauses {
             if wc.constraint != null {
               let iface_name = sym_to_string(wc.constraint!)
@@ -2393,7 +2393,7 @@ lyric checker {
     let prev_tvm = self.type_var_methods
     let inherited = self.type_var_methods
     self.type_var_methods = null
-    let wheres = f.where_children()
+    let wheres = f.wc.children()
     for wc in wheres {
       if wc.variable == null && wc.constraint != null {
         // Bare relational constraint: where Graph<G, N, E>
