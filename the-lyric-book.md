@@ -3145,7 +3145,7 @@ The desugar pipeline runs five passes in a fixed order:
 
 1. **Interface fields** — turn `field T.name: Type` declarations on interfaces into matching getter/setter method signatures
 2. **Field access** — rewrite `obj.field` shorthand inside interface bodies into the getter/setter calls created by pass 1
-3. **Relations** — process `relation` declarations, binding interfaces to class pairs and injecting label-prefixed fields
+3. **Relations** — process `relation` declarations, binding interfaces to class pairs and injecting per-side fields into the label's sub-scope on each class
 4. **Destructors** — copy each interface's matching `owns`/`refs` destructor block onto the concrete class's `destroy` method
 5. **Default impls** — extract interface methods that carry a body into top-level generic functions guarded by relational `where` clauses
 
@@ -4445,7 +4445,7 @@ Between parsing and C emission, the source passes through three major transforma
 
 **Desugar** (1,454 lines) runs five passes in fixed order: InterfaceFields → FieldAccess → Relations → Destructors → DefaultImpls. The order is load-bearing — each pass generates AST nodes that later passes depend on. Relations (Chapter 8) and interfaces (Chapter 9) cover the design in detail; the key implementation insight is that destructor copies must be *deep* to prevent cross-relation contamination when method names are renamed.
 
-**Check** (5,087 lines) is five-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, handling label-prefixed names; Phase 1.6 validates that every interface used as a relation hint has the right shape (paired destructors, well-typed field declarations); Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
+**Check** (5,087 lines) is five-phase: Phase 0 pre-registers all type names so forward and cross-file references resolve; Phase 1 fills in the full `TypeInfo` (fields, methods, variants, type parameters, constraints); Phase 1.5 binds interface methods from impl blocks and where-clauses onto concrete classes, resolving labeled-scope method names onto each side; Phase 1.6 validates that every interface used as a relation hint has the right shape (paired destructors, well-typed field declarations); Phase 2 type-checks every function body and annotates every expression with its resolved type. Each phase must complete across ALL blocks before the next begins — this is what makes forward references and cross-file references work.
 
 **Lower** (3,657 lines) translates the checked AST into LIR — a flattened, structured intermediate representation where `a + b * c` becomes `t1 = b * c; t2 = a + t1`. Control flow stays structured (if/while/match as statements, not basic blocks) because the C backend emits structured C. The lowerer also handles short-circuit `&&`/`||` (eager evaluation caused segfaults) and append write-back (without it, `append(obj.field, elem)` modifies a copy).
 
