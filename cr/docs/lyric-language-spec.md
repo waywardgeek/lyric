@@ -1165,11 +1165,40 @@ A `relation` declaration is syntactic sugar for a labeled impl of
 the matching hint interface (`ArrayList`, `DoublyLinked`, or
 `HashedList`) plus an `owns`/`refs` flag selecting the destructor
 pair. `relation ArrayList Team:roster owns [Player:team]` desugars
-to `impl ArrayList<Team:roster, Player:team> { ... }` with the
+to `impl ArrayList<Team:roster, Player:team> owns { }` with the
 field-bind mappings synthesized from the hint interface's
 `field T.name: Type` declarations and the `owns` destructor pair
-selected. See `cr/docs/multi-class-interface-redesign.md` §3.8 for
-the full desugar story.
+selected. See `cr/docs/multi-class-interface-redesign.md` §3.8 and
+§3.9 for the full desugar story.
+
+#### Ownership-annotated impl declarations
+
+An impl whose interface declares hint shape (one or more
+`field T.name: Type` declarations plus paired
+`destructor owns T { ... }` / `destructor refs T { ... }` blocks
+— see §Interfaces) may carry an `owns` or `refs` keyword between
+the closing `>` of the type-argument list and the opening `{` of
+the body:
+
+```lyric
+impl ArrayList<Team:roster, Player:team> owns { }
+impl DoublyLinked<Node:ready_q, Node:ready_q_child> refs { }
+```
+
+The annotation selects which paired destructor block on the hint
+interface is copied onto each concrete class (the `owns` form
+cascade-destroys; the `refs` form unlinks only). When the impl
+body is empty, the desugar synthesizes per-side field bindings
+from the hint interface's `field T.name: Type` declarations using
+each type-var's label, exactly as it does for `relation`
+declarations.
+
+The `relation` surface (§Relations) is sugar for this form. The
+underlying impl form is available for two cases the relation
+surface does not cover today: user-defined hint interfaces (not
+just the three stdlib hints), and direct ownership-annotated
+impls that need a non-empty body for additional Alias / FieldBind
+/ Inline mappings beyond the synthesized field-binds.
 
 ### Where Clauses
 

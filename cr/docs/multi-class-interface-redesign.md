@@ -601,6 +601,105 @@ form (a single-label-on-the-whole-impl parser path, never used by
 user code; only ever populated by the relation→impl desugar
 internally) is removed in favor of the per-type-var form.
 
+### 3.9 Ownership annotation lives on impl; `RelationDecl` collapses post-desugar
+
+§3.8 moved labels from the impl block to its type-variables. After
+that change, every cross-class participation rule that a `relation`
+declaration carries — *which* interface, *which* concrete classes,
+*which* per-side scope labels — is expressible directly on a
+labeled `impl`. The only remaining piece a relation carries that
+an impl does not is the `owns` / `refs` flag (§3.5) selecting which
+destructor pair the desugar pass copies onto the concrete classes.
+
+Move that flag onto the impl block too, and the relation surface
+becomes a thin sugar that desugars to a labeled+annotated impl
+exhaustively. The downstream value: three desugar passes
+(`desugar_interface_fields`, `desugar_destructors`, and
+`desugar_relations` itself) all converge on iterating impl blocks
+rather than relation declarations, and `RelationDecl` becomes a
+purely transient AST shape that is never observed by the checker,
+the lowerer, the LIR, or the C backend.
+
+**Surface syntax:**
+
+```lyric
+impl ArrayList<Team:roster, Player:team> owns { }
+impl DoublyLinked<Node:ready_q, Node:ready_q_child> refs { }
+```
+
+The `owns` / `refs` keyword sits between the closing `>` of the
+type-argument list and the opening `{` of the body — exactly
+mirroring the relation surface (`relation ArrayList Team:roster
+owns [Player:team]`). The body may be empty: when the impl block
+carries the same labels and the same ownership semantics the
+relation would have carried, no per-side mappings are needed —
+the desugar synthesizes them from the hint interface's
+`field T.name: Type` declarations the same way it does for
+relations today.
+
+**Relation surface stays — it's the convenient daily-driver
+spelling:**
+
+```
+  relation ArrayList Team:roster owns [Player:team]
+      ≡  // exact desugar — both labels ride on type-args, owns rides on impl
+  impl ArrayList<Team:roster, Player:team> owns { }
+```
+
+`desugar_relations` continues to synthesize an impl from each
+relation, now dropping `rel.kind` into the new `ImplBlock.kind`
+slot alongside the per-type-var labels it already drops into
+`ImplTypeArg.label`. After this pass, every relation has a
+corresponding fully-typed impl; later passes iterate impls.
+
+**Hint-shape generalization.** Until this change, the
+"hint-shape interface" (an interface with `field T.name: Type`
+declarations plus paired `destructor owns/refs T { ... }` blocks)
+was effectively a stdlib privilege held by `ArrayList`,
+`DoublyLinked`, and `HashedList` because the only entry point
+that recognized hint-shape was the relation surface, which
+checks the hint name against those three. Once the ownership
+flag is a property of any impl block, any interface declaring
+that shape becomes a candidate for an `owns`/`refs`-annotated
+impl directly — no relation surface required. The Phase 3a
+validator (`validate_relation_hints`) generalizes from "this
+interface is being used as a relation hint" to "this interface
+is being used as an `owns`/`refs`-annotated impl" with the
+same three diagnostics (§3.7), broadening user-defined hints to
+genuinely first-class.
+
+**Same-class double ownership.** §3.8 showed that two impls of
+`DoublyLinked` on the same `Node` class under distinct labels
+non-collide. With ownership on the impl, that property extends
+naturally to ownership-bearing relationships: a single class can
+participate in two *owning* relationships of the same hint
+interface under distinct labels, each with its own destructor
+cascade firing through its own label scope.
+
+**Implementation footprint.** `ImplBlock` gains a single
+`kind: RelationKind?` slot (null means "not an ownership impl";
+non-null means "synthesize fields/destructors from the named hint
+interface's hint shape, using the per-type-var labels"). Parser
+gains one token-peek after the closing `>`. `desugar_relations`
+drops `rel.kind` into the synthesized impl's slot. The other
+relevant desugar passes switch their outer iteration from
+`block.rd_children()` to "impl blocks whose `kind` is non-null"
+and read labels off `impl.ib_args[i].label` instead of via a
+side-channel. The Phase 3a validator switches iteration the
+same way. `RelationDecl` continues to exist as a parse-time
+AST node but is drained at the end of `desugar_relations` and
+ignored by every later pass; a follow-up commit can delete it
+outright.
+
+**Why not delete the `relation` surface keyword?** It stays —
+relations are the daily-driver spelling for declaring class
+ownership, and they read better than the equivalent impl form
+for the common case. The impl form is the *underlying mechanism*;
+the relation surface is the convenient name. This mirrors how
+auto-generated `destroy` methods stay even though `final` and
+manual destructors exist — the cheap, named surface stays
+because it earns its keep.
+
 ---
 
 ## 4. Method System Rules
