@@ -313,12 +313,6 @@ module checker
   func new_registry() -> Registry
     source: checker.ly:116
 
-  func get_method_aliases() -> Dict<Sym, string>
-    source: checker.ly:152
-
-  func get_method_labels() -> Dict<Sym, string>
-    source: checker.ly:159
-
   class Checker
     source: checker.ly:166
     field current_func_name: string

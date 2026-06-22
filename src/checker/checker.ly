@@ -144,24 +144,11 @@ lyric checker {
   // Checker state
   // =====================================================================
 
-  // Global: maps label-prefixed method names to base method names.
-  // e.g. "c1_append" → "append". Populated by checker, read by monomorphizer.
-  let mut _method_aliases: Dict<Sym, string>? = null
-  let mut _method_labels: Dict<Sym, string>? = null
-
-  func get_method_aliases() -> Dict<Sym, string> {
-    if isnull(_method_aliases) {
-      _method_aliases = Dict<Sym, string>()
-    }
-    return _method_aliases!
-  }
-
-  func get_method_labels() -> Dict<Sym, string> {
-    if isnull(_method_labels) {
-      _method_labels = Dict<Sym, string>()
-    }
-    return _method_labels!
-  }
+  // (Phase 3e cleanup: _method_aliases / _method_labels deleted.
+  // They were write-only — populated by Phase 1.5/1.5b registration
+  // sites but never read inside the checker. The monomorphizer's
+  // last-underscore split recovers the label directly from the
+  // mangled method name; see monomorphizer.ly ~line 510.)
 
   permanent class Checker {
     registry: Registry
@@ -1556,8 +1543,6 @@ lyric checker {
               // Use let ref to prevent scope-exit free — sym() stores pointer to string data
               let ref label_name = "__" + label_str + "_" + fname
               reg_name = label_name
-              get_method_aliases().set(sym(reg_name), fname)
-              get_method_labels().set(sym(reg_name), label_str)
             }
             let method_key = concrete_name + "." + reg_name
             self.method_type_args.set(sym(method_key), ta)
@@ -1646,8 +1631,6 @@ lyric checker {
             // Use let ref to prevent scope-exit free — sym() stores pointer to string data
             let ref label_name = "__" + label_str + "_" + mname
             reg_name = label_name
-            get_method_aliases().set(sym(reg_name), mname)
-            get_method_labels().set(sym(reg_name), label_str)
           }
           let existing = cinfo!.methods.get(sym(reg_name))
           if existing != null { continue }
