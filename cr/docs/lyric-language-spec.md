@@ -1124,6 +1124,53 @@ impl Printable<Widget> {
 `T.` is implicit; just `method = member`, `method <-> member`, or
 `method(params) -> Ret { body }`.
 
+#### Labeled impl declarations
+
+Any top-level class type-argument of an impl declaration may carry
+an optional `:label`. Members the interface puts on that class are
+then injected under a `<label>` sub-scope on that class instead of
+flat into the class namespace.
+
+```lyric
+impl ArrayList<Team:roster, Player:team> {
+    P.children <-> Team.roster_field
+    C.parent   <-> Player.team_field
+    C.index    <-> Player.team_idx
+}
+```
+
+Members on the parent type-var (`P`, bound to `Team`) inject into
+the `roster` scope on `Team`; members on the child type-var (`C`,
+bound to `Player`) inject into the `team` scope on `Player`. Call
+sites use the dotted scope path: `team.roster.children`,
+`player.team.parent`. Omit the label and the side injects flat
+(`team.children`, `player.parent`) — see §Relations for the scope-
+vs-flat rules and the "at most one unlabeled per (P, C) pair"
+constraint.
+
+Labels are *per class type-variable*, not per impl block. Same-
+letter labels on different type-vars in the same impl are legal
+(`impl DoublyLinked<Route:a, Via:a>`) because each label lives in
+its own class's namespace. Two instances of the same interface on
+the same class, under distinct labels, give two non-colliding
+bundles of injected members:
+
+```lyric
+// Node participates in two intrusive linked lists, no collision:
+impl DoublyLinked<Node:ready_q,   Node:ready_q_child>   { ... }
+impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
+```
+
+A `relation` declaration is syntactic sugar for a labeled impl of
+the matching hint interface (`ArrayList`, `DoublyLinked`, or
+`HashedList`) plus an `owns`/`refs` flag selecting the destructor
+pair. `relation ArrayList Team:roster owns [Player:team]` desugars
+to `impl ArrayList<Team:roster, Player:team> { ... }` with the
+field-bind mappings synthesized from the hint interface's
+`field T.name: Type` declarations and the `owns` destructor pair
+selected. See `cr/docs/multi-class-interface-redesign.md` §3.8 for
+the full desugar story.
+
 ### Where Clauses
 
 Generic functions can require interface satisfaction:

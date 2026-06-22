@@ -497,6 +497,110 @@ optional fields; consumers satisfy them by providing those members.
 The `Collection`, `EdgeWeight`, `HasRoot`, and `Numeric` interfaces
 in §5 and §6.2 are examples.
 
+### 3.8 Labels live on impl type variables; relations are sugar
+
+A relation declaration carries one label per side
+(`relation ArrayList Team:roster owns [Player:team]`). Each label
+says "the members this interface puts on this class go into the
+`<label>` scope on that class." Because each side has its own class
+and its own scope namespace, the label naturally belongs to the
+**type variable that names the participating class**, not to the
+impl block as a whole.
+
+This is reflected in surface syntax: an impl declaration can
+optionally label any of its top-level class type-arguments.
+
+```lyric
+impl ArrayList<Team:roster, Player:team> {
+    P.children <-> Team.roster_field
+    C.parent   <-> Player.team_field
+    C.index    <-> Player.team_idx
+}
+```
+
+Members declared on `P` (the parent type variable) inject into the
+`roster` scope on `Team`; members on `C` inject into the `team`
+scope on `Player`. Omit the label and the side injects flat into
+the class namespace (§3.1).
+
+Labels are *per class type-variable*, not per impl block. Same-
+letter labels on different type-vars in the same impl are fine
+(`<Route:a, Via:a>`) because each label lives in its own class's
+namespace (§3.2). An earlier draft of this design carried a single
+`ImplBlock.label` slot to which the parent-side label was routed
+and the child-side label was threaded through a separate side-
+channel in `desugar_destructors`; per-type-var labels eliminate
+that asymmetry.
+
+**A relation is then a trivial desugar to a labeled impl:**
+
+```
+  relation ArrayList Team:roster owns [Player:team]
+      ↓
+  impl ArrayList<Team:roster, Player:team> {
+      // field-binds synthesized from the hint interface's
+      // field declarations, using each side's label
+  }
+  + owns flag on each side's destructor pair (§3.5)
+```
+
+Both labels ride on the impl's type-args. No special "this label
+belongs to the parent side" routing — the type-var IS the side.
+
+**Why this matters beyond relations.** Type variables in an impl
+declaration already designate the participating classes (that's
+what makes multi-class interfaces work — the same interface puts
+default fields and methods on more than one class via its
+type-vars). Labels-per-type-var generalize the "inject this
+bundle of fields/methods onto this class, in a named sub-scope"
+capability to *any* multi-class interface, whether or not it's a
+relation hint.
+
+The canonical motivating example is older than Lyric. Around 1990,
+C++ users hit the question: "How do I make a class participate in
+two intrusive linked lists at once?" Single inheritance from a
+`LinkedListChild` mixin worked for the first list and collided on
+the second. Multiple inheritance partially worked but offered no
+way to disambiguate which `next`/`prev` field belonged to which
+list, and dragged in vtable layout pain that wasn't even relevant
+to the problem. The feature the community actually wanted was
+*"inject the same default-field bundle on this class twice, under
+distinct names."* Per-class-type-variable labels on impl
+declarations are exactly that feature, three decades late. Two
+instances of the same interface on the same class, under distinct
+labels, give two non-colliding bundles of injected members:
+
+```lyric
+impl DoublyLinked<Node:ready_q,   Node:ready_q_child>   { ... }
+impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
+```
+
+`node.ready_q.next` and `node.blocked_q.next` are different fields
+on the same class, with no naming collision and no inheritance.
+The relation surface syntax (`relation DoublyLinked Node:ready_q
+owns [Node:ready_q_child]`) is the convenient daily-driver
+spelling; per-type-var labels on impls are the underlying
+mechanism that makes "non-colliding double injection" cleanly
+expressible at all.
+
+**Implementation footprint** of moving from `ImplBlock.label: Sym?`
+(single slot) to per-type-var labels is small and local. The impl
+block's type-argument list changes from `[TypeExpr]` to a wrapper
+`[ImplTypeArg]` where each entry pairs a `TypeExpr` with an
+optional `Sym?` label. The parser learns to read `:label` after
+each top-level type-arg in an `impl` declaration. The relation→impl
+desugar drops each side's label into the corresponding type-arg.
+The checker's existing label-prefix registration consults the
+per-type-arg label instead of the impl-block-wide label. The
+previous `type_param_to_label` side-channel in `desugar_destructors`
+is deleted. Net change is mildly LOC-positive only because the
+side-channel disappears.
+
+**Backward-removed:** the obsolete `impl X<...> as <label> { ... }`
+form (a single-label-on-the-whole-impl parser path, never used by
+user code; only ever populated by the relation→impl desugar
+internally) is removed in favor of the per-type-var form.
+
 ---
 
 ## 4. Method System Rules
