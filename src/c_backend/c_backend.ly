@@ -3173,7 +3173,14 @@ func CGen.emit_return_stmt(self, s: LStmt?) {
     return
   }
   if len(d.values) == 0 {
-    self.line("return;")
+    // In C, main() is emitted as `int main(int, char**)`, so a bare
+    // Lyric `return` inside main must lower to `return 0;` to keep gcc
+    // happy ("'return' with no value, in function returning non-void").
+    if !isnull(self.current_func) && self.func_name(self.current_func!) == "main" {
+      self.line("return 0;")
+    } else {
+      self.line("return;")
+    }
     return
   }
   if len(d.values) == 1 {
