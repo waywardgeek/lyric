@@ -11,6 +11,11 @@ module desugar
 
     1. desugar_interface_fields — turns `field T.name: Type` declarations
        on interfaces into matching getter/setter method signatures.
+       The synthesized FuncDecls are tagged with is_synthesized=true so
+       downstream passes (notably the checker's Phase 1.7 satisfaction
+       check) can distinguish mechanical accessors from user-authored
+       methods. The user-visible contract member is the field; the
+       accessors exist for vtable correctness in the C backend.
     2. desugar_field_access — rewrites `obj.field` shorthand inside
        interface bodies into getter/setter method calls for fields lifted
        by pass 1.

@@ -5039,6 +5039,178 @@ lyric checker {
   }
 
   // =====================================================================
+  // Phase 1.7 — Plain-impl satisfaction check (Phase 4 Wave 1 / 4w1-c)
+  //
+  // For every plain `impl Iface<C1, C2, ...> { ... }` (where ib.kind is
+  // null — relation-synthesized owns/refs hints are validated by Phase
+  // 1.6 above), check that every ABSTRACT member of the interface
+  // (method with body == null, plus every InterfaceFieldDecl) is
+  // satisfied by either:
+  //   (a) an ImplMapping the user wrote in the impl body, OR
+  //   (b) a method/field already declared on the concrete class.
+  //
+  // We do NOT consult `cls_info.methods` for the method check, because
+  // Phase 1.5b (register_interface_methods) preemptively registers
+  // interface methods (including abstract ones) onto the concrete class
+  // — which makes every abstract method appear "satisfied" if we
+  // trusted that dict. We walk the class's ClassDecl.cm directly
+  // instead. Fields are checked via `cls_info.fields` (1.5b does not
+  // touch fields).
+  //
+  // Default methods (body != null on the interface side) are skipped
+  // here — they're satisfied by a future desugar pass (Phase 4 Wave 1 /
+  // 4w1-a, currently deferred).
+  //
+  // We accumulate ALL misses for an impl into ONE diagnostic.
+  // =====================================================================
+
+  func Checker.validate_impl_satisfies_abstract(self, file: File) {
+    // Pre-build a class-name -> ClassDecl map across all blocks so we
+    // can consult the original AST for a concrete class's own methods.
+    let mut class_decls: Dict<Sym, ClassDecl> = Dict<Sym, ClassDecl>()
+    let blocks = file.fb.children()
+    for bi in range(0, len(blocks)) {
+      let classes = blocks[bi].cd.children()
+      for ci in range(0, len(classes)) {
+        let c = classes[ci]
+        if c.name != null {
+          class_decls.set(c.name!, c)
+        }
+      }
+    }
+    for bi in range(0, len(blocks)) {
+      let impls = blocks[bi].ib.children()
+      for ii in range(0, len(impls)) {
+        let ib = impls[ii]
+        if !isnull(ib.kind) { continue }  // relation hint — Phase 1.6 territory
+        self.validate_one_impl_satisfies(ib, class_decls)
+      }
+    }
+  }
+
+  func Checker.validate_one_impl_satisfies(self, ib: ImplBlock, class_decls: Dict<Sym, ClassDecl>) {
+    if ib.interface_name == null { return }
+    let iname = sym_to_string(ib.interface_name!)
+    let iface_entry = self.iface_decls.get(sym(iname))
+    if isnull(iface_entry) { return }
+    let iface = iface_entry!.value
+
+    // Build subst: iface type-param name -> concrete class name string.
+    let itp = iface.itp.children()
+    let impl_args = ib.ib_arg.children()
+    let mut subst: Dict<Sym, string> = Dict<Sym, string>()
+    let mut limit = len(itp)
+    if len(impl_args) < limit { limit = len(impl_args) }
+    for i in range(0, limit) {
+      if itp[i].name != null && !isnull(impl_args[i].type_expr) {
+        let tp_name = sym_to_string(itp[i].name!)
+        let t = self.resolve_type_expr(impl_args[i].type_expr!)
+        let cname = type_name(t)
+        if cname != "" {
+          subst.set(sym(tp_name), cname)
+        }
+      }
+    }
+
+    // Build set of (receiver_tp, method_name) pairs satisfied by impl mappings.
+    let mut bound_by_impl: Dict<Sym, bool> = Dict<Sym, bool>()
+    let mappings = ib.ibm.children()
+    for mpi in range(0, len(mappings)) {
+      let mp = mappings[mpi]
+      if mp.method_name == null { continue }
+      if mp.type_param == null { continue }
+      let key = sym_to_string(mp.type_param!) + "." + sym_to_string(mp.method_name!)
+      bound_by_impl.set(sym(key), true)
+    }
+
+    let mut missing: [string] = []
+
+    // Abstract methods (body == null on the interface side).
+    let imethods = iface.im.children()
+    for mi in range(0, len(imethods)) {
+      let m = imethods[mi]
+      if !isnull(m.body) { continue }  // default method — handled elsewhere
+      if m.name == null { continue }
+      if m.receiver_type == null { continue }  // free-function helper — exempt
+
+      // Skip methods that a desugar pass generated as a mechanical
+      // projection of a user-authored contract member. The current
+      // case is interface-field getters/setters (desugar pass 1).
+      // The corresponding field appears below and produces the single
+      // user-visible diagnostic for the missing contract member.
+      if m.is_synthesized { continue }
+
+      let recv_tp = sym_to_string(m.receiver_type!)
+      let mname = sym_to_string(m.name!)
+
+      // (a) Satisfied by an impl mapping?
+      let map_key = recv_tp + "." + mname
+      if bound_by_impl.has(sym(map_key)) { continue }
+
+      // (b) Satisfied by a method on the concrete class itself?
+      let cls_entry = subst.get(sym(recv_tp))
+      if isnull(cls_entry) { continue }  // unresolved binding — don't pile on
+      let cls_name = cls_entry!.value
+      let cls_decl_entry = class_decls.get(sym(cls_name))
+      let mut found = false
+      if !isnull(cls_decl_entry) {
+        let cls_decl = cls_decl_entry!.value
+        let own_methods = cls_decl.cm.children()
+        for omi in range(0, len(own_methods)) {
+          let om = own_methods[omi]
+          if om.name != null && sym_to_string(om.name!) == mname {
+            found = true
+          }
+        }
+      }
+      if !found {
+        append(missing, "method `" + cls_name + "." + mname + "` (declared as `" + recv_tp + "." + mname + "` in interface " + iname + ")")
+      }
+    }
+
+    // Abstract fields — every InterfaceFieldDecl is abstract by construction.
+    // Phase 1.5b does NOT register fields on concrete classes, so cls_info.fields
+    // reflects only the class's own fields.
+    let ifields = iface.ifd.children()
+    for fi in range(0, len(ifields)) {
+      let f = ifields[fi]
+      if f.name == null { continue }
+      if f.type_param == null { continue }
+      let tp = sym_to_string(f.type_param!)
+      let cls_entry = subst.get(sym(tp))
+      if isnull(cls_entry) { continue }
+      let cls_name = cls_entry!.value
+      let cls_info = self.registry.lookup(cls_name)
+      if isnull(cls_info) { continue }
+      let fname = sym_to_string(f.name!)
+      if !cls_info!.fields.has(sym(fname)) {
+        append(missing, "field `" + cls_name + "." + fname + "` (declared as `" + tp + "." + fname + "` in interface " + iname + ")")
+      }
+    }
+
+    if len(missing) > 0 {
+      let mut head = "impl " + iname + "<"
+      let mut first = true
+      for ai in range(0, len(impl_args)) {
+        if !first { head = head + ", " }
+        first = false
+        if !isnull(impl_args[ai].type_expr) {
+          let t = self.resolve_type_expr(impl_args[ai].type_expr!)
+          let n = type_name(t)
+          if n != "" { head = head + n } else { head = head + "?" }
+        } else {
+          head = head + "?"
+        }
+      }
+      head = head + ">"
+      let mut msg = head + " does not satisfy abstract members:"
+      for mi in range(0, len(missing)) {
+        msg = msg + "\n  - " + missing[mi]
+      }
+      self.error_at(ib.span, msg)
+    }
+  }
+  // =====================================================================
   // Helper
   // =====================================================================
 
@@ -5071,6 +5243,10 @@ lyric checker {
     // Phase 1.6: validate that every interface used as a relation hint
     // has the right shape (multi-class-interface-redesign §3.7).
     c.validate_relation_hints(file)
+
+    // Phase 1.7: validate that every plain impl satisfies the interface's
+    // abstract members (Phase 4 Wave 1 / 4w1-c).
+    c.validate_impl_satisfies_abstract(file)
 
     // Phase 2: check all function bodies
     for b in blocks {

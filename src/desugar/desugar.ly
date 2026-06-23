@@ -29,6 +29,7 @@ lyric desugar {
           let getter = FuncDecl {
             name: fd.name,
             is_public: false,
+            is_synthesized: true,
             receiver_type: fd.type_param,
             return_type: fd.type_expr,
             body: null,
@@ -59,6 +60,7 @@ lyric desugar {
           let setter = FuncDecl {
             name: setter_name,
             is_public: false,
+            is_synthesized: true,
             receiver_type: fd.type_param,
             return_type: null,
             body: null,

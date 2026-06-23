@@ -79,6 +79,11 @@ lyric ast {
     is_public: bool
     is_final: bool
     is_trusted: bool
+    is_synthesized: bool   // true when a desugar pass generated this
+                           // (e.g. interface field getter/setter). The
+                           // satisfaction check (checker §Phase 1.7)
+                           // uses this to skip mechanical projections
+                           // of user-authored contract members.
     receiver_type: Sym?
     return_type: TypeExpr?
     body: Block?

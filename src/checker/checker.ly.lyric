@@ -252,6 +252,42 @@ module checker
     See cr/docs/multi-class-interface-redesign.md §3.1.
     """
 
+  invariant "Phase 1.7 — Plain-Impl Satisfaction Check":
+    procedural
+    """
+    validate_impl_satisfies_abstract runs after validate_relation_hints
+    and before bodies are checked. For every plain `impl Iface<C1, C2,
+    ...> { ... }` (ib.kind == null — relation-bearing hints are Phase
+    1.6 territory), it verifies that every abstract member of the
+    interface is satisfied by either an ImplMapping the user wrote OR
+    a method/field already declared on the concrete class.
+
+    Two subtleties drive the implementation:
+
+    1. The check walks `ClassDecl.cm` to discover the class's own
+    methods rather than consulting `cls_info.methods`, because Phase
+    1.5b (register_interface_methods) deliberately registers
+    interface methods — abstract included — onto concrete classes so
+    that `t.method()` calls through a generic-typed receiver resolve.
+    `cls_info.methods` is therefore the CALLABLE set, not the
+    IMPLEMENTED set. Trusting it would make every abstract method
+    appear "satisfied".
+
+    2. Abstract methods with `FuncDecl.is_synthesized == true` are
+    skipped. The current source of synthesized methods is desugar
+    pass 1's interface-field expansion (`field T.name: Type` →
+    T.name() getter and T.set_name() setter, needed for vtable
+    correctness in the C backend). The user-visible contract member
+    is the field; the accessors are mechanical projections. Reporting
+    the field's absence three times — as missing getter, missing
+    setter, missing field — is hostile. ONE complaint per
+    user-authored contract member is the rule; the field check covers
+    the field, the accessors are suppressed.
+
+    All misses for one impl are accumulated into a single diagnostic
+    at ib.span.
+    """
+
   typedef TypeKind: enum { Int, Uint, Float, Bool, String, Void, Nil, Any, Error, Lock, Optional(inner: Type), Sequence(elem: Type), Map(key: Type, value: Type), Tuple(fields: [TupleFieldType]), Func(params: [Type], ret: Type, type_param_names: [string]), Struct(name: string), Class(name: string), Enum(name: string), Interface(name: string), TypeVar(name: string), Channel(elem: Type), Generator(elem: Type), ErrorResult(ok: Type, err: Type), Module(name: string), Union(variants: [Type]) }
     source: checker.ly:19
 
@@ -497,6 +533,10 @@ module checker
       source: checker.ly:4974
     method validate_one_hint_interface(self, ib: ImplBlock, iface: InterfaceDecl)
       source: checker.ly:4994
+    method validate_impl_satisfies_abstract(self, file: File)
+      source: checker.ly:5067
+    method validate_one_impl_satisfies(self, ib: ImplBlock, class_decls: Dict<Sym, ClassDecl>)
+      source: checker.ly:5091
 
   func new_checker() -> Checker
     source: checker.ly:178

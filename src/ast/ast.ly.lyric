@@ -151,6 +151,8 @@ module ast
     field body: Block?
     field is_final: bool
     field is_public: bool
+    field is_synthesized: bool
+      doc: "true when a desugar pass generated this (e.g. interface field getter/setter). Lets later passes — especially the satisfaction check in checker §Phase 1.7 — distinguish user-authored contract members from mechanical projections."
     field is_trusted: bool
     field name: Sym?
     field receiver_type: Sym?
