@@ -1896,6 +1896,35 @@ lyric checker {
       }
     }
 
+    // Sub-scope collision diagnostic (sub-scope-refactor Tier 1).
+    // Every labeled side of every relation-bearing impl that names this
+    // class registers a SubScope on cls.css (see desugar.ly Phase C).
+    // A user-declared method or field that shares a name with one of
+    // those relation labels (e.g. `func Network.nodes(self)` colliding
+    // with `relation DoublyLinked Network:nodes owns [...]`) shadows
+    // the dotted-scope sugar's resolution path silently — the user gets
+    // `unknown method: children` on `self.nodes.children()` because
+    // `self.nodes` resolved to the user method, not the sub-scope.
+    // Fire one diagnostic per collision naming both sides.
+    for scope in cls.css.children() {
+      if scope.label == null { continue }
+      let label_name = sym_to_string(scope.label!)
+      let hint_name = if scope.hint_iface != null { sym_to_string(scope.hint_iface!) } else { "<unknown hint>" }
+      let side_str = if scope.side_index == 0 { "parent" } else { "child" }
+      for f in cfields {
+        if f.name != null && sym_to_string(f.name!) == label_name {
+          eprintln(f"checker: class {cname} field '{label_name}' collides with relation label '{cname}:{label_name}' from `{hint_name}` ({side_str}-side) — rename the field or the relation label")
+          os_exit(1)
+        }
+      }
+      for m in cmethods {
+        if m.name != null && sym_to_string(m.name!) == label_name {
+          eprintln(f"checker: class {cname} method '{label_name}' collides with relation label '{cname}:{label_name}' from `{hint_name}` ({side_str}-side) — rename the method or the relation label so `self.{label_name}.<member>` can resolve through the relation's sub-scope")
+          os_exit(1)
+        }
+      }
+    }
+
     self.pop_scope()
     // self.registry.register(cname, info) // Already in registry
 
@@ -4983,6 +5012,60 @@ lyric checker {
   // healthy code base.
   // =====================================================================
 
+  // Sub-scope collision diagnostic (sub-scope-refactor.md Tier 1) —
+  // file-level pass for EXTERNAL receiver methods. The inner-method
+  // case (`class C { func name(self) ... }`) is caught in register_class
+  // by walking cls.cm directly. External-method form
+  // (`func C.name(self) ...`) lives in block.fd with receiver_type set
+  // and is invisible to register_class, so we scan it here.
+  //
+  // Mirrors the per-class diagnostic: for every ClassDecl, every entry
+  // in cls.css whose label matches an external receiver method on that
+  // class fires a precise error naming both sides of the collision.
+
+  func Checker.validate_subscope_collisions(self, file: File) {
+    let blocks = file.fb.children()
+    // Build a (receiver_name -> [external method name]) index once.
+    let ext_methods = Dict<Sym, [string]>()
+    for blk in blocks {
+      let fns = blk.fd.children()
+      for f in fns {
+        if f.name == null { continue }
+        if f.receiver_type == null { continue }
+        let rname = sym_to_string(f.receiver_type!)
+        let mname = sym_to_string(f.name!)
+        let entry = ext_methods.get(sym(rname))
+        let mut names: [string] = []
+        if entry != null { names = entry!.value }
+        names = append(names, mname)
+        ext_methods.set(sym(rname), names)
+      }
+    }
+    for blk in blocks {
+      for cls in blk.cd.children() {
+        if cls.name == null { continue }
+        let cname = sym_to_string(cls.name!)
+        let entry = ext_methods.get(sym(cname))
+        if entry == null { continue }
+        let ext_names = entry!.value
+        for scope in cls.css.children() {
+          if scope.label == null { continue }
+          let label_name = sym_to_string(scope.label!)
+          let hint_name = if scope.hint_iface != null { sym_to_string(scope.hint_iface!) } else { "<unknown hint>" }
+          let side_str = if scope.side_index == 0 { "parent" } else { "child" }
+          for en in ext_names {
+            if en == label_name {
+              eprintln(f"checker: external method '{cname}.{label_name}' collides with relation label '{cname}:{label_name}' from `{hint_name}` ({side_str}-side) — rename the method or the relation label so `self.{label_name}.<member>` can resolve through the relation's sub-scope")
+              os_exit(1)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // =====================================================================
+
   func Checker.validate_relation_hints(self, file: File) {
     let blocks = file.fb.children()
     let mut validated: Dict<Sym, bool> = Dict<Sym, bool>()
@@ -5272,6 +5355,10 @@ lyric checker {
     // Phase 1.6: validate that every interface used as a relation hint
     // has the right shape (multi-class-interface-redesign §3.7).
     c.validate_relation_hints(file)
+
+    // Phase 1.65: sub-scope label collisions on external receiver
+    // methods (the inner-method case is caught in register_class).
+    c.validate_subscope_collisions(file)
 
     // Phase 1.7: validate that every plain impl satisfies the interface's
     // abstract members (Phase 4 Wave 1 / 4w1-c).

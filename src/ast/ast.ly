@@ -118,6 +118,22 @@ lyric ast {
   relation ArrayList ClassDecl:cm owns [FuncDecl:cm]
   relation ArrayList ClassDecl:cwc owns [WhereClause:cwc]
 
+  // Per-side label record for relation-injected members on this class.
+  // Populated by desugar Phase B, one entry per labeled side of every
+  // impl-with-kind whose type-arg names this class. Metadata only — the
+  // injected fields/methods themselves still live on ClassDecl.cf / .cm
+  // under their `__label_member` mangled names (this refactor's Tier 1
+  // intentionally does NOT move them; see cr/docs/sub-scope-refactor.md).
+  // The checker reads SubScope to fire a precise collision diagnostic
+  // when a user method/field shares a name with a relation label.
+  class SubScope {
+    label: Sym?              // "nodes", "roster", "fwd", ...
+    hint_iface: Sym?         // DoublyLinked, ArrayList, HashedList, or user hint
+    side_index: i32          // 0 = parent-side, 1 = child-side
+    span: Span
+  }
+  relation ArrayList ClassDecl:css owns [SubScope:css]
+
   class StructDecl {
     name: Sym?
     is_public: bool

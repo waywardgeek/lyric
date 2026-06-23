@@ -1,13 +1,41 @@
 # Sub-Scope Refactor — Design Note
 
-**Status**: design only. Not scheduled. Created 2026-06-23 after Bill + Hewitt
-review surfaced collision-class bugs and structural smells that all point
-at the same missing primitive: relation labels are first-class
-*sub-scopes* on the parent class, but the AST/checker/lowerer model them
-as string-prefix flattened fields.
+**Status**: SHIPPED 2026-06-23 (Tier 1 only — see "Scope-down" below).
+Original analysis preserved below for context.
 
 This doc captures the analysis so the next session inherits the
 reasoning instead of re-deriving it.
+
+## Scope-down (2026-06-23, Bill + Hewitt review)
+
+Original plan was a 6-stage migration through checker, lowerer, LIR, and
+c_backend to make relation labels first-class structural sub-scopes
+everywhere. Bill then redirected to push sub-scopes into the LIR so the
+lowerer's `rename_prefix` mangling could go away. On further analysis we
+walked it back to **Tier 1: metadata-only SubScope on the AST**:
+
+- The only user-visible bug is the missing collision diagnostic
+  (graph.ly Part 3: `Network.nodes` method colliding with relation label
+  `Network:nodes`). That needs only label+hint+side metadata on the
+  class — not structural members.
+- Lowerer `rename_prefix` reads `ib_args[0].label` only; the comment
+  flags it as future work but it's not blocking. Both labels are already
+  on the AST via `ImplBlock.ib_args[i].label` — a future cleanup can
+  consult both without any structural SubScope.
+- Dotted-scope dispatch copy-paste is a code smell, not a bug. Helper-
+  function refactor someday if motivated.
+- Two-DLLs-per-(P,C) bug was already fixed 2026-06-23 in
+  `desugar_relations` Phase A (per-side labels part of impl-block
+  identity).
+
+So **Tier 1** is: `class SubScope { label, hint_iface, side_index }` on
+ast.ly, owned by ClassDecl via a peer relation, populated by desugar
+Phase B, consumed by checker for the collision diagnostic only. C
+backend keeps its current `__label_member` flattening — flattening is a
+code-emission concern that this refactor doesn't touch. Stages 2-6 from
+the original plan are NOT scheduled; revisit only if a future motivating
+case (nested classes, namespace-scoping interfaces, structural label-
+aware monomorphization) appears.
 
 ---
 

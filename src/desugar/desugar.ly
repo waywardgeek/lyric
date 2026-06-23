@@ -515,6 +515,45 @@ lyric desugar {
           array_append<ImplBlock, ImplMapping>(impl_block, m)
         }
       }
+
+      // ===== Phase C: populate SubScope records on bound classes =====
+      // Tier 1 of the sub-scope refactor (cr/docs/sub-scope-refactor.md):
+      // for every impl-with-kind, append one SubScope per labeled side
+      // onto the bound class. Metadata only — no member migration. The
+      // checker reads ClassDecl.css to fire a precise collision
+      // diagnostic when a user-declared field/method shares a name with
+      // a relation label (e.g. graph.ly Part 3: user method `Network.nodes`
+      // colliding with relation label `Network:nodes`).
+      //
+      // Iterates impls (not relations) so user-authored
+      // `impl Hint<A:l, B:l> owns { }` over user-defined hint interfaces
+      // gets identical treatment to a relation-synthesized impl.
+      for impl_block in block.ib.children() {
+        if isnull(impl_block.kind) { continue }
+        if isnull(impl_block.interface_name) { continue }
+        let impl_args = impl_block.ib_arg.children()
+        let mut side_idx: i32 = 0
+        while side_idx < len(impl_args) as i32 {
+          let ta = impl_args[side_idx]
+          if !isnull(ta.label) && !isnull(ta.type_expr) {
+            let side_name_sym = type_expr_name(ta.type_expr!)
+            if !isnull(side_name_sym) {
+              let cls_entry = class_map.get(sym(side_name_sym!.name))
+              if !isnull(cls_entry) {
+                let cls = cls_entry!.value
+                let scope = SubScope {
+                  label: ta.label,
+                  hint_iface: impl_block.interface_name,
+                  side_index: side_idx,
+                  span: ta.span,
+                }
+                array_append<ClassDecl, SubScope>(cls, scope)
+              }
+            }
+          }
+          side_idx = side_idx + 1
+        }
+      }
     }
   }
   // ---- 4. DesugarDestructors ----

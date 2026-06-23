@@ -190,6 +190,13 @@ module ast
     field name: Sym?
     field span: Span
 
+  class SubScope
+    source: ast.ly:133
+    field hint_iface: Sym?
+    field label: Sym?
+    field side_index: i32
+    field span: Span
+
   class StructDecl
     source: ast.ly:116
     field is_public: bool

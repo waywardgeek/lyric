@@ -255,6 +255,26 @@ module desugar
     See cr/docs/multi-class-interface-redesign.md §3.9.
     """
 
+  invariant "Phase C Populates ClassDecl.css":
+    procedural
+    """
+    desugar_relations Phase C runs after Phase B inside the same per-
+    block loop. For every impl block with non-null kind, it walks
+    ib_args and appends one SubScope record onto each LABELED side's
+    bound ClassDecl.css. Side index (0 = parent, 1 = child) and the
+    hint interface's name are captured so the checker can emit a
+    precise collision diagnostic (Checker.validate_subscope_collisions
+    + the inner-class branch in register_class) when a user-declared
+    field or method on the bound class shares a name with the label.
+
+    This is Tier 1 of the sub-scope refactor (cr/docs/sub-scope-
+    refactor.md) — METADATA ONLY. The injected `__label_member` field
+    and method names produced earlier in Phase B remain on
+    ClassDecl.cf / .cm under their mangled names; the SubScope is a
+    side table, not a member container. Future tiers (NOT scheduled)
+    would migrate the injected members into the SubScope itself.
+    """
+
   func desugar_interface_extends(file: File)
     source: desugar.ly:29
 

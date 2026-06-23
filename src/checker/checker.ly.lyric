@@ -531,6 +531,8 @@ module checker
       source: checker.ly:4937
     method validate_relation_hints(self, file: File)
       source: checker.ly:4974
+    method validate_subscope_collisions(self, file: File)
+      source: checker.ly:5026
     method validate_one_hint_interface(self, ib: ImplBlock, iface: InterfaceDecl)
       source: checker.ly:4994
     method validate_impl_satisfies_abstract(self, file: File)
