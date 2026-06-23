@@ -1490,186 +1490,219 @@ cannot do this reliably; a parser-aware tool can.
 Block migrating the bootstrap compiler on shipping this tool. The
 bootstrap source is ~30K lines; manual migration is not viable.
 
-### Phase 4: Capability interfaces and constraint aliases
+### Phase 4: User-authored multi-class generic interfaces with relation equivalence
 
-**Overview**: ship the `constraint` alias keyword, labels-in-where-
-clauses, aggressive auto-derive, the `Collection` capability interface,
-and the impl-alias / grouped-impl sugar. This is the load-bearing
-spec deliverable that unblocks `testdata/graph.ly` and
-`testdata/tree.ly` (both currently parse-fail on `constraint Foo<...>
-= ...`) and lays the foundation for any algorithm library that
-quantifies over multiple relation shapes.
+**Pivot note (2026-06-23):** the previous Phase 4 plan committed in
+commit `21b4ae5` framed this work around `constraint` aliases,
+`Collection<P,C>` as the load-bearing algorithm substrate, labels-in-
+where-clauses, and grouped-impl-on-constraint-alias. That design
+hit a fatal hole: when the user's relation labels don't match the
+algorithm's expected names (the FPGA `Route:a/Route:b → :out/:in`
+case), the per-Collection-instance impl-alias form scattered the
+user's binding decisions across N separate impls. Worse: the user
+had no syntactic locus to write the binding in ONE place, so silent
+semantic bugs from inconsistent bindings were a near-certainty.
+
+The pivoted design (Bill + Hewitt, 2026-06-23 evening review)
+puts user-authored multi-class generic interfaces at the center.
+The canonical design sketch lives in `testdata/graph.ly` (v6 — see
+commit `a99ae9b`); read it first, then this plan.
+
+**Overview**: ship user-authored multi-class generic interfaces with
+default methods, `extends` for desugar-time composition, abstract-
+relation declarations on type-variable parent/child sides, the impl-
+block `relation equivalence` syntax, the `field/method equivalence`
+syntax, and empty-body auto-derive. This is the load-bearing spec
+deliverable that unblocks `testdata/graph.ly` and `testdata/tree.ly`
+and gives algorithm authors ONE place to declare what their algorithm
+needs and ONE place per (data, interface) pair where the user wires
+the binding.
 
 **Dependencies**: Phase 3 (labels-as-scopes) is shipped. Phase 1
 finishing work (class field auto-getter + UFCS function-syntax) should
-land first so the auto-derive name+signature matcher in §5.4 can rely
-on field-derived getters being present in the class scope.
+land first so the auto-derive name-match in 4f can rely on field-
+derived getters being present in the class scope.
 
 **Substep plan** (mirrors the 3a–3e cadence of Phase 3):
 
-#### Phase 4a — Lexer + parser for `constraint` declarations
+#### Phase 4a — Lexer + parser for `extends` on interfaces
 
-- Add `KConstraint` to the lexer keyword table; add `"constraint"` to
-  the hard-keyword list in the language reference.
-- Parser: top-level declaration `constraint Name<T1, T2, ...> = A<...>
-  + B<...> + C<...>`. AST node `ConstraintAliasDecl { name: Sym,
-  type_params: [Sym], body: [ConstraintRef] }` where `ConstraintRef`
-  is the existing constraint AST node (whatever desugar passes use
-  for where-clause entries today).
-- `+` is the existing constraint composition operator; reuse the
-  parser path for `where Foo<...> + Bar<...>`.
-- Single-element bodies (`constraint Single<T> = Other<T>`) parse;
-  empty bodies are an error.
-- Pretty-printer (`main.ly`) round-trips constraint aliases.
-- Acceptance: `testdata/test_constraint_alias_parse.ly` declares an
-  alias and references it in a `where` clause; checker can be a
-  stub for this substep (the alias resolves to nothing until 4d).
+- Add `KExtends` to the lexer keyword table; add `"extends"` to the
+  hard-keyword list in the language reference.
+- Parser: extend the interface header to accept `extends ParentIface<T1,
+  T2, ...>` after the type-parameter list and before the body brace.
+  Multiple parents allowed (`extends A<...> + B<...>`) for the rare
+  multi-inheritance case; defer that to the second wave if it isn't
+  needed for graph.ly.
+- AST: `InterfaceDecl.extends: [InterfaceRef]` (a slice of refs, one
+  per parent interface).
+- Pretty-printer round-trips. Acceptance: `testdata/test_extends_parse.ly`
+  declares a child interface and the AST dump shows the extends slot
+  populated.
 
-#### Phase 4b — Lexer + parser for labels-in-where-clauses
+#### Phase 4b — Abstract relation declarations in interface bodies
 
-- Extend the type-argument parser inside constraint references to
-  accept `TypeName:label` per argument, with the label as a plain
-  identifier (matches the impl-block label syntax shipped in §3.8).
-- AST: `TypeArg { type: TypeExpr, label: Sym? }` (or a slot added
-  to whatever the constraint-arg AST currently uses; check the §3.8
-  ImplBlock changes for the existing pattern).
-- Allow labels on a subset of args, not all (`Collection<G, N:graph>`
-  parses; the labelled arg binds to the named scope on N, the
-  unlabeled arg binds to the flat scope on G).
-- Acceptance: `testdata/test_where_labels_parse.ly` shows mixed
-  labeled/unlabeled args.
+- Extend the existing `relation` parser to accept TYPE-VARIABLE parent
+  and child sides (today it requires concrete class names). Inside an
+  interface body, `relation Collection G:nodes [N:graph]` declares an
+  abstract relation slot keyed by the (parent-label, child-label)
+  pair on the type-variable pair (G, N).
+- Owns/refs is OPTIONAL on abstract relations (kind-unspecified means
+  either satisfies). Required on concrete relations as today.
+- AST: extend `RelationDecl` to allow `TyVarRef` on parent/child
+  sides, and an `optional kind: RelationKind` instead of mandatory.
+- Acceptance: `testdata/test_abstract_relation_parse.ly` declares an
+  interface with three abstract relations of varying kind-specification.
 
-#### Phase 4c — `Collection<P, C>` interface in stdlib
+#### Phase 4c — Impl-body relation-equivalence syntax
 
-- Declare `Collection<P, C>` in `stdlib/std.ly` as a two-class
-  capability interface. Methods (initial set):
-  - `pub func P.iter(self) -> gen C` — iteration
-  - `pub func P.count(self) -> i32` — cardinality
-  - `pub func C.parent(self) -> P?` — back-edge, optional null for
-    refs-shape relations where the back-edge is set externally
-- Auto-impl `Collection<P:label, C:label>` for every owns/refs impl
-  produced by Phase 3's desugar. That is: any class-pair that has
-  `impl ArrayList<P:l, C:l> owns { }` (or DoublyLinked, HashedList)
-  generates an `impl Collection<P:l, C:l>` whose bodies delegate to
-  the relation's scope-iteration and `len(scope)`.
-- This is the "any hint that emits a scope satisfies Collection on
-  that scope" rule — labels carry through cleanly because the scope
-  name and the Collection label are the same identifier.
-- Acceptance: `testdata/test_collection_autoimpl.ly` checks that
-  `for c in p.label.iter()` works for one `ArrayList`, one
-  `DoublyLinked owns`, and one `HashedList`.
+- Parser: inside an impl body, accept relation-equivalence lines
+  of the form:
+  `P:plabel/C:clabel = ConcreteP:plabel/ConcreteC:clabel`
+  where P/C are the interface's type-variable names (matched against
+  the impl header's binding), ConcreteP/ConcreteC are the concrete
+  classes (must match the interface's type-arg binding for P/C).
+- Also accept the existing field/method equivalence:
+  `TypeVar.member = ConcreteClass.accessor`
+- AST: `ImplBlock.relation_equivs: [RelationEquiv]` and
+  `ImplBlock.member_equivs: [MemberEquiv]` — two parallel buckets.
+  Existing impl-body content (`pub func ...` for explicit method
+  bodies) stays in `ImplBlock.methods` as today.
+- Acceptance: `testdata/test_impl_relation_equiv_parse.ly` covers
+  the FPGA case from graph.ly Part 2.
 
-#### Phase 4d — Constraint-alias expansion at where-clause sites
+#### Phase 4d — `extends` desugar pass
 
-- Add a desugar pass `DesugarConstraintAliases` that runs before the
-  checker's constraint-resolution phase. For every `where` clause,
-  expand any `ConstraintAliasRef` into the alias's body, substituting
-  the call-site type arguments for the alias's type parameters.
-- Aliases-of-aliases expand transitively. Detect and reject cyclic
-  references with a clean diagnostic.
-- After this pass, no `ConstraintAliasRef` survives in any `where`
-  clause; the checker sees only concrete constraint instantiations.
-- Keep `ConstraintAliasDecl` in the AST for tooling and error
-  messages (so diagnostics can name the alias the user wrote, not
-  just the expanded form).
-- Acceptance: `testdata/test_constraint_alias_expansion.ly` declares
-  `constraint Foo<T> = Bar<T> + Baz<T>` and a function `where Foo<X>`;
-  verify the checker resolves both Bar and Baz against X.
+- After Phase 4a–4c parse, add a desugar pass `DesugarInterfaceExtends`
+  that runs before relation/field desugar.
+- For each interface with a non-empty `extends` slot, copy the parent
+  interface's abstract relations, fields, and methods (declarations
+  AND default bodies) into the child interface's namespace, with the
+  parent's type-parameter slots substituted by the child's binding
+  in the `extends ParentIface<X, Y>` clause.
+- **Tightening rule**: if a child interface re-declares one of the
+  copied abstract relations with a more specific kind (`owns` over
+  unspecified, or `owns`/`refs` over unspecified), the child's
+  declaration wins. **Loosening is an error**: child cannot drop a
+  parent's kind requirement or change `owns` to `refs` / vice versa.
+  Diagnostic: cite both declaration sites and explain the conflict.
+- After this pass, child interfaces are flat — no `extends` field
+  survives. Algorithms calling default methods on a child interface
+  see all parent + child methods in one namespace.
+- Acceptance: `testdata/test_extends_tightening.ly` covers
+  `MutableDirectedGraph extends DirectedGraph` with `relation Collection
+  G:nodes owns [N:graph]` tightening, plus a negative test that
+  tries to loosen `owns` → unspecified and verifies the error.
 
-#### Phase 4e — Aggressive auto-derive (§5.4)
+#### Phase 4e — Impl auto-derive on empty body
 
-- For each constraint instantiation a user code site requires
-  (post-4d, so all aliases are already expanded), the checker walks
-  the constraint's methods and, for each one, looks in the receiver
-  type's class scope (including labeled scopes from §3.8 and field-
-  derived getters from Phase 1's class-field follow-up) for a
-  unique name+signature match.
-- Priority: explicit `impl` always wins; otherwise the unique class-
-  scope match satisfies; otherwise (zero or ≥2 matches) compile error
-  with the §5.9 ambiguity diagnostic.
-- Signature match is by name + arity + parameter types + return type;
-  no auto-coercion, no fuzzy match.
-- For labeled-constraint instantiations like
-  `Collection<N:out, E:source>`, the matcher restricts its search to
-  the `:out` scope on N (and the `:source` scope on E). If those
-  scopes don't exist on the receiver type, that's a "constraint not
-  satisfied" error (§5.9 second shape).
-- Acceptance: extend the test in 4c with one auto-derive success case
-  and one ambiguity case; assert error text matches §5.9.
+- For an `impl Iface<...> { }` with an empty body, walk Iface's
+  abstract relations and member declarations and synthesize the
+  equivalence mappings by exact-name match against the receiver type's
+  class scope:
+  - **Relation auto-derive**: for each abstract relation
+    `Collection P:plabel [C:clabel]`, look up the concrete class
+    bound to P. If it has a relation with parent-label `plabel` and
+    the child class+child-label match, emit a synthetic
+    `P:plabel/C:clabel = ConcreteP:plabel/ConcreteC:clabel` equivalence.
+  - **Member auto-derive**: for each abstract `field T.name: Type`
+    or `func T.name(self, ...) -> R`, look up the concrete class
+    bound to T. If it has a field or method with exact name `name`
+    and matching signature, emit a synthetic member equivalence.
+- If ANY abstract member fails to find a unique match, the impl is
+  invalid. Emit ONE error listing every unsatisfied member with its
+  expected shape, so the user sees the full gap in one diagnostic
+  rather than fixing one at a time. (§5.9 third shape, generalized.)
+- Mixed-mode is supported: an impl body may contain SOME equivalences
+  and rely on auto-derive for the rest. The auto-derive only runs for
+  members the user didn't explicitly bind.
+- Acceptance: `testdata/test_impl_autoderive.ly` covers the Network/
+  Person/Follow empty-body case from graph.ly Part 3, plus a negative
+  test where a relation label is misspelled and the missing-bindings
+  diagnostic includes the right suggestion.
 
-#### Phase 4f — Explicit `impl` and impl-alias form (§5.5)
+#### Phase 4f — Relation-equivalence desugar to method bodies
 
-- Long form: `impl Iface<...labels...> { method bodies }` already
-  parses via §3.8/3.9 work. Wire the checker to recognize this as the
-  "always wins" priority-1 satisfier from §5.4.
-- Alias form: `impl Collection<Route:out, Via:source> =
-  Collection<Route:a, Via:a>`. Parser: top-level `impl X = Y` where
-  X and Y are both labeled-instantiation forms of the same interface.
-  Desugar: synthesize one delegating method per interface method,
-  body `return self.<a-label>.<method>()` (and similar shape for
-  each method).
-- Acceptance: `testdata/test_impl_alias.ly` covers the FPGA Route
-  example from §5.4 (a/b → out/in renaming).
+- After 4d (extends flattened) and 4e (autoderive filled), every impl
+  has a complete equivalence table. Add a desugar pass
+  `DesugarImplEquivalences` that walks the impl's default methods
+  (copied from the interface in 4d) and rewrites every reference to
+  an abstract relation as a reference to the bound concrete relation.
+  - `self.nodes.iter()` (abstract, label `nodes` on G) →
+    `self.routes.iter()` (concrete, label `routes` on Net).
+  - `e.src` (abstract field/getter on E) → `e.src` (concrete getter
+    if labels match, otherwise the bound concrete getter).
+  - `self.outgoing` (zero-arg scope reference on N) →
+    `self.a` (the bound relation scope on Route).
+- The rewrite is mechanical: walk the AST, look up each access in the
+  equivalence table, substitute.
+- After this pass, every default-method body in the impl is in terms
+  of CONCRETE accessors. The monomorphizer takes it from there;
+  c_backend sees no abstract names.
+- Acceptance: `testdata/test_impl_relation_rewrite.ly` checks that
+  `net.bfs(start)` (calling the inherited default method) generates
+  the expected concrete relation calls.
 
-#### Phase 4g — Grouped-impl-on-constraint-alias body sugar (§5.5)
+#### Phase 4g — Partial impls (generic in some type variables)
 
-- Parser: `impl AliasName<T1, T2, ...> { Foo<...> = Foo<...>; Bar<...>
-  = Bar<...> }` — each body entry is itself a 4f-style impl-alias
-  (or a long-form block with methods).
-- Desugar: expand to a top-level `impl Foo<...> = Foo<...>` (and so
-  on) per body entry. The grouping is purely visual.
-- Detect mismatches: each body entry must match one of the
-  constraints in the alias's expansion; missing or extra entries
-  are an error with the §5.9 third shape (a clean list of what
-  was expected vs. what was provided).
-- Acceptance: `testdata/test_grouped_impl.ly` covers the
-  `DirectedGraph` triple-binding example from §5.5.
+- Parser: accept `impl<W> WDG<FlexNet, FlexRoute, FlexVia<W>, W> { ... }`
+  — the impl itself has type parameters declared between `impl` and
+  the interface name.
+- Checker: when an impl has open type variables, the equivalence
+  bindings are scoped over them. The monomorphizer specializes the
+  impl per use site, same engine as generic-function specialization.
+- This is a small extension of Phase 3's labels-on-impl-type-vars
+  work (§3.8/3.9), which already handles concrete type-arg labels;
+  4g adds the open type-arg case.
+- Acceptance: graph.ly Part 4 (`FlexNet`/`FlexRoute`/`FlexVia<W>`)
+  compiles and `sum_flex_i32` + `sum_flex_f64` both run.
 
-#### Phase 4h — Error message shapes (§5.9)
+#### Phase 4h — Stdlib `Collection<P, C>` minimum-shape interface
 
-- Implement the three diagnostic shapes from §5.9 verbatim (the spec's
-  examples are the acceptance bar): auto-derive ambiguity, constraint
-  not satisfied, field/method collision. The field/method collision
-  message already partially exists at `checker.ly:1892` from Phase 1;
-  upgrade it to the §5.9 format (with both declaration sites + the
-  one-line "rename one" suggestion).
-- Source positions on every error: the alias declaration site, the
-  use site (where the constraint is required), and the matching /
-  non-matching candidate sites all need to be cited.
-- Acceptance: golden-test the diagnostic text for each shape.
+- Declare `Collection<P, C>` in `stdlib/std.ly` as the minimum-shape
+  vocabulary interface used in abstract relation declarations
+  (`relation Collection G:nodes [N:graph]`). Required surface:
+  `iter`, `count`, `parent` (the same three the Phase 4 design has
+  always listed for Collection).
+- Auto-impl `Collection<P, C>` for every concrete relation produced
+  by Phase 3's desugar — that is, any owns/refs relation on any hint
+  (ArrayList / DoublyLinked / HashedList) automatically satisfies
+  Collection on its (parent, child) pair.
+- This is the ONE place `Collection` lives now: as the shape
+  vocabulary for abstract relations, NOT as the algorithm substrate.
+  Algorithms quantify over user-authored interfaces (DirectedGraph,
+  Tree, Lattice...), each of which declares its abstract relations
+  using `Collection` as the minimum shape name.
 
 #### Phase 4i — Reactivate `graph.ly` and `tree.ly`; sweep stdlib
 
 - With Phase 4a–4h shipped, both currently parse-failing tests should
-  flip to PASS. If they don't, the failures are the second wave of
-  Phase 4 work (e.g., constraint usage inside generic algorithm
-  bodies — `bfs`, `topo_sort`, etc., which probably need
-  Phase 5 static methods on numeric weights too — defer the genuinely
-  Phase-5-blocked tests behind a `🚧` callout).
-- Sweep `stdlib/std.ly` for places that should be expressed as
-  constraint aliases now that they're available (the ArrayList /
-  DoublyLinked / HashedList hint family is a likely candidate for
-  having a `Linear<P, C>` alias that bundles their shared shape).
-- Update `cr/docs/lyric-language-reference.md` §Capability Interfaces
-  / §Constraint Aliases sections with examples.
+  flip to PASS. The canonical `testdata/graph.ly` already exists in
+  the v6 design sketch (commit `a99ae9b`); `testdata/tree.ly` needs a
+  parallel v6 rewrite using the same patterns (Tree<T, N> interface
+  with abstract `relation Collection N:children [N:parent]`).
+- Sweep the language reference (`cr/docs/lyric-language-reference.md`)
+  with new §Multi-Class Interfaces section covering the abstract-
+  relation + impl-equivalence design.
 - Update the book (`cr/docs/the-lyric-book.md`) Ch 9 (interfaces) and
-  Ch 12 (generics) to show the new mechanisms.
+  Ch 12 (generics) with the new mechanisms. Drop Ch 11's constraint-
+  alias prose entirely.
 
-**Estimated scope**: each substep is ≤200 LOC of compiler change
+**Estimated scope**: each substep is ≤300 LOC of compiler change
 (parser/desugar/checker), with proportional stdlib/test additions.
-Total Phase 4 budget: ~2,000 LOC compiler + ~500 LOC stdlib +
-~1,000 LOC testdata. Comparable in magnitude to Phase 3, which
-shipped in two days of focused work.
+Total Phase 4 budget: ~2,500 LOC compiler + ~300 LOC stdlib +
+~1,000 LOC testdata. Slightly larger than the constraint-alias
+plan but more uniform — fewer concepts, more orthogonal mechanisms.
 
-**Parallelizability**: 4a, 4b, and 4h are independent and fleet-safe
-once the AST types are agreed (so write a tiny pre-flight commit that
-adds `ConstraintAliasDecl` and `TypeArg.label` empty stubs, then
-spawn three agents). 4c–4g are sequential because each builds on
-the previous one. 4i is single-agent verification + book sweep.
+**Parallelizability**: 4a (extends keyword), 4b (abstract relations),
+and 4c (impl equivalence parser) are independent and fleet-safe once
+the AST extensions land in a pre-flight commit. 4d–4g are sequential
+because each builds on the previous one. 4h is a stdlib addition
+that depends on 4b. 4i is single-agent verification + book sweep.
 
 **Why fourth in the overall ordering**: depends on labels-as-scopes
-(Phase 3) for the constraint instantiations to work. Lays the
-groundwork for algorithm libraries.
+(Phase 3) for abstract relations to reference type-variable parent/
+child sides with labels. Lays the groundwork for algorithm libraries.
 
 ### Phase 5: Static methods + Numeric constraint
 
