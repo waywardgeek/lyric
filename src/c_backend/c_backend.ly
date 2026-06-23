@@ -157,9 +157,16 @@ func new_cgen(prog: LProgram?) -> CGen? {
       g.method_to_receiver!.set(sym(funcs[i].name), funcs[i].receiver)
     }
     g.func_by_name!.set(sym(key), funcs[i])
-    // Track generator functions
+    // Track generator functions, keyed by the C name they'll be called by.
+    // For methods, that's <receiver>_<name> (matches func_name(f) emission).
+    // For free fns, that's the bare name. Lookups in emit_call_expr (free fn)
+    // and emit_method_call_expr (method) use the same mangling.
     if !isnull(funcs[i].return_type) && funcs[i].return_type!.kind is TyGenerator {
-      g.gen_funcs!.set(sym(funcs[i].name), true)
+      if funcs[i].receiver != "" {
+        g.gen_funcs!.set(sym(f"{funcs[i].receiver}_{funcs[i].name}"), true)
+      } else {
+        g.gen_funcs!.set(sym(funcs[i].name), true)
+      }
     }
     i = i + 1
   }
@@ -2224,6 +2231,15 @@ func CGen.emit_method_call_expr(self, e: LExpr?) -> string {
     }
   }
   let method_name = f"{class_name}_{d.method}"
+  // Generator-returning method: rewrite call to the synthesized _init function,
+  // matching the free-fn path in emit_call_expr. The for-loop iter site will
+  // cast the resulting pointer to {method_name}_gen_t*.
+  if self.is_gen_func_by_name(method_name) {
+    if args_str != "" {
+      return f"{method_name}_init({recv}, {args_str})"
+    }
+    return f"{method_name}_init({recv})"
+  }
   if args_str != "" {
     return f"{method_name}({recv}, {args_str})"
   }
@@ -3402,11 +3418,31 @@ func CGen.resolve_tag_constant(self, d: LTypeSwitchData, case_type: LType?) -> s
 // Generator support
 // ---------------------------------------------------------------------------
 
+// Generator base-name resolution. The for-loop iter site (emit_for_stmt) needs
+// the generator's mangled C name (e.g. "iota" or "Foo_iota") so it can spell
+// the iterator type ({base}_gen_t*) and the next-step call ({base}_next()).
+//
+// Approach: the collection is always a ValTemp produced by a prior StTempDef
+// whose initializer is the generator call. We scan the current function body
+// for that StTempDef and extract the callee name from its expression.
+//
+// INVARIANT: resolution MUST succeed for any TyGenerator collection — by the
+// time we get here the typechecker has confirmed this is a real generator
+// call. An empty result is a compiler invariant violation; we panic with a
+// clear message rather than emit "unknown_gen" and produce broken C.
 func CGen.resolve_gen_base_name(self, v: LValue?) -> string {
   if !isnull(v) && v!.kind is ValTemp {
-    return self.find_gen_func_name_in_stmts(self.current_func!.body, v!.temp_id)
+    let name = self.find_gen_func_name_in_stmts(self.current_func!.body, v!.temp_id)
+    if name == "" {
+      let fn = if !isnull(self.current_func) { self.current_func!.name } else { "<unknown>" }
+      eprintln(f"c_backend[resolve_gen_base_name]: could not resolve generator call for temp _t{v!.temp_id} in function '{fn}' — TyGenerator collection has no producing StTempDef with an ExCall/ExMethodCall initializer; this is a compiler invariant violation, not a fallback case")
+      os_exit(1)
+    }
+    return name
   }
-  return "unknown_gen"
+  eprintln("c_backend[resolve_gen_base_name]: TyGenerator collection is not a ValTemp; this path is unimplemented and must not be reached silently")
+  os_exit(1)
+  return ""
 }
 
 func CGen.find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> string {
@@ -3427,42 +3463,82 @@ func CGen.find_gen_func_name_in_stmts(self, stmts: [LStmt?], temp_id: i32) -> st
     if s.kind is StIf {
       let d = s.if_data!
       let r = self.find_gen_func_name_in_stmts(d.then_body, temp_id)
-      if r != "unknown_gen" { return r }
+      if r != "" { return r }
       let r2 = self.find_gen_func_name_in_stmts(d.else_body, temp_id)
-      if r2 != "unknown_gen" { return r2 }
+      if r2 != "" { return r2 }
     }
     if s.kind is StWhile {
       let d = s.while_data!
       let r = self.find_gen_func_name_in_stmts(d.cond_block, temp_id)
-      if r != "unknown_gen" { return r }
+      if r != "" { return r }
       let r2 = self.find_gen_func_name_in_stmts(d.body, temp_id)
-      if r2 != "unknown_gen" { return r2 }
+      if r2 != "" { return r2 }
     }
     if s.kind is StFor {
       let d = s.for_data!
       let r = self.find_gen_func_name_in_stmts(d.body, temp_id)
-      if r != "unknown_gen" { return r }
+      if r != "" { return r }
     }
     if s.kind is StSwitch {
       let d = s.switch_data!
       let mut j = 0
       while j < len(d.cases) {
         let r = self.find_gen_func_name_in_stmts(d.cases[j].body, temp_id)
-        if r != "unknown_gen" { return r }
+        if r != "" { return r }
         j = j + 1
       }
     }
     i = i + 1
   }
-  return "unknown_gen"
+  return ""
 }
 
+// Extract the C name of the generator function being called by the expression
+// that initialized a temp. Returns "" if the expression isn't a call (caller
+// is responsible for treating that as a search miss, not a fallback).
+//
+// For methods (ExMethodCall), the name mirrors emit_method_call_expr's
+// mangling: <class_name>_<method>, where class_name comes from the receiver's
+// declared type (with TyOptional unwrap to the underlying class handle).
 func CGen.extract_func_name_from_expr(self, e: LExpr?) -> string {
-  if !isnull(e) && e!.kind is ExCall {
+  if isnull(e) {
+    return ""
+  }
+  if e!.kind is ExCall {
     let d = e!.call!
     return c_safe_name(d.func_name)
   }
-  return "unknown_gen"
+  if e!.kind is ExMethodCall {
+    let d = e!.method_call!
+    let mut class_name = ""
+    if !isnull(d.receiver) && !isnull(d.receiver!.typ) {
+      class_name = d.receiver!.typ!.name
+      if d.receiver!.typ!.kind is TyOptional && !isnull(d.receiver!.typ!.elem) && d.receiver!.typ!.elem!.kind is TyClassHandle {
+        class_name = d.receiver!.typ!.elem!.name
+      }
+    }
+    if class_name == "" {
+      let resolved = self.resolve_value_type(d.receiver)
+      if !isnull(resolved) {
+        class_name = resolved!.name
+        if resolved!.kind is TyOptional && !isnull(resolved!.elem) {
+          class_name = resolved!.elem!.name
+        }
+      }
+    }
+    if class_name == "" {
+      let recv_entry = self.method_to_receiver!.get(sym(d.method))
+      if !isnull(recv_entry) {
+        class_name = recv_entry!.value
+      }
+    }
+    if class_name == "" {
+      eprintln(f"c_backend[extract_func_name_from_expr]: ExMethodCall to method '{d.method}' has no resolvable receiver class — checker should have caught this; refusing to emit 'unknown_gen' fallback")
+      os_exit(1)
+    }
+    return f"{class_name}_{d.method}"
+  }
+  return ""
 }
 
 // ---------------------------------------------------------------------------

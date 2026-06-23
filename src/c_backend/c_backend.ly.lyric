@@ -81,6 +81,28 @@ module c_backend
     a tagged union — detected by is_simple_enum on each LEnumDecl.
     """
 
+  invariant "Generator Call-Site Mangling":
+    procedural
+    """
+    Generator function lookup (gen_funcs) is keyed by the SAME mangled C
+    name that func_name(f) produces — i.e. <receiver>_<name> for methods,
+    bare <name> for free functions. Both emit_call_expr (free fn) and
+    emit_method_call_expr (method) MUST agree on this mangling when
+    appending the _init suffix at the call site, and extract_func_name_
+    from_expr MUST reproduce the same mangling when scanning ExCall and
+    ExMethodCall initializers in find_gen_func_name_in_stmts.
+
+    Mismatch produces broken C: the for-loop iter site falls back to
+    unknown_gen and emits unknown_gen_gen_t* / unknown_gen_next(), which
+    are not declared anywhere. This bug existed pre-4w1-a because nothing
+    in stdlib exercised class-method generators.
+
+    resolve_gen_base_name MUST panic when it cannot resolve a TyGenerator
+    collection — it is an invariant violation, NOT a fallback case.
+    Returning "unknown_gen" as a sentinel is forbidden (see system-wide
+    de-jank rule against fallbacks).
+    """
+
   invariant "Capture and Mut-Param Redirection":
     procedural
     """
