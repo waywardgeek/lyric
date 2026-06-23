@@ -1520,108 +1520,120 @@ algorithms expressed as default methods and user data bound via the
 alias-form impl. Three concrete gaps to close (from the 2026-06-23
 empirical probe):
 
+**Wave 1 status (post-2026-06-23 ship):**
+- ✅ 4w1-b shipped (commit c443fa1) — `extends` keyword
+- ✅ 4w1-c shipped (commit 67732fa) — empty-body impl diagnostic
+- ✅ 4w1-d shipped (commit 651da5f) — partial impls `impl<W>`
+- 🚧 4w1-a DEFERRED — default-method emission for multi-class
+  interfaces. See sharpened description below.
+- 🚧 4w1-e PARTIAL — reactivation pending 4w1-a. graph.ly parses
+  fully but fails at the checker on default-method bodies; tree.ly
+  unchanged.
+
 ##### Phase 4w1-a — Default-method monomorphization-and-emission bug
 
-Today: an interface default method like `G.count_edges(self) -> i32`
-declared inside `interface Graph<G,N,E>`, with a matching
-`impl Graph<SimpleGraph, SimpleNode, SimpleEdge>`, gets the
-call-site mangled name `SimpleGraph_count_edges` but the c_backend
-never emits the body under that name. gcc fails with `implicit
-declaration of function 'SimpleGraph_count_edges'`.
+**Sharpened 2026-06-23 after empirical investigation:**
 
-Fix: trace the default-method-to-impl path in monomorphizer +
-c_backend. The default method should be specialized per impl
-instantiation (one C function per impl) with the matching mangled
-name. Likely a missing arm in the monomorphizer that walks impl
-blocks and emits one specialized copy of each unsatisfied default
-method per impl, with the impl's alias bindings substituted.
+The receiver-only type-inference path in the checker recovers the
+receiver's type-var (G for `Graph<G,N,E>.count_edges`) but cannot
+recover N and E — they're declared by the impl block, not by the
+call-site receiver. Today, when monomorphization tries to specialize
+the default-method body, it has only G bound; references to N and
+E inside the body resolve to TypeVar and the body lowers as void*
+with `unknown method: iter` errors at every loop over `n.outgoing_edges()`.
+
+Two design directions, both viable, each ~200-400 LOC:
+
+1. **Impl-block-driven type-inference.** When checking a generic-method
+   call where the receiver type is bound to an impl's first type-var
+   slot, walk the impl's ib_arg list to pre-bind the other type-vars
+   in the substitution map. This pushes impl-scope type info into the
+   call-site resolver.
+
+2. **Per-impl specialized emission.** Emit one C function per impl
+   instantiation for each unsatisfied default method, with the impl's
+   type-var bindings baked in at synthesis time. The function name
+   uses the impl's concrete type names as suffix
+   (`SimpleGraph_count_edges` for `impl Graph<SimpleGraph, SimpleNode,
+   SimpleEdge>`). The default-method body gets deep-copied and
+   substituted with the impl's bindings, then emitted as a top-level
+   function. Call sites that resolve to the impl pick the right
+   specialization.
+
+Approach (2) is more like Rust's monomorphization and integrates with
+the existing `desugar_default_impls` pass (pass 5) — extend that pass
+to ALSO walk impl blocks and emit per-impl specializations of unsatisfied
+default methods.
+
+Reference work from the wt-default-method sub-agent (commit not made,
+worktree torn down): lowerer.ly:~810 attempts to synthesize impl-alias
+wrappers with name `iface_name + "_" + method_name` to avoid
+two-interfaces-same-class-method collisions; checker.ly:~3810 attempts
+to fill `inferred_type_args` from `method_type_args` registry — both
+correct for single-class interface inference but neither handles the
+multi-class impl case. Useful as starting points; expect rewrites
+once the design call between (1) and (2) is made.
 
 Acceptance: `testdata/test_default_method_emit.ly` exercises a
 multi-class interface with one default method, three impl
 instantiations, and asserts each runs end-to-end with the right
 result. (Today fails at gcc; should compile and run after fix.)
+Also: graph.ly Part 1+3 (Network/Person/Follow auto-derive) and Part 2
+(FPGA) should both run end-to-end.
 
-##### Phase 4w1-b — `extends` keyword on interfaces
+##### Phase 4w1-b — `extends` keyword on interfaces — ✅ SHIPPED
 
-- Add `KExtends` to the lexer keyword table; add `"extends"` to the
-  hard-keyword list in the language reference.
-- Parser: extend the interface header to accept `extends ParentIface<T1,
-  T2, ...>` after the type-parameter list and before the body brace.
-  Multiple parents allowed (`extends A<...> + B<...>`) but defer to
-  the second wave if not needed for graph.ly initially.
-- AST: `InterfaceDecl.extends: [InterfaceRef]`.
-- Desugar pass `DesugarInterfaceExtends`: copy the parent interface's
-  abstract methods, fields, and default methods into the child
-  interface's namespace, with type-parameter substitution per the
-  `extends` binding. Child may override (re-declare) a parent's
-  method to specialize behavior; the child's declaration wins.
-- Acceptance: `testdata/test_extends.ly` covers
-  `WeightedDirectedGraph extends DirectedGraph` from graph.ly and
-  asserts the child interface sees all parent methods.
+Shipped commit c443fa1 (2026-06-23). Single-parent `extends Parent<...>`
+on interface header; desugar pass 0 (`desugar_interface_extends`) copies
+parent's abstract methods, fields, default-bodied methods, and destructor
+blocks into the child with parent's type-params substituted by the
+child's `extends_args`. Child wins on name collision. Extends chains
+resolve transitively. Multi-parent `extends A<...> + B<...>` is 🚧
+future-work. Args are bare type-var names (Sym); full TypeExpr args
+are 🚧 future-work.
 
-##### Phase 4w1-c — Empty-body impl auto-derive
+##### Phase 4w1-c — Empty-body impl auto-derive — ✅ SHIPPED
 
-- Parser: accept `impl Iface<...> { }` (today fails with `undefined
-  variable: ;`). The empty body must lex as a well-formed impl with
-  zero bindings, NOT trigger the misleading variable-decl-style
-  error.
-- Desugar pass `DesugarImplAutoderive`: for an impl with an empty
-  body OR a body that doesn't bind every abstract member, walk the
-  interface's unsatisfied abstract members (methods + fields). For
-  each, look up the concrete class bound to its type variable in the
-  class scope. If a member with the exact same name and a compatible
-  signature exists, emit a synthetic alias binding. Otherwise add it
-  to the missing-bindings list.
-- If any abstract member fails to auto-derive AND wasn't explicitly
-  bound, emit ONE error listing every unsatisfied member with its
-  expected signature, so the user sees the full gap in one
-  diagnostic. (§5.9 third shape, generalized to multi-class.)
-- Mixed-mode supported: an impl body may contain SOME explicit
-  bindings and rely on auto-derive for the rest.
-- Acceptance: `testdata/test_impl_autoderive.ly` covers the Network/
-  Person/Follow empty-body case, plus a negative test where a
-  method name is misspelled and the missing-bindings diagnostic
-  includes the right suggestion.
+Shipped commit 67732fa (2026-06-23). Phase 1.7 in the checker
+(`validate_impl_satisfies_abstract`) walks every plain impl (non-
+relation-hint), accumulates missing abstract members, and emits ONE
+diagnostic per impl listing every miss. Skips synthesized abstract
+methods (FuncDecl.is_synthesized=true) so a missing
+`field T.name: Type` produces one complaint about the field, not three
+about field+getter+setter. Note: the AUTO-DERIVE itself (synthesizing
+alias bindings from same-named class methods) is NOT in this commit;
+satisfaction is satisfied implicitly via Phase 1.5b which already
+registers interface methods on concrete classes. The diagnostic
+catches the cases where that implicit path doesn't find a match.
 
-##### Phase 4w1-d — Partial impls (open type variables)
+##### Phase 4w1-d — Partial impls (open type variables) — ✅ SHIPPED
 
-- Parser: accept `impl<W> WeightedDirectedGraph<FlexNet, FlexRoute,
-  FlexVia<W>, W> { ... }` — type parameters declared between `impl`
-  and the interface name.
-- Checker: when an impl has open type variables, the alias bindings
-  are scoped over them. Monomorphizer specializes per use site, same
-  engine as generic-function specialization (which is already shipped).
-- This extends Phase 3's labels-on-impl-type-vars work (§3.8/3.9),
-  which already handles concrete type-arg labels; 4w1-d adds the
-  open type-arg case.
-- Acceptance: graph.ly Part 4 (`FlexNet`/`FlexRoute`/`FlexVia<W>`)
-  compiles and `sum_flex_i32` + `sum_flex_f64` both run.
+Shipped commit 651da5f (2026-06-23). Parser accepts
+`impl<W> Iface<..., W>` syntax. AST adds `ImplBlock:imtp` relation
+owning TypeParams (label `imtp` not `itp` to avoid TypeParam
+back-pointer collision with InterfaceDecl). The existing TypeVar
+tolerance in checker `is_assignable` handles unbound W without an
+explicit scope-push pass; monomorphization needed no change.
+Verified end-to-end with `impl<W> Container<Box<W>, W>` probe.
 
-##### Phase 4w1-e — Reactivate `graph.ly` and `tree.ly`
+##### Phase 4w1-e — Reactivate `graph.ly` and `tree.ly` — 🚧 PARTIAL
 
-- Reactivate `testdata/graph.ly` using the fields/methods-only design
-  (no relation equivalence yet). graph.ly v7 should be the working
-  reference for Wave 1.
-- Reactivate `testdata/tree.ly` with parallel patterns (Tree<T, N>
-  with abstract methods `T.root`, `N.children`, `N.parent`).
-- Update `cr/docs/lyric-language-spec.md` §Interfaces and Multi-Class
-  Contracts to show the Graph example with the new design. The
-  relation-equivalence section gets a 🚧 Wave 2 callout.
-- Update `cr/docs/lyric-language-reference.md` §11 Interfaces with the
-  working subset description; 🚧 only on relation equivalence.
-- Sweep the book (`cr/docs/the-lyric-book.md`) Ch 9 (interfaces) to
-  remove constraint-alias prose entirely; defer Ch 12 (generics)
-  update until Phase 5 (Numeric).
+graph.ly Part 0 (interface declarations) and partial-impl syntax
+parse fully post-Wave-1. Default-method bodies fail at the checker
+on `n.outgoing_edges().iter()` resolution because 4w1-a hasn't
+landed yet. graph.ly remains in the test suite FAIL set; full
+reactivation blocked on 4w1-a. tree.ly unchanged.
 
-**Wave 1 budget**: ~800 LOC compiler (default-method emission fix is
-the biggest piece — likely 300-400 LOC; extends/autoderive/partial
-each ~100-200 LOC) + ~200 LOC stdlib + ~500 LOC testdata.
-
-**Wave 1 parallelizability**: 4w1-b (extends), 4w1-c (autoderive),
-and 4w1-d (partial impls) are independent and fleet-safe after a
-pre-flight AST stub commit. 4w1-a (default-method emission) is the
-critical-path single-agent investigation. 4w1-e is sequential
-verification + doc sweep.
+**Wave 1 actual cost (post-ship):**
+- 4w1-b extends: 224 LOC (vs ~150 estimate). Larger because
+  desugar pass needed deep_copy_func_decl helper.
+- 4w1-c empty-body diagnostic: 230 LOC (vs ~80 estimate). Larger
+  because the satisfaction check needed to bypass Phase 1.5b's
+  callable-vs-implemented pollution and add the is_synthesized
+  tagging on FuncDecl to distinguish field-derived accessors.
+- 4w1-d partial impls: 23 LOC (vs ~100 estimate). Tiny because
+  the AST shape was the bulk; no checker work needed.
+- lyric.c regen: 1,281 insertions / 758 deletions (one rollup commit).
 
 ---
 

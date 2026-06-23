@@ -37,6 +37,21 @@
 //      `N.outgoing_edges = Route.a` synthesizes
 //      `pub func Route.outgoing_edges(self) -> [Via] { return self.a.iter() }`.
 //
+// 🚧 STATUS (post-Wave-1 ship 2026-06-23):
+//   • Wave 1 lexer/parser pieces (extends, partial impls, empty-body
+//     impl + auto-derive diagnostic) ARE shipped. This file parses
+//     fully.
+//   • Default-method emission for multi-class interfaces (4w1-a) is
+//     NOT shipped — the receiver-only type inference yields G but
+//     can't recover N and E for Graph<G,N,E>.count_edges. Until
+//     4w1-a lands, the default-method bodies in DirectedGraph and
+//     WeightedDirectedGraph below are aspirational. Calls to them
+//     from main() fail at the checker with "unknown method: iter"
+//     / "field not found" because the synthesized method bodies
+//     can't resolve N's surface.
+//   • Relation equivalence (Wave 2) is the other pending piece —
+//     `G:nodes/N:graph = Net:routes/Route:net` syntax NOT in lexer.
+//
 // 🚧 NOT IN THIS FILE — deferred to Wave 2 (relation equivalence):
 //      relation Collection G:nodes [N:graph]    (abstract relations)
 //      G:nodes/N:graph = Net:routes/Route:net   (relation equivalence)
