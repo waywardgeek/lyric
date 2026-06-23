@@ -107,6 +107,29 @@ module lowerer
     constructed object has uninitialized fields.
     """
 
+  invariant "Alias-Wrapper Bodies Bypass Rename Map":
+    procedural
+    """
+    Alias-form impl mappings (`G.nodes = MyGraph.nodes`) cause
+    lower_impl_block to synthesize a forwarding wrapper named
+    `IfaceName_methodName` (e.g. `DiGraph_nodes`) on the concrete class,
+    AND to register `class_name + "." + method_name` → wrapper in
+    impl_method_renames so external call sites route through it.
+
+    The wrapper BODY itself MUST NOT use ExMethodCall on self — that
+    lowering re-consults impl_method_renames, and for the common case
+    where target_member == method_name the call points right back at
+    the wrapper, producing infinite runtime recursion. The wrapper
+    body emits an ExCall directly to the user-helper's mangled C name
+    (`target_class + "_" + target_member`), bypassing the rename
+    machinery entirely.
+
+    Discovered via 4w1-a default-method emission probe (2026-06-23):
+    the bug was dormant for as long as no call site reached the
+    wrapper at runtime; the desugar specialize pass made wrappers
+    reachable and exposed it.
+    """
+
   invariant "Short-Circuit Lowering":
     procedural
     """

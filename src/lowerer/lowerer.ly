@@ -807,27 +807,55 @@ lyric lowerer {
           // two interfaces map the same class+method to different targets
           let wrapper_name = iface_name + "_" + method_name
           let target_member = if !isnull(mapping.target_member) { mapping.target_member!.name } else { method_name }
+          // target_class is the user-named RHS class (e.g. `MyGraph` in
+          // `G.nodes = MyGraph.nodes`). The parser always sets it on
+          // Alias mappings; fall back to class_name if somehow null.
+          let target_class = if !isnull(mapping.target_class) { mapping.target_class!.name } else { class_name }
 
-          // Register rename with @-delimited key (all prefixes including embeds)
+          // Register rename with @-delimited key (all prefixes including embeds).
+          // Use sites OUTSIDE the wrapper that call `class_name.method_name`
+          // get rewritten to the wrapper. The wrapper body itself bypasses
+          // this rename map by emitting a direct ExCall (see below) —
+          // otherwise the wrapper recurses into itself when target_member
+          // == method_name (the common case for alias-form impls).
           for rp in all_rename_prefixes {
             let rename_key = rp + "@" + class_name + "@" + method_name
             self.impl_method_renames!.set(sym(rename_key), wrapper_name)
           }
           self.impl_method_renames!.set(sym(class_name + "." + method_name), wrapper_name)
 
-          // Build forwarding call body — use method call on self (not static call)
+          // Build forwarding call body.
+          //
+          // IMPORTANT: emit as an ExCall to the user-helper's mangled C
+          // name (`target_class + "_" + target_member`, e.g.
+          // `MyGraph_nodes`) — NOT as an ExMethodCall on self with method
+          // `target_member`. An ExMethodCall would route through the
+          // impl_method_renames map registered just above, and for the
+          // common alias case where target_member == method_name the
+          // rewrite would point right back at the wrapper itself,
+          // producing infinite recursion at runtime (the bug fixed here).
           let mut call_args: [LValue?] = []
-          // Only non-self params (self is the receiver)
+          append(call_args, make_var_val("self", self_type))   // self is just an argument to the user-helper
           for i in range(1, len(params)) {
             append(call_args, make_var_val(params[i].name, params[i].typ))
+          }
+          let mut call_mut_args: [bool] = [false]
+          for i in range(1, len(params)) {
+            append(call_mut_args, params[i].mutable)
           }
 
           self.temp_id = 0
           let saved = self.save_stmts()
           let call_expr = LExpr {
-            kind: ExMethodCall,
+            kind: ExCall,
             typ: rt,
-            method_call: LMethodCallData { receiver: make_var_val("self", self_type), method: target_member, args: call_args, mut_args: [], is_exported: false }
+            call: LCallData {
+              func_name: target_class + "_" + target_member,
+              args: call_args,
+              mut_args: call_mut_args,
+              type_args: [],
+              is_exported: true,
+            }
           }
 
           if !isnull(rt) && rt!.kind is TyUnit {
