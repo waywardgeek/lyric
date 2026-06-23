@@ -15,7 +15,7 @@ lyric lexer {
   enum TokenKind {
     // Keywords
     KLyric KFunc KClass KStruct KEnum KInterface KRelation KField
-    KDestructor KImport KImplements KImpl KAs KIs KType KWhere
+    KDestructor KImport KImplements KImpl KExtends KAs KIs KType KWhere
     KOwns KRefs KMut KSelf KFrom KTrue KFalse KNil KPub
     // Statement keywords
     KLet KIf KElse KFor KIn KWhile KMatch KReturn KBreak KContinue
@@ -58,6 +58,7 @@ lyric lexer {
     d.set(`import`, KImport)
     // "implements" is contextual — parsed by parser.peek_annotation()
     d.set(`impl`, KImpl)
+    d.set(`extends`, KExtends)
     d.set(`as`, KAs)
     d.set(`is`, KIs)
     d.set(`type`, KType)

@@ -160,6 +160,18 @@ lyric ast {
     name: Sym?
     is_public: bool
     implements: [Sym]
+    // Single-parent interface inheritance (Phase 4 Wave 1 / 4w1-b).
+    // `interface Child<A, B> extends Parent<A, B> { ... }` sets
+    // extends_name = "Parent" and extends_args = ["A", "B"]. Args are
+    // bare type-var names (Sym) drawn from the child's type-param
+    // scope; full TypeExpr args are 🚧 future-work. null/empty means
+    // no extends. desugar_interface_extends (pass 0) materializes the
+    // inheritance by copying parent's abstract methods, fields, and
+    // destructors into the child with type-param substitution; child
+    // wins on name collision. Default-bodied parent methods are also
+    // copied with body deep-cloned and substituted.
+    extends_name: Sym?
+    extends_args: [Sym]
     span: Span
   }
   relation ArrayList InterfaceDecl:itp owns [TypeParam:itp]

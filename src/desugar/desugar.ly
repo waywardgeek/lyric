@@ -1,6 +1,8 @@
 // desugar.ly — AST desugaring passes for the Lyric bootstrap compiler
 // Ported from pkg/ast/desugar.go
 // Desugar order (must be maintained):
+//   0. DesugarInterfaceExtends — materialize interface inheritance by
+//      copying parent's members into child (Phase 4 Wave 1 / 4w1-b)
 //   1. DesugarInterfaceFields — convert field decls to getter/setter methods
 //   2. DesugarFieldAccess — rewrite self.field shorthand into getter/setter calls
 //   3. DesugarRelations — inject fields + impl blocks from relations
@@ -8,6 +10,166 @@
 //   5. DesugarDefaultImpls — extract interface methods with bodies to top-level functions
 
 lyric desugar {
+
+
+  // ---- 0. DesugarInterfaceExtends ----
+  // Materializes single-parent interface inheritance.
+  //   interface Child<A, B> extends Parent<A, B> { ... }
+  // gets the parent's abstract methods, fields, and destructors copied
+  // into the child with parent's type-params substituted by the child's
+  // extends_args. Default-bodied parent methods are copied with the body
+  // deep-cloned + substituted. Child wins on name collision (matching
+  // member already declared on the child).
+  //
+  // Runs BEFORE DesugarInterfaceFields so inherited fields get their
+  // getter/setter pair synthesized by pass 1 on the child. The pass
+  // resolves parent extends recursively (transitive inheritance) using
+  // a visited set keyed by interface name to detect cycles.
+
+  func desugar_interface_extends(file: File) {
+    // Build cross-block index: interface name -> InterfaceDecl.
+    let mut iface_index: Dict<Sym, InterfaceDecl> = Dict<Sym, InterfaceDecl>()
+    for block in file.fb.children() {
+      for iface in block.id.children() {
+        if !isnull(iface.name) {
+          iface_index.set(iface.name!, iface)
+        }
+      }
+    }
+
+    // Resolve every interface that has an extends clause. Use a visited
+    // dict on the iface name so transitive extends and shared ancestors
+    // each materialize exactly once per interface.
+    let mut resolved: Dict<Sym, bool> = Dict<Sym, bool>()
+    for block in file.fb.children() {
+      for iface in block.id.children() {
+        resolve_extends(iface, iface_index, resolved)
+      }
+    }
+  }
+
+  func resolve_extends(iface: InterfaceDecl, iface_index: Dict<Sym, InterfaceDecl>, resolved: Dict<Sym, bool>) {
+    if isnull(iface.name) { return }
+    if resolved.has(iface.name!) { return }
+    resolved.set(iface.name!, true)
+    if isnull(iface.extends_name) { return }
+
+    let parent_entry = iface_index.get(iface.extends_name!)
+    if isnull(parent_entry) { return }   // unresolved parent — checker will diagnose elsewhere
+    let parent = parent_entry!.value
+
+    // Resolve parent's own extends FIRST so we copy a fully-materialized parent.
+    resolve_extends(parent, iface_index, resolved)
+
+    // Build substitution: parent's type-param NAME -> child's extends arg name string.
+    let mut type_map: Dict<Sym, string> = Dict<Sym, string>()
+    let parent_tps = parent.itp.children()
+    let mut limit = len(parent_tps)
+    if len(iface.extends_args) < limit { limit = len(iface.extends_args) }
+    for i in range(0, limit) {
+      if !isnull(parent_tps[i].name) {
+        type_map.set(parent_tps[i].name!, iface.extends_args[i].name)
+      }
+    }
+
+    // Build child's existing-member name sets so child-wins-on-collision works.
+    let mut child_method_names: Dict<Sym, bool> = Dict<Sym, bool>()
+    for m in iface.im.children() {
+      if !isnull(m.name) { child_method_names.set(m.name!, true) }
+    }
+    let mut child_field_names: Dict<Sym, bool> = Dict<Sym, bool>()
+    for f in iface.ifd.children() {
+      if !isnull(f.name) { child_field_names.set(f.name!, true) }
+    }
+
+    // Inherit fields.
+    for pf in parent.ifd.children() {
+      if !isnull(pf.name) && child_field_names.has(pf.name!) { continue }
+      let nf = InterfaceFieldDecl {
+        type_param: substitute_sym(pf.type_param, type_map),
+        name: pf.name,
+        type_expr: substitute_type_expr_copy(pf.type_expr, type_map),
+        span: pf.span,
+      }
+      array_append<InterfaceDecl, InterfaceFieldDecl>(iface, nf)
+    }
+
+    // Inherit methods (abstract + default).
+    for pm in parent.im.children() {
+      if !isnull(pm.name) && child_method_names.has(pm.name!) { continue }
+      let nm = deep_copy_func_decl(pm, type_map)
+      array_append<InterfaceDecl, FuncDecl>(iface, nm)
+    }
+
+    // Inherit destructors (no name dedupe — destructors are positional by
+    // type_param + kind, not by name).
+    for pd in parent.idb.children() {
+      let nd_body = deep_copy_block(pd.body)
+      if !isnull(nd_body) {
+        substitute_type_params_in_block(nd_body!, type_map)
+      }
+      let nd = DestructorBlock {
+        type_param: substitute_sym(pd.type_param, type_map),
+        kind: pd.kind,
+        body: nd_body,
+        span: pd.span,
+      }
+      array_append<InterfaceDecl, DestructorBlock>(iface, nd)
+    }
+  }
+
+  // Deep-copy a FuncDecl, substituting type-param names in the receiver,
+  // param types, return type, where-clauses, and body. Inheriting an
+  // interface method needs a fresh AST node so child-side mutations
+  // (later desugar passes) don't bleed back into the parent.
+  func deep_copy_func_decl(f: FuncDecl, type_map: Dict<Sym, string>) -> FuncDecl {
+    let new_fn = FuncDecl {
+      name: f.name,
+      is_public: f.is_public,
+      is_final: f.is_final,
+      is_trusted: f.is_trusted,
+      is_synthesized: f.is_synthesized,
+      receiver_type: substitute_sym(f.receiver_type, type_map),
+      return_type: substitute_type_expr_copy(f.return_type, type_map),
+      body: deep_copy_block(f.body),
+      span: f.span,
+    }
+    for tp in f.fp.children() {
+      let new_tp = TypeParam {
+        name: tp.name,
+        constraint: tp.constraint,
+        span: tp.span,
+      }
+      array_append<FuncDecl, TypeParam>(new_fn, new_tp)
+    }
+    for p in f.param.children() {
+      let new_p = Param {
+        name: p.name,
+        type_expr: substitute_type_expr_copy(p.type_expr, type_map),
+        is_mut: p.is_mut,
+        is_self: p.is_self,
+        span: p.span,
+      }
+      array_append<FuncDecl, Param>(new_fn, new_p)
+    }
+    for wc in f.wc.children() {
+      let new_wc = WhereClause {
+        variable: wc.variable,
+        constraint: wc.constraint,
+        span: wc.span,
+      }
+      for wa in wc.wc_arg.children() {
+        let new_wa = TypeExpr { kind: wa.kind, span: wa.span }
+        substitute_type_params_in_type_expr(new_wa, type_map)
+        array_append<WhereClause, TypeExpr>(new_wc, new_wa)
+      }
+      array_append<FuncDecl, WhereClause>(new_fn, new_wc)
+    }
+    if !isnull(new_fn.body) {
+      substitute_type_params_in_block(new_fn.body!, type_map)
+    }
+    return new_fn
+  }
 
 
   // ---- 2. DesugarInterfaceFields ----
@@ -758,6 +920,7 @@ lyric desugar {
   // ---- Main entry point ----
 
   func desugar_all(file: File) {
+    desugar_interface_extends(file)
     desugar_interface_fields(file)
     desugar_field_access(file)
     desugar_relations(file)

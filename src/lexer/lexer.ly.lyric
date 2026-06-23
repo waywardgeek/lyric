@@ -113,7 +113,7 @@ module lexer
     """
 
 
-  typedef TokenKind: enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KImport, KImplements, KImpl, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
+  typedef TokenKind: enum { KLyric, KFunc, KClass, KStruct, KEnum, KInterface, KRelation, KField, KDestructor, KImport, KImplements, KImpl, KExtends, KAs, KIs, KType, KWhere, KOwns, KRefs, KMut, KSelf, KFrom, KTrue, KFalse, KNil, KPub, KLet, KIf, KElse, KFor, KIn, KWhile, KMatch, KReturn, KBreak, KContinue, KSpawn, KSelect, KCase, KLock, KYield, LIdent, LIntLit, LFloatLit, LStringLit, LTripleString, LFString, LCharLit, LBacktickSym, PLParen, PRParen, PLBrace, PRBrace, PLBracket, PRBracket, PComma, PColon, PDot, PArrow, PFatArrow, PBiArrow, PPipe, PQuestion, PLt, PGt, OAssign, OPlus, OMinus, OStar, OSlash, OPercent, OEqEq, OBangEq, OLtEq, OGtEq, OAmpAmp, OPipePipe, OBang, OAmp, OCaret, OShl, OShr, OPlusEq, OMinusEq, OStarEq, OSlashEq, SNewline, SEOF }
     source: lexer.ly:15
 
   class Token

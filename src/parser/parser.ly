@@ -553,6 +553,27 @@ lyric parser {
       }
     }
 
+    // Optional `extends Parent<arg, arg>` clause (Phase 4 Wave 1 / 4w1-b).
+    // Args are bare type-var names drawn from the child's type-param scope;
+    // full TypeExpr args are 🚧 future-work and would require updating
+    // InterfaceDecl.extends_args from [Sym] to [TypeExpr].
+    if self.peek().kind == KExtends {
+      self.next()  // consume 'extends'
+      let parent = self.expect(LIdent)?
+      iface.extends_name = sym(parent!.text)
+      if self.peek().kind == PLt {
+        self.next()  // consume '<'
+        while self.peek().kind != PGt && self.peek().kind != SEOF {
+          let arg = self.expect(LIdent)?
+          iface.extends_args = append(iface.extends_args, sym(arg!.text))
+          if self.peek().kind == PComma {
+            self.next()
+          }
+        }
+        self.expect(PGt)?
+      }
+    }
+
     self.expect(PLBrace)?
     self.skip_newlines()
 

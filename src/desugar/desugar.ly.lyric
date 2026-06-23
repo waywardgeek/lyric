@@ -9,6 +9,15 @@ module desugar
     causes silent failures, so the fixed sequence in desugar_all is the
     single source of truth:
 
+    0. desugar_interface_extends — materializes single-parent interface
+       inheritance. `interface Child<A,B> extends Parent<A,B> { ... }`
+       gets the parent's abstract methods, fields, default-method
+       bodies, and destructor blocks copied into the child with
+       parent's type-params substituted by the child's extends_args.
+       Child wins on member-name collision. Extends chains resolve
+       transitively (parent's own extends materializes first). Runs
+       BEFORE pass 1 so inherited fields get their getter/setter pair
+       synthesized on the child.
     1. desugar_interface_fields — turns `field T.name: Type` declarations
        on interfaces into matching getter/setter method signatures.
        The synthesized FuncDecls are tagged with is_synthesized=true so
@@ -73,6 +82,7 @@ module desugar
     procedural
     """
     desugar_all MUST invoke the passes in this exact order:
+      0. desugar_interface_extends
       1. desugar_interface_fields
       2. desugar_field_access
       3. desugar_relations
@@ -81,7 +91,7 @@ module desugar
 
     Each pass generates AST consumed by later passes. Running out of
     order produces silent failures (missing fields, unrenamed method
-    calls). All five passes MUST complete before the checker runs.
+    calls). All six passes MUST complete before the checker runs.
     """
 
   invariant "Cross-Block Class Lookup":
@@ -212,8 +222,17 @@ module desugar
     See cr/docs/multi-class-interface-redesign.md §3.9.
     """
 
+  func desugar_interface_extends(file: File)
+    source: desugar.ly:29
+
+  func resolve_extends(iface: InterfaceDecl, iface_index: Dict<Sym, InterfaceDecl>, resolved: Dict<Sym, bool>)
+    source: desugar.ly:51
+
+  func deep_copy_func_decl(f: FuncDecl, type_map: Dict<Sym, string>) -> FuncDecl
+    source: desugar.ly:128
+
   func desugar_interface_fields(file: File)
-    source: desugar.ly:17
+    source: desugar.ly:179
 
   func desugar_relations(file: File)
     source: desugar.ly:98

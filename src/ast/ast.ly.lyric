@@ -210,6 +210,10 @@ module ast
 
   class InterfaceDecl
     source: ast.ly:159
+    field extends_args: [Sym]
+      doc: "Bare type-var names supplied to extends_name's type parameters. Length and order match the parent's itp. TypeExpr args are 🚧 future-work."
+    field extends_name: Sym?
+      doc: "Single-parent inheritance: null means no `extends` clause. desugar_interface_extends materializes the inheritance by copying parent's members into the child."
     field implements: [Sym]
     field is_public: bool
     field name: Sym?
