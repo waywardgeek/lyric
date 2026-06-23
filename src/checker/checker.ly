@@ -4096,7 +4096,36 @@ lyric checker {
       _ => {}
     }
 
-    eprintln(f"checker: field {field_str} not found on type {tname}")
+    let mut kind_str = "unknown"
+    match recv_type.kind {
+      Int => { kind_str = "Int" }
+      Uint => { kind_str = "Uint" }
+      Float => { kind_str = "Float" }
+      Bool => { kind_str = "Bool" }
+      String => { kind_str = "String" }
+      Void => { kind_str = "Void" }
+      Nil => { kind_str = "Nil" }
+      Any => { kind_str = "Any" }
+      Error => { kind_str = "Error" }
+      Lock => { kind_str = "Lock" }
+      Struct(n) => { kind_str = f"Struct({n})" }
+      Class(n) => { kind_str = f"Class({n})" }
+      Enum(n) => { kind_str = f"Enum({n})" }
+      Interface(n) => { kind_str = f"Interface({n})" }
+      Module(n) => { kind_str = f"Module({n})" }
+      Optional(_) => { kind_str = "Optional" }
+      Sequence(_) => { kind_str = "Sequence" }
+      Channel(_) => { kind_str = "Channel" }
+      Tuple(_) => { kind_str = "Tuple" }
+      Func(_, _, _) => { kind_str = "Func" }
+      TypeVar(n) => { kind_str = f"TypeVar({n})" }
+      Generator(_) => { kind_str = "Generator" }
+      Map(_, _) => { kind_str = "Map" }
+      Union(_) => { kind_str = "Union" }
+      ErrorResult(_, _) => { kind_str = "ErrorResult" }
+      _ => { kind_str = "<other>" }
+    }
+    eprintln(f"checker: field '{field_str}' not found on type '{tname}' (recv kind: {kind_str})")
     os_exit(1)
     return make_error_type()
   }
