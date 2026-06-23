@@ -37,18 +37,28 @@
 //      `N.outgoing_edges = Route.a` synthesizes
 //      `pub func Route.outgoing_edges(self) -> [Via] { return self.a.iter() }`.
 //
-// 🚧 STATUS (post-Wave-1 ship 2026-06-23):
+// 🚧 STATUS (2026-06-23 — post-Numeric ship, ambiguity sweep):
 //   • Wave 1 lexer/parser pieces (extends, partial impls, empty-body
 //     impl + auto-derive diagnostic) ARE shipped. This file parses
 //     fully.
-//   • Default-method emission for multi-class interfaces (4w1-a) is
-//     NOT shipped — the receiver-only type inference yields G but
-//     can't recover N and E for Graph<G,N,E>.count_edges. Until
-//     4w1-a lands, the default-method bodies in DirectedGraph and
-//     WeightedDirectedGraph below are aspirational. Calls to them
-//     from main() fail at the checker with "unknown method: iter"
-//     / "field not found" because the synthesized method bodies
-//     can't resolve N's surface.
+//   • `where Numeric<W>` is recognized (Numeric joins Comparable /
+//     Equatable / Hashable as a marker constraint; see TODO.md
+//     "Built-in constraints hard-coded in checker"). The cast
+//     `0 as W` now substitutes properly through default-method
+//     specialization (Cast arm added to the rich substitutor
+//     2026-06-23; see TODO.md "Generic AST visitor refactor" for
+//     the deeper cleanup that makes that bug shape impossible).
+//   • The FILE STILL FAILS to compile end-to-end. Two blockers:
+//       1. Alias-form impl bindings (`N.outgoing_edges = Route.outgoing_a`)
+//          are not consulted by the checker when resolving
+//          `n.outgoing_edges()` inside the specialized default-method
+//          body of `bfs` / `count_edges` / `total_weight`. See TODO.md
+//          "Multi-class interface default-method alias resolution"
+//          for the proposed FuncDecl.source_impl back-pointer fix.
+//       2. (Possibly latent — surfaces once #1 is fixed.) Other
+//          rich-substitutor wildcards may swallow additional Expr
+//          kinds reached by these bodies. See same "Generic AST
+//          visitor refactor" TODO.
 //   • Relation equivalence (Wave 2) is the other pending piece —
 //     `G:nodes/N:graph = Net:routes/Route:net` syntax NOT in lexer.
 //
@@ -140,9 +150,9 @@ interface WeightedDirectedGraph<G, N, E, W> extends DirectedGraph<G, N, E> {
     pub func E.weight(self) -> W
 
     pub func G.total_weight(self) -> W where Numeric<W> {
-        let mut sum: W = W.zero()
+        let mut sum: W = 0 as W
         for n in self.nodes() {
-            for e in n.outgoing_edges() { sum = sum.add(e.weight()) }
+            for e in n.outgoing_edges() { sum = sum + e.weight() }
         }
         return sum
     }
@@ -182,24 +192,24 @@ relation DoublyLinked Route:b     refs [Via:b_src]
 
 pub func Net.all_routes(self) -> [Route] {
     let mut result: [Route] = []
-    for r in self.routes.iter() { result = append(result, r) }
+    for r in self.routes.children() { result = append(result, r) }
     return result
 }
 
 pub func Route.outgoing_a(self) -> [Via] {
     let mut result: [Via] = []
-    for v in self.a.iter() { result = append(result, v) }
+    for v in self.a.children() { result = append(result, v) }
     return result
 }
 
 pub func Route.incoming_b(self) -> [Via] {
     let mut result: [Via] = []
-    for v in self.b.iter() { result = append(result, v) }
+    for v in self.b.children() { result = append(result, v) }
     return result
 }
 
-pub func Via.a_endpoint(self) -> Route { return self.a_src }
-pub func Via.b_endpoint(self) -> Route { return self.b_src }
+pub func Via.a_endpoint(self) -> Route { return self.a_src.parent! }
+pub func Via.b_endpoint(self) -> Route { return self.b_src.parent! }
 
 impl WeightedDirectedGraph<Net, Route, Via, f32> {
     G.nodes           = Net.all_routes
@@ -246,30 +256,39 @@ relation DoublyLinked Network:nodes         owns [Person:graph]
 relation DoublyLinked Person:outgoing_edges refs [Follow:src]
 relation DoublyLinked Person:incoming_edges refs [Follow:dst]
 
-// User-defined helpers matching the interface names exactly.
-pub func Network.nodes(self) -> [Person] {
+// User-defined helpers — names distinct from the relation labels
+// (`Network:nodes`, `Person:outgoing_edges`, `Person:incoming_edges`)
+// so the impl binds them explicitly. The natural domain terms stay
+// on the relations; helpers carry the algorithm-side names.
+pub func Network.all_nodes(self) -> [Person] {
     let mut result: [Person] = []
-    for p in self.nodes.iter() { result = append(result, p) }
+    for p in self.nodes.children() { result = append(result, p) }
     return result
 }
 
-pub func Person.outgoing_edges(self) -> [Follow] {
+pub func Person.all_outgoing(self) -> [Follow] {
     let mut result: [Follow] = []
-    for e in self.outgoing_edges.iter() { result = append(result, e) }
+    for e in self.outgoing_edges.children() { result = append(result, e) }
     return result
 }
 
-pub func Person.incoming_edges(self) -> [Follow] {
+pub func Person.all_incoming(self) -> [Follow] {
     let mut result: [Follow] = []
-    for e in self.incoming_edges.iter() { result = append(result, e) }
+    for e in self.incoming_edges.children() { result = append(result, e) }
     return result
 }
 
-// (Follow.src/dst/weight are accessible directly — relation back-
-// pointers and f64 field auto-getters.  All six abstract members
-// have an exact-name match in the class scope.)
+pub func Follow.src_person(self) -> Person { return self.src.parent! }
+pub func Follow.dst_person(self) -> Person { return self.dst.parent! }
 
-impl WeightedDirectedGraph<Network, Person, Follow, f64> { }   // all auto-derived
+impl WeightedDirectedGraph<Network, Person, Follow, f64> {
+    G.nodes           = Network.all_nodes
+    N.outgoing_edges  = Person.all_outgoing
+    N.incoming_edges  = Person.all_incoming
+    E.src             = Follow.src_person
+    E.dst             = Follow.dst_person
+    E.weight          = Follow.weight       // f64 field auto-getter
+}
 
 pub func count_follows(net: Network) -> i32 {
     return net.count_edges()
@@ -314,26 +333,36 @@ relation DoublyLinked FlexNet:routes              owns [FlexRoute:net]
 relation DoublyLinked FlexRoute:outgoing_edges    refs [FlexVia:src]
 relation DoublyLinked FlexRoute:incoming_edges    refs [FlexVia:dst]
 
-pub func FlexNet.nodes(self) -> [FlexRoute] {
+pub func FlexNet.all_nodes(self) -> [FlexRoute] {
     let mut result: [FlexRoute] = []
-    for r in self.routes.iter() { result = append(result, r) }
+    for r in self.routes.children() { result = append(result, r) }
     return result
 }
 
-pub func FlexRoute.outgoing_edges(self) -> [FlexVia<W>] {
+pub func FlexRoute.all_outgoing(self) -> [FlexVia<W>] {
     let mut result: [FlexVia<W>] = []
-    for v in self.outgoing_edges.iter() { result = append(result, v) }
+    for v in self.outgoing_edges.children() { result = append(result, v) }
     return result
 }
 
-pub func FlexRoute.incoming_edges(self) -> [FlexVia<W>] {
+pub func FlexRoute.all_incoming(self) -> [FlexVia<W>] {
     let mut result: [FlexVia<W>] = []
-    for v in self.incoming_edges.iter() { result = append(result, v) }
+    for v in self.incoming_edges.children() { result = append(result, v) }
     return result
 }
+
+pub func FlexVia.src_route(self) -> FlexRoute { return self.src.parent! }
+pub func FlexVia.dst_route(self) -> FlexRoute { return self.dst.parent! }
 
 // Partial impl: W remains open; monomorphized per use site.
-impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> { }
+impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> {
+    G.nodes           = FlexNet.all_nodes
+    N.outgoing_edges  = FlexRoute.all_outgoing
+    N.incoming_edges  = FlexRoute.all_incoming
+    E.src             = FlexVia.src_route
+    E.dst             = FlexVia.dst_route
+    E.weight          = FlexVia.weight
+}
 
 pub func sum_flex_i32(net: FlexNet) -> i32 {
     return net.total_weight()              // W inferred = i32 via FlexVia<i32>
@@ -382,3 +411,54 @@ pub func sum_flex_f64(net: FlexNet) -> f64 {
 //   - **Helper functions bridge relation accessors to interface
 //     methods today** (Wave 1).  Wave 2 will absorb the helpers via
 //     relation equivalence so user code drops the wrapper boilerplate.
+
+// =========================================================================
+// main — exercise count_edges (default method) and total_weight (Numeric)
+// across all three impls: Part 2 (f32), Part 3 (f64), Part 4 (open W).
+// =========================================================================
+
+func main() {
+    // Part 2: FPGA router. 1 net → 2 routes → 2 vias (weights 1.5, 2.5).
+    let net = Net { name: "fpga" }
+    let r0 = Route { layer: 0 }
+    let r1 = Route { layer: 1 }
+    net.routes.append(r0)
+    net.routes.append(r1)
+    let v0 = Via { fuse_id: 100, weight: 1.5 }
+    let v1 = Via { fuse_id: 101, weight: 2.5 }
+    r0.a.append(v0)
+    r1.b.append(v0)
+    r0.a.append(v1)
+    r1.b.append(v1)
+    println(f"part2: count_fuses={count_fuses(net)} sum_weights={sum_fuse_weights(net)}")
+
+    // Part 3: follower network. 1 network → 3 people, A→B, A→C, B→C.
+    let nw = Network { name: "feed" }
+    let a = Person { handle: "alice" }
+    let b = Person { handle: "bob" }
+    let c = Person { handle: "carol" }
+    nw.nodes.append(a)
+    nw.nodes.append(b)
+    nw.nodes.append(c)
+    let f_ab = Follow { since: 100, weight: 0.5 }
+    let f_ac = Follow { since: 200, weight: 1.5 }
+    let f_bc = Follow { since: 300, weight: 0.25 }
+    a.outgoing_edges.append(f_ab)
+    b.incoming_edges.append(f_ab)
+    a.outgoing_edges.append(f_ac)
+    c.incoming_edges.append(f_ac)
+    b.outgoing_edges.append(f_bc)
+    c.incoming_edges.append(f_bc)
+    println(f"part3: count_follows={count_follows(nw)} total_engagement={total_engagement(nw)}")
+
+    // Part 4: weight-agnostic FlexNet — exercise sum_flex_f64 only.
+    // (sum_flex_i32 is declared but exercising it would need a separate
+    // FlexNet instance with FlexVia<i32> children; left as a compile
+    // check for the partial-impl monomorphization path.)
+    let fn0 = FlexNet { name: "flex" }
+    let fr = FlexRoute { layer: 0 }
+    fn0.routes.append(fr)
+    let fv = FlexVia<f64> { fuse_id: 1, weight: 3.0 }
+    fr.outgoing_edges.append(fv)
+    println(f"part4: sum_flex_f64={sum_flex_f64(fn0)}")
+}
