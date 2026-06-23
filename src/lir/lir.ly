@@ -712,6 +712,7 @@ lyric lir {
     slab_mode_soa: bool
     detect_uaf: bool
     rc_free: bool
+    unsafe_mode: bool   // -U flag: skip null checks on `!` unwrap for speed
   }
 
   // Resolve class_decl, is_permanent, is_owned on all LType nodes in the program.

@@ -687,6 +687,7 @@ module lir
     field slab_mode_soa: bool
     field structs: [LStructDecl]
     field type_defs: [LTypeDef]
+    field unsafe_mode: bool
     method resolve_class_types(self)
       source: lir.ly:721
 

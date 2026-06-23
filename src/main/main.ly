@@ -581,7 +581,7 @@ func dump_lir_to_file(prog: LProgram, path: string) {
 // compile_pipeline — shared parse/check/lower/emit pipeline
 // ---------------------------------------------------------------------------
 
-func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool {
+func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool, unsafe_mode: bool) -> bool {
   // Parse all input files
   let mut all_files: [File?] = []
   let mut i = 0
@@ -670,9 +670,13 @@ func compile_pipeline(inputs: [string], output: string, module_root: string, lir
   if detect_uaf {
     prog!.detect_uaf = true
   }
+  if unsafe_mode {
+    prog!.unsafe_mode = true
+  }
   if rc_free {
     prog!.rc_free = true
   }
+
   slab_rewrite(prog!)
 
 
@@ -700,6 +704,7 @@ func cmd_compile(args: [string]) -> bool {
   let mut soa = false
   let mut detect_uaf = false
   let mut rc_free = true
+  let mut unsafe_mode = false
   let mut i = 0  while i < len(args) {
     if args[i] == "-o" {
       i = i + 1
@@ -721,6 +726,8 @@ func cmd_compile(args: [string]) -> bool {
       rc_free = true
     } else if args[i] == "--no-rc" {
       rc_free = false
+    } else if args[i] == "-U" || args[i] == "--unsafe" {
+      unsafe_mode = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -778,7 +785,7 @@ func cmd_compile(args: [string]) -> bool {
     }
   }
 
-  return compile_pipeline(inputs, output, module_root, lir_dump, soa, detect_uaf, rc_free)
+  return compile_pipeline(inputs, output, module_root, lir_dump, soa, detect_uaf, rc_free, unsafe_mode)
 }
 
 // ---------------------------------------------------------------------------
@@ -792,6 +799,7 @@ func cmd_test(args: [string]) -> bool {
   let mut soa = false
   let mut detect_uaf = false
   let mut rc_free = true
+  let mut unsafe_mode = false
   let mut i = 0
   while i < len(args) {
     if args[i] == "-o" {
@@ -812,6 +820,8 @@ func cmd_test(args: [string]) -> bool {
       rc_free = true
     } else if args[i] == "--no-rc" {
       rc_free = false
+    } else if args[i] == "-U" || args[i] == "--unsafe" {
+      unsafe_mode = true
     } else {
       inputs = append(inputs, args[i])
     }
@@ -896,6 +906,9 @@ func cmd_test(args: [string]) -> bool {
   }
   if rc_free {
     prog!.rc_free = true
+  }
+  if unsafe_mode {
+    prog!.unsafe_mode = true
   }
   slab_rewrite(prog!)
 

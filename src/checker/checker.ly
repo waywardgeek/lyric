@@ -65,6 +65,7 @@ lyric checker {
     type_param_names: [string]
     type_param_constraints: [string]
     implements_list: [string]   // interface names this class implements
+    sub_scope_labels: Dict<Sym, bool>  // relation labels (one entry per SubScope on this class)
   }
 
   permanent class VariantInfo {
@@ -329,6 +330,7 @@ lyric checker {
       type_param_names: [],
       type_param_constraints: [],
       implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
     }
     self.registry.register(name, info)
     self.scope.define(name, t)
@@ -1278,6 +1280,7 @@ lyric checker {
           type_param_names: [],
           type_param_constraints: [],
           implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
         }
         self.registry.register(iname, stub)
       }
@@ -1295,6 +1298,7 @@ lyric checker {
           type_param_names: [],
           type_param_constraints: [],
           implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
         }
         self.registry.register(sname, stub)
       }
@@ -1312,6 +1316,7 @@ lyric checker {
           type_param_names: [],
           type_param_constraints: [],
           implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
         }
         self.registry.register(cname, stub)
       }
@@ -1329,6 +1334,7 @@ lyric checker {
           type_param_names: [],
           type_param_constraints: [],
           implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
         }
         self.registry.register(ename, stub)
       }
@@ -1392,6 +1398,7 @@ lyric checker {
           type_param_names: [],
           type_param_constraints: [],
           implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
         }
         self.registry.register(aname, info)
         self.scope.define(aname, t)
@@ -1692,6 +1699,7 @@ lyric checker {
         type_param_names: [],
         type_param_constraints: [],
         implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
       }
       self.registry.register(iname, info)
       info_opt = self.registry.lookup(iname)
@@ -1758,6 +1766,7 @@ lyric checker {
         type_param_names: [],
         type_param_constraints: [],
         implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
       }
       self.registry.register(sname, info)
       info_opt = self.registry.lookup(sname)
@@ -1824,6 +1833,7 @@ lyric checker {
         type_param_names: [],
         type_param_constraints: [],
         implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
       }
       self.registry.register(cname, info)
       info_opt = self.registry.lookup(cname)
@@ -1906,9 +1916,18 @@ lyric checker {
     // `unknown method: children` on `self.nodes.children()` because
     // `self.nodes` resolved to the user method, not the sub-scope.
     // Fire one diagnostic per collision naming both sides.
+    //
+    // The same pass also populates info.sub_scope_labels — a fast name
+    // lookup the dotted-scope dispatch sites consult to OVERRIDE the
+    // has_label check when the label exists as a sub-scope. Without
+    // this override Phase 1.5b's preemptive registration of an
+    // interface's abstract methods (e.g. `G.nodes`) onto the concrete
+    // class poisons has_label and the dotted-scope sugar can never
+    // fire for matching-name labels.
     for scope in cls.css.children() {
       if scope.label == null { continue }
       let label_name = sym_to_string(scope.label!)
+      info.sub_scope_labels.set(scope.label!, true)
       let hint_name = if scope.hint_iface != null { sym_to_string(scope.hint_iface!) } else { "<unknown hint>" }
       let side_str = if scope.side_index == 0 { "parent" } else { "child" }
       for f in cfields {
@@ -1987,6 +2006,7 @@ lyric checker {
         type_param_names: [],
         type_param_constraints: [],
         implements_list: [],
+      sub_scope_labels: Dict<Sym, bool>(),
       }
       self.registry.register(ename, info)
       info_opt = self.registry.lookup(ename)
@@ -2177,6 +2197,10 @@ lyric checker {
   // typed methods (func P.children, func C.label, etc.) to the actual type var names.
   func Checker.grant_relational_methods(self, iface_name: string, type_args: [TypeExpr]) {
     let iface_entry = self.iface_decls.get(sym(iface_name))
+    if iface_entry == null {
+      eprintln(f"checker: unknown interface '{iface_name}' in where clause — define the interface or remove the constraint")
+      os_exit(1)
+    }
     let iface = iface_entry!.value
 
     // Build interface type param name → where clause type arg name mapping
@@ -3769,7 +3793,8 @@ lyric checker {
           if info0 != null {
             let has_label = info0!.fields.has(sym(label_str)) || info0!.methods.has(sym(label_str))
             let has_comb = info0!.fields.has(sym(combined)) || info0!.methods.has(sym(combined))
-            if !has_label && has_comb {
+            let is_subscope = info0!.sub_scope_labels.has(sym(label_str))
+            if (is_subscope || !has_label) && has_comb {
               // Pull the existing mut_args off call_expr.kind to preserve
               // its [bool] type — synthesizing `[]` in this position trips
               // a Lyric codegen bug that emits LyricSlice_void.
@@ -4054,7 +4079,8 @@ lyric checker {
           if info0 != null {
             let has_label = info0!.fields.has(sym(label_str)) || info0!.methods.has(sym(label_str))
             let has_comb = info0!.fields.has(sym(combined)) || info0!.methods.has(sym(combined))
-            if !has_label && has_comb {
+            let is_subscope = info0!.sub_scope_labels.has(sym(label_str))
+            if (is_subscope || !has_label) && has_comb {
               parent_expr.kind = ExprKind.FieldAccess(inner, sym(combined))
               return self.check_field_access(parent_expr, inner, sym(combined))
             }
@@ -5012,6 +5038,63 @@ lyric checker {
   // healthy code base.
   // =====================================================================
 
+  // =====================================================================
+
+  // Validate that every where-clause constraint references a defined
+  // interface or one of the built-in constraints. Without this pass,
+  // an unknown constraint name (typo, or aspirational reference like
+  // `where Numeric<W>` before Numeric ships) silently flows into
+  // grant_relational_methods at function-body checking time and
+  // null-derefs on the missing iface_decls lookup. Catch it once,
+  // early, with a clean message naming the constraint and the func.
+
+  func Checker.validate_where_clauses(self, file: File) {
+    let blocks = file.fb.children()
+    for blk in blocks {
+      // Function-level where clauses.
+      for f in blk.fd.children() {
+        for wc in f.wc.children() {
+          if wc.constraint == null { continue }
+          let cname = sym_to_string(wc.constraint!)
+          if cname == "Comparable" || cname == "Equatable" || cname == "Hashable" { continue }
+          if self.iface_decls.has(sym(cname)) { continue }
+          let fname = if f.name != null { sym_to_string(f.name!) } else { "<unnamed>" }
+          eprintln(f"checker: unknown constraint '{cname}' in where clause of func '{fname}' — define the interface or use one of the built-in constraints (Comparable, Equatable, Hashable)")
+          os_exit(1)
+        }
+      }
+      // Class-level where clauses.
+      for c in blk.cd.children() {
+        for wc in c.cwc.children() {
+          if wc.constraint == null { continue }
+          let cname = sym_to_string(wc.constraint!)
+          if cname == "Comparable" || cname == "Equatable" || cname == "Hashable" { continue }
+          if self.iface_decls.has(sym(cname)) { continue }
+          let kname = if c.name != null { sym_to_string(c.name!) } else { "<unnamed>" }
+          eprintln(f"checker: unknown constraint '{cname}' in where clause of class '{kname}' — define the interface or use one of the built-in constraints (Comparable, Equatable, Hashable)")
+          os_exit(1)
+        }
+      }
+      // Interface methods can also carry where clauses on default-method bodies.
+      for iface in blk.id.children() {
+        for m in iface.im.children() {
+          for wc in m.wc.children() {
+            if wc.constraint == null { continue }
+            let cname = sym_to_string(wc.constraint!)
+            if cname == "Comparable" || cname == "Equatable" || cname == "Hashable" { continue }
+            if self.iface_decls.has(sym(cname)) { continue }
+            let mname = if m.name != null { sym_to_string(m.name!) } else { "<unnamed>" }
+            let iname = if iface.name != null { sym_to_string(iface.name!) } else { "<unnamed>" }
+            eprintln(f"checker: unknown constraint '{cname}' in where clause of interface method '{iname}.{mname}' — define the interface or use one of the built-in constraints (Comparable, Equatable, Hashable)")
+            os_exit(1)
+          }
+        }
+      }
+    }
+  }
+
+  // =====================================================================
+
   // Sub-scope collision diagnostic (sub-scope-refactor.md Tier 1) —
   // file-level pass for EXTERNAL receiver methods. The inner-method
   // case (`class C { func name(self) ... }`) is caught in register_class
@@ -5351,6 +5434,12 @@ lyric checker {
 
     // Phase 1.5: register interface methods using ALL impl blocks
     c.register_interface_methods(file)
+
+    // Phase 1.55: validate where-clause constraints reference real
+    // interfaces (or built-in constraints) — catch typos/aspirational
+    // references with a clean message rather than a downstream null
+    // deref in grant_relational_methods.
+    c.validate_where_clauses(file)
 
     // Phase 1.6: validate that every interface used as a relation hint
     // has the right shape (multi-class-interface-redesign §3.7).

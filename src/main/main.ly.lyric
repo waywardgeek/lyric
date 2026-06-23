@@ -82,7 +82,7 @@ module main
   func dump_lir_to_file(prog: LProgram, path: string)
     source: main.ly:508
 
-  func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool) -> bool
+  func compile_pipeline(inputs: [string], output: string, module_root: string, lir_dump: string, soa: bool, detect_uaf: bool, rc_free: bool, unsafe_mode: bool) -> bool
     source: main.ly:584
 
   func cmd_compile(args: [string]) -> bool

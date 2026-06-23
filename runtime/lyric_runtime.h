@@ -426,6 +426,21 @@ static inline lyric_string lyric_str_trim(lyric_string s) {
 #define lyric_isnull(opt) (!(opt).has)
 #define lyric_unwrap(opt) ((opt).val)
 
+/* Checked variants — emitted by the C backend in safe mode (default).
+ * The compiler's `-U` / `--unsafe` flag switches emission back to the
+ * unchecked forms above for benchmarks. Class-typed optionals are bare
+ * pointers (NULL = none); non-class optionals are the {has,val} struct. */
+#define lyric_unwrap_class(ptr) ({ \
+    __typeof__(ptr) _u = (ptr); \
+    if (_u == NULL) { fprintf(stderr, "panic: unwrap of null class optional\n"); exit(1); } \
+    _u; \
+})
+#define lyric_unwrap_checked(opt) ({ \
+    __typeof__(opt) _o = (opt); \
+    if (!_o.has) { fprintf(stderr, "panic: unwrap of null optional\n"); exit(1); } \
+    _o.val; \
+})
+
 /* -------------------------------------------------------------------------
  * Error Results  —  {bool is_err; T value; const char* error}
  * -------------------------------------------------------------------------

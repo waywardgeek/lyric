@@ -1942,14 +1942,21 @@ func CGen.emit_expr_str(self, e: LExpr?) -> string {
     ExUnwrapOptional => {
       let d = e!.unwrap_opt!
       let val_type = self.resolve_value_type(d.value)
+      let inner_str = self.emit_value(d.value)
       if !isnull(val_type) {
         let is_class = val_type!.kind is TyClassHandle
         let is_opt_class = self.is_class_optional(val_type)
         if is_class || is_opt_class {
-          return self.emit_value(d.value)
+          if self.prog!.unsafe_mode {
+            return inner_str
+          }
+          return f"lyric_unwrap_class({inner_str})"
         }
       }
-      return f"lyric_unwrap({self.emit_value(d.value)})"
+      if self.prog!.unsafe_mode {
+        return f"lyric_unwrap({inner_str})"
+      }
+      return f"lyric_unwrap_checked({inner_str})"
     }
     ExIsNull => {
       let d = e!.is_null!
