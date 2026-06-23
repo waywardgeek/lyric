@@ -212,6 +212,15 @@ lyric ast {
   }
   relation ArrayList ImplBlock:ib_arg owns [ImplTypeArg:ib_arg]
   relation ArrayList ImplBlock:ibm owns [ImplMapping:ibm]
+  // Per-impl type parameters for partial impls (Phase 4 Wave 1 / 4w1-d).
+  //   impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> { }
+  // Each TypeParam here must appear in ib_arg.type_expr somewhere (the
+  // checker enforces this). The checker pushes these into scope before
+  // resolving impl_arg type expressions so references like FlexVia<W>
+  // resolve. Empty for non-partial impls. Label is `imtp` (not `itp`)
+  // because TypeParam already has an `itp` back-pointer to InterfaceDecl,
+  // and Lyric's relation labels live in a flat per-child namespace.
+  relation ArrayList ImplBlock:imtp owns [TypeParam:imtp]
 
   // Per-class-type-variable label on an impl declaration's top-level
   // type argument. The label selects the sub-scope on the bound class

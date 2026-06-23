@@ -677,8 +677,21 @@ lyric parser {
   func Parser.parse_impl(self) -> (ImplBlock?, error) {
     let start = self.peek().span.start
     self.next()  // consume 'impl'
+    let impl_block = ImplBlock { span: Span { start: start, end: start } }
+
+    // Optional per-impl type params: `impl<W>` (Phase 4 Wave 1 / 4w1-d).
+    // Distinguished from the interface's type-args (which come after
+    // the interface name) by position. Bare TypeParam list — constraints
+    // are accepted by parse_type_params so `impl<T: Numeric>` parses.
+    if self.peek().kind == PLt {
+      let params = self.parse_type_params()?
+      for tp in params {
+        array_append<ImplBlock, TypeParam>(impl_block, tp)
+      }
+    }
+
     let name = self.expect(LIdent)?
-    let impl_block = ImplBlock { interface_name: sym(name!.text), span: Span { start: start, end: start } }
+    impl_block.interface_name = sym(name!.text)
 
     if self.peek().kind == PLt {
       self.next()
