@@ -437,7 +437,20 @@ func CGen.c_type(self, t: LType?) -> string {
       return self.opt_type_name(t!.elem)
     }
     TyTaggedUnion => { return t!.name }
-    TyGenerator => { return "void* /* generator */" }
+    TyGenerator => {
+      // Reaching c_type(TyGenerator) means a generator-typed value escaped
+      // to a generic declaration site (StTempDef / StVarDecl / parameter)
+      // without being intercepted by a gen-aware emitter. Falling back to
+      // "void* /* generator */" produces C that compiles but routes
+      // through "unknown_gen" at the iter site — silently broken.
+      //
+      // Callers that legitimately hold a TyGenerator temp must consult the
+      // producing expression and emit the proper {base}_gen_t* directly.
+      // See StTempDef in emit_stmt for the canonical pattern.
+      eprintln("c_backend[c_type]: TyGenerator reached generic c_type path; callers must derive base_gen_t* from the producing expression at StTempDef/StVarDecl emission. Falling back to void* is forbidden (silently broken at the iter site).")
+      os_exit(1)
+      return ""
+    }
     TyChannel => {
       if !isnull(t!.elem) {
         let suffix = self.chan_suffix(t!.elem)
@@ -2757,6 +2770,21 @@ func CGen.emit_stmt(self, s: LStmt?) {
         return
       }
       let temp_name = f"_t{d.id}"
+      // Generator-typed temps cannot go through c_field_decl — TyGenerator
+      // has no generic C representation (it's not "void*"). Derive the
+      // {base}_gen_t* struct pointer from the producing call expression.
+      // Without this special case, c_type panics on TyGenerator.
+      if !isnull(ty) && ty!.kind is TyGenerator {
+        let base = self.extract_func_name_from_expr(d.expr)
+        if base == "" {
+          let mut fn_name = "<unknown>"
+          if !isnull(self.current_func) { fn_name = self.current_func!.name }
+          eprintln(f"c_backend[StTempDef]: TyGenerator temp _t{d.id} in function '{fn_name}' has no resolvable producing call (extract_func_name_from_expr returned empty); cannot derive base_gen_t* — compiler invariant violation")
+          os_exit(1)
+        }
+        self.line(f"{base}_gen_t* {temp_name} = {self.emit_expr_str(d.expr)};")
+        return
+      }
       self.line(f"{self.c_field_decl(ty, temp_name)} = {self.emit_expr_str(d.expr)};")
     }
     StVarDecl => {
@@ -3440,7 +3468,9 @@ func CGen.resolve_gen_base_name(self, v: LValue?) -> string {
     }
     return name
   }
-  eprintln("c_backend[resolve_gen_base_name]: TyGenerator collection is not a ValTemp; this path is unimplemented and must not be reached silently")
+  let mut kind_name = "null LValue"
+  if !isnull(v) { kind_name = "non-ValTemp LValue" }
+  eprintln(f"c_backend[resolve_gen_base_name]: TyGenerator collection is a {kind_name}, not a ValTemp; this path is unimplemented and must not be reached silently")
   os_exit(1)
   return ""
 }
