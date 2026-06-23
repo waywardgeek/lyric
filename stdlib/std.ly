@@ -194,6 +194,16 @@ lyric std {
       unref child
     }
 
+    // Forward iteration: `for c in parent.label.children() { ... }`
+    pub func P.children(self) -> gen C {
+      let mut cur = self.first
+      while !isnull(cur) {
+        let nxt = cur!.next
+        yield cur!
+        cur = nxt
+      }
+    }
+
     // 'owns': walk forward, detach each child, destroy it.
     destructor owns P {
       let mut cur = self.first()

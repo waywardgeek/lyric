@@ -207,7 +207,20 @@ module desugar
     → ib_args[1].label) NOT into a single impl-block-wide label slot
     (which no longer exists). Existing labels on the impl-type-args take
     precedence over the relation's labels — user-authored impls win over
-    relation-synthesized labels. See cr/docs/multi-class-interface-
+    relation-synthesized labels.
+
+    Per-side labels are also part of an impl's IDENTITY for the find-
+    or-create lookup in Phase A. Two relations sharing the same (hint,
+    parent_class, child_class) but differing in their labels (e.g.
+    `DoublyLinked Node:fwd refs [Edge:a]` vs
+    `DoublyLinked Node:bwd refs [Edge:b]`) MUST produce two
+    independent impl blocks. The matcher therefore merges with an
+    existing impl only when each side's existing label is either
+    unset (slot still open for a label drop) or exactly equal to the
+    relation's label. Without this rule, the second relation's labels
+    get silently dropped on the floor and only the first relation's
+    label-prefixed fields are injected, producing "field 'bwd' not
+    found" errors at use sites. See cr/docs/multi-class-interface-
     redesign.md §3.8.
     """
 

@@ -302,6 +302,14 @@ lyric desugar {
         if parent_name == "" || child_name == "" { continue }
 
         // Look for existing impl block matching (hint, parent, child).
+        // Per-side labels are part of the relation's identity: an existing
+        // impl with non-null labels that DON'T match this relation's labels
+        // is a different relation (e.g. `Node:fwd refs [Edge:a]` vs
+        // `Node:bwd refs [Edge:b]` — two independent DLLs over the same
+        // (Node, Edge) pair). We only merge when both labels are either
+        // null (slot still open) or match the relation's labels exactly.
+        let rel_p_label = if !isnull(rel.parent.label) { rel.parent.label!.name } else { "" }
+        let rel_c_label = if !isnull(rel.child.label) { rel.child.label!.name } else { "" }
         let mut existing: ImplBlock? = null
         for ib in block.ib.children() {
           if !isnull(ib.interface_name) && ib.interface_name!.name == rel.hint!.name {
@@ -310,7 +318,13 @@ lyric desugar {
               let n0 = if !isnull(ta[0].type_expr) { type_expr_name(ta[0].type_expr!) } else { null }
               let n1 = if !isnull(ta[1].type_expr) { type_expr_name(ta[1].type_expr!) } else { null }
               if !isnull(n0) && !isnull(n1) && n0!.name == parent_name && n1!.name == child_name {
-                existing = ib
+                let p_lab = if !isnull(ta[0].label) { ta[0].label!.name } else { "" }
+                let c_lab = if !isnull(ta[1].label) { ta[1].label!.name } else { "" }
+                let p_ok = (p_lab == "") || (rel_p_label != "" && p_lab == rel_p_label)
+                let c_ok = (c_lab == "") || (rel_c_label != "" && c_lab == rel_c_label)
+                if p_ok && c_ok {
+                  existing = ib
+                }
               }
             }
           }
