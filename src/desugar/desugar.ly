@@ -1689,6 +1689,18 @@ lyric desugar {
         substitute_type_params_rich_in_expr(receiver, type_map)
         substitute_type_params_rich_in_expr(index, type_map)
       }
+      Cast(target_type, operand) => {
+        // The cast TARGET type carries TypeVar references that must be
+        // substituted alongside everything else (e.g. `0 as W` inside a
+        // specialized default-method body). The trailing wildcard arm
+        // below silently drops nodes — see TODO.md "Generic AST visitor
+        // refactor"; once that lands, this and its sibling Lambda/
+        // Match/StructLit/IfElse/Try/etc. drops become structurally
+        // impossible because forgetting an arm in one centralized
+        // visitor is a real diagnostic, not silent incompleteness.
+        substitute_type_params_rich_in_type_expr(target_type, type_map)
+        substitute_type_params_rich_in_expr(operand, type_map)
+      }
       _ => {}
     }
   }

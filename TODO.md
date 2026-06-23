@@ -38,6 +38,106 @@
 
 ## Known Tech Debt
 
+### Generic AST visitor refactor
+Multiple passes in desugar/checker/lir hand-roll the same recursive
+walk of the AST, one match-arm per Expr/Stmt/TypeExpr variant:
+- `substitute_type_params_rich_in_{block,stmt,expr,type_expr}` in
+  desugar.ly
+- `deep_copy_expr` / `deep_copy_block` in desugar.ly
+- `rename_method_calls_in_{block,stmt,expr}` in desugar.ly
+- TypeVar-leak scan in `validateAllExprsResolved` (checker.ly)
+- (Probably more in lir/lowerer.ly and the optimizer.)
+
+Each of these has — or will have — the same bug shape: an arm gets
+forgotten for some Expr kind (Cast, Lambda, Match, StructLit,
+IfElse, Try, TupleLit, StringInterp, ListLit, MapLit, Slice,
+Unwrap, Is), the trailing `_ => {}` wildcard swallows it, and the
+pass silently misses a sub-tree. The Cast/`0 as W`/W-leak bug
+in default-method specialization (fixed 2026-06-23) was exactly
+this shape and is unlikely to be the last.
+
+**Right factoring** (centralize the per-variant enumeration):
+- New file `src/ast/visit.ly` (or similar) exporting:
+    - `for_each_subexpr(e: Expr, cb: fn(Expr))`
+    - `for_each_subtypeexpr_in_expr(e: Expr, cb: fn(TypeExpr))`
+    - `for_each_substmt(s: Stmt, cb: fn(Stmt))`
+    - `for_each_expr_in_stmt(s: Stmt, cb: fn(Expr))`
+    - `walk_exprs_deep(root, cb)` / `walk_typeexprs_deep_*` /
+      `walk_stmts_deep_*` built on the above.
+- Rewrite each consumer above as a one-liner over the appropriate
+  `walk_*_deep`. Forgetting a variant in ONE centralized visitor
+  is a real diagnostic (entire AST kind silently unwalked),
+  vastly more visible than the current N×M silent drops.
+- The AST is full Lyric — relation back-pointers (e.g.
+  `Block:bs owns [Stmt:b]`) handle parent walks orthogonally.
+
+Expected size: ~150 LOC for the visitor primitives + delete ~500
+LOC across the consumers above. Bug-prevention value: structural
+elimination of an entire class of "forgot a case" defects.
+
+### Multi-class interface default-method alias resolution
+Default methods declared on a multi-class interface and specialized
+into concrete classes (desugar pass 4.5) currently FAIL to resolve
+alias-form impl bindings inside the specialized body. Example:
+
+```lyric
+interface DG<G, N, E> {
+    pub func N.outgoing_edges(self) -> [E]
+    pub func G.bfs(self, start: N) -> [N] {
+        // ...
+        for e in n.outgoing_edges() { ... }   // ← unknown method
+    }
+}
+impl DG<Net, Route, Via> {
+    N.outgoing_edges = Route.outgoing_a    // alias-form
+    // ...
+}
+```
+
+After desugar pass 4.5 specializes bfs for `<Net, Route, Via>`,
+the specialized body's `n.outgoing_edges()` (n: Route) errors with
+"unknown method: outgoing_edges" because Phase 1.5b only registers
+the interface abstract NAME on the concrete class when the impl
+is empty-body / direct-match — alias-form bindings register the
+TARGET name (`Route.outgoing_a`), not the interface name.
+
+**Design (Bill 2026-06-23):** desugar should not substitute method
+call names (it lacks types) — instead, attach the per-impl alias
+rename table to each specialized FuncDecl as a back-pointer to the
+source ImplBlock. The checker, when resolving `expr.member` inside
+a function whose `source_impl != null`, consults the impl's
+bindings first: for each `IfaceTypeVar.member = ConcreteClass.alias`
+binding whose (substituted) class matches the receiver and whose
+member matches the call, rewrite to the alias target. Handles both
+method-alias and field-alias (field auto-getter) forms uniformly.
+
+Add `FuncDecl.source_impl: ImplBlock?` (null for normal funcs).
+Set in desugar pass 4.5 when deep-copying default-method bodies.
+Consult in checker method-resolution + field-access dispatch
+before falling through to normal lookup.
+
+This unblocks `testdata/graph.ly` Parts 2-4. Without it, graph.ly
+remains baseline FAIL.
+
+### Built-in constraints hard-coded in checker
+- `Comparable`, `Equatable`, `Hashable`, and (planned) `Numeric` are
+  recognized by string-match in `satisfies_constraint` (zero callers
+  today) and were previously enforced by `validate_where_clauses`
+  (now disabled — call commented out in `check_program`).
+- They should be defined as **marker interfaces** (zero methods) in
+  `stdlib/std.ly`, e.g. `interface Numeric<T> { }`, so:
+    1. They appear in `iface_decls` like any other interface.
+    2. `satisfies_constraint` becomes a structural lookup (iface +
+       type → built-in dispatch table for primitive admission)
+       instead of a string-match.
+    3. `grant_relational_methods` no longer needs the marker-skip
+       branch — empty method set falls through naturally.
+    4. `validate_where_clauses` can be re-enabled with the standard
+       `iface_decls.has(name)` check covering all four uniformly.
+- Until this lands, `where Numeric<W>` compiles because
+  `grant_relational_methods` skips cleanly and the validator is
+  off — but typos like `where Comparible<T>` silently succeed.
+
 ### `class_renames` global map — last-writer-wins
 - Multiple specializations of the same generic class overwrite each other in the global map
 - Causes subtle bugs with multi-class interfaces + generics
