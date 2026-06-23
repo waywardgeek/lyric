@@ -51,6 +51,21 @@ module desugar
        Multiple impls touching the same class append wrapped block-
        stmts. Method calls inside the copy are renamed to their
        label-prefixed forms using ib_args[i].label.
+    4.5. desugar_specialize_default_impls — for each plain impl block
+       (impl.kind == null) of a user-authored multi-class interface,
+       emits a fully-substituted concrete copy of every default-bodied
+       interface method as a top-level FuncDecl on the concrete
+       receiver class. The impl's per-side type-arg bindings (G→Net,
+       N→Route, E→Via, W→f32) are baked in via rich substitution at
+       desugar time, so the monomorphizer never has to recover N and
+       E from receiver-only type inference (which it can't). Skips
+       methods the impl overrides via an explicit ImplMapping. Carries
+       impl-level type-params (ib.imtp) onto the specialized fn so
+       partial impls (`impl<W> Iface<..., W>`) remain generic in W.
+       Panics on collision: two impls producing the same Class.method
+       specialization is a user error (use distinct labels or provide
+       an explicit alias binding in one impl). See
+       cr/docs/multi-class-interface-redesign.md §9 Phase 4 Wave 1 4w1-a.
     5. desugar_default_impls — extracts interface methods that carry a
        body into top-level generic functions guarded by relational
        `where` clauses, so any conforming class picks them up.
@@ -87,11 +102,16 @@ module desugar
       2. desugar_field_access
       3. desugar_relations
       4. desugar_destructors
+      4.5. desugar_specialize_default_impls
       5. desugar_default_impls
 
     Each pass generates AST consumed by later passes. Running out of
     order produces silent failures (missing fields, unrenamed method
-    calls). All six passes MUST complete before the checker runs.
+    calls). All seven passes MUST complete before the checker runs.
+
+    Pass 4.5 MUST run BEFORE pass 5 because pass 5 moves bodied
+    FuncDecls off the interface; pass 4.5 deep-copies from them and
+    needs them still attached.
     """
 
   invariant "Cross-Block Class Lookup":
@@ -239,6 +259,9 @@ module desugar
 
   func desugar_destructors(file: File)
     source: desugar.ly:351
+
+  func desugar_specialize_default_impls(file: File)
+    source: desugar.ly:712
 
   func desugar_default_impls(file: File)
     source: desugar.ly:513

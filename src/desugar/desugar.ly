@@ -670,6 +670,159 @@ lyric desugar {
       }
     }
   }
+  // ---- 4.5. DesugarSpecializeDefaultImpls ----
+  // For each plain `impl Iface<Concrete...> { aliases }` block, emit a
+  // fully-substituted concrete copy of every default-bodied interface
+  // method as a top-level function on the concrete receiver class. The
+  // impl's type-arg bindings are known at desugar time, so we substitute
+  // them in directly — no monomorphizer needed.
+  //
+  // Bodies reference the interface's named surface (`self.nodes()`,
+  // `n.outgoing_edges()`). With the receiver substituted to the concrete
+  // class and the loop-variable types substituted to their concrete
+  // bindings, those calls resolve to alias-wrapper methods that the
+  // lowerer synthesizes from the impl's ImplMappings (lowerer.ly:701,
+  // `lower_impl_block`). End-to-end: this pass + the lowerer's existing
+  // wrapper emission = working default-method calls without any
+  // monomorphizer involvement.
+  //
+  // Runs BEFORE desugar_default_impls (pass 5) because that pass moves
+  // the bodied FuncDecls off the interface and onto the block — we need
+  // them still on the interface to deep-copy from.
+  //
+  // Override: if the impl explicitly binds the method (an ImplMapping
+  // whose method_name matches), the user's binding wins and we skip
+  // the specialized copy.
+  //
+  // Partial impls (`impl<W> Iface<..., W>`): the impl's own type-params
+  // (ib.imtp) get carried onto the specialized function. The
+  // monomorphizer's existing single-var specialization path handles the
+  // remaining W per use site.
+  //
+  // Collision: if two impls produce the same `Class.method` specialization
+  // (e.g. a class impls two unrelated interfaces with a same-named
+  // default method, neither overriding), this is a user error. We panic
+  // with a clear message pointing at the receiver+method; the user can
+  // disambiguate by labeling one of the interfaces (Wave 2 work) or by
+  // providing an explicit alias binding in one of the impls.
+
+  func desugar_specialize_default_impls(file: File) {
+    // Cross-block interface index.
+    let mut iface_index: Dict<Sym, InterfaceDecl> = Dict<Sym, InterfaceDecl>()
+    for block in file.fb.children() {
+      for iface in block.id.children() {
+        if !isnull(iface.name) {
+          iface_index.set(iface.name!, iface)
+        }
+      }
+    }
+
+    // Collision tracker keyed on "ClassName.method_name".
+    let mut emitted: Dict<Sym, bool> = Dict<Sym, bool>()
+
+    for block in file.fb.children() {
+      for ib in block.ib.children() {
+        if isnull(ib.interface_name) { continue }
+        if !isnull(ib.kind) { continue }    // owns/refs impl — destructor pass owns it
+
+        let iface_entry = iface_index.get(ib.interface_name!)
+        if isnull(iface_entry) { continue }
+        let iface = iface_entry!.value
+
+        // Build the substitution maps from iface type-params to impl bindings.
+        // rich_map preserves full type args (needed for Dict<K,V>, FlexVia<W>);
+        // str_map gives quick lookup of the top-level concrete class name for
+        // receiver-type rewriting (which uses Sym, not TypeExpr).
+        let iface_tps = iface.itp.children()
+        let impl_args = ib.ib_arg.children()
+        let mut rich_map: Dict<Sym, TypeExpr> = Dict<Sym, TypeExpr>()
+        let mut str_map: Dict<Sym, string> = Dict<Sym, string>()
+        let mut limit = len(iface_tps)
+        if len(impl_args) < limit { limit = len(impl_args) }
+        for i in range(0, limit) {
+          if !isnull(iface_tps[i].name) && !isnull(impl_args[i].type_expr) {
+            rich_map.set(iface_tps[i].name!, impl_args[i].type_expr!)
+            match impl_args[i].type_expr!.kind {
+              Named(nm, _) => { str_map.set(iface_tps[i].name!, nm.name) }
+              _ => {}
+            }
+          }
+        }
+
+        // Override set: methods explicitly bound by the impl win over defaults.
+        let mut override_set: Dict<Sym, bool> = Dict<Sym, bool>()
+        for m in ib.ibm.children() {
+          if !isnull(m.method_name) {
+            override_set.set(m.method_name!, true)
+          }
+        }
+
+        // Walk default-bodied methods on the iface. Pass 0 (extends) has
+        // already flattened parent methods into child, so iface.im
+        // contains everything.
+        for m in iface.im.children() {
+          if isnull(m.body) { continue }         // abstract — skip
+          if isnull(m.name) { continue }
+          if isnull(m.receiver_type) { continue }
+          if override_set.has(m.name!) { continue }
+
+          // Resolve the concrete receiver class via str_map.
+          let recv_entry = str_map.get(m.receiver_type!)
+          if isnull(recv_entry) { continue }
+          let recv_class_name = recv_entry!.value
+
+          let key_sym = sym(recv_class_name + "." + m.name!.name)
+          if emitted.has(key_sym) {
+            panic("desugar: default-method specialization collision on " +
+                  recv_class_name + "." + m.name!.name +
+                  " — two impls produce the same specialization. " +
+                  "Disambiguate with an explicit alias binding in one impl.")
+          }
+          emitted.set(key_sym, true)
+
+          // Deep-clone with empty string-map (no string substitution; rich
+          // substitution below handles everything).
+          let empty_map: Dict<Sym, string> = Dict<Sym, string>()
+          let fn = deep_copy_func_decl(m, empty_map)
+
+          // Rich substitution: param types, return type, body, where-clauses.
+          for p in fn.param.children() {
+            if !isnull(p.type_expr) {
+              substitute_type_params_rich_in_type_expr(p.type_expr!, rich_map)
+            }
+          }
+          if !isnull(fn.return_type) {
+            substitute_type_params_rich_in_type_expr(fn.return_type!, rich_map)
+          }
+          if !isnull(fn.body) {
+            substitute_type_params_rich_in_block(fn.body!, rich_map)
+          }
+          for wc in fn.wc.children() {
+            for wa in wc.wc_arg.children() {
+              substitute_type_params_rich_in_type_expr(wa, rich_map)
+            }
+          }
+
+          // Receiver becomes the concrete class.
+          fn.receiver_type = sym(recv_class_name)
+
+          // Carry impl-level type-params (partial impls) onto the fn so the
+          // monomorphizer still sees them as the remaining free vars.
+          for tp in ib.imtp.children() {
+            let new_tp = TypeParam {
+              name: tp.name,
+              constraint: tp.constraint,
+              span: tp.span,
+            }
+            array_append<FuncDecl, TypeParam>(fn, new_tp)
+          }
+
+          array_append<LyricBlock, FuncDecl>(block, fn)
+        }
+      }
+    }
+  }
+
   // ---- 5. DesugarDefaultImpls ----
   // Extracts interface methods with bodies into top-level functions
   // with relational where clauses.
@@ -925,6 +1078,7 @@ lyric desugar {
     desugar_field_access(file)
     desugar_relations(file)
     desugar_destructors(file)
+    desugar_specialize_default_impls(file)
     desugar_default_impls(file)
   }
 
