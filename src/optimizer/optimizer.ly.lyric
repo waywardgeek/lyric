@@ -61,12 +61,34 @@ module optimizer
   invariant "Side-Effect Safety on Elimination":
     procedural
     """
-    When eliminate_unused_temps drops a VarDecl whose RHS is_side_effect_expr
-    (Call, MethodCall, push, append, sort, reverse, remove, extend), it MUST
-    convert the decl to StSideEffect rather than deleting it. Otherwise an
-    unused-result call like `_ = list.push(x)` would be silently optimized
-    away, changing program semantics. Pure expressions (literals, var reads,
-    arithmetic, field reads) may be deleted outright.
+    is_side_effect_expr is the SINGLE source of truth for which expressions
+    survive dead-temp elimination. It is consulted twice: by Pass 1
+    (fuse_side_effect_temps) when converting `_tN = call(); _ = _tN` into
+    StSideEffect, and by Pass 5 (eliminate_unused_temps) when deciding
+    whether an unused temp's RHS should be preserved as StSideEffect or
+    dropped entirely.
+
+    Three categories belong in the whitelist:
+
+    1. I/O and mutating container ops (push, append, sort, reverse, remove,
+       extend, channel_close, channel_receive). Dropping an unused-result
+       call like `_ = list.push(x)` silently loses the mutation.
+
+    2. Diagnostic builtins (println, eprintln, print, eprint, assert,
+       assert_eq, panic). These produce observable output even when the
+       value is discarded.
+
+    3. NORETURN / process-terminating builtins (os_exit, exit, abort).
+       Without these in the list, Pass 5 sees `_tN = os_exit(1)` with no
+       consumer, returns false from is_side_effect_expr, and drops the
+       entire StTempDef — turning a panic site into a fallthrough that
+       silently produces wrong output. Found 2026-06-23 when class-method
+       generator panics with plain-string eprintln (no sprintf temp to
+       keep them alive) were being optimized away.
+
+    Pure expressions (literals, var reads, arithmetic, field reads) may be
+    deleted outright. ExCall and ExMethodCall always return true — we
+    conservatively assume any user-defined call may have side effects.
     """
 
   invariant "Temp ID Normalization":

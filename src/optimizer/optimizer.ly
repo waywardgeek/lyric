@@ -139,6 +139,16 @@ func is_side_effect_expr(e: LExpr) -> bool {
           b!.name == "assert" ||
           b!.name == "assert_eq" ||
           b!.name == "panic" ||
+          // Noreturn / process-terminating builtins. Without these, Pass 5
+          // (eliminate_unused_temps) drops `_tN = os_exit(1)` entirely
+          // when _tN is unused — silently turning a panic site into a
+          // fallthrough. Found 2026-06-23: c_backend's plain-string
+          // eprintln+os_exit pairs were being optimized away because the
+          // sprintf-less form produces an unused temp that this whitelist
+          // didn't cover. Do not remove without auditing every panic site.
+          b!.name == "os_exit" ||
+          b!.name == "exit" ||
+          b!.name == "abort" ||
           b!.name == "append" ||
           b!.name == "slice_push" ||
           b!.name == "slice_extend" ||
