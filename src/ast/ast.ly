@@ -1182,6 +1182,29 @@ func merge_stdlib(file: File?, std_file: File?) {
         }
     }
 
+    // Build set of class names that WILL be merged into the user file, so
+    // we can keep stdlib methods together with their receiver classes.
+    // Methods whose receiver class isn't being merged are broken-by-
+    // construction: their bodies reference fields/methods of a class that
+    // the checker can't find in the registry, so `self` falls back to
+    // TypeVar(<receiver>) and the first field access blows up.
+    // (User code is unaffected — this guard only narrows the stdlib pull-in.)
+    let pulled_receivers = Dict<Sym, bool>()
+    for ci in range(0, len(std_classes)) {
+        if std_classes[ci].name != null {
+            pulled_receivers.set(sym(std_classes[ci].name!.name), true)
+        }
+    }
+    // User-defined classes also count as valid receivers.
+    for bi in range(0, len(blocks)) {
+        let user_classes = blocks[bi].cd.children()
+        for ci in range(0, len(user_classes)) {
+            if user_classes[ci].name != null {
+                pulled_receivers.set(sym(user_classes[ci].name!.name), true)
+            }
+        }
+    }
+
     // Collect functions that return/use referenced stdlib classes or are called
     let mut std_funcs: [FuncDecl] = []
     let merged_funcs = Dict<Sym, bool>()
@@ -1194,6 +1217,18 @@ func merge_stdlib(file: File?, std_file: File?) {
         let fentry = std_func_map.get(fname)
         if fentry == null { continue }
         let fn_ = fentry!.value
+        // Methods (receiver_type != null): only merge when the receiver
+        // class is also being merged. Primitive-receiver methods are
+        // handled by a dedicated loop below (i32.get_hash, etc.) — skip
+        // them here so the missing-receiver guard doesn't false-positive
+        // on primitives that aren't in std_class_map.
+        if fn_.receiver_type != null {
+            let rname = fn_.receiver_type!.name
+            if !is_primitive_type(rname) {
+                let recv_in_pull = pulled_receivers.get(sym(rname))
+                if recv_in_pull == null { continue }
+            }
+        }
         let called = used_func_names.get(fname)
         let refs_types = ast_func_references_types(fn_, used_types)
         if called != null || refs_types {
@@ -1337,6 +1372,21 @@ func merge_stdlib(file: File?, std_file: File?) {
                 let fentry = std_func_map.get(fname)
                 if fentry != null {
                     let fn_ = fentry!.value
+                    // Same guard as the initial merge loop: never pull a
+                    // method whose receiver class isn't being merged.
+                    // Without this, a transitively-reached call to bare
+                    // `len` (called by some other stdlib fn we pulled in)
+                    // pulls Dict.len even when Dict isn't merged, and the
+                    // checker then panics on `self.d` in Dict.len's body.
+                    let mut skip_no_recv = false
+                    if fn_.receiver_type != null {
+                        let rname = fn_.receiver_type!.name
+                        if !is_primitive_type(rname) {
+                            let recv_in_merged = merged_classes.get(sym(rname))
+                            if recv_in_merged == null { skip_no_recv = true }
+                        }
+                    }
+                    if skip_no_recv { continue }
                     merged_funcs.set(fname, true)
                     std_funcs = append(std_funcs, fn_)
                     changed = true

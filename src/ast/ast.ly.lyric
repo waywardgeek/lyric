@@ -20,6 +20,20 @@ module ast
     5. Repeat until no new dependencies discovered
     This avoids bloating the binary with unused stdlib code.
 
+    INVARIANT: NEVER merge a method (FuncDecl with receiver_type != null) into
+    the user file unless its receiver class is ALSO being merged. A method
+    without its receiver class is broken-by-construction — the checker's
+    Phase 2 free-function loop falls back to `self: TypeVar(<receiver>)`
+    when `registry.lookup(receiver)` fails, and any field access in the
+    method body then panics ("field X not found on type ''"). Primitive
+    receivers (i32, u64, …) are exempt — they're handled by a dedicated
+    pass below since they aren't in std_class_map.
+    Found 2026-06-23 after fixing the optimizer DCE bug that was silently
+    swallowing exit(1) in the checker's panic site, masking 22 tests.
+    Triggering pattern: user calls bare `len(s)` (string builtin); merge
+    sees "len" in used_func_names, std_func_map["len"] holds Dict.len
+    (last `pub func *.len` wins), pulls Dict.len without Dict the class.
+
     Module Resolution (Namespace Flattening): resolve_module_imports flattens
     packages into a single global namespace in 3 phases:
     1. Prefixing: all declarations in imported package get prefix (e.g. math.sin → math_sin)
