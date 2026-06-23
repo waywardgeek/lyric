@@ -1490,215 +1490,193 @@ cannot do this reliably; a parser-aware tool can.
 Block migrating the bootstrap compiler on shipping this tool. The
 bootstrap source is ~30K lines; manual migration is not viable.
 
-### Phase 4: User-authored multi-class generic interfaces with relation equivalence
+### Phase 4: User-authored multi-class generic interfaces
 
-**Pivot note (2026-06-23):** the previous Phase 4 plan committed in
-commit `21b4ae5` framed this work around `constraint` aliases,
-`Collection<P,C>` as the load-bearing algorithm substrate, labels-in-
-where-clauses, and grouped-impl-on-constraint-alias. That design
-hit a fatal hole: when the user's relation labels don't match the
-algorithm's expected names (the FPGA `Route:a/Route:b → :out/:in`
-case), the per-Collection-instance impl-alias form scattered the
-user's binding decisions across N separate impls. Worse: the user
-had no syntactic locus to write the binding in ONE place, so silent
-semantic bugs from inconsistent bindings were a near-certainty.
+**Wave-split note (2026-06-23):** the empirical probe this morning
+showed that the alias-form impl (`G.nodes = SimpleGraph.get_nodes`)
+already parses and resolves through the checker. The relation-
+equivalence syntax from the prior plan is pure ergonomic sugar (3
+impl lines vs 5 in the FPGA case, subsumed iter/count/parent); it
+is NOT load-bearing. Phase 4 splits cleanly into a minimum-viable
+Wave 1 (fields/methods only, ships now) and a deferred Wave 2
+(relation equivalence + stdlib Collection vocabulary).
 
-The pivoted design (Bill + Hewitt, 2026-06-23 evening review)
-puts user-authored multi-class generic interfaces at the center.
-The canonical design sketch lives in `testdata/graph.ly` (v6 — see
-commit `a99ae9b`); read it first, then this plan.
-
-**Overview**: ship user-authored multi-class generic interfaces with
-default methods, `extends` for desugar-time composition, abstract-
-relation declarations on type-variable parent/child sides, the impl-
-block `relation equivalence` syntax, the `field/method equivalence`
-syntax, and empty-body auto-derive. This is the load-bearing spec
-deliverable that unblocks `testdata/graph.ly` and `testdata/tree.ly`
-and gives algorithm authors ONE place to declare what their algorithm
-needs and ONE place per (data, interface) pair where the user wires
-the binding.
+The canonical design sketch lives in `testdata/graph.ly`; the
+spec's Graph example (§Interfaces and Multi-Class Contracts) is
+the user-facing documentation of the target.
 
 **Dependencies**: Phase 3 (labels-as-scopes) is shipped. Phase 1
-finishing work (class field auto-getter + UFCS function-syntax) should
-land first so the auto-derive name-match in 4f can rely on field-
-derived getters being present in the class scope.
+finishing work (class field auto-getter + UFCS function-syntax) is
+still missing and should land before Wave 1's empty-body auto-derive
+ships, because auto-derive matches against the class scope including
+field-derived getters.
 
-**Substep plan** (mirrors the 3a–3e cadence of Phase 3):
+---
 
-#### Phase 4a — Lexer + parser for `extends` on interfaces
+#### Wave 1 — Fields and methods (the minimum viable design)
+
+Wave 1 makes graph.ly and tree.ly compile and run end-to-end with
+algorithms expressed as default methods and user data bound via the
+alias-form impl. Three concrete gaps to close (from the 2026-06-23
+empirical probe):
+
+##### Phase 4w1-a — Default-method monomorphization-and-emission bug
+
+Today: an interface default method like `G.count_edges(self) -> i32`
+declared inside `interface Graph<G,N,E>`, with a matching
+`impl Graph<SimpleGraph, SimpleNode, SimpleEdge>`, gets the
+call-site mangled name `SimpleGraph_count_edges` but the c_backend
+never emits the body under that name. gcc fails with `implicit
+declaration of function 'SimpleGraph_count_edges'`.
+
+Fix: trace the default-method-to-impl path in monomorphizer +
+c_backend. The default method should be specialized per impl
+instantiation (one C function per impl) with the matching mangled
+name. Likely a missing arm in the monomorphizer that walks impl
+blocks and emits one specialized copy of each unsatisfied default
+method per impl, with the impl's alias bindings substituted.
+
+Acceptance: `testdata/test_default_method_emit.ly` exercises a
+multi-class interface with one default method, three impl
+instantiations, and asserts each runs end-to-end with the right
+result. (Today fails at gcc; should compile and run after fix.)
+
+##### Phase 4w1-b — `extends` keyword on interfaces
 
 - Add `KExtends` to the lexer keyword table; add `"extends"` to the
   hard-keyword list in the language reference.
 - Parser: extend the interface header to accept `extends ParentIface<T1,
   T2, ...>` after the type-parameter list and before the body brace.
-  Multiple parents allowed (`extends A<...> + B<...>`) for the rare
-  multi-inheritance case; defer that to the second wave if it isn't
-  needed for graph.ly.
-- AST: `InterfaceDecl.extends: [InterfaceRef]` (a slice of refs, one
-  per parent interface).
-- Pretty-printer round-trips. Acceptance: `testdata/test_extends_parse.ly`
-  declares a child interface and the AST dump shows the extends slot
-  populated.
+  Multiple parents allowed (`extends A<...> + B<...>`) but defer to
+  the second wave if not needed for graph.ly initially.
+- AST: `InterfaceDecl.extends: [InterfaceRef]`.
+- Desugar pass `DesugarInterfaceExtends`: copy the parent interface's
+  abstract methods, fields, and default methods into the child
+  interface's namespace, with type-parameter substitution per the
+  `extends` binding. Child may override (re-declare) a parent's
+  method to specialize behavior; the child's declaration wins.
+- Acceptance: `testdata/test_extends.ly` covers
+  `WeightedDirectedGraph extends DirectedGraph` from graph.ly and
+  asserts the child interface sees all parent methods.
 
-#### Phase 4b — Abstract relation declarations in interface bodies
+##### Phase 4w1-c — Empty-body impl auto-derive
 
-- Extend the existing `relation` parser to accept TYPE-VARIABLE parent
-  and child sides (today it requires concrete class names). Inside an
-  interface body, `relation Collection G:nodes [N:graph]` declares an
-  abstract relation slot keyed by the (parent-label, child-label)
-  pair on the type-variable pair (G, N).
-- Owns/refs is OPTIONAL on abstract relations (kind-unspecified means
-  either satisfies). Required on concrete relations as today.
-- AST: extend `RelationDecl` to allow `TyVarRef` on parent/child
-  sides, and an `optional kind: RelationKind` instead of mandatory.
-- Acceptance: `testdata/test_abstract_relation_parse.ly` declares an
-  interface with three abstract relations of varying kind-specification.
-
-#### Phase 4c — Impl-body relation-equivalence syntax
-
-- Parser: inside an impl body, accept relation-equivalence lines
-  of the form:
-  `P:plabel/C:clabel = ConcreteP:plabel/ConcreteC:clabel`
-  where P/C are the interface's type-variable names (matched against
-  the impl header's binding), ConcreteP/ConcreteC are the concrete
-  classes (must match the interface's type-arg binding for P/C).
-- Also accept the existing field/method equivalence:
-  `TypeVar.member = ConcreteClass.accessor`
-- AST: `ImplBlock.relation_equivs: [RelationEquiv]` and
-  `ImplBlock.member_equivs: [MemberEquiv]` — two parallel buckets.
-  Existing impl-body content (`pub func ...` for explicit method
-  bodies) stays in `ImplBlock.methods` as today.
-- Acceptance: `testdata/test_impl_relation_equiv_parse.ly` covers
-  the FPGA case from graph.ly Part 2.
-
-#### Phase 4d — `extends` desugar pass
-
-- After Phase 4a–4c parse, add a desugar pass `DesugarInterfaceExtends`
-  that runs before relation/field desugar.
-- For each interface with a non-empty `extends` slot, copy the parent
-  interface's abstract relations, fields, and methods (declarations
-  AND default bodies) into the child interface's namespace, with the
-  parent's type-parameter slots substituted by the child's binding
-  in the `extends ParentIface<X, Y>` clause.
-- **Tightening rule**: if a child interface re-declares one of the
-  copied abstract relations with a more specific kind (`owns` over
-  unspecified, or `owns`/`refs` over unspecified), the child's
-  declaration wins. **Loosening is an error**: child cannot drop a
-  parent's kind requirement or change `owns` to `refs` / vice versa.
-  Diagnostic: cite both declaration sites and explain the conflict.
-- After this pass, child interfaces are flat — no `extends` field
-  survives. Algorithms calling default methods on a child interface
-  see all parent + child methods in one namespace.
-- Acceptance: `testdata/test_extends_tightening.ly` covers
-  `MutableDirectedGraph extends DirectedGraph` with `relation Collection
-  G:nodes owns [N:graph]` tightening, plus a negative test that
-  tries to loosen `owns` → unspecified and verifies the error.
-
-#### Phase 4e — Impl auto-derive on empty body
-
-- For an `impl Iface<...> { }` with an empty body, walk Iface's
-  abstract relations and member declarations and synthesize the
-  equivalence mappings by exact-name match against the receiver type's
-  class scope:
-  - **Relation auto-derive**: for each abstract relation
-    `Collection P:plabel [C:clabel]`, look up the concrete class
-    bound to P. If it has a relation with parent-label `plabel` and
-    the child class+child-label match, emit a synthetic
-    `P:plabel/C:clabel = ConcreteP:plabel/ConcreteC:clabel` equivalence.
-  - **Member auto-derive**: for each abstract `field T.name: Type`
-    or `func T.name(self, ...) -> R`, look up the concrete class
-    bound to T. If it has a field or method with exact name `name`
-    and matching signature, emit a synthetic member equivalence.
-- If ANY abstract member fails to find a unique match, the impl is
-  invalid. Emit ONE error listing every unsatisfied member with its
-  expected shape, so the user sees the full gap in one diagnostic
-  rather than fixing one at a time. (§5.9 third shape, generalized.)
-- Mixed-mode is supported: an impl body may contain SOME equivalences
-  and rely on auto-derive for the rest. The auto-derive only runs for
-  members the user didn't explicitly bind.
+- Parser: accept `impl Iface<...> { }` (today fails with `undefined
+  variable: ;`). The empty body must lex as a well-formed impl with
+  zero bindings, NOT trigger the misleading variable-decl-style
+  error.
+- Desugar pass `DesugarImplAutoderive`: for an impl with an empty
+  body OR a body that doesn't bind every abstract member, walk the
+  interface's unsatisfied abstract members (methods + fields). For
+  each, look up the concrete class bound to its type variable in the
+  class scope. If a member with the exact same name and a compatible
+  signature exists, emit a synthetic alias binding. Otherwise add it
+  to the missing-bindings list.
+- If any abstract member fails to auto-derive AND wasn't explicitly
+  bound, emit ONE error listing every unsatisfied member with its
+  expected signature, so the user sees the full gap in one
+  diagnostic. (§5.9 third shape, generalized to multi-class.)
+- Mixed-mode supported: an impl body may contain SOME explicit
+  bindings and rely on auto-derive for the rest.
 - Acceptance: `testdata/test_impl_autoderive.ly` covers the Network/
-  Person/Follow empty-body case from graph.ly Part 3, plus a negative
-  test where a relation label is misspelled and the missing-bindings
-  diagnostic includes the right suggestion.
+  Person/Follow empty-body case, plus a negative test where a
+  method name is misspelled and the missing-bindings diagnostic
+  includes the right suggestion.
 
-#### Phase 4f — Relation-equivalence desugar to method bodies
+##### Phase 4w1-d — Partial impls (open type variables)
 
-- After 4d (extends flattened) and 4e (autoderive filled), every impl
-  has a complete equivalence table. Add a desugar pass
-  `DesugarImplEquivalences` that walks the impl's default methods
-  (copied from the interface in 4d) and rewrites every reference to
-  an abstract relation as a reference to the bound concrete relation.
-  - `self.nodes.iter()` (abstract, label `nodes` on G) →
-    `self.routes.iter()` (concrete, label `routes` on Net).
-  - `e.src` (abstract field/getter on E) → `e.src` (concrete getter
-    if labels match, otherwise the bound concrete getter).
-  - `self.outgoing` (zero-arg scope reference on N) →
-    `self.a` (the bound relation scope on Route).
-- The rewrite is mechanical: walk the AST, look up each access in the
-  equivalence table, substitute.
-- After this pass, every default-method body in the impl is in terms
-  of CONCRETE accessors. The monomorphizer takes it from there;
-  c_backend sees no abstract names.
-- Acceptance: `testdata/test_impl_relation_rewrite.ly` checks that
-  `net.bfs(start)` (calling the inherited default method) generates
-  the expected concrete relation calls.
-
-#### Phase 4g — Partial impls (generic in some type variables)
-
-- Parser: accept `impl<W> WDG<FlexNet, FlexRoute, FlexVia<W>, W> { ... }`
-  — the impl itself has type parameters declared between `impl` and
-  the interface name.
-- Checker: when an impl has open type variables, the equivalence
-  bindings are scoped over them. The monomorphizer specializes the
-  impl per use site, same engine as generic-function specialization.
-- This is a small extension of Phase 3's labels-on-impl-type-vars
-  work (§3.8/3.9), which already handles concrete type-arg labels;
-  4g adds the open type-arg case.
+- Parser: accept `impl<W> WeightedDirectedGraph<FlexNet, FlexRoute,
+  FlexVia<W>, W> { ... }` — type parameters declared between `impl`
+  and the interface name.
+- Checker: when an impl has open type variables, the alias bindings
+  are scoped over them. Monomorphizer specializes per use site, same
+  engine as generic-function specialization (which is already shipped).
+- This extends Phase 3's labels-on-impl-type-vars work (§3.8/3.9),
+  which already handles concrete type-arg labels; 4w1-d adds the
+  open type-arg case.
 - Acceptance: graph.ly Part 4 (`FlexNet`/`FlexRoute`/`FlexVia<W>`)
   compiles and `sum_flex_i32` + `sum_flex_f64` both run.
 
-#### Phase 4h — Stdlib `Collection<P, C>` minimum-shape interface
+##### Phase 4w1-e — Reactivate `graph.ly` and `tree.ly`
+
+- Reactivate `testdata/graph.ly` using the fields/methods-only design
+  (no relation equivalence yet). graph.ly v7 should be the working
+  reference for Wave 1.
+- Reactivate `testdata/tree.ly` with parallel patterns (Tree<T, N>
+  with abstract methods `T.root`, `N.children`, `N.parent`).
+- Update `cr/docs/lyric-language-spec.md` §Interfaces and Multi-Class
+  Contracts to show the Graph example with the new design. The
+  relation-equivalence section gets a 🚧 Wave 2 callout.
+- Update `cr/docs/lyric-language-reference.md` §11 Interfaces with the
+  working subset description; 🚧 only on relation equivalence.
+- Sweep the book (`cr/docs/the-lyric-book.md`) Ch 9 (interfaces) to
+  remove constraint-alias prose entirely; defer Ch 12 (generics)
+  update until Phase 5 (Numeric).
+
+**Wave 1 budget**: ~800 LOC compiler (default-method emission fix is
+the biggest piece — likely 300-400 LOC; extends/autoderive/partial
+each ~100-200 LOC) + ~200 LOC stdlib + ~500 LOC testdata.
+
+**Wave 1 parallelizability**: 4w1-b (extends), 4w1-c (autoderive),
+and 4w1-d (partial impls) are independent and fleet-safe after a
+pre-flight AST stub commit. 4w1-a (default-method emission) is the
+critical-path single-agent investigation. 4w1-e is sequential
+verification + doc sweep.
+
+---
+
+#### Wave 2 — Relation equivalence (deferred ergonomic upgrade)
+
+The relation-equivalence syntax — `G:plabel/N:clabel = ConcreteP:plabel/
+ConcreteC:clabel` — reduces the user's binding lines (3 instead of 5
+per relation in the FPGA case) by mapping whole relations as units
+instead of per-accessor. It also introduces `Collection<P, C>` as a
+stdlib vocabulary interface used to declare abstract relations.
+
+This is genuinely sugar over Wave 1: the same user code can be
+written using fields/methods only (each iter/count/parent gets its
+own alias line). Wave 2 unblocks a more concise per-relation impl
+syntax but is NOT required for graph.ly / tree.ly to compile.
+
+##### Phase 4w2-a — Abstract relation declarations in interface bodies
+
+- Extend the existing `relation` parser to accept TYPE-VARIABLE
+  parent and child sides. `relation Collection G:nodes [N:graph]`
+  inside an interface body declares an abstract relation slot.
+- Owns/refs is OPTIONAL on abstract relations (omitted = either
+  kind satisfies). Mutator interfaces tighten via `extends + relation
+  Collection G:nodes owns [N:graph]`.
+
+##### Phase 4w2-b — Impl-body relation-equivalence syntax
+
+- Parser: inside an impl body, accept relation-equivalence lines:
+  `P:plabel/C:clabel = ConcreteP:plabel/ConcreteC:clabel`
+- Existing field/method equivalence (`T.member = Concrete.accessor`)
+  stays as the per-member binding form. Two parallel buckets in the
+  ImplBlock AST.
+
+##### Phase 4w2-c — Stdlib `Collection<P, C>` interface
 
 - Declare `Collection<P, C>` in `stdlib/std.ly` as the minimum-shape
-  vocabulary interface used in abstract relation declarations
-  (`relation Collection G:nodes [N:graph]`). Required surface:
-  `iter`, `count`, `parent` (the same three the Phase 4 design has
-  always listed for Collection).
-- Auto-impl `Collection<P, C>` for every concrete relation produced
-  by Phase 3's desugar — that is, any owns/refs relation on any hint
-  (ArrayList / DoublyLinked / HashedList) automatically satisfies
-  Collection on its (parent, child) pair.
-- This is the ONE place `Collection` lives now: as the shape
-  vocabulary for abstract relations, NOT as the algorithm substrate.
-  Algorithms quantify over user-authored interfaces (DirectedGraph,
-  Tree, Lattice...), each of which declares its abstract relations
-  using `Collection` as the minimum shape name.
+  vocabulary for abstract relations: `iter`, `count`, `parent`.
+- Auto-impl `Collection<P:label, C:label>` for every owns/refs
+  relation produced by Phase 3's desugar. Any concrete user hint
+  (`ArrayList`, `DoublyLinked`, `HashedList`) automatically
+  satisfies `Collection` on its (parent, child) pair.
 
-#### Phase 4i — Reactivate `graph.ly` and `tree.ly`; sweep stdlib
+##### Phase 4w2-d — DesugarImplEquivalences for relations
 
-- With Phase 4a–4h shipped, both currently parse-failing tests should
-  flip to PASS. The canonical `testdata/graph.ly` already exists in
-  the v6 design sketch (commit `a99ae9b`); `testdata/tree.ly` needs a
-  parallel v6 rewrite using the same patterns (Tree<T, N> interface
-  with abstract `relation Collection N:children [N:parent]`).
-- Sweep the language reference (`cr/docs/lyric-language-reference.md`)
-  with new §Multi-Class Interfaces section covering the abstract-
-  relation + impl-equivalence design.
-- Update the book (`cr/docs/the-lyric-book.md`) Ch 9 (interfaces) and
-  Ch 12 (generics) with the new mechanisms. Drop Ch 11's constraint-
-  alias prose entirely.
+- Walks each impl's default methods and rewrites every reference to
+  an abstract relation as a reference to the bound concrete relation.
+  `self.nodes.iter()` → `self.routes.iter()`.
+- After this pass, every default-method body is in terms of CONCRETE
+  accessors. The monomorphizer takes it from there.
 
-**Estimated scope**: each substep is ≤300 LOC of compiler change
-(parser/desugar/checker), with proportional stdlib/test additions.
-Total Phase 4 budget: ~2,500 LOC compiler + ~300 LOC stdlib +
-~1,000 LOC testdata. Slightly larger than the constraint-alias
-plan but more uniform — fewer concepts, more orthogonal mechanisms.
+**Wave 2 budget**: ~1,200 LOC compiler + ~100 stdlib + ~500 testdata.
+Lands when Wave 1 has proven itself in real use (and when there is
+appetite for it).
 
-**Parallelizability**: 4a (extends keyword), 4b (abstract relations),
-and 4c (impl equivalence parser) are independent and fleet-safe once
-the AST extensions land in a pre-flight commit. 4d–4g are sequential
-because each builds on the previous one. 4h is a stdlib addition
-that depends on 4b. 4i is single-agent verification + book sweep.
+---
 
 **Why fourth in the overall ordering**: depends on labels-as-scopes
 (Phase 3) for abstract relations to reference type-variable parent/

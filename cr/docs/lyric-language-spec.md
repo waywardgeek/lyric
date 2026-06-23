@@ -1036,95 +1036,222 @@ interfaces or in separate classes held as dependencies.
 ## Interfaces and Multi-Class Contracts
 
 Interfaces are first-class declarations. They can span multiple type
-parameters, defining relationships between types:
+parameters, defining relationships between types. The canonical
+example is a graph:
 
 ```lyric
-interface Graph<G, N, E> {
-    // Abstract methods bound to type params
-    func G.nodes(self) -> [N]
-    func N.out_edges(self) -> [E]
-    func E.tgt_node(self) -> N
+interface DirectedGraph<G, N, E> {
+    // Abstract surface — every implementing impl must satisfy these.
+    pub func G.nodes(self) -> [N]
+    pub func N.outgoing_edges(self) -> [E]
+    pub func N.incoming_edges(self) -> [E]
+    pub func E.src(self) -> N
+    pub func E.dst(self) -> N
 
-    // Default method (desugared to top-level generic function with
-    //   `where Graph<G, N, E>` constraint)
-    pub func count_edges(graph: G) -> i32 {
+    // Default algorithms — bodies use the abstract surface above.
+    // Specialized per impl at monomorphization; one C function per impl.
+    pub func G.count_edges(self) -> i32 {
         let mut total: i32 = 0
-        let nodes = graph.nodes()
-        let mut i: i32 = 0
-        while i < len(nodes) {
-            total = total + len(nodes[i].out_edges())
-            i = i + 1
+        for n in self.nodes() {
+            for _e in n.outgoing_edges() { total = total + 1 }
         }
         return total
     }
 
-    // Field injection — adds fields to implementing classes
-    field P.first: C?
-    field C.parent: P?
-
-    // Destructor injection — paired by relation kind (owns vs refs).
-    // Desugar copies the block whose kind matches the relation's keyword.
-    destructor owns P { ... }   // runs when used as `relation Hint X owns [Y]`
-    destructor owns C { ... }
-    destructor refs P { ... }   // runs when used as `relation Hint X refs [Y]`
-    destructor refs C { ... }
-    // Bare `destructor P { }` (no kind keyword) defaults to `owns`.
+    pub func G.bfs(self, start: N) -> [N] { /* ... */ }
 }
 ```
 
-### Default Methods
+### Interface composition with `extends`
 
-A method with a body inside an interface becomes a top-level generic
-function with a relational `where` clause. The example above's `count_edges`
-desugars to:
+A child interface aggregates a parent's surface via `extends`. This is
+a pure desugar-time copy of the parent's abstract methods, fields, and
+default methods into the child's namespace — **no runtime IS-A**, no
+vtable widening, no subtype relation between the interfaces:
 
 ```lyric
-pub func count_edges<G, N, E>(graph: G) -> i32 where Graph<G, N, E> { ... }
+interface WeightedDirectedGraph<G, N, E, W> extends DirectedGraph<G, N, E> {
+    pub func E.weight(self) -> W
+
+    pub func G.total_weight(self) -> W where Numeric<W> {
+        let mut sum: W = W.zero()
+        for n in self.nodes() {
+            for e in n.outgoing_edges() { sum = sum.add(e.weight()) }
+        }
+        return sum
+    }
+}
 ```
 
-Callers invoke it via method syntax (`graph.count_edges()`) when the
-interface is implemented on the receiver's type.
+A child interface may **override** a parent's method by re-declaring it
+with the same name and signature; the child's body wins. Multi-parent
+`extends A<...> + B<...>` is reserved for future work; today exactly
+one parent is supported.
 
-(Interface embedding via the `embed` keyword has been removed; see
-§Recently Removed.)
+### Impl blocks
 
-### Impl Blocks
-
-Wire interface methods to concrete class methods:
+An impl block binds an interface to one or more concrete classes.
+Three forms of binding are supported inside an impl body:
 
 ```lyric
-// Alias: method → method
-impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
-    G.nodes = SimpleGraph.get_nodes
-    N.out_edges = SimpleNode.get_edges
-    E.tgt_node = SimpleEdge.get_target
+// Alias: interface member ↔ concrete-class accessor
+impl WeightedDirectedGraph<Net, Route, Via, f32> {
+    G.nodes          = Net.all_routes      // method on concrete class
+    N.outgoing_edges = Route.outgoing_a    // method
+    N.incoming_edges = Route.incoming_b    // method
+    E.src            = Via.a_endpoint      // method
+    E.dst            = Via.b_endpoint      // method
+    E.weight         = Via.weight          // field auto-getter
 }
 
-// Field bind: interface field ↔ concrete field
-impl ArrayList<Team, Player> {
-    P.children <-> Team.roster
-    C.parent   <-> Player.team
-    C.index    <-> Player.team_idx
-}
-
-// Inline implementation
+// Inline: define the binding body in place
 impl Printable<Widget> {
     P.to_string = (self) -> string { return f"Widget({self.name})" }
 }
 ```
 
-**Three mapping forms** inside an impl block:
+Each alias binding `T.member = ConcreteType.accessor` synthesizes a
+forwarding wrapper at desugar time:
 
-- **Alias** — `T.method = Class.method`
-- **FieldBind** — `T.field <-> Class.field` (the `<->` token is the
-  bidirectional field-binding arrow)
-- **Inline** — `T.method(params) -> Ret { body }`
+```lyric
+// Generated from G.nodes = Net.all_routes:
+pub func Net.nodes(self) -> [Route] { return self.all_routes() }
+```
 
-**Short form after `impl Iface<Args> for ConcreteType`:** the leading
-`T.` is implicit; just `method = member`, `method <-> member`, or
-`method(params) -> Ret { body }`.
+The right-hand-side may be any callable in the concrete class scope:
+a method, a field (auto-getter), or — when the data lives in a
+relation — a user-defined helper method that adapts the relation
+accessor to the interface's expected return type.
 
-#### Labeled impl declarations
+### Auto-derive on empty impl body
+
+When the user's concrete-class member names match the interface's
+abstract surface exactly, the impl body may be **empty**:
+
+```lyric
+class Network { name: string }
+class Person  { handle: string }
+class Follow  { since: i64; weight: f64 }
+
+relation DoublyLinked Network:nodes         owns [Person:graph]
+relation DoublyLinked Person:outgoing_edges refs [Follow:src]
+relation DoublyLinked Person:incoming_edges refs [Follow:dst]
+
+// Helper methods named to match the interface's abstract surface:
+pub func Network.nodes(self) -> [Person] { /* ... */ }
+pub func Person.outgoing_edges(self) -> [Follow] { /* ... */ }
+pub func Person.incoming_edges(self) -> [Follow] { /* ... */ }
+// (Follow.src, Follow.dst, Follow.weight are accessible directly —
+//  relation back-pointers and the f64 field's auto-getter.)
+
+impl WeightedDirectedGraph<Network, Person, Follow, f64> { }    // all auto-derived
+```
+
+The auto-derive pass walks the interface's unsatisfied abstract
+members. For each, it looks up the concrete class bound to the
+member's type variable and checks for a member with the exact same
+name and a compatible signature. Matches generate synthetic alias
+bindings. If any abstract member fails to match, the compiler emits
+**one** diagnostic listing every unsatisfied member with its expected
+signature, so the user sees the full gap in one error rather than
+fixing them one at a time.
+
+Mixed-mode is supported: an impl body may bind some members
+explicitly and let auto-derive fill the rest.
+
+### Partial impls (generic in some type variables)
+
+An impl may leave one or more type variables open. The impl itself
+is then generic and is monomorphized per use site:
+
+```lyric
+class FlexVia<W> { fuse_id: i32; weight: W }
+// ... FlexNet, FlexRoute, relations ...
+
+impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> { }
+
+pub func sum_i32(net: FlexNet) -> i32 { return net.total_weight() }
+pub func sum_f64(net: FlexNet) -> f64 { return net.total_weight() }
+```
+
+Each use site that involves a different `W` specializes the impl
+separately; the monomorphizer reuses the same machinery as for
+generic-function specialization.
+
+### 🚧 Relation equivalence (Wave 2, under construction)
+
+The example above uses **alias bindings** for relation-backed data,
+which requires the user to author helper methods that adapt relation
+accessors to interface-expected return types (`Network.nodes(self) ->
+[Person]`, `Person.outgoing_edges(self) -> [Follow]`, etc.).
+
+A future ergonomic upgrade — relation equivalence — will let the user
+declare the binding as a single line per relation:
+
+```lyric
+// 🚧 Wave 2 syntax — NOT shipped yet.
+interface DirectedGraph<G, N, E> {
+    relation Collection G:nodes [N:graph]               // abstract relation
+    relation Collection N:outgoing_edges [E:src]
+    relation Collection N:incoming_edges [E:dst]
+    // ... default algorithms use n.outgoing_edges.iter(), etc.
+}
+
+impl DirectedGraph<Net, Route, Via> {
+    G:nodes/N:graph                = Net:routes/Route:net
+    N:outgoing_edges/E:src         = Route:a/Via:a_src
+    N:incoming_edges/E:dst         = Route:b/Via:b_src
+}
+```
+
+This subsumes `iter`/`count`/parent-back as a single relation
+mapping. See `cr/docs/multi-class-interface-redesign.md` §9 Phase 4
+Wave 2 for the implementation plan.
+
+### Relation hints
+
+Relation hints (binary interfaces — see §Relations) additionally
+declare `field T.name: Type` (injected into the implementing class)
+and **paired destructors** keyed on the relation kind:
+
+```lyric
+interface ArrayList<P, C> {
+    field P.children: [C]
+    field C.parent:  P?
+    field C.index:   i32
+
+    pub trusted func P.append(self, child: C) { ... }
+    pub trusted func P.remove(self, child: C) { ... }
+
+    destructor owns P { ... }   // selected by `relation ArrayList X owns [Y]`
+    destructor owns C { ... }
+    destructor refs P { ... }   // selected by `relation ArrayList X refs [Y]`
+    destructor refs C { ... }
+}
+```
+
+The `owns` / `refs` keyword on the destructor block must match the
+relation's kind keyword; the desugar pass copies only the matching
+pair onto the concrete classes. A bare `destructor T { ... }` (no
+kind) defaults to `owns`.
+
+(Interface embedding via the `embed` keyword has been removed in
+favor of `extends` for interface composition; see §Recently Removed.)
+
+### Where clauses
+
+Generic functions can require interface satisfaction:
+
+```lyric
+pub func count<P, C>(p: P) -> i32 where DoublyLinked<P, C> {
+    return len(p.children())
+}
+```
+
+The relational form (`DoublyLinked<P, C>`) is what makes the method
+calls on `p` inside the body resolve to interface methods.
+
+### Labeled impl declarations
 
 Any top-level class type-argument of an impl declaration may carry
 an optional `:label`. Members the interface puts on that class are
@@ -1153,32 +1280,21 @@ letter labels on different type-vars in the same impl are legal
 (`impl DoublyLinked<Route:a, Via:a>`) because each label lives in
 its own class's namespace. Two instances of the same interface on
 the same class, under distinct labels, give two non-colliding
-bundles of injected members:
-
-```lyric
-// Node participates in two intrusive linked lists, no collision:
-impl DoublyLinked<Node:ready_q,   Node:ready_q_child>   { ... }
-impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
-```
+bundles of injected members.
 
 A `relation` declaration is syntactic sugar for a labeled impl of
 the matching hint interface (`ArrayList`, `DoublyLinked`, or
 `HashedList`) plus an `owns`/`refs` flag selecting the destructor
-pair. `relation ArrayList Team:roster owns [Player:team]` desugars
-to `impl ArrayList<Team:roster, Player:team> owns { }` with the
-field-bind mappings synthesized from the hint interface's
-`field T.name: Type` declarations and the `owns` destructor pair
-selected. See `cr/docs/multi-class-interface-redesign.md` §3.8 and
+pair. See `cr/docs/multi-class-interface-redesign.md` §3.8 and
 §3.9 for the full desugar story.
 
-#### Ownership-annotated impl declarations
+### Ownership-annotated impl declarations
 
 An impl whose interface declares hint shape (one or more
 `field T.name: Type` declarations plus paired
-`destructor owns T { ... }` / `destructor refs T { ... }` blocks
-— see §Interfaces) may carry an `owns` or `refs` keyword between
-the closing `>` of the type-argument list and the opening `{` of
-the body:
+`destructor owns T { ... }` / `destructor refs T { ... }` blocks)
+may carry an `owns` or `refs` keyword between the closing `>` of
+the type-argument list and the opening `{` of the body:
 
 ```lyric
 impl ArrayList<Team:roster, Player:team> owns { }
@@ -1186,34 +1302,9 @@ impl DoublyLinked<Node:ready_q, Node:ready_q_child> refs { }
 ```
 
 The annotation selects which paired destructor block on the hint
-interface is copied onto each concrete class (the `owns` form
-cascade-destroys; the `refs` form unlinks only). When the impl
-body is empty, the desugar synthesizes per-side field bindings
-from the hint interface's `field T.name: Type` declarations using
-each type-var's label, exactly as it does for `relation`
-declarations.
+interface is copied onto each concrete class.
 
-The `relation` surface (§Relations) is sugar for this form. The
-underlying impl form is available for two cases the relation
-surface does not cover today: user-defined hint interfaces (not
-just the three stdlib hints), and direct ownership-annotated
-impls that need a non-empty body for additional Alias / FieldBind
-/ Inline mappings beyond the synthesized field-binds.
-
-### Where Clauses
-
-Generic functions can require interface satisfaction:
-
-```lyric
-pub func count<P, C>(p: P) -> i32 where DoublyLinked<P, C> {
-    return len(p.children())
-}
-```
-
-The relational form (`DoublyLinked<P, C>`) is what makes the method calls
-on `p` inside the body resolve to interface methods.
-
-### The `error` Interface
+### The `error` interface
 
 `error` is a built-in interface. Any class with a
 `message(self) -> string` method satisfies it via structural subtyping:
@@ -1229,8 +1320,8 @@ class Error {
 }
 ```
 
-The lowercase name is intentional — `error` is part of the type vocabulary
-and reads naturally in signatures like `(T, error)`.
+The lowercase name is intentional — `error` is part of the type
+vocabulary and reads naturally in signatures like `(T, error)`.
 
 ---
 

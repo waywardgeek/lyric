@@ -1,103 +1,89 @@
-// graph.ly — user-authored multi-class generic interfaces (v6)
+// graph.ly — user-authored multi-class generic interfaces (v7)
 //
-// 🚧 FUTURE SYNTAX — this file does NOT parse with the current compiler.
-//    It is the canonical design sketch for Phase 4 of the multi-class
-//    interface redesign.  Tracks the post-pivot design (no `constraint`
-//    aliases, no `Collection` middleware as algorithm substrate).  See
-//    cr/docs/multi-class-interface-redesign.md §9 Phase 4 for the
-//    implementation plan that will make this file compile.
+// Companion to tree.ly.  Demonstrates the Wave-1 design (fields and
+// methods only, no relation equivalence).  This is the design that
+// the spec's §Interfaces and Multi-Class Contracts documents as the
+// canonical multi-class interface example.
 //
-// Companion to tree.ly.  Demonstrates the relation-equivalence design
-// (Bill + Hewitt, 2026-06-22→23 evening review):
+// Design summary (Bill + Hewitt, 2026-06-23 morning review):
 //
 //   1. Algorithms live as default methods inside user-authored generic
-//      interfaces.  No `Collection` middleware in the user-facing
-//      surface; no `constraint` aliases.  The interface IS the surface
-//      algorithms quantify over, declared in one place.
+//      interfaces.  The interface declares the abstract surface
+//      (methods with type-var receivers like `func G.nodes(self) -> [N]`)
+//      and the default algorithm bodies that use that surface.
 //
-//   2. Interfaces declare ABSTRACT RELATIONS using the existing Phase 3
-//      relation syntax.  `Collection` reappears as the minimum-shape
-//      vocabulary for relation slots (iter + count + parent-back).
-//      Concrete user hints (`ArrayList`, `DoublyLinked`, `HashedList`)
-//      all auto-satisfy `Collection`.
+//   2. Interface composition is `extends Parent<...>` — pure desugar-
+//      time aggregation (copy parent methods into child).  No vtable
+//      widening, no runtime IS-A.  Child may override parent methods.
 //
-//   3. Abstract relations omit `owns`/`refs` when the algorithm doesn't
-//      care.  Read-only graph algorithms (bfs, total_weight, etc.) are
-//      compatible with either ownership kind.  Mutator interfaces
-//      (`MutableDirectedGraph`) tighten the requirement to `owns` so
-//      the destructor cascades correctly.
+//   3. Impl blocks bind concrete classes to interface type vars via
+//      alias mappings:
+//          T.member = ConcreteType.accessor
+//      where T is the interface's type-var name (G/N/E/W in graph
+//      interfaces) and ConcreteType.accessor is the concrete class's
+//      method or field-derived getter.
 //
-//   4. Impl blocks bind concrete relations to abstract relations via
-//      RELATION EQUIVALENCE.  One line per relation, not per accessor:
-//          G:plabel/N:clabel = ConcreteP:plabel/ConcreteC:clabel
-//      Non-relation surface (fields, methods) maps via the v5 syntax:
-//          E.member = ConcreteType.accessor
-//      Empty impl body = auto-derive on exact name match across both
-//      relation-key and member buckets.
+//   4. Empty impl body triggers auto-derive on exact-name match.  For
+//      each unsatisfied abstract method, the compiler looks up the
+//      concrete class bound to its type-var and checks for a method
+//      with the same name and compatible signature.  Missing matches
+//      surface as ONE diagnostic listing every unsatisfied member.
 //
-//   5. Interface composition is `extends Parent<...>` — pure desugar-
-//      time method-aggregation (no vtable widening).  A child interface
-//      may re-declare a parent's abstract relation with a tightened
-//      kind (`owns` constraint) but never with a loosened one.
-//
-//   6. Partial impls (leaving a type var open) make the impl itself
+//   5. Partial impls (leaving a type var open) make the impl itself
 //      generic.  Monomorphized per use site.
 //
-//   7. Capability primitives (single-class interfaces like Numeric<T>)
-//      live in stdlib; users compose them via where-clauses.
+//   6. Relation accessors (post-Phase-3e dotted scope: `n.outgoing.iter()`)
+//      are valid right-hand-side targets in alias mappings.  A binding
+//      `N.outgoing_edges = Route.a` synthesizes
+//      `pub func Route.outgoing_edges(self) -> [Via] { return self.a.iter() }`.
 //
-// Rules carried over unchanged from earlier rounds:
-//   - Methods are class-scoped functions (UFCS at call sites).
-//   - Field/method unification (field auto-getter + setter sugar).
-//   - Phase 3 labels-as-scopes: `person.outgoing.iter()`, `len(person.outgoing)`.
-//   - Generic type params explicit between `func` and the name:
-//     `pub func<G, N, E> G.method(self) -> ...`.
+// 🚧 NOT IN THIS FILE — deferred to Wave 2 (relation equivalence):
+//      relation Collection G:nodes [N:graph]    (abstract relations)
+//      G:nodes/N:graph = Net:routes/Route:net   (relation equivalence)
+//   Both are pure ergonomic sugar over Wave 1; the same user code
+//   compiles with field/method bindings only (this file).  See
+//   cr/docs/multi-class-interface-redesign.md §9 Phase 4 Wave 2.
 
 // =========================================================================
 // PART 1.  Graph interfaces  (would live in `graph` package)
 // =========================================================================
 
-// DirectedGraph<G, N, E> is the surface every directed-graph algorithm
-// needs.  Three abstract relations + non-relation accessors + default
-// algorithms.  The relations are kind-unspecified — either owns or
-// refs satisfies — because the algorithms here only read.
+// DirectedGraph<G, N, E> declares the abstract surface every directed-
+// graph algorithm needs, plus default algorithm bodies.
 
 interface DirectedGraph<G, N, E> {
-    // Abstract relations — keyed by (parent:plabel, child:clabel).
-    // `Collection` is the minimum-shape hint (iter + count + parent-back).
-    // Concrete hints (ArrayList/DoublyLinked/HashedList) all auto-satisfy.
-    // Owns/refs unspecified → either kind satisfies.
-    relation Collection G:nodes    [N:graph]
-    relation Collection N:outgoing [E:src]
-    relation Collection N:incoming [E:dst]
+    // Abstract surface — every impl must satisfy these five.
+    pub func G.nodes(self) -> [N]
+    pub func N.outgoing_edges(self) -> [E]
+    pub func N.incoming_edges(self) -> [E]
+    pub func E.src(self) -> N
+    pub func E.dst(self) -> N
 
     // Default algorithms — monomorphized into the impl at desugar time.
-    // Bodies use the abstract relations via dotted scope; impl-time
-    // substitution rewrites `self.nodes.iter()` → user's relation.
 
     pub func G.count_edges(self) -> i32 {
         let mut total: i32 = 0
-        for n in self.nodes.iter() {
-            for _e in n.outgoing.iter() { total = total + 1 }
+        for n in self.nodes() {
+            for _e in n.outgoing_edges() { total = total + 1 }
         }
         return total
     }
 
     pub func N.successors(self) -> [N] {
         let mut result: [N] = []
-        for e in self.outgoing.iter() { result = append(result, e.src) }
+        for e in self.outgoing_edges() { result = append(result, e.dst()) }
         return result
     }
 
     pub func N.predecessors(self) -> [N] {
         let mut result: [N] = []
-        for e in self.incoming.iter() { result = append(result, e.dst) }
+        for e in self.incoming_edges() { result = append(result, e.src()) }
         return result
     }
 
     pub func G.has_edge(self, src: N, dst: N) -> bool {
-        for e in src.outgoing.iter() {
-            if e.src == dst { return true }
+        for e in src.outgoing_edges() {
+            if e.dst() == dst { return true }
         }
         return false
     }
@@ -107,7 +93,7 @@ interface DirectedGraph<G, N, E> {
         // to stay free of stdlib hashing.  Switch to Dict<N, bool> once
         // Hashable.equals is restored on the interface.
         let mut found = false
-        for n in self.nodes.iter() {
+        for n in self.nodes() {
             if n == start { found = true }
         }
         if !found { panic("bfs: start node not in graph") }
@@ -119,8 +105,8 @@ interface DirectedGraph<G, N, E> {
             let n = queue[0]
             queue = queue[1:]
             order = append(order, n)
-            for e in n.outgoing.iter() {
-                let m = e.src
+            for e in n.outgoing_edges() {
+                let m = e.dst()
                 if !visited.contains(m) {
                     visited = append(visited, m)
                     queue = append(queue, m)
@@ -132,64 +118,32 @@ interface DirectedGraph<G, N, E> {
 }
 
 // WeightedDirectedGraph<G, N, E, W> adds an edge-weight surface and
-// one weight-using algorithm.  `extends` is desugar-time method-
-// aggregation (no runtime IS-A).  No new abstract relations; just
-// adds a `weight` field on E.
+// one weight-using algorithm.  `extends` is desugar-time method
+// aggregation (no runtime IS-A).
 
 interface WeightedDirectedGraph<G, N, E, W> extends DirectedGraph<G, N, E> {
-    field E.weight: W
+    pub func E.weight(self) -> W
 
     pub func G.total_weight(self) -> W where Numeric<W> {
         let mut sum: W = W.zero()
-        for n in self.nodes.iter() {
-            for e in n.outgoing.iter() { sum = sum.add(e.weight) }
+        for n in self.nodes() {
+            for e in n.outgoing_edges() { sum = sum.add(e.weight()) }
         }
         return sum
     }
 }
 
-// MutableDirectedGraph<G, N, E> tightens the :nodes relation to require
-// `owns` so destructive operations cascade correctly.  A user whose
-// concrete relation is `refs` will be rejected at the impl block (not
-// at the algorithm call site) with a clean diagnostic.
-//
-// NOTE: mid-iteration deletion is undefined in Lyric today (Phase B's
-// slice-invalidation bug on relation children, logged in TODO).  Until
-// the language specifies it, the safe pattern is two-pass: collect
-// dead nodes in a slice, then delete in a second loop.
-
-interface MutableDirectedGraph<G, N, E> extends DirectedGraph<G, N, E> {
-    // Tightened: nodes must be owned so remove_node can cascade.
-    // outgoing/incoming inherit DirectedGraph's unspecified kind
-    // (the edge endpoints don't need to be owned for deletion to work
-    // when nodes are owned and edges follow via owns Route → owns Via).
-    relation Collection G:nodes owns [N:graph]
-
-    pub func G.remove_node(self, n: N) {
-        // Cascades to all edges incident on n via the owns chain.
-        self.nodes.remove(n)
-    }
-
-    pub func G.prune_dangling(self) {
-        // Two-pass: collect, then delete.  See NOTE above.
-        let mut dead: [N] = []
-        for n in self.nodes.iter() {
-            if n.outgoing.is_empty() && n.incoming.is_empty() {
-                dead = append(dead, n)
-            }
-        }
-        for n in dead { self.nodes.remove(n) }
-    }
-}
-
 // =========================================================================
-// PART 2.  FPGA antifuse router  (neutral labels — explicit equivalences)
+// PART 2.  FPGA antifuse router  (neutral labels — explicit alias mapping)
 // =========================================================================
 //
 // The user's relation labels (a/b) don't match the interface's named
-// surface (outgoing/incoming).  The impl block names the equivalence
-// explicitly.  Three abstract relations → three equivalence lines, plus
-// one field equivalence for the weight.
+// surface (outgoing_edges/incoming_edges).  The impl block names the
+// alias mapping explicitly.  Six abstract members → six binding lines.
+//
+// Each binding line synthesizes a forwarding wrapper at desugar time.
+// E.g. `N.outgoing_edges = Route.outgoing_a` synthesizes
+//     pub func Route.outgoing_edges(self) -> [Via] { return self.outgoing_a() }
 
 class Net {
     name: string
@@ -205,57 +159,60 @@ class Via {
 }
 
 relation DoublyLinked Net:routes  owns [Route:net]
-relation DoublyLinked Route:a     refs [Via:src]
-relation DoublyLinked Route:b     refs [Via:dst]
+relation DoublyLinked Route:a     refs [Via:a_src]
+relation DoublyLinked Route:b     refs [Via:b_src]
+
+// Helper methods bridge the relation accessors to interface surface.
+// In Wave 2, these can be elided in favor of relation equivalence.
+
+pub func Net.all_routes(self) -> [Route] {
+    let mut result: [Route] = []
+    for r in self.routes.iter() { result = append(result, r) }
+    return result
+}
+
+pub func Route.outgoing_a(self) -> [Via] {
+    let mut result: [Via] = []
+    for v in self.a.iter() { result = append(result, v) }
+    return result
+}
+
+pub func Route.incoming_b(self) -> [Via] {
+    let mut result: [Via] = []
+    for v in self.b.iter() { result = append(result, v) }
+    return result
+}
+
+pub func Via.a_endpoint(self) -> Route { return self.a_src }
+pub func Via.b_endpoint(self) -> Route { return self.b_src }
 
 impl WeightedDirectedGraph<Net, Route, Via, f32> {
-    // Relation equivalences (LHS = interface relation key, RHS = concrete):
-    G:nodes/N:graph    = Net:routes/Route:net
-    N:outgoing/E:src   = Route:a/Via:src
-    N:incoming/E:dst   = Route:b/Via:dst
-
-    // Field equivalence (for non-relation surface):
-    E.weight = Via.weight
+    G.nodes           = Net.all_routes
+    N.outgoing_edges  = Route.outgoing_a
+    N.incoming_edges  = Route.incoming_b
+    E.src             = Via.a_endpoint
+    E.dst             = Via.b_endpoint
+    E.weight          = Via.weight       // f32 field auto-getter on E
 }
 
 // Use sites — algorithms callable as methods via UFCS.
 
 pub func count_fuses(net: Net) -> i32 {
-    return net.count_edges()           // default method from DirectedGraph
+    return net.count_edges()
 }
 
 pub func sum_fuse_weights(net: Net) -> f32 {
-    return net.total_weight()          // default method from WeightedDirectedGraph
-}
-
-// Router-specific bidirectional walker — uses raw relations directly
-// via dotted scope.  Not a graph algorithm; just user code over the
-// same data.
-pub func adjacent_vias(r: Route) -> [Via] {
-    let mut result: [Via] = []
-    for v in r.a.iter() { result = append(result, v) }
-    for v in r.b.iter() { result = append(result, v) }
-    return result
+    return net.total_weight()
 }
 
 // =========================================================================
 // PART 3.  Follower network  (semantic labels — empty impl, auto-derive)
 // =========================================================================
 //
-// When the user picks labels that match the interface relation keys
-// exactly, the impl body can be EMPTY.  Auto-derive walks both buckets:
-//
-//   Relations (matched by parent-label and child-label exact match):
-//     G:nodes/N:graph    ↔ Network:nodes/Person:graph        ✓
-//     N:outgoing/E:src   ↔ Person:outgoing/Follow:src        ✓
-//     N:incoming/E:dst   ↔ Person:incoming/Follow:dst        ✓
-//
-//   Fields/methods (matched by exact name in class scope):
-//     E.weight           ↔ Follow.weight (auto-getter on f64 field) ✓
-//
-// All four bindings auto-derive.  Empty body = success.  If any
-// member fails to match, the compiler emits one error listing every
-// unsatisfied member (§5.9 third shape).
+// When the user's relation back-pointer field names AND helper-method
+// names match the interface's abstract surface exactly, the impl body
+// can be EMPTY.  Auto-derive walks the abstract surface and matches
+// against the class scope by exact name.
 
 class Network {
     name: string
@@ -270,13 +227,34 @@ class Follow {
     weight: f64 = 1.0
 }
 
-relation DoublyLinked Network:nodes    owns [Person:graph]
-relation DoublyLinked Person:outgoing  refs [Follow:src]
-relation DoublyLinked Person:incoming  refs [Follow:dst]
+relation DoublyLinked Network:nodes         owns [Person:graph]
+relation DoublyLinked Person:outgoing_edges refs [Follow:src]
+relation DoublyLinked Person:incoming_edges refs [Follow:dst]
+
+// User-defined helpers matching the interface names exactly.
+pub func Network.nodes(self) -> [Person] {
+    let mut result: [Person] = []
+    for p in self.nodes.iter() { result = append(result, p) }
+    return result
+}
+
+pub func Person.outgoing_edges(self) -> [Follow] {
+    let mut result: [Follow] = []
+    for e in self.outgoing_edges.iter() { result = append(result, e) }
+    return result
+}
+
+pub func Person.incoming_edges(self) -> [Follow] {
+    let mut result: [Follow] = []
+    for e in self.incoming_edges.iter() { result = append(result, e) }
+    return result
+}
+
+// (Follow.src/dst/weight are accessible directly — relation back-
+// pointers and f64 field auto-getters.  All six abstract members
+// have an exact-name match in the class scope.)
 
 impl WeightedDirectedGraph<Network, Person, Follow, f64> { }   // all auto-derived
-
-// Use sites — same algorithms, different concrete type.
 
 pub func count_follows(net: Network) -> i32 {
     return net.count_edges()
@@ -294,16 +272,6 @@ pub func mutual_followers(a: Person, b: Person) -> [Person] {
         if b_preds.contains(p) { result = append(result, p) }
     }
     return result
-}
-
-// Network ALSO satisfies MutableDirectedGraph because its :nodes
-// relation IS owns.  No additional impl block needed — DirectedGraph's
-// auto-derived bindings carry over to MutableDirectedGraph (extends).
-
-impl MutableDirectedGraph<Network, Person, Follow> { }   // also auto-derived
-
-pub func clean_inactive_users(net: Network) {
-    net.prune_dangling()
 }
 
 // =========================================================================
@@ -327,15 +295,30 @@ class FlexVia<W> {           // generic in the weight type
     weight: W
 }
 
-relation DoublyLinked FlexNet:routes      owns [FlexRoute:net]
-relation DoublyLinked FlexRoute:outgoing  refs [FlexVia:src]
-relation DoublyLinked FlexRoute:incoming  refs [FlexVia:dst]
+relation DoublyLinked FlexNet:routes              owns [FlexRoute:net]
+relation DoublyLinked FlexRoute:outgoing_edges    refs [FlexVia:src]
+relation DoublyLinked FlexRoute:incoming_edges    refs [FlexVia:dst]
 
-// W remains open — every (FlexNet, FlexRoute, FlexVia<W>) instantiation
-// monomorphizes through this impl.  Other bindings auto-derive.
-impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> {
-    G:nodes/N:graph = FlexNet:routes/FlexRoute:net   // labels diverge (routes vs nodes)
+pub func FlexNet.nodes(self) -> [FlexRoute] {
+    let mut result: [FlexRoute] = []
+    for r in self.routes.iter() { result = append(result, r) }
+    return result
 }
+
+pub func FlexRoute.outgoing_edges(self) -> [FlexVia<W>] {
+    let mut result: [FlexVia<W>] = []
+    for v in self.outgoing_edges.iter() { result = append(result, v) }
+    return result
+}
+
+pub func FlexRoute.incoming_edges(self) -> [FlexVia<W>] {
+    let mut result: [FlexVia<W>] = []
+    for v in self.incoming_edges.iter() { result = append(result, v) }
+    return result
+}
+
+// Partial impl: W remains open; monomorphized per use site.
+impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> { }
 
 pub func sum_flex_i32(net: FlexNet) -> i32 {
     return net.total_weight()              // W inferred = i32 via FlexVia<i32>
@@ -346,49 +329,41 @@ pub func sum_flex_f64(net: FlexNet) -> f64 {
 }
 
 // =========================================================================
-// Summary  (what changed from v5)
+// Summary
 // =========================================================================
 //
 //                ┌─────────────────────────┬──────────────────────────┐
 //                │ FPGA router (Part 2)    │ Follower network (Part 3)│
 //   ─────────────┼─────────────────────────┼──────────────────────────┤
-//   Labels       │ neutral (routes/a/b)    │ semantic (nodes/out/in)  │
+//   Labels       │ neutral (routes/a/b)    │ match interface surface  │
 //   Weight type  │ f32                     │ f64                      │
-//   Impl block   │ 1 (3 rel + 1 field)     │ 1 (empty body)           │
-//   Mutator impl │ N/A                     │ 1 (empty body)           │
+//   Impl block   │ 1 (6 alias lines)       │ 1 (empty body)           │
+//   Helper fns   │ 5                       │ 3                        │
 //                └─────────────────────────┴──────────────────────────┘
 //
-// What this design (v6) demonstrates:
+// What this design (v7, Wave 1) demonstrates:
 //
-//   - **Relation equivalence as the binding primitive.** The LHS
-//     `G:nodes/N:graph` is a single typed token (interface relation
-//     key) checked against the interface's declared abstract relations
-//     in one lookup.  No per-method resolution; iter/count/parent are
-//     all subsumed by mapping the relation as a unit.
+//   - **One user-authored interface per algorithm domain.** Algorithms
+//     are default methods on the interface; the interface IS the
+//     surface the algorithm quantifies over.
 //
-//   - **Omit owns/refs to mean "don't care."** Algorithm interfaces
-//     declare abstract relations without an ownership kind; the user's
-//     concrete relation can be owns or refs and still satisfy.  Mutator
-//     interfaces tighten the requirement (`owns`) where deletion
-//     semantics demand it.  No `any` keyword needed.
+//   - **`extends` for interface composition** — desugar-time method
+//     aggregation, no runtime IS-A, no vtable widening.
 //
-//   - **`extends` for desugar-time method aggregation.** Child
-//     interfaces may tighten parent's abstract relations (add `owns`)
-//     but never loosen them.  No runtime IS-A relation; no vtable
-//     widening.  Bootstrap cost: ~ the old `embed` lowering, adapted
-//     for multi-class.
+//   - **Alias-form impl as the binding primitive.** `T.member =
+//     Concrete.accessor` synthesizes a forwarding wrapper at desugar.
 //
-//   - **Empty-body impls trigger auto-derive on EXACT match across
-//     both buckets** (relation key + member name).  Single error
-//     surface lists every unsatisfied member.
+//   - **Empty-body impls trigger auto-derive on exact name match.**
+//     The user opts in to auto-derive by writing the impl (declaring
+//     the intent).  Missing bindings surface as one diagnostic.
 //
-//   - **Partial impls are generic.** `impl<W> WDG<FlexNet, FlexRoute,
-//     FlexVia<W>, W>` leaves W open; monomorphizes per use site.
+//   - **Partial impls are generic.** `impl<W> WDG<...,W>` leaves W
+//     open; monomorphized per use site.
 //
 //   - **Algorithm bodies use the interface's named surface
-//     (`n.outgoing.iter()`, `e.src`), not the user's labels.** The
-//     impl-block relation-equivalence does the translation at desugar.
+//     (`n.outgoing_edges()`, `e.dst()`), not the user's labels.** The
+//     impl-block alias does the translation at desugar.
 //
-//   - **No `_method_aliases` global, no per-relation rename map, no
-//     textual-prefix dispatch, no constraint-alias resolution.** The
-//     Forge bug class is eliminated by construction.
+//   - **Helper functions bridge relation accessors to interface
+//     methods today** (Wave 1).  Wave 2 will absorb the helpers via
+//     relation equivalence so user code drops the wrapper boilerplate.

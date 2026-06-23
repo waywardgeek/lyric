@@ -300,22 +300,44 @@ println(r)  // r in scope here
 
 ## 11. Interfaces
 
-Multi-class interfaces declare relationships between type parameters.
+Multi-class interfaces declare a contract spanning one or more type
+parameters. The interface body contains abstract method declarations
+(no body) and/or default method declarations (with body); default
+methods are specialized per impl at monomorphization.
 
 ```lyric
-interface Graph<G, N, E> {
-    func G.nodes(self) -> [N]
-    func N.out_edges(self) -> [E]
-    func E.tgt_node(self) -> N
+interface Greeter<T> {
+    pub func T.greet(self) -> string
 
-    pub func count_edges(graph: G) -> i32 {
-        let mut total = 0
-        let nodes = graph.nodes()
-        for n in nodes { total = total + len(n.out_edges()) }
-        return total
+    pub func T.shout(self) -> string {        // default method
+        return self.greet() + "!"
     }
 }
 ```
+
+For the canonical multi-class example (`DirectedGraph<G, N, E>` with
+default algorithms and `WeightedDirectedGraph extends DirectedGraph`),
+see `cr/docs/lyric-language-spec.md` §Interfaces and Multi-Class
+Contracts.
+
+### Interface composition (`extends`)
+
+```lyric
+interface Sub<T> extends Base<T> {
+    pub func T.extra_method(self) -> i32
+}
+```
+
+`extends` aggregates a parent interface's surface into the child at
+desugar time (copy of abstract methods, fields, default methods, with
+type-parameter substitution). **No runtime IS-A**, no vtable widening,
+no subtype relation. Child may override a parent's method by re-
+declaring it with the same signature.
+
+Multi-parent (`extends A<...> + B<...>`) is reserved for future work;
+today exactly one parent is supported.
+
+### Relation hints
 
 Relation hints (binary interfaces — see §12) additionally declare
 `field T.name: Type` (injected into the implementing class) and
@@ -342,12 +364,13 @@ kind keyword; the desugar pass copies only the matching pair onto the
 concrete classes. A bare `destructor T { ... }` (no kind) defaults to `owns`.
 
 ### Impl blocks
+
+Three forms of binding inside an impl body:
+
 ```lyric
-// Alias: interface method ↔ class method
-impl Graph<SimpleGraph, SimpleNode, SimpleEdge> {
-    G.nodes = SimpleGraph.get_nodes
-    N.out_edges = SimpleNode.get_edges
-    E.tgt_node = SimpleEdge.get_target
+// Alias: interface member ↔ concrete-class accessor
+impl Greeter<Hi> {
+    T.greet = Hi.greeting          // method on concrete class
 }
 
 // Field bind: interface field ↔ concrete field
@@ -364,41 +387,89 @@ impl Printable<Widget> {
 }
 ```
 
-**Labeled impl declarations.** Each top-level class type-arg may
-carry an optional `:label` that puts the interface's per-side
-injected members under a `<label>` sub-scope on that class (see
-`cr/docs/multi-class-interface-redesign.md` §3.8):
+Each alias binding `T.member = ConcreteType.accessor` synthesizes a
+forwarding wrapper at desugar time. The right-hand-side may be any
+callable in the concrete class scope: a method, a field auto-getter,
+or a user-defined helper that adapts a relation accessor to the
+interface's expected signature.
+
+### Empty-body auto-derive
+
+When the concrete class's member names match the interface's abstract
+surface exactly, the impl body may be empty:
+
+```lyric
+impl Greeter<Cat> { }              // auto-derives T.greet → Cat.greet
+```
+
+The auto-derive walks the interface's unsatisfied abstract members
+and looks for exact-name matches in the concrete class scope. Missing
+matches surface as one diagnostic listing every unsatisfied member.
+
+Mixed-mode is supported: bind some members explicitly, let auto-derive
+fill the rest.
+
+### Partial impls (open type variables)
+
+An impl may leave one or more type variables open. The impl is then
+generic and is monomorphized per use site:
+
+```lyric
+class Box<W> { value: W }
+impl<W> Container<Box<W>, W> { }    // W open; specialized per use site
+```
+
+### Labeled impl declarations
+
+Each top-level class type-arg may carry an optional `:label` that puts
+the interface's per-side injected members under a `<label>` sub-scope
+on that class (see `cr/docs/multi-class-interface-redesign.md` §3.8):
 
 ```lyric
 impl ArrayList<Team:roster, Player:team> { ... }
-// label-prefixed members: team.roster_children, player.team_parent
+// dotted-scope access: team.roster.children, player.team.parent
 
 // Same interface, same class, distinct labels — non-colliding:
 impl DoublyLinked<Node:ready_q,   Node:ready_q_child>   { ... }
 impl DoublyLinked<Node:blocked_q, Node:blocked_q_child> { ... }
 ```
 
-A `relation` declaration is sugar for a labeled impl of the
-matching hint interface plus an `owns`/`refs` flag.
+A `relation` declaration is sugar for a labeled impl of the matching
+hint interface plus an `owns`/`refs` flag.
 
-User-authored ownership impls of user-defined hint interfaces
-work directly: an interface whose shape satisfies §3.7 (two
-type parameters; every field, destructor, and abstract method-
-with-receiver names one of them) is a candidate for
-`impl Hint<A:l1, B:l2> owns { }` / `refs { }` — the compiler
-injects fields, generates field-binds, and synthesizes
-destructors exactly as it does for a relation-synthesized
-ownership impl.
+User-authored ownership impls of user-defined hint interfaces work
+directly: an interface whose shape satisfies §3.7 (two type
+parameters; every field, destructor, and abstract method-with-receiver
+names one of them) is a candidate for `impl Hint<A:l1, B:l2> owns { }`
+/ `refs { }`.
 
 🚧 The dotted-scope call form (`team.roster.children`) for accessing
 label-prefixed members shipped in Phase 3c-capability and became
 canonical in Phase 3e. The underlying storage name is mangled
 (`Team.__roster_children`) so the bare textual-prefix form
-(`team.roster_children`) is no longer reachable — gcc reports the
-helpful "did you mean `__roster_children`?" if a stale call survives.
-Coexistence with user-declared fields sharing the same prefix is now
-allowed: `class Team { roster_children: i32 }` plus
-`relation ArrayList Team:roster owns [...]` is well-formed.
+(`team.roster_children`) is no longer reachable.
+
+### 🚧 Relation equivalence (Wave 2, under construction)
+
+A future ergonomic upgrade will let interface authors declare
+**abstract relations** on type-var sides, and impl authors bind them
+with a single line per relation that subsumes iter/count/parent-back:
+
+```lyric
+// 🚧 NOT shipped yet — see redesign doc §9 Phase 4 Wave 2.
+interface DirectedGraph<G, N, E> {
+    relation Collection G:nodes [N:graph]
+    // ...
+}
+
+impl DirectedGraph<Net, Route, Via> {
+    G:nodes/N:graph = Net:routes/Route:net
+}
+```
+
+Today the user must author helper methods that adapt relation
+accessors to the interface's expected return types and bind them via
+the alias form. Wave 2 removes that boilerplate.
 
 ### `error` interface
 Built-in. Any class with a `message(self) -> string` method satisfies it.
