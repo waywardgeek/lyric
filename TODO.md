@@ -39,6 +39,13 @@
 ## Known Tech Debt
 
 ### Generic AST visitor refactor
+**Priority**: Hewitt's #1 recommended next sprint (see IDEAS.md). The
+same shallow-copy-plus-mutation bug shape bit twice in one sprint
+(2026-06-23): `deep_copy_type_expr` and `substitute_type_expr_copy`
+both had stale "shallow is safe" comments predating the rich-
+substitution path. Every duplicated walker is a future "forgot an
+arm" bug; one centralized visitor structurally eliminates the class.
+
 Multiple passes in desugar/checker/lir hand-roll the same recursive
 walk of the AST, one match-arm per Expr/Stmt/TypeExpr variant:
 - `substitute_type_params_rich_in_{block,stmt,expr,type_expr}` in
