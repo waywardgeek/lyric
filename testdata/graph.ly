@@ -315,12 +315,23 @@ pub func mutual_followers(a: Person, b: Person) -> [Person] {
 // A weight-agnostic router data set — the impl leaves W open,
 // monomorphizing per use site.  Same engine as generic-function
 // specialization.
+//
+// 🚧 STATUS (2026-06-23): Part 4 reaches the checker successfully via the
+// alias-resolution path shipped this sprint, but FAILS at gcc because
+// the impl alias `N.outgoing_edges = FlexRoute.all_outgoing` only
+// matches by NAME COINCIDENCE between the impl's W and the helper's W.
+// The monomorphizer can't see the binding, so `FlexVia.dst_route` is
+// emitted unspecialized and the C compiler rejects the type mismatch.
+// See TODO.md "Explicit type-binding in impl alias mappings (de-jank)"
+// for the fix: alias RHS should carry explicit type-args
+// (`FlexRoute<W>.all_outgoing` or `FlexRoute.all_outgoing<W>`) so the
+// type-level binding is in the source, not implicit.
 
-class FlexNet {
+class FlexNet<W> {
     name: string
 }
 
-class FlexRoute {
+class FlexRoute<W> {
     layer: i32
 }
 
@@ -329,12 +340,12 @@ class FlexVia<W> {           // generic in the weight type
     weight: W
 }
 
-relation DoublyLinked FlexNet:routes              owns [FlexRoute:net]
-relation DoublyLinked FlexRoute:outgoing_edges    refs [FlexVia:src]
-relation DoublyLinked FlexRoute:incoming_edges    refs [FlexVia:dst]
+relation DoublyLinked FlexNet<W>:routes              owns [FlexRoute<W>:net]
+relation DoublyLinked FlexRoute<W>:outgoing_edges    refs [FlexVia<W>:src]
+relation DoublyLinked FlexRoute<W>:incoming_edges    refs [FlexVia<W>:dst]
 
-pub func FlexNet.all_nodes(self) -> [FlexRoute] {
-    let mut result: [FlexRoute] = []
+pub func FlexNet.all_nodes(self) -> [FlexRoute<W>] {
+    let mut result: [FlexRoute<W>] = []
     for r in self.routes.children() { result = append(result, r) }
     return result
 }
@@ -351,11 +362,11 @@ pub func FlexRoute.all_incoming(self) -> [FlexVia<W>] {
     return result
 }
 
-pub func FlexVia.src_route(self) -> FlexRoute { return self.src.parent! }
-pub func FlexVia.dst_route(self) -> FlexRoute { return self.dst.parent! }
+pub func FlexVia.src_route(self) -> FlexRoute<W> { return self.src.parent! }
+pub func FlexVia.dst_route(self) -> FlexRoute<W> { return self.dst.parent! }
 
 // Partial impl: W remains open; monomorphized per use site.
-impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> {
+impl<W> WeightedDirectedGraph<FlexNet<W>, FlexRoute<W>, FlexVia<W>, W> {
     G.nodes           = FlexNet.all_nodes
     N.outgoing_edges  = FlexRoute.all_outgoing
     N.incoming_edges  = FlexRoute.all_incoming
@@ -364,11 +375,11 @@ impl<W> WeightedDirectedGraph<FlexNet, FlexRoute, FlexVia<W>, W> {
     E.weight          = FlexVia.weight
 }
 
-pub func sum_flex_i32(net: FlexNet) -> i32 {
-    return net.total_weight()              // W inferred = i32 via FlexVia<i32>
+pub func sum_flex_i32(net: FlexNet<i32>) -> i32 {
+    return net.total_weight()              // W bound to i32 by net's type
 }
 
-pub func sum_flex_f64(net: FlexNet) -> f64 {
+pub func sum_flex_f64(net: FlexNet<f64>) -> f64 {
     return net.total_weight()
 }
 
@@ -455,8 +466,8 @@ func main() {
     // (sum_flex_i32 is declared but exercising it would need a separate
     // FlexNet instance with FlexVia<i32> children; left as a compile
     // check for the partial-impl monomorphization path.)
-    let fn0 = FlexNet { name: "flex" }
-    let fr = FlexRoute { layer: 0 }
+    let fn0 = FlexNet<f64> { name: "flex" }
+    let fr = FlexRoute<f64> { layer: 0 }
     fn0.routes.append(fr)
     let fv = FlexVia<f64> { fuse_id: 1, weight: 3.0 }
     fr.outgoing_edges.append(fv)

@@ -64,8 +64,12 @@ module desugar
        partial impls (`impl<W> Iface<..., W>`) remain generic in W.
        Panics on collision: two impls producing the same Class.method
        specialization is a user error (use distinct labels or provide
-       an explicit alias binding in one impl). See
-       cr/docs/multi-class-interface-redesign.md §9 Phase 4 Wave 1 4w1-a.
+       an explicit alias binding in one impl). Sets `fn.source_impl =
+       ib` on every specialized FuncDecl as a back-pointer to the
+       producing impl, so the checker can consult the impl's alias
+       bindings (ibm) when resolving dot-operator references inside
+       the specialized body. See cr/docs/multi-class-interface-
+       redesign.md §9 Phase 4 Wave 1 4w1-a.
     5. desugar_default_impls — extracts interface methods that carry a
        body into top-level generic functions guarded by relational
        `where` clauses, so any conforming class picks them up.

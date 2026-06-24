@@ -157,6 +157,18 @@ lyric checker {
     errors: [string]
     current_func_return: Type?
     current_func_name: string
+    current_func: FuncDecl?    // The FuncDecl currently being checked, or
+                               // null at top level. Pushed/popped by
+                               // check_func_body. Dot-operator resolution
+                               // (check_method_call, check_field_access)
+                               // reads current_func.source_impl to consult
+                               // impl-alias bindings BEFORE the standard
+                               // registry lookup: inside a default-method
+                               // specialization the impl's alias table is
+                               // authoritative for any iface-surface name
+                               // (e.g. `N.outgoing_edges = Route.outgoing_a`
+                               // means a Route receiver's `outgoing_edges`
+                               // resolves to `outgoing_a`, full stop).
     iface_decls: Dict<Sym, InterfaceDecl>  // for checkImplements
     type_var_methods: Dict<Sym, Dict<Sym, Type>>?  // type var name → (method name → method type)
     method_type_args: Dict<Sym, [TypeExpr]>  // "Type.method" → concrete type args for interface methods
@@ -170,6 +182,7 @@ lyric checker {
       errors: [],
       current_func_return: null,
       current_func_name: "",
+      current_func: null,
       iface_decls: Dict<Sym, InterfaceDecl>(),
       method_type_args: Dict<Sym, [TypeExpr]>(),
     }
@@ -1211,7 +1224,13 @@ lyric checker {
       // Zero-span means this TypeExpr came from type_to_type_expr (synthetic)
       return make_typevar_type(name)
     }
-    // Unknown type — treat as type variable (matches Go checker behavior)
+    // Unknown type — treat as type variable (matches Go checker behavior).
+    // Surgical signature-level validation (validate_signature_type_vars,
+    // run before bodies) rejects undeclared free type-vars in user-authored
+    // function signatures with a clear "undefined type identifier" error.
+    // Keeping the lenient fallback here is required because internal round-
+    // trips (monomorphization, type_to_type_expr → resolve, etc.) legit-
+    // imately pass through unresolved names.
     return make_typevar_type(name)
   }
 
@@ -2423,8 +2442,10 @@ lyric checker {
 
     let prev_ret = self.current_func_return
     let prev_name = self.current_func_name
+    let prev_func = self.current_func
     let prev_trusted = self.in_trusted
     self.in_trusted = f.is_trusted
+    self.current_func = f
 
     if f.name != null {
       self.current_func_name = sym_to_string(f.name!)
@@ -2529,6 +2550,7 @@ lyric checker {
     self.type_var_methods = prev_tvm
     self.current_func_return = prev_ret
     self.current_func_name = prev_name
+    self.current_func = prev_func
     self.in_trusted = prev_trusted
     self.pop_scope()
   }
@@ -2729,6 +2751,15 @@ lyric checker {
 
       if declared_type != null {
         if !self.is_assignable(val_type, declared_type!) {
+          let dbg_val: string = match val_type.kind {
+            Sequence(e) => { "Seq(" + type_name(e) + ")" }
+            _ => { type_name(val_type) }
+          }
+          let dbg_dec: string = match declared_type!.kind {
+            Sequence(e) => { "Seq(" + type_name(e) + ")" }
+            _ => { type_name(declared_type!) }
+          }
+          eprintln(f"DBG vartype: name={sym_to_string(name)} val={dbg_val} declared={dbg_dec}")
           self.error("type mismatch in variable declaration for " + sym_to_string(name))
         }
         self.scope.define(sym_to_string(name), declared_type!)
@@ -3732,6 +3763,111 @@ lyric checker {
   // Method call checking
   // =====================================================================
 
+  // try_resolve_impl_alias_method — when the currently-checked FuncDecl was
+  // produced by desugar pass 4.5 (default-method specialization), its body
+  // contains identifiers from the abstract interface surface. The impl's
+  // alias bindings are AUTHORITATIVE for those names on the bound concrete
+  // classes — we MUST consult them before any registry lookup, otherwise an
+  // unrelated method on the concrete class (or one injected by Phase 1.5b)
+  // could shadow the iface-surface name and silently resolve to the wrong
+  // target. Returns the resolved Type and rewrites call_expr.kind in place
+  // (MethodCall.method swapped, or rewritten to FieldAccess for FieldBind),
+  // or returns null if there is no matching binding.
+  func Checker.try_resolve_impl_alias_method(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr], recv_type: Type) -> Type? {
+    if isnull(self.current_func) { return null }
+    let cf = self.current_func!
+    if isnull(cf.source_impl) { return null }
+    let ib = cf.source_impl!
+    if isnull(ib.interface_name) { return null }
+
+    let recv_class_name = type_name(recv_type)
+    if recv_class_name == "" { return null }
+
+    // Resolve interface decl to build iface-TV -> concrete-class map.
+    let iface_entry = self.iface_decls.get(ib.interface_name!)
+    if isnull(iface_entry) { return null }
+    let iface = iface_entry!.value
+
+    let iface_tps = iface.itp.children()
+    let impl_args = ib.ib_arg.children()
+    let mut tv_to_class: Dict<Sym, string> = Dict<Sym, string>()
+    let mut limit = len(iface_tps)
+    if len(impl_args) < limit { limit = len(impl_args) }
+    for i in range(0, limit) {
+      if isnull(iface_tps[i].name) { continue }
+      if isnull(impl_args[i].type_expr) { continue }
+      match impl_args[i].type_expr!.kind {
+        Named(nm, _) => { tv_to_class.set(iface_tps[i].name!, nm.name) }
+        _ => {}
+      }
+    }
+
+    let method_str = sym_to_string(method)
+    for m in ib.ibm.children() {
+      if isnull(m.method_name) { continue }
+      if sym_to_string(m.method_name!) != method_str { continue }
+      if isnull(m.type_param) { continue }
+      let concrete_entry = tv_to_class.get(m.type_param!)
+      if isnull(concrete_entry) { continue }
+      if concrete_entry!.value != recv_class_name { continue }
+      if isnull(m.target_class) { continue }
+      if isnull(m.target_member) { continue }
+
+      let target_class_str = sym_to_string(m.target_class!)
+      let target_member_str = sym_to_string(m.target_member!)
+
+      match m.kind {
+        Alias => {
+          // Rewrite MethodCall.method to the target member; re-dispatch so
+          // arg type inference, propagate_arg_types, and inferred_type_args
+          // all flow through the standard path. For the cases we support
+          // (user helpers on the concrete class itself) target_class equals
+          // the receiver class — assert that.
+          if target_class_str != recv_class_name {
+            eprintln(f"checker: impl alias '{method_str}' targets cross-class member '{target_class_str}.{target_member_str}' on receiver '{recv_class_name}' — not supported")
+            os_exit(1)
+          }
+          // No-op rename: the user-authored method on the concrete class
+          // already has the iface-surface name (auto-derive-style binding,
+          // e.g. `N.outgoing_edges = MyNode.outgoing_edges`). Returning
+          // null here lets the standard registry lookup find that method
+          // directly. Re-dispatching with the same name would re-enter
+          // this helper and recurse forever.
+          if target_member_str == method_str { return null }
+          let new_method = sym(target_member_str)
+          let mut keep_mut: [bool] = []
+          match call_expr.kind {
+            MethodCall(_, _, _, _, ma) => { keep_mut = ma }
+            _ => {}
+          }
+          call_expr.kind = ExprKind.MethodCall(receiver, new_method, type_args, args, keep_mut)
+          return self.check_method_call(call_expr, receiver, new_method, type_args, args)
+        }
+        FieldBind => {
+          // Field-as-getter: rewrite the call to a FieldAccess and resolve
+          // through the standard field-access path. Setter form
+          // (`mut_self_setter(x)`) is not used by default-method bodies.
+          if len(args) != 0 {
+            eprintln(f"checker: impl FieldBind '{method_str}' invoked with arguments — setter form not supported in default-method bodies")
+            os_exit(1)
+          }
+          if target_class_str != recv_class_name {
+            eprintln(f"checker: impl FieldBind '{method_str}' targets cross-class field '{target_class_str}.{target_member_str}' on receiver '{recv_class_name}' — not supported")
+            os_exit(1)
+          }
+          let target_sym = sym(target_member_str)
+          call_expr.kind = ExprKind.FieldAccess(receiver, target_sym)
+          return self.check_field_access(call_expr, receiver, target_sym)
+        }
+        Inline => {
+          // Inline mappings provide their own body; they do not appear as
+          // calls inside a default-method body's resolution.
+        }
+      }
+    }
+    return null
+  }
+
   func Checker.check_method_call(self, call_expr: Expr, receiver: Expr, method: Sym, type_args: [TypeExpr], args: [Expr]) -> Type {
     // Qualified enum variant constructor: EnumName.Variant(args)
     // Must check BEFORE check_expr on receiver — enum names are in registry, not scope,
@@ -3831,6 +3967,15 @@ lyric checker {
       append(arg_types, self.check_expr(a))
     }
     let method_str = sym_to_string(method)
+
+    // Aliases first: inside a default-method specialization (current_func
+    // .source_impl != null), the impl's alias bindings are authoritative
+    // for any iface-surface name. Checking the registry first would let
+    // unrelated methods on the concrete class shadow the binding and
+    // silently resolve to the wrong target — a notoriously hard bug to
+    // track down. Bill's call (2026-06-23).
+    let alias_result = self.try_resolve_impl_alias_method(call_expr, receiver, method, type_args, args, recv_type)
+    if !isnull(alias_result) { return alias_result! }
 
 
     // Built-in methods by receiver type
@@ -4537,6 +4682,19 @@ lyric checker {
         // Skip generic functions — they aren't fully resolved
         let tps = f.fp.children()
         if len(tps) > 0 { continue }
+        // Skip external methods whose receiver class is generic — the
+        // method inherits the class's type-params and its body legitimately
+        // carries them as TypeVars (specialized per use site by the
+        // monomorphizer). Without this, every `pub func FlexNet.foo(...)
+        // -> [FlexBar<W>]` on a generic class trips the validator with a
+        // cryptic "TypeVar leak". Added 2026-06-23 alongside graph.ly
+        // Part 4 (FlexNet<W>).
+        if !isnull(f.receiver_type) {
+          let rinfo = self.registry.lookup(sym_to_string(f.receiver_type!))
+          if !isnull(rinfo) {
+            if len(rinfo!.type_param_names) > 0 { continue }
+          }
+        }
 
         let ctx = f.name!.name
         self.vwalk_block(f.body!, ctx)

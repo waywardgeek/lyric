@@ -859,6 +859,20 @@ lyric desugar {
           // Receiver becomes the concrete class.
           fn.receiver_type = sym(recv_class_name)
 
+          // Back-pointer to the impl that produced this specialization.
+          // The checker pushes the enclosing FuncDecl as current_func in
+          // check_func_body; dot-operator resolution (check_method_call,
+          // check_field_access) then consults fn.source_impl.ibm bindings
+          // to rewrite alias-form method/field references (e.g.
+          // N.outgoing_edges = Route.outgoing_a → method "outgoing_edges"
+          // becomes "outgoing_a" once the receiver class is known).
+          // Without this back-pointer those calls would fail with
+          // "unknown method" because Phase 1.5b registers the TARGET name
+          // (Route.outgoing_a) on the concrete class, not the interface
+          // surface name. See TODO.md "Multi-class interface default-
+          // method alias resolution".
+          fn.source_impl = ib
+
           // Carry impl-level type-params (partial impls) onto the fn so the
           // monomorphizer still sees them as the remaining free vars.
           for tp in ib.imtp.children() {
@@ -1458,17 +1472,79 @@ lyric desugar {
   }
 
   func deep_copy_type_expr(te: TypeExpr) -> TypeExpr {
-    // Shallow copy of TypeExpr is safe for desugar: substitute_type_params_in_type_expr
-    // creates new enum values rather than mutating class fields. The critical deep copy
-    // is for Expr/Stmt trees where destructor method renames cause contamination.
-    return TypeExpr { kind: te.kind, span: te.span }
+    // Must recurse: substitute_type_params_rich_in_type_expr mutates
+    // te.kind in place (`te.kind = replacement.kind`), so if a Sequence's
+    // inner TypeExpr is shared across multiple specialized FuncDecls,
+    // substituting [N] → [Route] in the first copy silently rewrites
+    // every other copy's inner type too. Bug surfaced 2026-06-23 when
+    // graph.ly's WeightedDirectedGraph impl-specializations all ended
+    // up with the FIRST impl's element class after pass 4.5. Earlier
+    // comment ("Shallow copy is safe for desugar") predated the rich
+    // (mutating) substitution path.
+    let new_kind = deep_copy_type_expr_kind(te.kind)
+    return TypeExpr { kind: new_kind, span: te.span }
+  }
+
+  func deep_copy_type_expr_kind(k: TypeExprKind) -> TypeExprKind {
+    match k {
+      Named(name, args) => {
+        let mut new_args: [TypeExpr] = []
+        let mut i: i32 = 0
+        while i < len(args) {
+          new_args = append(new_args, deep_copy_type_expr(args[i]))
+          i = i + 1
+        }
+        let r: TypeExprKind = TypeExprKind.Named(name, new_args)
+        return r
+      }
+      Optional(inner) => {
+        let r: TypeExprKind = TypeExprKind.Optional(deep_copy_type_expr(inner))
+        return r
+      }
+      Sequence(elem) => {
+        let r: TypeExprKind = TypeExprKind.Sequence(deep_copy_type_expr(elem))
+        return r
+      }
+      Map(key, value) => {
+        let r: TypeExprKind = TypeExprKind.Map(deep_copy_type_expr(key), deep_copy_type_expr(value))
+        return r
+      }
+      Tuple(fields) => {
+        let mut new_fields: [TupleField] = []
+        for f in fields {
+          let new_te: TypeExpr? = if !isnull(f.type_expr) { deep_copy_type_expr(f.type_expr!) } else { null }
+          new_fields = append(new_fields, TupleField { name: f.name, type_expr: new_te })
+        }
+        let r: TypeExprKind = TypeExprKind.Tuple(new_fields)
+        return r
+      }
+      Func(params, ret) => {
+        let mut new_params: [TypeExpr] = []
+        let mut i: i32 = 0
+        while i < len(params) {
+          new_params = append(new_params, deep_copy_type_expr(params[i]))
+          i = i + 1
+        }
+        let r: TypeExprKind = TypeExprKind.Func(new_params, deep_copy_type_expr(ret))
+        return r
+      }
+      Channel(elem) => {
+        let r: TypeExprKind = TypeExprKind.Channel(deep_copy_type_expr(elem))
+        return r
+      }
+      Generator(elem) => {
+        let r: TypeExprKind = TypeExprKind.Generator(deep_copy_type_expr(elem))
+        return r
+      }
+      _ => { return k }
+    }
   }
 
   func deep_copy_type_args(args: [TypeExpr]) -> [TypeExpr] {
     let mut result: [TypeExpr] = []
     let mut i: i32 = 0
     while i < len(args) {
-      result = append(result, TypeExpr { kind: args[i].kind, span: args[i].span })
+      result = append(result, deep_copy_type_expr(args[i]))
       i = i + 1
     }
     return result
@@ -1608,6 +1684,9 @@ lyric desugar {
         substitute_type_params_rich_in_expr(value, type_map)
       }
       VarDecl(name, names, type_expr, is_mut, is_ref, value) => {
+        if !isnull(type_expr) {
+          substitute_type_params_rich_in_type_expr(type_expr!, type_map)
+        }
         if !isnull(value) { substitute_type_params_rich_in_expr(value!, type_map) }
       }
       Return(value) => {

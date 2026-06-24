@@ -76,7 +76,91 @@ LOC across the consumers above. Bug-prevention value: structural
 elimination of an entire class of "forgot a case" defects.
 
 ### Multi-class interface default-method alias resolution
-Default methods declared on a multi-class interface and specialized
+SHIPPED 2026-06-23 (see commit log). `FuncDecl.source_impl` added; pass 4.5
+sets it; checker `try_resolve_impl_alias_method` consults it FIRST in dot
+dispatch (Bill: aliases must trump registry lookup to avoid silent shadowing).
+No-op-rename guard prevents infinite recursion on auto-derive-style bindings.
+Bug found and fixed in the same sprint: `deep_copy_type_expr` was shallow,
+causing rich-substitution mutations to leak across multiple per-impl
+specializations of the same default method.
+
+### Explicit type-binding in impl alias mappings (de-jank)
+Currently impl alias mappings like
+
+```
+impl<W> WeightedDirectedGraph<FlexNet<W>, FlexRoute<W>, FlexVia<W>, W> {
+    N.outgoing_edges = FlexRoute.all_outgoing
+}
+```
+
+work by NAME COINCIDENCE only — `FlexRoute.all_outgoing` (whose return
+type uses `W` from the class) happens to thread W through because of
+string matching, NOT because of any type-level binding declared in the
+alias. If the helper used `V` instead of `W` in its declaration the
+impl wouldn't compile, but conversely: if the helper used a different
+SHAPE (e.g. function-level `<U>`), the impl wouldn't know what to
+bind U to.
+
+Bill's design (2026-06-23): the alias RHS should carry explicit
+type-args so the binding is in the source, not implicit. Two
+candidate syntaxes both expressing "specialize this callable for W":
+
+```
+N.outgoing_edges = FlexRoute<W>.all_outgoing       // class-instantiation form
+N.outgoing_edges = FlexRoute.all_outgoing<W>       // function-side type-arg form
+```
+
+The class-instantiation form is more honest when V belongs to the
+class (`class FlexRoute<V> { ... }`), since V is a class type-param
+not a function one. The function-side form matches existing stdlib
+patterns (`Dict.set<K, V>`). Pick one and require it.
+
+Tied to this: the user-side restructure of graph.ly Part 4 currently
+lives in tree as `class FlexNet<W>` / `FlexRoute<W>` / `FlexVia<W>`
+with the alias `= FlexRoute.all_outgoing` (no explicit binding —
+relies on the W string-match coincidence). Once explicit binding
+lands, the alias becomes `= FlexRoute<W>.all_outgoing` (or fn-side
+equivalent) and we can also rename the class-side param to `V` as a
+test that the compiler doesn't conflate by name.
+
+Scope: parser (alias-RHS type-args), checker (resolve parametric
+callable, thread bindings through `try_resolve_impl_alias_method`),
+possibly desugar (impl's per-binding rich substitution context),
+monomorphizer (specialize alias targets with explicit args). Easily
+200+ LOC; warrants its own sprint. Without it, graph.ly Part 4
+ALSO fails at gcc — `FlexVia_dst_route` returns `int` instead of
+`FlexRoute_i32*` because monomorphization can't see the binding.
+
+### Reject undeclared type identifiers in user signatures (de-jank)
+Currently `resolve_named_type` silently promotes any unknown identifier
+to a TypeVar (line 1234 of checker.ly: "Unknown type — treat as type
+variable (matches Go checker behavior)"). This masks user typos
+(`FlexVia<Wieght>` becomes a synthetic generic over Wieght) and lets
+undeclared free vars surface only at the validator stage as cryptic
+"TypeVar leak" messages.
+
+Bill's call (2026-06-23): a Named identifier in a type position should
+error with a clear "undefined type identifier" message unless it is
+a primitive, a registered type, or a declared type-param (function's
+own `<T>`, receiver class's `<U>`, or a where-clause variable).
+
+Attempted in-sprint: a `validate_func_signature` pass in `register_func`
+broke ~25 tests including stdlib usages. The implementation needs to
+handle: (a) registration ORDER (Dict.set<K, V> may be checked before
+Dict's class type-params are populated in the registry), (b)
+relation-decl-synthesized helpers, (c) interface-field-derived
+getter/setter synthesis spans, (d) maybe more. Estimate: 100-200 LOC
+of careful sequencing once registration order is understood.
+
+Coupled with that work: the SYNTAX for declaring type-params on an
+external method of a CONCRETE class is `pub func Class.method<T>(...)`
+(type-params AFTER method name); for an external method whose
+RECEIVER is itself a type-var the form is `pub func<T> T.method(...)`.
+Both forms exist in the codebase (stdlib for the former, tree.ly for
+the latter); the parser accepts both. Once the strict-reject lands,
+the error message should suggest the right form based on receiver kind.
+
+### Multi-class interface default-method alias resolution (original entry)Default methods declared on a multi-class interface and specialized
 into concrete classes (desugar pass 4.5) currently FAIL to resolve
 alias-form impl bindings inside the specialized body. Example:
 

@@ -171,6 +171,8 @@ module ast
     field name: Sym?
     field receiver_type: Sym?
     field return_type: TypeExpr?
+    field source_impl: ImplBlock?
+      doc: "back-pointer to the impl declaration that produced this FuncDecl (default-method specialization in desugar pass 4.5), or null. The checker pushes the enclosing FuncDecl in check_func_body, so dot-operator resolution can consult source_impl.ibm bindings to rewrite alias-form method/field references (e.g. `N.outgoing_edges = Route.outgoing_a`) when normal lookup misses on the receiver class."
     field span: Span
 
   class Field
