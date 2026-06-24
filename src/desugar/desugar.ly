@@ -1177,10 +1177,12 @@ lyric desugar {
   // Create a copy of a TypeExpr with type params substituted
   func substitute_type_expr_copy(te: TypeExpr?, type_map: Dict<Sym, string>) -> TypeExpr? {
     if isnull(te) { return null }
-    let result = TypeExpr {
-      kind: te!.kind,
-      span: te!.span,
-    }
+    // Must deep-copy: inner TypeExpr nodes are shared by `kind: te!.kind`,
+    // and the rich substitution path mutates `te.kind = replacement.kind`
+    // in place. Without a recursive copy, substituting [N]→[Route] in one
+    // specialization silently rewrites every other specialization's inner
+    // type. Same shape as the deep_copy_type_expr fix earlier this sprint.
+    let result = deep_copy_type_expr(te!)
     substitute_type_params_in_type_expr(result, type_map)
     return result
   }
