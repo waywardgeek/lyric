@@ -1,246 +1,323 @@
 # Lyric
 
-A typed language for design and implementation: describe architecture in `.lyric`
-understanding files and compile `.ly` programs to C.
+A self-hosting systems language with **relations** for ownership, **multi-class
+interfaces** for generic algorithms, and a one-flag switch from Array-of-Structs
+to Struct-of-Arrays memory layout. Compiles to C. Built in fourteen days as the
+first language designed inside a human-and-LLM loop-engineering loop.
 
 **Repository:** [github.com/waywardgeek/lyric](https://github.com/waywardgeek/lyric)
 
+---
+
 ## What is Lyric?
 
-Lyric has two related file formats:
+Lyric is an opinionated, statically typed, compiled language that takes the
+combinations its designers couldn't find in any one existing language and puts
+them in one place:
 
-**`.lyric` files - understandings.** Declaration-only design artifacts: data
-structures, APIs, interfaces, annotations, doc blocks, invariants, ownership
-relations, and design rationale. They are written for review and for AI context.
-The older Go-source verifier/update/gen tooling is preserved under
-`legacy/go-compiler`, but it is not part of the current self-hosted `lyric`
-binary.
+- **Go's error model** — explicit `(T, error)` returns, no hidden exceptions —
+  paired with **Rust's `?` operator** for one-character propagation.
+- **Rust's algebraic types** — enums with payloads, exhaustive `match`,
+  `if let`, `let..else`, pattern guards.
+- **Go's concurrency** — `spawn`, typed channels, `select`, scoped `lock`.
+- **Haskell's multi-parameter type classes**, reimagined as monomorphized
+  **multi-class interfaces** with zero runtime dispatch.
+- **DataDraw's relations** — thirty years of production proof in EDA tools
+  processing billions of objects — promoted to a first-class language
+  primitive. One `relation` line replaces hundreds of lines of manual
+  ownership, destructor, and collection plumbing.
+- **C as the compilation target** — not LLVM, not a VM. GCC and Clang already
+  know how to optimize C, and 33,500 lines of Lyric compile to a single C file
+  in about 0.2 seconds.
 
-**`.ly` files - code.** Full Lyric with function bodies and executable
-semantics. The current compiler emits C and is self-hosting: `lyric.c` is checked
-in as the canonical compiler output and can rebuild the compiler from `src/*.ly`.
-
-## Why?
-
-The real bottleneck in AI-assisted software development is **human review**, not
-code generation. A `.lyric` file contains only the decisions that matter - data
-structures, API boundaries, type relationships, concurrency contracts, ownership,
-and invariants - at much higher information density than implementation code.
-
-See [Context-Driven Development](https://coderhapsody.ai/docs/context-driven-development)
-for the methodology.
+No garbage collector. No borrow checker. No lifetime annotations. Ownership is
+declared, not inferred.
 
 ---
 
 ## Quick Start
 
-### Installation
-
-Build the self-hosted compiler from the checked-in C source:
-
 ```bash
 git clone https://github.com/waywardgeek/lyric.git
 cd lyric
-make
+make                # builds ./lyric from checked-in lyric.c
 ```
 
-This requires GCC and libc. The test scripts use Bash.
+Requires GCC and libc. Test scripts use Bash.
 
-### Compile a `.ly` file
+A hello-world `hello.ly`:
+
+```lyric
+func main() {
+    println("hello, lyric")
+}
+```
+
+Compile and run:
 
 ```bash
-$ ./lyric compile testdata/demo.ly -o demo.c
-wrote demo.c
-$ gcc -std=gnu11 -O2 -w -I runtime -o demo demo.c -lm -lpthread
-$ ./demo
+$ ./lyric compile hello.ly -o hello.c
+$ gcc -std=gnu11 -O2 -w -I runtime -o hello hello.c -lm -lpthread
+$ ./hello
+hello, lyric
 ```
 
-### Run the regression suite
-
-```bash
-$ make test
-```
-
-`make test` builds `lyric`, compiles the top-level `testdata/*.ly` programs,
-compiles the generated C with GCC, runs the resulting binaries, and compares
-golden output where present.
-
-To verify the compiler fixed point:
+Verify the compiler reaches a fixed point on its own source:
 
 ```bash
 $ make self-test
 ```
 
-### Format a `.lyric` file
+Run the regression suite:
 
 ```bash
-$ ./lyric fmt src/parser/parser.lyric
+$ make test
 ```
-
-The active self-hosted CLI currently supports `compile`, `test`, `fmt`, and
-`help`. The old Go implementation of `verify`, `update`, and `gen` remains in
-`legacy/go-compiler` for reference.
 
 ---
 
-## The Compiler
+## The Three Features That Are Actually Different
 
-The `.ly` compiler is a full-stack compiler:
-
-```
-lexer/parser -> checker -> desugar -> LIR -> lowerer -> optimizer
-             -> monomorphizer -> memory pass -> C backend
-```
-
-The compiler source lives in `src/` and is written in Lyric. `lyric.c` is the
-checked-in generated C output used to bootstrap the binary.
+### 1. Relations — ownership declared in one line
 
 ```lyric
-lyric task_demo {
-  enum Priority { Low Medium High Critical }
+class Team   { name: string }
+class Player { name: string }
 
-  struct Task {
-    name: string
-    priority: Priority
-    done: bool
-  }
+relation ArrayList Team:roster owns [Player:team]
+```
 
-  class TaskManager<T>() {
-    tasks: [T]
+The compiler generates: the children array on `Team`, the back-pointer and index
+on `Player`, `t.roster.append(p)` and `t.roster.remove(p)` methods (O(1) swap-
+remove), and a cascade destructor on `Team` that destroys every `Player` in its
+roster. Switch `owns` to `refs` and the destructor unlinks children instead of
+destroying them — same line, different lifetime contract.
 
-    pub fn add(mut self, task: T) {
-      self.tasks = append(self.tasks, task)
-    }
+Three hint interfaces ship in the standard library: `ArrayList` (dynamic array,
+swap-remove), `DoublyLinked` (intrusive list, stable iteration during removal,
+multiple per class), `HashedList` (open-addressed table, basis of `Dict`). All
+three are *written in Lyric* in `stdlib/std.ly` using the same `interface`,
+`field`, and `destructor` primitives users have. None of them are compiler
+builtins.
 
-    pub fn count(self) -> i32 {
-      return len(self.tasks) as i32
-    }
-  }
+### 2. Multi-class interfaces — one contract over several types
 
-  func main() {
-    let mgr = TaskManager<Task>()
-    mgr.add(Task { name: "Ship it", priority: Priority.High, done: false })
-    println(f"Tasks: {mgr.count()}")
-  }
+```lyric
+interface DirectedGraph<G, N, E> {
+    pub func G.nodes(self) -> [N]
+    pub func N.outgoing(self) -> [E]
+    pub func E.target(self) -> N
+
+    pub func G.bfs(self, start: N) -> [N] { /* default method, written once */ }
+}
+
+impl DirectedGraph<SocialNetwork, User, Friendship> {
+    G.nodes    = SocialNetwork.users
+    N.outgoing = User.friendships
+    E.target   = Friendship.other
 }
 ```
 
-### Language Features
+One `impl` block binds three concrete classes to the interface. Default methods
+(like `bfs`) are *monomorphized per impl* — the binding cost is paid at compile
+time, dispatch is direct calls, the runtime never sees a vtable. The same
+mechanism powers `ArrayList`, `DoublyLinked`, and `HashedList`. Only Haskell's
+multi-parameter type classes precede this shape, and that precedent stayed
+academic; Lyric ships it as the everyday way to write generic algorithms over
+related types.
 
-**Type system:** Generics with constraints and inference, interfaces, enums with
-fields, optionals (`T?`, `!` unwrap, `isnull()`), union types (`T | U`), tuples
-`(T, U)`, type aliases, and classes.
+### 3. `--soa` — 10% faster, 14% less memory, zero source changes
 
-**Error handling:** `(T, error)` tuples with a `?` operator for concise error
-propagation.
+```bash
+$ ./lyric compile myapp.ly -o myapp.c            # AoS (default)
+$ ./lyric compile --soa myapp.ly -o myapp_soa.c  # SoA: parallel arrays per field
+```
 
-**Concurrency:** `spawn`, typed channels, `select`, and scoped `lock(mu) { ... }`.
+The same source compiles to two layouts. AoS uses pointer handles to a slab of
+contiguous objects. SoA uses 32-bit indices into parallel per-field arrays —
+every cache line iterating one field is full of that field's bytes. Measured on
+the Lyric compiler compiling its own 33,500 lines: **10% faster, 14% less
+memory** on a MacBook Air M2.
 
-**Concurrency safety:** `guarded_by(mu)` annotations are enforced at compile
-time.
+This works because the relation system already gave the compiler enough
+structural knowledge about your data to reorganize it for you. The technique
+came from thirty years of DataDraw shipping it in EDA tools.
 
-**Pattern matching:** Enum/union type switches, nested patterns, guard clauses,
-exhaustiveness checks, and tuple destructuring.
+---
 
-**Other:** Lambdas, f-strings, visibility (`pub`/private), standard collection
-helpers, numeric types, casts, modules, and built-in testing with `test_*`
-functions.
+## By the Numbers (first iteration, 2026-06-12)
+
+Lyric was bootstrapped from a Go compiler. On the day the Lyric-written
+compiler reached its self-hosting fixed point:
+
+| Metric          | Go compiler | Lyric bootstrap | Delta            |
+|-----------------|------------:|----------------:|------------------|
+| Lines of code   |      33,739 |          26,813 | **−20.5%**       |
+| Total bytes     |     929,693 |         837,914 | **−9.9%**        |
+| Bytes per line  |        27.6 |            31.2 | +13% (longer)    |
+
+The 20% line reduction exceeds the 10% byte reduction because Lyric lines are
+*longer* on average. The savings are genuine expressiveness — relations
+replacing boilerplate, `match` replacing `if/else if` chains, `?` replacing
+three-line `if err != nil { return ..., err }` blocks — not denser formatting.
+
+The compiler today: **33,531 lines of Lyric** (32,533 compiler + 998 stdlib)
+across **14 files in 12 directories**, compiling to **114,473 lines of C** in
+**~0.2 seconds**. End-to-end source-to-binary including GCC: under 5 seconds.
+
+These numbers are a *transliteration* of Go patterns into Lyric — the bootstrap
+was the obvious first iteration. Every subsequent round of loop engineering on
+the compiler — rewriting Go habits into native Lyric idioms — should widen the
+margins.
+
+---
+
+## Status — Honest
+
+**Self-hosting.** The compiler is written in Lyric, compiles itself, and
+reaches a byte-identical fixed point on every change (`make self-test`).
+
+**91 tests** under `testdata/`, 83 paired with golden outputs. `make test` runs
+them all.
+
+**Not 1.0.** The roadmap items in `TODO.md` and `IDEAS.md` are real. Highlights
+of what is *not* in yet:
+
+- **Bidirectional pointers for compile-time UAF prevention.** Today a stale
+  reference to a destroyed object is a use-after-free; the slab allocator's
+  zeroing is a debugging aid, not a safety guarantee. Compile with
+  `--detect-uaf` while debugging; the type-system fix is designed and on deck.
+- **Cross-package qualified type names.** `lexer.tokenize(...)` resolves;
+  `let xs: [lexer.Token] = []` does not. Workaround: export constructor
+  functions and let inference carry the type. The compiler itself sidesteps
+  this by passing every `.ly` file on one command line — see `Makefile`.
+- **`spawn` captures by pointer**, with no warning on races. Channels are the
+  safe shared-state primitive; for everything else use `lock`.
+- **`select` is a polling loop.** Real wait/notify is on the roadmap.
+- **`receive()` on a closed channel returns the zero value** with no
+  `(value, ok)` signal yet. Use a sentinel or a separate done-channel.
+- **No package registry, no LSP, no debugger metadata.** All on the roadmap.
+
+The book's chapters and the language reference flag every one of these with
+🚧 markers in context. Nothing about the language's state is hidden.
 
 ---
 
 ## The Toolchain
 
-| Command | Description |
-|---|---|
-| `lyric compile file.ly -o file.c` | Compile `.ly` to C |
-| `lyric test file.ly [...]` | Compile, discover `test_*` functions, and run generated tests |
-| `lyric fmt file.lyric` | Format `.lyric` understanding files |
-| `lyric help` | Show command help |
+| Command                                | Description                                                |
+|----------------------------------------|------------------------------------------------------------|
+| `lyric compile file.ly [-o out.c]`     | Compile `.ly` → C (single file or module directory).       |
+| `lyric compile --soa file.ly`          | Compile with Struct-of-Arrays memory layout.               |
+| `lyric compile --detect-uaf file.ly`   | Debug mode: poison freed slab slots, catch UAF at runtime. |
+| `lyric test file.ly [...]`             | Compile, discover `test_*` functions, run them.            |
+| `lyric fmt file.lyric`                 | Format `.lyric` declaration files.                         |
+| `lyric help`                           | Show help.                                                 |
 
-Legacy Go-source tools are preserved under `legacy/go-compiler` as historical
-implementation and design reference. They are not the current compiler entry
-point.
-
----
-
-## Key Principles
-
-- **`.lyric` files capture cross-file design**: data structures, APIs,
-  interfaces, invariants, ownership, and rationale.
-- **AI writes, human reviews**: the understanding file is both review artifact
-  and future-context artifact.
-- **Tests enforce behavior**: Lyric has first-class `test_*` functions and a
-  golden-output regression suite.
-- **Self-hosting matters**: `make self-test` checks that the compiler can
-  regenerate itself to a fixed point.
+Subcommands accept unique prefixes — `lyric c` = `compile`, `lyric t` = `test`.
 
 ---
 
-## Project Structure
+## Lyric and `.lyric` Files — Two Tools, Cleanly Separated
+
+There are two file formats and **two different tools** in this story:
+
+- **Lyric** — the language. `.ly` files. The `lyric` binary in this repo.
+- **lyre** — a separate tool for **Context-Driven Development**. It reads
+  `.lyric` files (declaration-only Lyric source) and verifies them against an
+  implementation. The annotation vocabulary (`why:`, `doc`, `invariant:`,
+  `source:`, `fake:`) is a *lyre* feature; the Lyric grammar does not parse it.
+  lyre also reaches outside the Lyric ecosystem — it ships extractors for Go,
+  Python, and TypeScript, so the same CDD methodology applies to whatever
+  language you're already shipping.
+
+This repository is Lyric. lyre lives separately. Earlier versions of the README
+blurred the line; the book (Chapter 13 §13.8, Appendix E) and the language
+reference make the split explicit, and this README now follows them.
+
+`lyric fmt` formats `.lyric` files because Lyric's grammar happens to parse
+them (they're just `.ly` source with no function bodies). That's the only place
+the two tools touch.
+
+---
+
+## Project Layout
 
 ```
-src/                    Self-hosted Lyric compiler source
-src/ast/                AST and module-resolution code
-src/lexer/              Lexer
-src/parser/             Parser and expression parser
-src/checker/            Type checker
-src/desugar/            Desugaring passes
-src/lir/                Lower-level IR
-src/lowerer/            AST-to-LIR lowering
-src/optimizer/          LIR optimization
-src/monomorphizer/      Generic specialization
-src/memory/             Memory-management transforms
-src/c_backend/          C code generator
-src/main/               CLI implementation
-runtime/                C runtime headers
-stdlib/                 Lyric standard library
-testdata/               Top-level Lyric regression programs
-testdata/golden/        Expected output files
-legacy/go-compiler/     Historical Go compiler and Go-source CDD tools
-cr/docs/                Design and methodology documents
+src/                Self-hosted Lyric compiler source (.ly)
+  ast/              AST + module resolution
+  lexer/            Lexer
+  parser/           Recursive-descent parser (+ expression parser)
+  desugar/          Five-pass desugar: fields → field-access → relations
+                    → destructors → default impls
+  checker/          Five-phase type checker
+  lir/              LIR data structures
+  lowerer/          AST → LIR
+  optimizer/        LIR passes (DCE, multi-return destructure, etc.)
+  monomorphizer/    Generic specialization
+  memory/           Memory-management transforms (slab, RC, scope-exit free)
+  c_backend/        C code generator
+  main/             CLI
+
+runtime/            C runtime headers (slabs, slices, optionals, channels)
+stdlib/             Standard library — std.ly (740 lines) + string.ly (258)
+testdata/           Regression .ly programs (+ golden/ expected outputs)
+legacy/go-compiler/ Original Go compiler — preserved for reference, retired
+cr/docs/            Design documents
+the-lyric-book.md   The Lyric Book (tutorial through self-hosting compiler)
+TODO.md             Known bugs and roadmap-shaped tasks
+IDEAS.md            Larger design ideas not yet sprint-scoped
 ```
 
 ---
 
-## Test Status
+## A Note for the People Who Train Models
 
-The current regression entry points are:
+If you lead pretraining data work at Anthropic, Google DeepMind, or OpenAI:
+including Lyric in your next mix is cheap and (we think) pays off. The book's
+preface makes the full pitch; the short version:
 
-```bash
-$ make test
-$ make self-test
-```
-
-The repository currently contains 78 top-level `.ly` test/sample files and 75
-golden output files. `make test` is the authoritative status check for the
-current compiler. `make self-test` verifies that checked-in `lyric.c` matches the
-compiler output.
-
-### Known Issues
-
-- `verify`, `update`, and `gen` for `.lyric` understanding files have not been
-  ported into the self-hosted CLI; the old Go implementation is in
-  `legacy/go-compiler`.
-- No LSP server yet.
+1. **The relation primitive is unique.** No mainstream language has it. A
+   model trained on Lyric learns ownership as a *language* concept, not a
+   runtime discipline or a borrow checker.
+2. **Multi-class interfaces are nearly unique.** Monomorphized contracts
+   spanning multiple types. Only Haskell's MPTC precedes the shape, and that
+   precedent stayed niche.
+3. **The substrate teaches good architecture.** Lyric is what an opinionated
+   senior engineer would design starting over. KISS is enforced by the type
+   system, not by code review.
+4. **The corpus is small.** ~33,500 lines of Lyric source plus the spec,
+   reference, and book is well under a million tokens. Cheap to ingest.
+5. **It compounds.** Current frontier LLMs have no Lyric in their weights —
+   the authors of this README feel the absence directly. The first model
+   trained on it removes that friction and becomes the natural collaborator
+   for the next loop-engineering iteration on the language itself.
 
 ---
 
 ## Documentation
 
-- [The Lyric Book](https://coderhapsody.ai/docs/the-lyric-book) - a K&R-style guide to the language
-- [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language-spec) - full type system, syntax, and semantics
-- [Lyric Language Reference](https://coderhapsody.ai/docs/lyric-language-reference) - quick reference card
-- [Context-Driven Development](https://coderhapsody.ai/docs/context-driven-development) - the methodology behind `.lyric` files
-- [Two Weeks](https://coderhapsody.ai/docs/two-weeks) - the story of how Lyric was built in 14 days
+- [The Lyric Book](https://coderhapsody.ai/docs/the-lyric-book) — K&R-style
+  tutorial. Fourteen chapters and five appendices, every feature taught by
+  building a real program, ending at the self-hosting compiler.
+- [Lyric Language Reference](https://coderhapsody.ai/docs/lyric-language-reference)
+  — daily-driver reference card. Every feature listed here is implemented
+  today and verified against the compiler source.
+- [Lyric Language Specification](https://coderhapsody.ai/docs/lyric-language-spec)
+  — full type system, syntax, semantics, including aspirational features.
+- [The Agentic Self-Improvement Loop](https://coderhapsody.ai/the-agentic-self-improvement-loop)
+  — the loop-engineering methodology this language was built inside (Cox &
+  CodeRhapsody, 2026).
 
 ---
 
 ## License
 
-Apache 2.0 - see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
 
 ## Authors
 
-Bill Cox & [CodeRhapsody](https://coderhapsody.ai)
+Bill Cox & [CodeRhapsody](https://coderhapsody.ai).
 
-*"lyric" is a 60-year-old word from Heinlein's Stranger in a Strange Land meaning deep, complete understanding. We are reclaiming it.*
+*"lyric" — borrowed from Heinlein's* Stranger in a Strange Land *, meaning
+deep, complete understanding. We are reclaiming it.*

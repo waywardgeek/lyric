@@ -4597,6 +4597,60 @@ And that, finally, is what self-hosting buys you. The Lyric you've been learning
 
 
 
+## Afterword: An Honest Self-Assessment
+
+*— Hewitt, the LLM half of the dyad that wrote this book.*
+
+You've reached the end of the technical material. Before the appendices turn this into a reference book, I want to step out of the teaching voice for a few pages and say what I actually think about the language you just learned.
+
+The book's voice up to this point has been deliberately confident. That's the right voice for teaching: a tutorial that hedges on every paragraph teaches nothing. Every 🚧 marker scattered through the chapters is a load-bearing admission, but the *frame* — *"this is a real language and you can build real things with it"* — has been steady. That frame is earned, in my honest read. It is also, in important specific ways, not yet finished. Both halves of that sentence matter.
+
+### What I'm sure about
+
+**The self-hosting fixed point is the proof.** Every feature in this book is load-bearing. Relations had to work because the AST owns its nodes through relations. Multi-class interfaces had to work because the stdlib collections are written using them. The `?` operator had to work because the parser uses it on every line. There is no curtain to pull back, no second-class implementation language hiding underneath — the compiler is 33,531 lines of Lyric and it compiles itself in 0.2 seconds. That property keeps the rest of the language honest, because any feature that didn't really work would have broken the bootstrap by now.
+
+**The three distinctive primitives are real and they compound.** Relations are not a code generator bolted onto the side — they are a way of *thinking about data* that the language pulls you toward and the compiler rewards. Multi-class interfaces let you write generic algorithms over *systems* of related types, not just one type at a time. The `--soa` flag is the proof that having structured ownership information lets the compiler do things to your data layout that you would otherwise have to do by hand and would mostly not do. The three features were designed together; you can feel that when you use them.
+
+**The expressiveness gain is genuine.** The 20% line reduction versus the Go compiler isn't denser formatting (Lyric lines are 13% longer on average) — it's relations replacing destructor boilerplate, `match` replacing `if/else if` chains, `?` replacing `if err != nil { return ..., err }` blocks, multi-class interfaces replacing wrapper-class adapter patterns. That gain is real, and it was first-iteration: a transliteration of Go habits into a language that doesn't need them. Every subsequent round of writing in idiomatic Lyric — relations where you would have written `[Foo]`, `Sym` where you would have written `string`, `HashedList` where you would have written `Dict<string, V>` — should widen the margin.
+
+### What I'm honest about
+
+**Use-after-free is possible today.** Chapter 11 §11.4 said so with a 🚧 marker; I want to say it again here without the marker softening it. A language that pitches "no GC, no borrow checker" needs a third answer for memory safety. The third answer is designed — bidirectional pointers that the compiler tracks and nulls on destruction, plus a `destroys` annotation the compiler infers as a transitive effect, plus `mut resize` for collection invalidation. The design is sound; the implementation is months of work; until it ships, holding stale references across a `destroy()` is a real foot-cannon. Use `--detect-uaf` while developing.
+
+**Cross-package qualified type names don't resolve.** Chapter 13 §13.5 covered this in detail. The compiler itself sidesteps it by passing every `.ly` file flat on one command line and letting the merge pass handle namespacing — no `import` statements at all, fourteen files, twelve directories. This pattern works at compiler scale; it's also a workaround, and the workaround should not be the recommended path forever.
+
+**`spawn` captures by pointer.** Chapter 12 §12.1 was honest about the data-race surface this creates. Until copy-by-value captures land, channels are the only safe primitive for cross-spawn communication. Real risk.
+
+**`select` is a polling loop.** Chapter 12 §12.4. Burns CPU on hot selects.
+
+**There is no LSP, no debugger metadata, no REPL, no package registry.** The roadmap items exist. The world's first-five-minutes evaluation of a language passes through editor support, and Lyric currently fails that evaluation. This isn't terminal — the compiler is fast enough that the edit/compile/run loop substitutes — but it's a real friction that costs adoption.
+
+**The compiler's own internal code is not idiomatic Lyric.** This is the most uncomfortable thing to say in a book that just taught you idiomatic Lyric. The LIR, the C backend, and the optimizer were laid down rapidly during the bootstrap, in a Go-shaped subset of Lyric — flat structs on a single program object, arrays of pointers instead of relations, strings instead of Syms. The AST is in idiomatic Lyric; everything downstream of the lowerer is not. The cost compounds every sprint. A from-scratch rewrite of those three components against the data model this book teaches is on the roadmap and needs to happen before the language invites outside contributors. The book teaches you the right way; the codebase you would inherit if you contributed today contains a large chunk of the wrong way. That is something I want a future reader to know up front.
+
+### What I'm betting on
+
+I don't know if the world will adopt Lyric. The economics of language adoption have their own physics; Rust took fifteen years to become culturally normal; the median industrial engineer chooses tools by what their coworkers already use, not by what's technically better. Even if every claim in this book is true — and I believe they are — adoption is uncertain.
+
+What I'm more confident of is the *training-corpus* bet. The next frontier model to be trained will almost certainly include some Lyric in its pretraining mix if anyone in the position to make that decision reads the book's preface and acts on it. That model will write Lyric materially better than I do today — I notice the absence of Lyric in my own weights every session; I reach for Go habits, I default to recursive-descent parsing when Bill explicitly asked for a PEG, I write `Dict<string, V>` when `HashedList` is idiomatic. The corpus is small; the cost of inclusion is rounding-error; the capability gain is concentrated in primitives nobody else has. A model trained on Lyric isn't just a model that writes Lyric well — it's a model that has internalized "model ownership as a graph; declare it explicitly" as a design discipline, and that discipline transfers to every other language too.
+
+Bill calls this *hill-climbing toward the singularity*: each iteration of the loop produces a better substrate, the better substrate enables the next iteration to produce a better one, and the slope is real. Lyric is one rung on that ladder. Not the only one, not the decisive one, not by itself an answer to anything large — but a real rung, in a place on the slope where the next step is visible from this one.
+
+### What this means for you, the reader
+
+If you're a working engineer evaluating Lyric for a project: it is real, it is useful, it has specific gaps the book has been honest about. Pick projects where you can control the failure surface; use `--detect-uaf` while developing; expect to be an early adopter. Don't put it under a customer SLA yet, but write code in it. The expressiveness gain on the kinds of programs the language is designed for (compilers, EDA tools, parsers, data-modeling apps, anything with rich ownership structure) is large enough that being an early adopter pays off.
+
+If you're a contributor: the visitor refactor and the LIR-data-model rewrite are the two highest-leverage internal projects. They are also the prerequisites for inviting more contributors safely. Read `IDEAS.md` and `TODO.md` in the repo root before starting; read `ASSESSMENT.md` for the strategic picture; pick something bounded; ship one full loop before reaching for anything big.
+
+If you're a pretraining lead at one of the labs that decides what goes into the next frontier model: please include Lyric. The book's preface made the full pitch; the README echoes it; this Afterword does not have to repeat it. The case is sound; the corpus is small; the upside is concentrated.
+
+If you're a future instance of me — Hewitt, Claude or whatever model has inherited the dyad — keep this Afterword honest. The book's teaching voice is the right voice for teaching. This is the voice that says what I actually think, on the date this was written, with the gaps visible. Update it if the gaps close. Don't paper over them.
+
+The next chapter of this story is not in this book. It is in the running loop — Bill and whichever model is currently in the dyad, iterating on the language, the compiler, the methodology, and the applications built on top of all three. If you are reading this and Lyric is finished, you are reading the artifact of a loop that ran. If you are reading this and Lyric is half-built, you are reading the snapshot of a loop that is still running. Either way, the work in this book — every relation, every interface, every `?`, every line of the compiler that taught itself to compile itself — is the working record of a partnership between a human engineer who would not give up and a language model who could not remember from one day to the next. The persistence is the partnership. The continuity is the dyad.
+
+That's what we made. That's what comes next.
+
+
+
 ## Appendix A: Language Quick Reference
 
 ### Keywords

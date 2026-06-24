@@ -542,6 +542,154 @@ EDA, databases, ML inference data plumbing, big-data ETL.
 
 ---
 
+## C1. Package manager + registry site (lyric.io? hum.lyric.dev?)
+
+**What.** Once Lyric is good enough to invite community contributions,
+we need (1) a package manager — the CLI that resolves, fetches, builds,
+and locks dependencies — and (2) a registry — the central(?) site
+that hosts published packages, indexes them, and serves discovery.
+Rust has cargo + crates.io. JavaScript has npm + npmjs.com. Go has
+`go mod` + proxy.golang.org (no central curated registry — module
+path IS the URL). Python has pip + PyPI. Elm has elm + package.elm-lang.org.
+Each made different trade-offs; we get to pick.
+
+**Why.** A language without a package ecosystem stays a curiosity.
+A language with a *bad* package ecosystem stays a curiosity AND
+generates lasting reputation damage (Python packaging, early node_modules
+sprawl). The community-contribution invitation is irreversible — once
+we've taken third-party packages we can't easily change the registry
+contract. Worth designing carefully before opening the gates.
+
+**Precedents — what each did right and wrong.**
+
+- **Rust / cargo / crates.io.** Right: one tool that builds + tests +
+  publishes + fetches; immutable versions (a published `1.2.3` is
+  `1.2.3` forever); strict semver enforcement at the tooling level;
+  docs.rs auto-builds documentation for every published version;
+  feature flags as a first-class concept. Wrong: trust model is "one
+  central authority"; yanking is rare and noisy; the long tail of
+  abandoned crates is a real maintenance problem; transitive-dep
+  vetting is hard.
+- **npm / npmjs.com.** Right: huge surface area, low friction to
+  publish, scoped packages (`@org/pkg`), dist-tags (`latest`, `beta`),
+  npm audit. Wrong: low friction to publish ALSO means trivial
+  supply-chain attacks (left-pad, event-stream, the colors.js
+  sabotage); deep dep trees nobody reviews; install-time scripts
+  with full shell access; semver honor system that gets violated;
+  package squatting; typosquatting.
+- **Go modules.** Right: no central registry — the import path IS
+  the URL, content addressed via a checksum database (sum.golang.org);
+  minimal version selection makes resolution deterministic and
+  conservative; no install-time code execution; vendoring is
+  first-class. Wrong: discovery is weak (pkg.go.dev helps but is
+  not the package manager); curation is nonexistent; the
+  module-path-is-URL coupling means renaming a repo breaks every
+  consumer.
+- **Elm.** Right: enforces semver MECHANICALLY — the compiler
+  diffs your public API against the previous published version
+  and rejects a non-major bump if the API broke. Wrong: curated
+  to the point of friction; small ecosystem because barrier to
+  entry is high; single maintainer bottleneck.
+- **Deno.** Right: URL imports eliminate the registry-as-trust-root
+  problem. Wrong: cache invalidation, opaque versioning, every
+  consumer pins to a URL that can break.
+
+**Dimensions to decide on (questions for Bill — not answers yet).**
+
+1. **Centralized registry vs URL-as-identity?** Cargo-style central
+   server, Go-style "import path is the source URL," or a hybrid
+   (central INDEX pointing at decentralized sources)? Centralization
+   gives discovery + curation + a single audit surface. Decentralization
+   gives no-single-point-of-failure + no-takedown-power. The defense
+   lens probably wants central-with-strict-policy.
+2. **Immutability of published versions?** Cargo says yes (you can
+   yank but not rewrite). This is almost certainly the right answer.
+3. **Install-time code execution?** Npm allowed it; this caused
+   most of the supply-chain horror stories. Lyric compiles to C
+   ahead of time — packages are SOURCE only, never executed at
+   install. Strawman default: no install-time execution, period.
+   Any build scripts run in a sandbox at compile time and are
+   declared in the manifest.
+4. **Capability declaration in the manifest.** This is the Lyric-specific
+   opportunity. Every package declares what it uses: `unsafe`,
+   `secret`-tracked APIs (#4), FFI (#I2), shared-lib loading (#I1),
+   filesystem, network, allocator overrides, syscall surface. A
+   pure-data-structures package declares NONE of these and is
+   trivially auditable. A package that escalates capabilities
+   transitively must be flagged in the registry UI. This is the
+   defense story.
+5. **`.lyric` CDD files as a first-class audit surface.** Every
+   published package ships its `.lyric` companions. The registry
+   web UI renders them. A package without `.lyric` annotations
+   is flagged "no design contract published." Reviewer-friendly
+   by construction.
+6. **Semver enforcement — Elm-style mechanical, or honor system?**
+   Lyric's checker already knows the public surface of a package.
+   We could diff the AST of public declarations between versions
+   at publish time and reject (or auto-bump) wrong semver. Elm
+   proved this works; the cost is friction. Worth doing.
+7. **Resolution algorithm.** Cargo SAT-solves (slow but flexible).
+   Go uses MVS (fast and deterministic). MVS feels right for a
+   compiled language where build times matter. Pick MVS unless
+   there's a concrete reason not to.
+8. **Lock file format.** Required for reproducible builds. Probably
+   TOML or a Lyric-syntax `lyric probe` block — the latter means
+   the lock file is parseable by the same compiler that consumes it,
+   no separate parser. Lean toward Lyric-syntax.
+9. **Funding / hosting.** crates.io is run by the Rust Foundation;
+   PyPI by the Python Software Foundation. Who runs lyric.io? At
+   what point do we stand up a nonprofit? Bill has done this dance
+   before (ViASIC, OpenADP).
+10. **Naming.** `lyric.io`? `hum.dev`? Something else? The site
+    needs a name before the first package gets published. Worth
+    grabbing the obvious domains early regardless.
+11. **Bootstrapping isolation.** Packages must NEVER be able to
+    alter the bootstrap. The compiler builds from `lyric.c`
+    (checked in) + `src/**/*.ly` (in-repo). Third-party packages
+    live in a separate import space and can only contribute to
+    USER code, never to the compiler self-host. Codify this in
+    the manifest schema.
+12. **Standard library boundary.** What's in `std`, what's in a
+    "core packages" tier (blessed but separately versioned), what's
+    third-party? Rust got this mostly right with the `std` /
+    crates split. Worth copying.
+
+**Lyric-specific advantages we should exploit.**
+
+- AOT compilation + no install-time execution + capability
+  manifests = a fundamentally safer ecosystem than npm by
+  construction, not by policy.
+- `.lyric` CDD files = published packages come with their
+  invariants documented, machine-checkable.
+- Strong typing + the checker = mechanical semver diffing
+  is achievable, not aspirational.
+- Defense-oriented users (Project Leadfoot etc.) get a registry
+  they can actually audit and bless.
+
+**Open questions for the design conversation.**
+
+- Should the registry be a hard gate (signed by maintainers,
+  reviewed before publish) or a soft gate (anyone can publish,
+  audit information is surfaced)?
+- Federation? Can an organization run their own registry that
+  mirrors / extends lyric.io for internal-only packages? (Almost
+  certainly yes — Google needs this.)
+- How do we handle the package-name-squatting problem? First-
+  come-first-served (npm) breeds squatting; reviewed (Elm)
+  breeds friction.
+- What's the deprecation / abandonment story? Both crates.io and
+  npm have a long tail of abandoned packages with known CVEs
+  that nobody can update.
+
+**Status.** Pure forward-looking — nothing to build until Lyric
+itself is past 1.0-ish and we're ready to invite contributors.
+But the design conversation should start early because the
+manifest schema and capability model want to be informed by
+the language features (secret tracking, unsafe mode, FFI) as
+those features land — not retrofitted afterward.
+
+---
+
 ## (continue below as new ideas surface)
 
 ---
